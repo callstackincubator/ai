@@ -36,7 +36,9 @@ const Ai = AiModule
 
 export default Ai;
 
-export interface AiModelSettings extends Record<string, unknown> {}
+export interface AiModelSettings extends Record<string, unknown> {
+  model_id?: string;
+}
 
 export interface Model {
   modelId: string;
@@ -209,6 +211,10 @@ type ModelOptions = {};
 
 export function getModel(modelId: string, options: ModelOptions = {}): AiModel {
   return new AiModel(modelId, options);
+}
+
+export function getModels(): AiModelSettings[] {
+  return Ai.getModels();
 }
 
 const { doGenerate, doStream } = Ai;

@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { GiftedChat, type IMessage } from 'react-native-gifted-chat';
-import { getModel } from 'react-native-ai';
+import { getModel, type AiModelSettings } from 'react-native-ai';
 import { generateText } from 'ai';
 import { v4 as uuid } from 'uuid';
 import NetworkInfo from './NetworkInfo';
-
-const modelId = 'Phi-3-mini-4k-instruct-q4f16_1-MLC';
+import { ModelSelection } from './ModelSelection';
 
 const aiBot = {
   _id: 2,
@@ -15,44 +14,66 @@ const aiBot = {
 };
 
 export default function Example() {
-  const [messages, setMessages] = useState<IMessage[]>([
-    {
-      _id: uuid(),
-      text: 'Hello! How can I help you today?',
-      createdAt: new Date(),
-      user: aiBot,
+  const [modelId, setModelId] = useState<string>();
+  const [messages, setMessages] = useState<IMessage[]>([]);
+
+  const onSendMessage = useCallback(
+    async (prompt: string) => {
+      console.log('MODEL: ', modelId);
+      if (modelId) {
+        console.log('Working on it!');
+        const { text } = await generateText({
+          model: getModel(modelId),
+          prompt,
+        });
+
+        setMessages((previousMessages) =>
+          GiftedChat.append(previousMessages, {
+            // @ts-ignore
+            _id: uuid(),
+            text,
+            createdAt: new Date(),
+            user: aiBot,
+          })
+        );
+      }
     },
-  ]);
+    [modelId]
+  );
 
-  const onSendMessage = async (prompt: string) => {
-    const { text } = await generateText({
-      model: getModel(modelId),
-      prompt,
-    });
+  const selectModel = useCallback((modelSettings: AiModelSettings) => {
+    if (modelSettings.model_id) {
+      setModelId(modelSettings.model_id);
+      setMessages((previousMessages) =>
+        GiftedChat.append(previousMessages, {
+          // @ts-ignore
+          _id: uuid(),
+          text: 'Model ready for conversation.',
+          createdAt: new Date(),
+          user: aiBot,
+        })
+      );
+    }
+  }, []);
 
-    setMessages((previousMessages) =>
-      GiftedChat.append(previousMessages, {
-        // @ts-ignore
-        _id: uuid(),
-        text,
-        createdAt: new Date(),
-        user: aiBot,
-      })
-    );
-  };
+  const onSend = useCallback(
+    (newMessage: IMessage[]) => {
+      setMessages((previousMessages) =>
+        GiftedChat.append(previousMessages, newMessage)
+      );
+
+      onSendMessage(newMessage[0]!.text);
+    },
+    [onSendMessage]
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <NetworkInfo />
+      <ModelSelection onModelIdSelected={selectModel} />
       <GiftedChat
         messages={messages}
-        onSend={(newMessage) => {
-          setMessages((previousMessages) =>
-            GiftedChat.append(previousMessages, newMessage)
-          );
-
-          onSendMessage(newMessage[0]!.text);
-        }}
+        onSend={onSend}
         user={{
           _id: 1,
         }}

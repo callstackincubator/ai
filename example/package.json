@@ -14,10 +14,12 @@
     "@react-native-community/netinfo": "^11.3.2",
     "@types/uuid": "^10.0.0",
     "ai": "^3.2.15",
+    "eventsource-parser": "^3.0.0",
     "react": "18.2.0",
     "react-native": "0.74.2",
     "react-native-get-random-values": "^1.11.0",
     "react-native-gifted-chat": "^2.4.0",
+    "react-native-select-dropdown": "^4.0.1",
     "text-encoding": "^0.7.0",
     "uuid": "^10.0.0",
     "zod": "^3.23.8"
