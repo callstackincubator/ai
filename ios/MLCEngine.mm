@@ -20,32 +20,32 @@
 @implementation MLCEngine
 
 - (instancetype)init {
-  self = [super init];
-  if (self) {
-    _state = [[EngineState alloc] init];
-    _jsonFFIEngine = [[JSONFFIEngine alloc] init];
-    _threads = [NSMutableArray array];
+    self = [super init];
+    if (self) {
+        _state = [[EngineState alloc] init];
+        _jsonFFIEngine = [[JSONFFIEngine alloc] init];
+        _threads = [NSMutableArray array];
 
-    [_jsonFFIEngine initBackgroundEngine:^(NSString* _Nullable result) {
-      [self.state streamCallbackWithResult:result];
-    }];
+        [_jsonFFIEngine initBackgroundEngine:^(NSString * _Nullable result) {
+            [self.state streamCallbackWithResult:result];
+        }];
 
-    BackgroundWorker* backgroundWorker = [[BackgroundWorker alloc] initWithTask:^{
-      [NSThread setThreadPriority:1.0];
-      [self.jsonFFIEngine runBackgroundLoop];
-    }];
+        BackgroundWorker *backgroundWorker = [[BackgroundWorker alloc] initWithTask:^{
+            [NSThread setThreadPriority:1.0];
+            [self.jsonFFIEngine runBackgroundLoop];
+        }];
 
-    BackgroundWorker* backgroundStreamBackWorker = [[BackgroundWorker alloc] initWithTask:^{
-      [self.jsonFFIEngine runBackgroundStreamBackLoop];
-    }];
+        BackgroundWorker *backgroundStreamBackWorker = [[BackgroundWorker alloc] initWithTask:^{
+            [self.jsonFFIEngine runBackgroundStreamBackLoop];
+        }];
 
-    backgroundWorker.qualityOfService = NSQualityOfServiceUserInteractive;
-    [_threads addObject:backgroundWorker];
-    [_threads addObject:backgroundStreamBackWorker];
-    [backgroundWorker start];
-    [backgroundStreamBackWorker start];
-  }
-  return self;
+        backgroundWorker.qualityOfService = NSQualityOfServiceUserInteractive;
+        [_threads addObject:backgroundWorker];
+        [_threads addObject:backgroundStreamBackWorker];
+        [backgroundWorker start];
+        [backgroundStreamBackWorker start];
+    }
+    return self;
 }
 
 - (void)dealloc {
@@ -66,9 +66,13 @@
   [self.jsonFFIEngine unload];
 }
 
-- (void)chatCompletionWithMessages:(NSArray*)messages completion:(void (^)(NSString* response))completion {
-  NSDictionary* request = @{@"messages" : messages};
-  [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine request:request completion:completion];
+- (void)chatCompletionWithMessages:(NSArray *)messages
+                        completion:(void (^)(NSString *response))completion {
+    NSDictionary *request = @{@"messages": messages, @"temperature": @0.6};
+
+    [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine
+                                        request:request
+                                     completion:completion];
 }
 
 @end
