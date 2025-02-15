@@ -16,11 +16,11 @@ on:
 
 jobs:
   CLang-Format:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install clang-format
-        run: sudo apt-get install clang-format
+        run: brew install clang-format
       - name: Check ios clang formatting
         run: |
           find ios -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.m" -o -name "*.mm" \) -print0 | while read -d $'\0' file; do
