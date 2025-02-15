@@ -20,9 +20,8 @@ jobs:
       - run: |
           curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.0.1/ktlint && chmod a+x ktlint && sudo mv ktlint /usr/local/bin/
       - name: run ktlint
-        working-directory: ./android/
         run: |
-          ktlint --reporter=checkstyle,output=build/ktlint-report.xml --relative --editorconfig=./.editorconfig
+          ./scripts/format-android.sh
         continue-on-error: true
       - uses: yutailang0119/action-ktlint@v3
         with:

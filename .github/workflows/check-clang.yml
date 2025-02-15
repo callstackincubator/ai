@@ -23,9 +23,6 @@ jobs:
         run: brew install clang-format
       - name: Check ios clang formatting
         run: |
-          find ios -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.m" -o -name "*.mm" \) -print0 | while read -d $'\0' file; do
-            clang-format -style=file:./ios/.clang-format -i "$file"
-          done
-        shell: bash
+          ./scripts/format-ios.sh
       - name: Check for changes
         run: git diff --exit-code HEAD
