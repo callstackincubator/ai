@@ -13,12 +13,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)init;
 
-- (void)reloadWithModelPath:(NSString *)modelPath modelLib:(NSString *)modelLib;
+- (void)reloadWithModelPath:(NSString*)modelPath modelLib:(NSString*)modelLib;
 - (void)reset;
 - (void)unload;
 
-- (void)chatCompletionWithMessages:(NSArray *)messages
-                        completion:(void (^)(id response))completion;
+- (void)chatCompletionWithMessages:(NSArray*)messages completion:(void (^)(id response))completion;
 @end
 
 NS_ASSUME_NONNULL_END

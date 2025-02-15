@@ -1,15 +1,12 @@
 package com.ai
 
+import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
-import com.facebook.react.bridge.Promise
 
-class AiModule internal constructor(context: ReactApplicationContext) :
-  AiSpec(context) {
+class AiModule internal constructor(context: ReactApplicationContext) : AiSpec(context) {
 
-  override fun getName(): String {
-    return NAME
-  }
+  override fun getName(): String = NAME
 
   // Example method
   // See https://reactnative.dev/docs/native-modules-android
