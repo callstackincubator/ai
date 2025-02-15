@@ -80,9 +80,8 @@ class AiModel implements LanguageModelV1 {
     };
   }> {
     const model = await this.getModel();
-    console.log({ model });
-
     const message =
+      // @ts-ignore
       options.prompt[options.prompt.length - 1]!.content[0]!.text!;
     console.log({ message });
 
@@ -120,9 +119,9 @@ class AiModel implements LanguageModelV1 {
   }> => {
     console.debug('stream options:', options);
 
-    const model = await this.getModel();
-    const message =
-      options.prompt[options.prompt.length - 1]!.content[0]!.text!;
+    // const model = await this.getModel();
+    // const message =
+    //   options.prompt[options.prompt.length - 1]!.content[0]!.text!;
 
     const eventEmitter = new NativeEventEmitter(NativeModules.Ai);
     eventEmitter.addListener('onChatUpdate', (data) => {
@@ -162,7 +161,7 @@ class AiModel implements LanguageModelV1 {
     //   },
     // });
 
-    Ai.doStream(model.modelId, message);
+    // Ai.doStream(model.modelId, message);
 
     // const stream = new ReadableStream({
     //   start: (controller) => {
@@ -199,7 +198,9 @@ class AiModel implements LanguageModelV1 {
     // TODO: how to convert event emitter to stream
 
     return {
-      stream: [],
+      stream: new ReadableStream({
+        start: () => {},
+      }),
       rawCall: { rawPrompt: options.prompt, rawSettings: this.options },
     };
   };
