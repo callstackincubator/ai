@@ -198,34 +198,32 @@ RCT_EXPORT_METHOD(getModel : (NSString*)name resolve : (RCTPromiseResolveBlock)r
   resolve(modelInfo);
 }
 
-RCT_EXPORT_METHOD(getModels:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
-{
-    _bundleURL = [[[NSBundle mainBundle] bundleURL] URLByAppendingPathComponent:@"bundle"];
-    NSURL *configURL = [_bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
+RCT_EXPORT_METHOD(getModels : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject) {
+  _bundleURL = [[[NSBundle mainBundle] bundleURL] URLByAppendingPathComponent:@"bundle"];
+  NSURL* configURL = [_bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
 
-    // Read and parse JSON
-    NSData *jsonData = [NSData dataWithContentsOfURL:configURL];
-    if (!jsonData) {
-        reject(@"error", @"Failed to read JSON data", nil);
-        return;
-    }
+  // Read and parse JSON
+  NSData* jsonData = [NSData dataWithContentsOfURL:configURL];
+  if (!jsonData) {
+    reject(@"error", @"Failed to read JSON data", nil);
+    return;
+  }
 
-    NSError *error;
-    NSDictionary *jsonDict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+  NSError* error;
+  NSDictionary* jsonDict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
 
-    if (error || ![jsonDict isKindOfClass:[NSDictionary class]]) {
-        reject(@"error", @"Failed to parse JSON", error);
-        return;
-    }
+  if (error || ![jsonDict isKindOfClass:[NSDictionary class]]) {
+    reject(@"error", @"Failed to parse JSON", error);
+    return;
+  }
 
-    NSArray *modelList = jsonDict[@"model_list"];
-    if (![modelList isKindOfClass:[NSArray class]]) {
-        reject(@"error", @"model_list is missing or invalid", nil);
-        return;
-    }
-    NSLog(@"models: %@", modelList);
-    resolve(modelList);
+  NSArray* modelList = jsonDict[@"model_list"];
+  if (![modelList isKindOfClass:[NSArray class]]) {
+    reject(@"error", @"model_list is missing or invalid", nil);
+    return;
+  }
+  NSLog(@"models: %@", modelList);
+  resolve(modelList);
 }
 
 // Don't compile this code when we build for the old architecture.
