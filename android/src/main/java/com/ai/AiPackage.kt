@@ -22,12 +22,18 @@ class AiPackage : TurboReactPackage() {
       moduleInfos[AiModule.NAME] = ReactModuleInfo(
         AiModule.NAME,
         AiModule.NAME,
-        false, // canOverrideExistingModule
-        false, // needsEagerInit
-        true, // hasConstants
-        false, // isCxxModule
-        isTurboModule // isTurboModule
+        // canOverrideExistingModule
+        false,
+        // needsEagerInit
+        false,
+        // hasConstants
+        true,
+        // isCxxModule
+        false,
+        // isTurboModule
+        isTurboModule
       )
+
       moduleInfos
     }
 }
