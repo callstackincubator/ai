@@ -8,21 +8,21 @@
 #import "BackgroundWorker.h"
 
 @implementation BackgroundWorker {
-    void (^_task)(void);
+  void (^_task)(void);
 }
 
 - (instancetype)initWithTask:(void (^)(void))task {
-    self = [super init];
-    if (self) {
-        _task = [task copy];
-    }
-    return self;
+  self = [super init];
+  if (self) {
+    _task = [task copy];
+  }
+  return self;
 }
 
 - (void)main {
-    if (_task) {
-        _task();
-    }
+  if (_task) {
+    _task();
+  }
 }
 
 @end

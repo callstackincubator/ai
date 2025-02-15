@@ -47,8 +47,7 @@ using namespace tvm::runtime;
     chat_completion_func_ = json_ffi_engine_->GetFunction("chat_completion");
     abort_func_ = json_ffi_engine_->GetFunction("abort");
     run_background_loop_func_ = json_ffi_engine_->GetFunction("run_background_loop");
-    run_background_stream_back_loop_func_ =
-        json_ffi_engine_->GetFunction("run_background_stream_back_loop");
+    run_background_stream_back_loop_func_ = json_ffi_engine_->GetFunction("run_background_stream_back_loop");
     exit_background_loop_func_ = json_ffi_engine_->GetFunction("exit_background_loop");
 
     ICHECK(init_background_engine_func_ != nullptr);
@@ -65,9 +64,8 @@ using namespace tvm::runtime;
 }
 
 - (void)initBackgroundEngine:(void (^)(NSString*))streamCallback {
-  TypedPackedFunc<void(String)> internal_stream_callback([streamCallback](String value) {
-    streamCallback([NSString stringWithUTF8String:value.c_str()]);
-  });
+  TypedPackedFunc<void(String)> internal_stream_callback(
+      [streamCallback](String value) { streamCallback([NSString stringWithUTF8String:value.c_str()]); });
   int device_type = kDLMetal;
   int device_id = 0;
   init_background_engine_func_(device_type, device_id, internal_stream_callback);
