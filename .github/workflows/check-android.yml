@@ -3,7 +3,7 @@ name: Check Android
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - '.github/workflows/check-android.yml'
       - 'android/**'

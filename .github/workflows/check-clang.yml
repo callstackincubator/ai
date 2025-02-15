@@ -3,13 +3,13 @@ name: Check CLang
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - '.github/workflows/check-clang.yml'
       - 'ios/**'
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - '.github/workflows/check-clang.yml'
       - 'ios/**'
