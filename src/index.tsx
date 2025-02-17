@@ -80,15 +80,31 @@ class AiModel implements LanguageModelV1 {
     };
   }> {
     const model = await this.getModel();
-    const message =
-      // @ts-ignore
-      options.prompt[options.prompt.length - 1]!.content[0]!.text!;
-    console.log({ message });
+
+    const messages = options.prompt;
+    const extractedMessages = messages.map((message) => {
+      let content = '';
+
+      if (Array.isArray(message.content)) {
+        content = message.content
+          .map((messageContent) =>
+            messageContent.type === 'text'
+              ? messageContent.text
+              : messageContent
+          )
+          .join('');
+      }
+
+      return {
+        role: message.role,
+        content: content,
+      };
+    });
 
     let text = '';
 
-    if (message.trim().length > 0) {
-      text = await Ai.doGenerate(model, message);
+    if (messages.length > 0) {
+      text = await Ai.doGenerate(model, extractedMessages);
     }
 
     return {

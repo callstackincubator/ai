@@ -87,9 +87,9 @@ RCT_EXPORT_MODULE()
   return nil;
 }
 
-RCT_EXPORT_METHOD(doGenerate : (NSString*)instanceId text : (NSString*)text resolve : (RCTPromiseResolveBlock)
+RCT_EXPORT_METHOD(doGenerate : (NSString*)instanceId messages : (NSArray<NSDictionary*>*)messages resolve : (RCTPromiseResolveBlock)
                       resolve reject : (RCTPromiseRejectBlock)reject) {
-  NSLog(@"Generating for instance ID: %@, with text: %@", instanceId, text);
+  NSLog(@"Generating for instance ID: %@, with text: %@", instanceId, messages);
   _displayText = @"";
   __block BOOL hasResolved = NO;
 
@@ -99,9 +99,7 @@ RCT_EXPORT_METHOD(doGenerate : (NSString*)instanceId text : (NSString*)text reso
 
     [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
 
-    NSDictionary* message = @{@"role" : @"user", @"content" : text};
-
-    [self.engine chatCompletionWithMessages:@[ message ]
+    [self.engine chatCompletionWithMessages:messages
                                  completion:^(id response) {
                                    if ([response isKindOfClass:[NSString class]]) {
                                      NSDictionary* parsedResponse = [self parseResponseString:response];

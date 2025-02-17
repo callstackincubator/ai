@@ -67,7 +67,8 @@
 }
 
 - (void)chatCompletionWithMessages:(NSArray*)messages completion:(void (^)(NSString* response))completion {
-  NSDictionary* request = @{@"messages" : messages};
+  NSDictionary* request = @{@"messages" : messages, @"temperature" : @0.6};
+
   [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine request:request completion:completion];
 }
 
