@@ -86,6 +86,9 @@ jobs:
         run: |
           /bin/bash -c "yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null"
 
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > example/android/local.properties
+
       - name: Cache Gradle
         if: env.turbo_cache_hit != 1
         uses: actions/cache@v4
