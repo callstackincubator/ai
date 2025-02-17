@@ -6,5 +6,8 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 
 abstract class AiSpec internal constructor(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
 
-  abstract fun multiply(a: Double, b: Double, promise: Promise)
+  abstract fun getModel(name: String, promise: Promise)
+  abstract fun getModels(promise: Promise)
+  abstract fun doGenerate(a: Double, b: Double, promise: Promise)
+  abstract fun doStream(a: Double, b: Double, promise: Promise)
 }
