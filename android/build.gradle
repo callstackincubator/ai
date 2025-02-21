@@ -114,6 +114,8 @@ dependencies {
   //noinspection GradleDynamicVersion
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+  implementation 'com.google.code.gson:gson:2.10.1'
+  implementation project(":mlc4j")
 }
 
 if (isNewArchitectureEnabled()) {
