@@ -3,9 +3,11 @@ package com.ai
 import ai.mlc.mlcllm.MLCEngine
 import ai.mlc.mlcllm.OpenAIProtocol
 import ai.mlc.mlcllm.OpenAIProtocol.ChatCompletionMessage
+import android.graphics.ColorSpace.Model
 import android.os.Environment
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.runtime.mutableIntStateOf
 import com.facebook.react.bridge.*
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.turbomodule.core.interfaces.TurboModule
@@ -49,9 +51,9 @@ class AiModule(reactContext: ReactApplicationContext) :
     emptyList<ModelRecord>().toMutableList()
   )
   private val gson = Gson()
+  private lateinit var chat: Chat
 
-  @ReactMethod
-  fun getModel(name: String, promise: Promise) {
+  private fun getAppConfig(): AppConfig {
     val appConfigFile = File(reactApplicationContext.applicationContext.getExternalFilesDir(""), AppConfigFilename)
 
     val jsonString: String = if (appConfigFile.exists()) {
@@ -60,7 +62,26 @@ class AiModule(reactContext: ReactApplicationContext) :
       reactApplicationContext.applicationContext.assets.open(AppConfigFilename).bufferedReader().use { it.readText() }
     }
 
-    appConfig = gson.fromJson(jsonString, AppConfig::class.java)
+    return gson.fromJson(jsonString, AppConfig::class.java)
+  }
+
+  private fun getModelConfig(modelRecord: ModelRecord): ModelConfig {
+    val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.modelId)
+    val modelConfigFile = File(modelDirFile, ModelConfigFilename)
+
+    val jsonString: String = if (modelConfigFile.exists()) {
+      modelConfigFile.readText()
+    } else {
+      throw Error("Requested model config not found")
+    }
+
+    return gson.fromJson(jsonString, ModelConfig::class.java)
+  }
+
+  @ReactMethod
+  fun getModel(name: String, promise: Promise) {
+    appConfig = getAppConfig()
+
     val modelConfig = appConfig.modelList.find { modelRecord -> modelRecord.modelId == name }
 
     if (modelConfig == null) {
@@ -68,10 +89,10 @@ class AiModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    downloadModelConfig(modelConfig)
     // Return a JSON object with details
-    val modelConfigInstance = JSONObject().apply {
-      put("model_id", modelConfig.modelId)
+    val modelConfigInstance = Arguments.createMap().apply {
+      putString("modelId", modelConfig.modelId)
+      putString("modelLib", modelConfig.modelLib) // Add more fields if needed
     }
 
     promise.resolve(modelConfigInstance)
@@ -80,15 +101,7 @@ class AiModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun getModels(promise: Promise) {
     try {
-      val appConfigFile = File(reactApplicationContext.applicationContext.getExternalFilesDir(""), AppConfigFilename)
-
-      val jsonString: String = if (appConfigFile.exists()) {
-        appConfigFile.readText()
-      } else {
-        reactApplicationContext.applicationContext.assets.open(AppConfigFilename).bufferedReader().use { it.readText() }
-      }
-
-      appConfig = gson.fromJson(jsonString, AppConfig::class.java)
+      appConfig = getAppConfig()
       appConfig.modelLibs = emptyList<String>().toMutableList()
 
       val modelsArray = Arguments.createArray().apply {
@@ -104,8 +117,28 @@ class AiModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun doGenerate(instanceId: String, text: String, promise: Promise) {
-    promise.resolve("Generated text for $instanceId: $text")
+  fun doGenerate(instanceId: String, messages: ReadableArray, promise: Promise) {
+    val messageList = mutableListOf<ChatCompletionMessage>()
+
+    for (i in 0 until messages.size()) {
+      val messageMap = messages.getMap(i) // Extract ReadableMap
+
+
+      val role = if (messageMap.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
+      val content = messageMap.getString("content") ?: ""
+
+      messageList.add(ChatCompletionMessage(role, content))
+    }
+
+    CoroutineScope(Dispatchers.Default).launch {
+      try {
+        val response = chat.generateResponse(messageList)
+
+        promise.resolve(response.toString())
+      } catch (e: Exception) {
+        Log.e("AI", "Error generating response", e)
+      }
+    }
   }
 
   @ReactMethod
@@ -115,6 +148,36 @@ class AiModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun prepareModel(instanceId: String, promise: Promise) {
+    val appConfig = getAppConfig()
+
+    val modelRecord = appConfig.modelList.find { modelRecord -> modelRecord.modelId == instanceId }
+
+    if(modelRecord == null) {
+      throw Error("There's no config for requested model")
+    }
+
+    downloadModelConfig(modelRecord)
+
+    val modelConfig = getModelConfig(modelRecord)
+
+    modelConfig.modelId = modelRecord.modelId
+    modelConfig.modelUrl = modelRecord.modelUrl
+    modelConfig.modelLib = modelRecord.modelLib
+
+    val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
+
+    try {
+      ModelState(modelConfig, modelDir).handleStart()
+    } catch (e: Exception) {
+      promise.reject("MODEL_DOWNLOAD", "Couldn't download model", e)
+    }
+
+    try {
+      chat = Chat(modelConfig, modelDir)
+    } catch (e: Exception) {
+      promise.reject("MODEL_INIT", "Couldn't initialize model", e)
+    }
+
     promise.resolve("Preparing model: $instanceId")
   }
 
@@ -164,66 +227,6 @@ class AiModule(reactContext: ReactApplicationContext) :
     }
   }
 
-  inner class ModelState(
-    val modelConfig: ModelConfig,
-    private val modelUrl: String,
-    private val modelDirFile: File
-  ) {
-    var modelInitState = mutableStateOf(ModelInitState.Initializing)
-    private var paramsConfig = ParamsConfig(emptyList())
-    val progress = mutableStateOf(0)
-    val total = mutableStateOf(1)
-    val id: UUID = UUID.randomUUID()
-    private val remainingTasks = emptySet<DownloadTask>().toMutableSet()
-    private val downloadingTasks = emptySet<DownloadTask>().toMutableSet()
-    private val maxDownloadTasks = 3
-    private val gson = Gson()
-
-
-    init {
-      switchToInitializing()
-    }
-
-    private fun switchToInitializing() {
-      val paramsConfigFile = File(modelDirFile, ParamsConfigFilename)
-      if (paramsConfigFile.exists()) {
-        loadParamsConfig()
-//        switchToIndexing()
-      } else {
-//        downloadParamsConfig()
-      }
-    }
-
-    private fun loadParamsConfig() {
-      val paramsConfigFile = File(modelDirFile, ParamsConfigFilename)
-      require(paramsConfigFile.exists())
-      val jsonString = paramsConfigFile.readText()
-      paramsConfig = gson.fromJson(jsonString, ParamsConfig::class.java)
-    }
-
-    private fun downloadParamsConfig() {
-      thread(start = true) {
-        val url = URL("${modelUrl}${ModelUrlSuffix}${ParamsConfigFilename}")
-        val tempId = UUID.randomUUID().toString()
-        val tempFile = File(modelDirFile, tempId)
-        url.openStream().use {
-          Channels.newChannel(it).use { src ->
-            FileOutputStream(tempFile).use { fileOutputStream ->
-              fileOutputStream.channel.transferFrom(src, 0, Long.MAX_VALUE)
-            }
-          }
-        }
-        require(tempFile.exists())
-        val paramsConfigFile = File(modelDirFile, ParamsConfigFilename)
-        tempFile.renameTo(paramsConfigFile)
-        require(paramsConfigFile.exists())
-
-        loadParamsConfig()
-//        switchToIndexing()
-      }
-    }
-  }
-
 }
 
 enum class ModelInitState {
@@ -246,17 +249,13 @@ enum class ModelChatState {
   Failed
 }
 
-enum class MessageRole {
-  Assistant,
-  User
-}
-
-data class MessageData(val role: MessageRole, val text: String, val id: UUID = UUID.randomUUID())
+data class MessageData(val role: String, val text: String, val id: UUID = UUID.randomUUID())
 
 
 data class ModelConfig(
   @SerializedName("model_lib") var modelLib: String,
   @SerializedName("model_id") var modelId: String,
+  @SerializedName("model_url") var modelUrl: String,
   @SerializedName("estimated_vram_bytes") var estimatedVramBytes: Long?,
   @SerializedName("tokenizer_files") val tokenizerFiles: List<String>,
   @SerializedName("context_window_size") val contextWindowSize: Int,
