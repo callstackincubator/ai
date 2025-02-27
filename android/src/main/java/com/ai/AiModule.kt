@@ -27,6 +27,9 @@ import java.util.concurrent.Executors
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.toMutableStateList
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.channels.toList
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.withContext
 import kotlin.concurrent.thread
 
 
@@ -130,11 +133,13 @@ class AiModule(reactContext: ReactApplicationContext) :
       messageList.add(ChatCompletionMessage(role, content))
     }
 
-    CoroutineScope(Dispatchers.Default).launch {
+    CoroutineScope(Dispatchers.Main).launch {
       try {
-        val response = chat.generateResponse(messageList)
-
-        promise.resolve(response.toString())
+          chat.generateResponse(messageList, callback = object :Chat.ChatStateCallback{
+            override fun onMessageReceived(message: String) {
+              promise.resolve(message)
+            }
+          })
       } catch (e: Exception) {
         Log.e("AI", "Error generating response", e)
       }
@@ -165,12 +170,6 @@ class AiModule(reactContext: ReactApplicationContext) :
     modelConfig.modelLib = modelRecord.modelLib
 
     val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
-
-    try {
-      ModelState(modelConfig, modelDir).handleStart()
-    } catch (e: Exception) {
-      promise.reject("MODEL_DOWNLOAD", "Couldn't download model", e)
-    }
 
     try {
       chat = Chat(modelConfig, modelDir)

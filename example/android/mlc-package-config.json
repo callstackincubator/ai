@@ -2,13 +2,10 @@
   "device": "android",
   "model_list": [
     {
-      "model": "HF://mlc-ai/Phi-3-mini-4k-instruct-q4f16_1-MLC",
-      "model_id": "Phi-3-mini-4k-instruct-q4f16_1-MLC",
-      "bundle_weight": false,
-      "estimated_vram_bytes": 3043000000,
-      "overrides": {
-        "prefill_chunk_size": 128
-      }
+      "model": "HF://mlc-ai/Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+      "estimated_vram_bytes": 3980990464,
+      "model_id": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+      "bundle_weight": false
     }
   ]
 }

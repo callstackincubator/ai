@@ -8,10 +8,13 @@ import androidx.compose.runtime.toMutableStateList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 class Chat(
   modelConfig: ModelConfig,
@@ -29,19 +32,17 @@ class Chat(
     engine.reload(modelDir.path, modelConfig.modelLib)
   }
 
-  suspend fun generateResponse(messages: MutableList<ChatCompletionMessage>) {
-    return withContext(Dispatchers.IO) { // Ensure it's running on the background thread
-      engine.chat.completions.create(messages = messages)
-    }
+  suspend fun generateResponse(messages: MutableList<ChatCompletionMessage>, callback : ChatStateCallback) {
+    executorService.submit {
+        viewModelScope.launch {
+          val chatResponse = engine.chat.completions.create(messages = messages)
+          val response = chatResponse.toList().joinToString("") { it.choices.joinToString("") { it.delta.content?.text ?: "" } }
+          callback.onMessageReceived(response)
+        }
+      }
   }
 
-//  fun generateResponse(messages: List<ChatCompletionMessage>) {
-//    executorService.submit {
-//      viewModelScope.launch {
-//        val response = engine.chat.completions.create(
-//          messages = messages,
-//        )
-//      }
-//    }
-//  }
+  interface ChatStateCallback {
+    fun onMessageReceived(message:String)
+  }
 }
