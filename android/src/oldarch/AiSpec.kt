@@ -8,6 +8,6 @@ abstract class AiSpec internal constructor(context: ReactApplicationContext) : R
 
   abstract fun getModel(name: String, promise: Promise)
   abstract fun getModels(promise: Promise)
-  abstract fun doGenerate(a: Double, b: Double, promise: Promise)
-  abstract fun doStream(a: Double, b: Double, promise: Promise)
+  abstract fun doGenerate(instanceId: String, text: String, promise: Promise)
+  abstract fun doStream(instanceId: String, text: String, promise: Promise)
 }
