@@ -1,23 +1,24 @@
 package com.ai
 
+import android.util.Log
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import com.ai.AiModule.Companion.ModelConfigFilename
 import com.ai.AiModule.Companion.ModelUrlSuffix
 import com.ai.AiModule.Companion.ParamsConfigFilename
 import com.google.gson.Gson
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.channels.Channels
 import java.util.UUID
-import kotlin.concurrent.thread
 
 class ModelState(
   private val modelConfig: ModelConfig,
   private val modelDir: File
 ) {
-  private var modelInitState = mutableStateOf(ModelInitState.Initializing)
   private var paramsConfig = ParamsConfig(emptyList())
   val progress = mutableIntStateOf(0)
   val total = mutableIntStateOf(1)
@@ -27,15 +28,11 @@ class ModelState(
   private val maxDownloadTasks = 3
   private val gson = Gson()
 
-  init {
-    switchToInitializing()
-  }
-
-  private fun switchToInitializing() {
+  suspend fun initialize() {
     val paramsConfigFile = File(modelDir, ParamsConfigFilename)
     if (paramsConfigFile.exists()) {
       loadParamsConfig()
-      switchToIndexing()
+      indexModel()
     } else {
       downloadParamsConfig()
     }
@@ -48,8 +45,8 @@ class ModelState(
     paramsConfig = gson.fromJson(jsonString, ParamsConfig::class.java)
   }
 
-  private fun downloadParamsConfig() {
-    thread(start = true) {
+  private suspend fun downloadParamsConfig() {
+    withContext(Dispatchers.IO) {
       val url = URL("${modelConfig.modelUrl}$ModelUrlSuffix$ParamsConfigFilename")
       val tempId = UUID.randomUUID().toString()
       val tempFile = File(modelDir, tempId)
@@ -66,30 +63,25 @@ class ModelState(
       require(paramsConfigFile.exists())
 
       loadParamsConfig()
-      switchToIndexing()
+      indexModel()
     }
   }
 
-  fun handleStart() {
-    switchToDownloading()
-  }
-
-  private fun switchToDownloading() {
-    modelInitState.value = ModelInitState.Downloading
-    for (downloadTask in remainingTasks) {
+  suspend fun download() {
+    for (downloadTask in remainingTasks.toList()) {
       if (downloadingTasks.size < maxDownloadTasks) {
         handleNewDownload(downloadTask)
       } else {
-        return
+        break
       }
     }
   }
 
-  private fun handleNewDownload(downloadTask: DownloadTask) {
-    require(modelInitState.value == ModelInitState.Downloading)
+  private suspend fun handleNewDownload(downloadTask: DownloadTask) {
     require(!downloadingTasks.contains(downloadTask))
     downloadingTasks.add(downloadTask)
-    thread(start = true) {
+
+    withContext(Dispatchers.IO) {
       val tempId = UUID.randomUUID().toString()
       val tempFile = File(modelDir, tempId)
       downloadTask.url.openStream().use {
@@ -102,52 +94,26 @@ class ModelState(
       require(tempFile.exists())
       tempFile.renameTo(downloadTask.file)
       require(downloadTask.file.exists())
-
       handleFinishDownload(downloadTask)
-
     }
+
   }
 
-  private fun handleFinishDownload(downloadTask: DownloadTask) {
+  private suspend fun handleFinishDownload(downloadTask: DownloadTask) {
     remainingTasks.remove(downloadTask)
     downloadingTasks.remove(downloadTask)
     ++progress.intValue
-    require(
-      modelInitState.value == ModelInitState.Downloading ||
-        modelInitState.value == ModelInitState.Pausing ||
-        modelInitState.value == ModelInitState.Clearing ||
-        modelInitState.value == ModelInitState.Deleting
-    )
-    if (modelInitState.value == ModelInitState.Downloading) {
+
       if (remainingTasks.isEmpty()) {
         if (downloadingTasks.isEmpty()) {
-          switchToFinished()
+          return
         }
       } else {
         handleNextDownload()
       }
-    } else if (modelInitState.value == ModelInitState.Pausing) {
-      if (downloadingTasks.isEmpty()) {
-        switchToPaused()
-      }
-    } else if (modelInitState.value == ModelInitState.Clearing) {
-      if (downloadingTasks.isEmpty()) {
-        clear()
-      }
-    }
   }
 
-  private fun switchToPaused() {
-    modelInitState.value = ModelInitState.Paused
-  }
-
-
-  private fun switchToFinished() {
-    modelInitState.value = ModelInitState.Finished
-  }
-
-  private fun handleNextDownload() {
-    require(modelInitState.value == ModelInitState.Downloading)
+  private suspend fun handleNextDownload() {
     for (downloadTask in remainingTasks) {
       if (!downloadingTasks.contains(downloadTask)) {
         handleNewDownload(downloadTask)
@@ -167,13 +133,14 @@ class ModelState(
     }
     val modelConfigFile = File(modelDir, ModelConfigFilename)
     require(modelConfigFile.exists())
-    switchToIndexing()
+    indexModel()
   }
 
-  private fun switchToIndexing() {
-    modelInitState.value = ModelInitState.Indexing
+  private fun indexModel() {
     progress.intValue = 0
     total.intValue = modelConfig.tokenizerFiles.size + paramsConfig.paramsRecords.size
+
+    // Adding Tokenizer to download tasks
     for (tokenizerFilename in modelConfig.tokenizerFiles) {
       val file = File(modelDir, tokenizerFilename)
       if (file.exists()) {
@@ -187,6 +154,8 @@ class ModelState(
         )
       }
     }
+
+    // Adding params to download tasks
     for (paramsRecord in paramsConfig.paramsRecords) {
       val file = File(modelDir, paramsRecord.dataPath)
       if (file.exists()) {
@@ -201,5 +170,4 @@ class ModelState(
       }
     }
   }
-
 }

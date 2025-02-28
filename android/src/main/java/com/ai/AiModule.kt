@@ -1,37 +1,23 @@
 package com.ai
 
-import ai.mlc.mlcllm.MLCEngine
 import ai.mlc.mlcllm.OpenAIProtocol
 import ai.mlc.mlcllm.OpenAIProtocol.ChatCompletionMessage
-import android.graphics.ColorSpace.Model
 import android.os.Environment
 import android.util.Log
-import android.widget.Toast
-import androidx.compose.runtime.mutableIntStateOf
 import com.facebook.react.bridge.*
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.turbomodule.core.interfaces.TurboModule
-import org.json.JSONObject
 import java.io.File
 import com.google.gson.annotations.SerializedName
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.channels.Channels
 import java.util.UUID
-import java.util.concurrent.Executors
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.toMutableStateList
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.channels.toList
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.withContext
-import kotlin.concurrent.thread
-
 
 @ReactModule(name = AiModule.NAME)
 class AiModule(reactContext: ReactApplicationContext) :
@@ -68,7 +54,9 @@ class AiModule(reactContext: ReactApplicationContext) :
     return gson.fromJson(jsonString, AppConfig::class.java)
   }
 
-  private fun getModelConfig(modelRecord: ModelRecord): ModelConfig {
+  private suspend fun getModelConfig(modelRecord: ModelRecord): ModelConfig {
+    downloadModelConfig(modelRecord)
+
     val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.modelId)
     val modelConfigFile = File(modelDirFile, ModelConfigFilename)
 
@@ -153,41 +141,43 @@ class AiModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun prepareModel(instanceId: String, promise: Promise) {
-    val appConfig = getAppConfig()
+    CoroutineScope(Dispatchers.IO).launch {
+      try {
+        val appConfig = getAppConfig()
 
-    val modelRecord = appConfig.modelList.find { modelRecord -> modelRecord.modelId == instanceId }
+        val modelRecord = appConfig.modelList.find { modelRecord -> modelRecord.modelId == instanceId }
 
-    if(modelRecord == null) {
-      throw Error("There's no config for requested model")
+        if (modelRecord == null) {
+          throw Error("There's no record for requested model")
+        }
+        val modelConfig = getModelConfig(modelRecord)
+
+        modelConfig.modelId = modelRecord.modelId
+        modelConfig.modelUrl = modelRecord.modelUrl
+        modelConfig.modelLib = modelRecord.modelLib
+        val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
+
+        val modelState = ModelState(modelConfig, modelDir)
+        modelState.initialize()
+        modelState.download()
+
+        chat = Chat(modelConfig, modelDir)
+
+        withContext(Dispatchers.Main) { promise.resolve("Model prepared: $instanceId") }
+      } catch (e: Exception) {
+        withContext(Dispatchers.Main) { promise.reject("MODEL_ERROR", "Error preparing model", e) }
+      }
     }
-
-    downloadModelConfig(modelRecord)
-
-    val modelConfig = getModelConfig(modelRecord)
-
-    modelConfig.modelId = modelRecord.modelId
-    modelConfig.modelUrl = modelRecord.modelUrl
-    modelConfig.modelLib = modelRecord.modelLib
-
-    val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
-
-    try {
-      chat = Chat(modelConfig, modelDir)
-    } catch (e: Exception) {
-      promise.reject("MODEL_INIT", "Couldn't initialize model", e)
-    }
-
-    promise.resolve("Preparing model: $instanceId")
   }
 
-  private fun downloadModelConfig(
+  private suspend fun downloadModelConfig(
     modelRecord: ModelRecord,
   ) {
-    CoroutineScope(Dispatchers.IO).launch {
+    withContext(Dispatchers.IO) {
       // Don't download if config is downloaded already
       val modelFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.modelId)
       if (modelFile.exists()) {
-        return@launch
+        return@withContext
       }
 
       // Prepare temp file for streaming
@@ -222,21 +212,9 @@ class AiModule(reactContext: ReactApplicationContext) :
       tempFile.copyTo(modelConfigFile, overwrite = true)
       tempFile.delete()
 
-      return@launch
+      return@withContext
     }
   }
-
-}
-
-enum class ModelInitState {
-  Initializing,
-  Indexing,
-  Paused,
-  Downloading,
-  Pausing,
-  Clearing,
-  Deleting,
-  Finished
 }
 
 enum class ModelChatState {
