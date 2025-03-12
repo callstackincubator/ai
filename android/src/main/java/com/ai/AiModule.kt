@@ -152,9 +152,11 @@ class AiModule(reactContext: ReactApplicationContext) :
         }
         val modelConfig = getModelConfig(modelRecord)
 
-        modelConfig.modelId = modelRecord.modelId
-        modelConfig.modelUrl = modelRecord.modelUrl
-        modelConfig.modelLib = modelRecord.modelLib
+        modelConfig.apply {
+				    modelId = modelRecord.modelId
+				    modelUrl = modelRecord.modelUrl
+				    modelLib = modelRecord.modelLib
+				}
         val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
 
         val modelState = ModelState(modelConfig, modelDir)

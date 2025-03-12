@@ -85,7 +85,6 @@ class AiModel implements LanguageModelV1 {
     };
   }> {
     const model = await this.getModel();
-    console.log('MODELLOOO', typeof model.modelId);
     const messages = options.prompt;
     const extractedMessages = messages.map((message): Message => {
       let content = '';

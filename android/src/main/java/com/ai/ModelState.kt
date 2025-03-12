@@ -30,12 +30,12 @@ class ModelState(
 
   suspend fun initialize() {
     val paramsConfigFile = File(modelDir, ParamsConfigFilename)
-    if (paramsConfigFile.exists()) {
-      loadParamsConfig()
-      indexModel()
-    } else {
+    if (!paramsConfigFile.exists()) {
       downloadParamsConfig()
     }
+
+    loadParamsConfig()
+    indexModel()
   }
 
   private fun loadParamsConfig() {
@@ -61,9 +61,6 @@ class ModelState(
       val paramsConfigFile = File(modelDir, ParamsConfigFilename)
       tempFile.renameTo(paramsConfigFile)
       require(paramsConfigFile.exists())
-
-      loadParamsConfig()
-      indexModel()
     }
   }
 
