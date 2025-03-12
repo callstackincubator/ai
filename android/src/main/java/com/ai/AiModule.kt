@@ -123,11 +123,11 @@ class AiModule(reactContext: ReactApplicationContext) :
 
     CoroutineScope(Dispatchers.Main).launch {
       try {
-          chat.generateResponse(messageList, callback = object :Chat.ChatStateCallback{
-            override fun onMessageReceived(message: String) {
-              promise.resolve(message)
-            }
-          })
+        chat.generateResponse(messageList, callback = object : Chat.ChatStateCallback {
+          override fun onMessageReceived(message: String) {
+            promise.resolve(message)
+          }
+        })
       } catch (e: Exception) {
         Log.e("AI", "Error generating response", e)
       }
@@ -153,10 +153,10 @@ class AiModule(reactContext: ReactApplicationContext) :
         val modelConfig = getModelConfig(modelRecord)
 
         modelConfig.apply {
-				    modelId = modelRecord.modelId
-				    modelUrl = modelRecord.modelUrl
-				    modelLib = modelRecord.modelLib
-				}
+          modelId = modelRecord.modelId
+          modelUrl = modelRecord.modelUrl
+          modelLib = modelRecord.modelLib
+        }
         val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
 
         val modelState = ModelState(modelConfig, modelDir)

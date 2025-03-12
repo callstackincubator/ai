@@ -23,17 +23,17 @@ class Chat(
     engine.reload(modelDir.path, modelConfig.modelLib)
   }
 
-  fun generateResponse(messages: MutableList<ChatCompletionMessage>, callback : ChatStateCallback) {
+  fun generateResponse(messages: MutableList<ChatCompletionMessage>, callback: ChatStateCallback) {
     executorService.submit {
-        viewModelScope.launch {
-          val chatResponse = engine.chat.completions.create(messages = messages)
-          val response = chatResponse.toList().joinToString("") { it.choices.joinToString("") { it.delta.content?.text ?: "" } }
-          callback.onMessageReceived(response)
-        }
+      viewModelScope.launch {
+        val chatResponse = engine.chat.completions.create(messages = messages)
+        val response = chatResponse.toList().joinToString("") { it.choices.joinToString("") { it.delta.content?.text ?: "" } }
+        callback.onMessageReceived(response)
       }
+    }
   }
 
   interface ChatStateCallback {
-    fun onMessageReceived(message:String)
+    fun onMessageReceived(message: String)
   }
 }

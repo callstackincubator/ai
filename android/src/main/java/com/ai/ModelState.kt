@@ -101,13 +101,13 @@ class ModelState(
     downloadingTasks.remove(downloadTask)
     ++progress.intValue
 
-      if (remainingTasks.isEmpty()) {
-        if (downloadingTasks.isEmpty()) {
-          return
-        }
-      } else {
-        handleNextDownload()
+    if (remainingTasks.isEmpty()) {
+      if (downloadingTasks.isEmpty()) {
+        return
       }
+    } else {
+      handleNextDownload()
+    }
   }
 
   private suspend fun handleNextDownload() {
