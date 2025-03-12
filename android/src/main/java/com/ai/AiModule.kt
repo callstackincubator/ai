@@ -29,10 +29,10 @@ class AiModule(reactContext: ReactApplicationContext) :
   companion object {
     const val NAME = "Ai"
 
-    const val AppConfigFilename = "mlc-app-config.json"
-    const val ModelConfigFilename = "mlc-chat-config.json"
-    const val ParamsConfigFilename = "ndarray-cache.json"
-    const val ModelUrlSuffix = "/resolve/main/"
+    const val APP_CONFIG_FILENAME = "mlc-app-config.json"
+    const val MODEL_CONFIG_FILENAME = "mlc-chat-config.json"
+    const val PARAMS_CONFIG_FILENAME = "ndarray-cache.json"
+    const val MODEL_URL_SUFFIX = "/resolve/main/"
   }
 
   private var appConfig = AppConfig(
@@ -43,12 +43,12 @@ class AiModule(reactContext: ReactApplicationContext) :
   private lateinit var chat: Chat
 
   private fun getAppConfig(): AppConfig {
-    val appConfigFile = File(reactApplicationContext.applicationContext.getExternalFilesDir(""), AppConfigFilename)
+    val appConfigFile = File(reactApplicationContext.applicationContext.getExternalFilesDir(""), APP_CONFIG_FILENAME)
 
     val jsonString: String = if (appConfigFile.exists()) {
       appConfigFile.readText()
     } else {
-      reactApplicationContext.applicationContext.assets.open(AppConfigFilename).bufferedReader().use { it.readText() }
+      reactApplicationContext.applicationContext.assets.open(APP_CONFIG_FILENAME).bufferedReader().use { it.readText() }
     }
 
     return gson.fromJson(jsonString, AppConfig::class.java)
@@ -58,7 +58,7 @@ class AiModule(reactContext: ReactApplicationContext) :
     downloadModelConfig(modelRecord)
 
     val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.modelId)
-    val modelConfigFile = File(modelDirFile, ModelConfigFilename)
+    val modelConfigFile = File(modelDirFile, MODEL_CONFIG_FILENAME)
 
     val jsonString: String = if (modelConfigFile.exists()) {
       modelConfigFile.readText()
@@ -183,7 +183,7 @@ class AiModule(reactContext: ReactApplicationContext) :
       }
 
       // Prepare temp file for streaming
-      val url = URL("${modelRecord.modelUrl}${ModelUrlSuffix}$ModelConfigFilename")
+      val url = URL("${modelRecord.modelUrl}${MODEL_URL_SUFFIX}$MODEL_CONFIG_FILENAME")
       val tempId = UUID.randomUUID().toString()
       val tempFile = File(
         reactApplicationContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
@@ -210,7 +210,7 @@ class AiModule(reactContext: ReactApplicationContext) :
 
       // Copy to config location and remove temp file
       val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
-      val modelConfigFile = File(modelDirFile, ModelConfigFilename)
+      val modelConfigFile = File(modelDirFile, MODEL_CONFIG_FILENAME)
       tempFile.copyTo(modelConfigFile, overwrite = true)
       tempFile.delete()
 

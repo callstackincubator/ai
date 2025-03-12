@@ -1,9 +1,9 @@
 package com.ai
 
 import androidx.compose.runtime.mutableIntStateOf
-import com.ai.AiModule.Companion.ModelConfigFilename
-import com.ai.AiModule.Companion.ModelUrlSuffix
-import com.ai.AiModule.Companion.ParamsConfigFilename
+import com.ai.AiModule.Companion.MODEL_CONFIG_FILENAME
+import com.ai.AiModule.Companion.MODEL_URL_SUFFIX
+import com.ai.AiModule.Companion.PARAMS_CONFIG_FILENAME
 import com.google.gson.Gson
 import java.io.File
 import java.io.FileOutputStream
@@ -24,7 +24,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
   private val gson = Gson()
 
   suspend fun initialize() {
-    val paramsConfigFile = File(modelDir, ParamsConfigFilename)
+    val paramsConfigFile = File(modelDir, PARAMS_CONFIG_FILENAME)
     if (!paramsConfigFile.exists()) {
       downloadParamsConfig()
     }
@@ -34,7 +34,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
   }
 
   private fun loadParamsConfig() {
-    val paramsConfigFile = File(modelDir, ParamsConfigFilename)
+    val paramsConfigFile = File(modelDir, PARAMS_CONFIG_FILENAME)
     require(paramsConfigFile.exists())
     val jsonString = paramsConfigFile.readText()
     paramsConfig = gson.fromJson(jsonString, ParamsConfig::class.java)
@@ -42,7 +42,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
 
   private suspend fun downloadParamsConfig() {
     withContext(Dispatchers.IO) {
-      val url = URL("${modelConfig.modelUrl}$ModelUrlSuffix$ParamsConfigFilename")
+      val url = URL("${modelConfig.modelUrl}$MODEL_URL_SUFFIX$PARAMS_CONFIG_FILENAME")
       val tempId = UUID.randomUUID().toString()
       val tempFile = File(modelDir, tempId)
       url.openStream().use {
@@ -53,7 +53,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
         }
       }
       require(tempFile.exists())
-      val paramsConfigFile = File(modelDir, ParamsConfigFilename)
+      val paramsConfigFile = File(modelDir, PARAMS_CONFIG_FILENAME)
       tempFile.renameTo(paramsConfigFile)
       require(paramsConfigFile.exists())
     }
@@ -115,14 +115,14 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
 
   private fun clear() {
     val files = modelDir.listFiles { dir, name ->
-      !(dir == modelDir && name == ModelConfigFilename)
+      !(dir == modelDir && name == MODEL_CONFIG_FILENAME)
     }
     require(files != null)
     for (file in files) {
       file.deleteRecursively()
       require(!file.exists())
     }
-    val modelConfigFile = File(modelDir, ModelConfigFilename)
+    val modelConfigFile = File(modelDir, MODEL_CONFIG_FILENAME)
     require(modelConfigFile.exists())
     indexModel()
   }
@@ -139,7 +139,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
       } else {
         remainingTasks.add(
           DownloadTask(
-            URL("${modelConfig.modelUrl}$ModelUrlSuffix$tokenizerFilename"),
+            URL("${modelConfig.modelUrl}$MODEL_URL_SUFFIX$tokenizerFilename"),
             file
           )
         )
@@ -154,7 +154,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
       } else {
         remainingTasks.add(
           DownloadTask(
-            URL("${modelConfig.modelUrl}$ModelUrlSuffix${paramsRecord.dataPath}"),
+            URL("${modelConfig.modelUrl}$MODEL_URL_SUFFIX${paramsRecord.dataPath}"),
             file
           )
         )
