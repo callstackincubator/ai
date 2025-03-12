@@ -45,6 +45,11 @@ export interface Model {
   modelLib: string;
 }
 
+export interface Message {
+  role: 'assistant' | 'system' | 'tool' | 'user';
+  content: string;
+}
+
 class AiModel implements LanguageModelV1 {
   readonly specificationVersion = 'v1';
   readonly defaultObjectGenerationMode = 'json';
@@ -80,9 +85,8 @@ class AiModel implements LanguageModelV1 {
     };
   }> {
     const model = await this.getModel();
-
     const messages = options.prompt;
-    const extractedMessages = messages.map((message) => {
+    const extractedMessages = messages.map((message): Message => {
       let content = '';
 
       if (Array.isArray(message.content)) {
@@ -104,7 +108,7 @@ class AiModel implements LanguageModelV1 {
     let text = '';
 
     if (messages.length > 0) {
-      text = await Ai.doGenerate(model, extractedMessages);
+      text = await Ai.doGenerate(model.modelId, extractedMessages);
     }
 
     return {
@@ -232,6 +236,10 @@ export function getModel(modelId: string, options: ModelOptions = {}): AiModel {
 
 export function getModels(): AiModelSettings[] {
   return Ai.getModels();
+}
+
+export function prepareModel(modelId: string) {
+  return Ai.prepareModel(modelId);
 }
 
 const { doGenerate, doStream } = Ai;
