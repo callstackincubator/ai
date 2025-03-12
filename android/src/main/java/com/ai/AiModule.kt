@@ -7,17 +7,17 @@ import android.util.Log
 import com.facebook.react.bridge.*
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.turbomodule.core.interfaces.TurboModule
-import java.io.File
-import com.google.gson.annotations.SerializedName
 import com.google.gson.Gson
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.google.gson.annotations.SerializedName
+import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.channels.Channels
 import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @ReactModule(name = AiModule.NAME)
 class AiModule(reactContext: ReactApplicationContext) :
@@ -114,7 +114,6 @@ class AiModule(reactContext: ReactApplicationContext) :
     for (i in 0 until messages.size()) {
       val messageMap = messages.getMap(i) // Extract ReadableMap
 
-
       val role = if (messageMap.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
       val content = messageMap.getString("content") ?: ""
 
@@ -123,11 +122,14 @@ class AiModule(reactContext: ReactApplicationContext) :
 
     CoroutineScope(Dispatchers.Main).launch {
       try {
-        chat.generateResponse(messageList, callback = object : Chat.ChatStateCallback {
-          override fun onMessageReceived(message: String) {
-            promise.resolve(message)
+        chat.generateResponse(
+          messageList,
+          callback = object : Chat.ChatStateCallback {
+            override fun onMessageReceived(message: String) {
+              promise.resolve(message)
+            }
           }
-        })
+        )
       } catch (e: Exception) {
         Log.e("AI", "Error generating response", e)
       }
@@ -172,9 +174,7 @@ class AiModule(reactContext: ReactApplicationContext) :
     }
   }
 
-  private suspend fun downloadModelConfig(
-    modelRecord: ModelRecord,
-  ) {
+  private suspend fun downloadModelConfig(modelRecord: ModelRecord) {
     withContext(Dispatchers.IO) {
       // Don't download if config is downloaded already
       val modelFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.modelId)
@@ -183,7 +183,7 @@ class AiModule(reactContext: ReactApplicationContext) :
       }
 
       // Prepare temp file for streaming
-      val url = URL("${modelRecord.modelUrl}${ModelUrlSuffix}${ModelConfigFilename}")
+      val url = URL("${modelRecord.modelUrl}${ModelUrlSuffix}$ModelConfigFilename")
       val tempId = UUID.randomUUID().toString()
       val tempFile = File(
         reactApplicationContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
@@ -230,7 +230,6 @@ enum class ModelChatState {
 
 data class MessageData(val role: String, val text: String, val id: UUID = UUID.randomUUID())
 
-
 data class ModelConfig(
   @SerializedName("model_lib") var modelLib: String,
   @SerializedName("model_id") var modelId: String,
@@ -238,13 +237,10 @@ data class ModelConfig(
   @SerializedName("estimated_vram_bytes") var estimatedVramBytes: Long?,
   @SerializedName("tokenizer_files") val tokenizerFiles: List<String>,
   @SerializedName("context_window_size") val contextWindowSize: Int,
-  @SerializedName("prefill_chunk_size") val prefillChunkSize: Int,
+  @SerializedName("prefill_chunk_size") val prefillChunkSize: Int
 )
 
-data class AppConfig(
-  @SerializedName("model_libs") var modelLibs: MutableList<String>,
-  @SerializedName("model_list") val modelList: MutableList<ModelRecord>,
-)
+data class AppConfig(@SerializedName("model_libs") var modelLibs: MutableList<String>, @SerializedName("model_list") val modelList: MutableList<ModelRecord>)
 
 data class ModelRecord(
   @SerializedName("model_url") val modelUrl: String,
@@ -255,10 +251,6 @@ data class ModelRecord(
 
 data class DownloadTask(val url: URL, val file: File)
 
-data class ParamsConfig(
-  @SerializedName("records") val paramsRecords: List<ParamsRecord>
-)
+data class ParamsConfig(@SerializedName("records") val paramsRecords: List<ParamsRecord>)
 
-data class ParamsRecord(
-  @SerializedName("dataPath") val dataPath: String
-)
+data class ParamsRecord(@SerializedName("dataPath") val dataPath: String)

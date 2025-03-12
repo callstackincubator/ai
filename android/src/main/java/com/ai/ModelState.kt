@@ -1,24 +1,19 @@
 package com.ai
 
-import android.util.Log
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import com.ai.AiModule.Companion.ModelConfigFilename
 import com.ai.AiModule.Companion.ModelUrlSuffix
 import com.ai.AiModule.Companion.ParamsConfigFilename
 import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.channels.Channels
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-class ModelState(
-  private val modelConfig: ModelConfig,
-  private val modelDir: File
-) {
+class ModelState(private val modelConfig: ModelConfig, private val modelDir: File) {
   private var paramsConfig = ParamsConfig(emptyList())
   val progress = mutableIntStateOf(0)
   val total = mutableIntStateOf(1)
@@ -93,7 +88,6 @@ class ModelState(
       require(downloadTask.file.exists())
       handleFinishDownload(downloadTask)
     }
-
   }
 
   private suspend fun handleFinishDownload(downloadTask: DownloadTask) {
@@ -145,7 +139,7 @@ class ModelState(
       } else {
         remainingTasks.add(
           DownloadTask(
-            URL("${modelConfig.modelUrl}$ModelUrlSuffix${tokenizerFilename}"),
+            URL("${modelConfig.modelUrl}$ModelUrlSuffix$tokenizerFilename"),
             file
           )
         )
