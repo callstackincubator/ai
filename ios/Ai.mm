@@ -224,6 +224,74 @@ RCT_EXPORT_METHOD(getModels : (RCTPromiseResolveBlock)resolve reject : (RCTPromi
   resolve(modelList);
 }
 
+RCT_EXPORT_METHOD(prepareModel:(NSString *)instanceId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        @try {
+            // Read app config
+            NSURL* configURL = [self.bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
+            NSData* jsonData = [NSData dataWithContentsOfURL:configURL];
+            
+            if (!jsonData) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    reject(@"MODEL_ERROR", @"Failed to read app config", nil);
+                });
+                return;
+            }
+            
+            NSError* error;
+            NSDictionary* appConfig = [NSJSONSerialization JSONObjectWithData:jsonData 
+                                                                    options:0 
+                                                                      error:&error];
+            
+            if (error) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    reject(@"MODEL_ERROR", @"Failed to parse app config", error);
+                });
+                return;
+            }
+            
+            // Find model record
+            NSArray* modelList = appConfig[@"model_list"];
+            NSDictionary* modelRecord = nil;
+            
+            for (NSDictionary* model in modelList) {
+                if ([model[@"model_id"] isEqualToString:instanceId]) {
+                    modelRecord = model;
+                    break;
+                }
+            }
+            
+            if (!modelRecord) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    reject(@"MODEL_ERROR", @"There's no record for requested model", nil);
+                });
+                return;
+            }
+            
+            // Update model properties
+            self.modelPath = modelRecord[@"model_path"];
+            self.modelLib = modelRecord[@"model_lib"];
+            
+            // Initialize engine with model
+            NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
+            NSString* modelLocalPath = [modelLocalURL path];
+            
+            [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
+            
+            dispatch_async(dispatch_get_main_queue(), ^{
+                resolve([NSString stringWithFormat:@"Model prepared: %@", instanceId]);
+            });
+            
+        } @catch (NSException *exception) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                reject(@"MODEL_ERROR", exception.reason, nil);
+            });
+        }
+    });
+}
+
 // Don't compile this code when we build for the old architecture.
 #ifdef RCT_NEW_ARCH_ENABLED
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const facebook::react::ObjCTurboModule::InitParams&)params {
