@@ -5,9 +5,8 @@ pre-commit:
       glob: '*.{js,ts,jsx,tsx}'
       run: npx eslint {staged_files}
     types:
-      glob: '*.{js,ts, jsx, tsx}'
-      run: npx tsc --noEmit
-      exclude: 'example/ios/build/**'
+      glob: '*.{js, ts, jsx, tsx}'
+      run: npx tsc --noEmit {staged_files}
 commit-msg:
   parallel: true
   commands:

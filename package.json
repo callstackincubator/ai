@@ -7,6 +7,9 @@
   "types": "lib/typescript/src/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
+  "bin": {
+    "mlc-prepare": "scripts/package-models.js"
+  },
   "files": [
     "src",
     "lib",
@@ -34,7 +37,8 @@
     "prepare": "bob build",
     "release": "release-it",
     "format:ios": "./scripts/format-ios.sh",
-    "format:android": "./scripts/format-android.sh"
+    "format:android": "./scripts/format-android.sh",
+    "prestart": "node scripts/mlc-prepare.js"
   },
   "keywords": [
     "react-native",
