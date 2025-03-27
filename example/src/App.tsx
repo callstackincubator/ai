@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { GiftedChat, type IMessage } from 'react-native-gifted-chat';
 import { getModel, type AiModelSettings, prepareModel } from 'react-native-ai';
-import { generateText, type CoreMessage } from 'ai';
+import { streamText, type CoreMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
 import NetworkInfo from './NetworkInfo';
 import { ModelSelection } from './ModelSelection';
@@ -20,7 +20,7 @@ export default function Example() {
   const onSendMessage = useCallback(
     async (messages: IMessage[]) => {
       if (modelId) {
-        const { text } = await generateText({
+        const { text } = streamText({
           model: getModel(modelId),
           temperature: 0.6,
           messages: messages
@@ -33,6 +33,13 @@ export default function Example() {
               };
             }),
         });
+        for await (const chunk of text) {
+          console.log('chunk', chunk);
+        }
+        // const chunk = await text;
+        // console.log('chunk', chunk);
+
+        console.log('text', text);
 
         setDisplayedMessages((previousMessages) =>
           GiftedChat.append(previousMessages, {

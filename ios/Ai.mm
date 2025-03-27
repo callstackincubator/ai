@@ -53,7 +53,7 @@ RCT_EXPORT_MODULE()
       NSLog(@"Error creating bundle directory: %@", dirError);
     }
 
-    // Copy the config file from the app bundle to Documents if it doesn't exist yet
+    //  Copy the config file from the app bundle to Documents if it doesn't exist yet
     NSURL* bundleConfigURL = [[[NSBundle mainBundle] bundleURL] URLByAppendingPathComponent:@"bundle/mlc-app-config.json"];
     NSURL* configURL = [_bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
 
@@ -156,10 +156,10 @@ RCT_EXPORT_METHOD(doGenerate : (NSString*)instanceId messages : (NSArray<NSDicti
   });
 }
 
-RCT_EXPORT_METHOD(doStream : (NSString*)instanceId text : (NSString*)text resolve : (RCTPromiseResolveBlock)
+RCT_EXPORT_METHOD(doStream : (NSString*)instanceId messages : (NSArray<NSDictionary*>*)messages resolve : (RCTPromiseResolveBlock)
                       resolve reject : (RCTPromiseRejectBlock)reject) {
 
-  NSLog(@"Streaming for instance ID: %@, with text: %@", instanceId, text);
+  NSLog(@"Streaming for instance ID: %@, with text: %@", instanceId, messages);
 
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     __block BOOL hasResolved = NO;
@@ -169,9 +169,7 @@ RCT_EXPORT_METHOD(doStream : (NSString*)instanceId text : (NSString*)text resolv
 
     [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
 
-    NSDictionary* message = @{@"role" : @"user", @"content" : text};
-
-    [self.engine chatCompletionWithMessages:@[ message ]
+    [self.engine chatCompletionWithMessages:messages
                                  completion:^(id response) {
                                    if ([response isKindOfClass:[NSString class]]) {
                                      NSDictionary* parsedResponse = [self parseResponseString:response];
