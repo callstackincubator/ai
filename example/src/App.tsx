@@ -48,19 +48,26 @@ export default function Example() {
     [modelId]
   );
 
-  const selectModel = useCallback((modelSettings: AiModelSettings) => {
+  const selectModel = useCallback(async (modelSettings: AiModelSettings) => {
     if (modelSettings.model_id) {
       setModelId(modelSettings.model_id);
       setDisplayedMessages((previousMessages) =>
         GiftedChat.append(previousMessages, {
-          // @ts-ignore
+          _id: uuid(),
+          text: 'Preparing model...',
+          createdAt: new Date(),
+          user: aiBot,
+        })
+      );
+      await prepareModel(modelSettings.model_id);
+      setDisplayedMessages((previousMessages) =>
+        GiftedChat.append(previousMessages, {
           _id: uuid(),
           text: 'Model ready for conversation.',
           createdAt: new Date(),
           user: aiBot,
         })
       );
-      prepareModel(modelSettings.model_id);
     }
   }, []);
 
