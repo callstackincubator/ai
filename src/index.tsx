@@ -234,7 +234,7 @@ export function getModel(modelId: string, options: ModelOptions = {}): AiModel {
   return new AiModel(modelId, options);
 }
 
-export function getModels(): AiModelSettings[] {
+export async function getModels(): Promise<AiModelSettings[]> {
   return Ai.getModels();
 }
 
