@@ -119,12 +119,7 @@ RCT_EXPORT_METHOD(doGenerate : (NSString*)instanceId messages : (NSArray<NSDicti
   __block BOOL hasResolved = NO;
 
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    // Get Documents directory path
-    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString* documentsDirectory = [paths firstObject];
-    NSURL* documentsURL = [NSURL fileURLWithPath:documentsDirectory];
-    NSURL* bundleURL = [documentsURL URLByAppendingPathComponent:@"bundle"];
-    NSURL* modelLocalURL = [bundleURL URLByAppendingPathComponent:self.modelPath];
+    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
     NSString* modelLocalPath = [modelLocalURL path];
 
     [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
@@ -259,7 +254,6 @@ RCT_EXPORT_METHOD(getModel : (NSString*)name resolve : (RCTPromiseResolveBlock)r
 }
 
 RCT_EXPORT_METHOD(getModels : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject) {
-  _bundleURL = [[[NSBundle mainBundle] bundleURL] URLByAppendingPathComponent:@"bundle"];
   NSURL* configURL = [_bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
 
   // Read and parse JSON
@@ -355,12 +349,7 @@ RCT_EXPORT_METHOD(prepareModel : (NSString*)instanceId resolve : (RCTPromiseReso
       self.modelLib = modelLib;
 
       // Initialize engine with model
-      // Get Documents directory path
-      NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-      NSString* documentsDirectory = [paths firstObject];
-      NSURL* documentsURL = [NSURL fileURLWithPath:documentsDirectory];
-      NSURL* bundleURL = [documentsURL URLByAppendingPathComponent:@"bundle"];
-      NSURL* modelLocalURL = [bundleURL URLByAppendingPathComponent:self.modelPath];
+      NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
 
       if (!modelLocalURL) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -392,14 +381,8 @@ RCT_EXPORT_METHOD(prepareModel : (NSString*)instanceId resolve : (RCTPromiseReso
 
   NSString* modelId = modelRecord[@"model_id"];
 
-  // Get Documents directory path - same as in downloadModelConfig
-  NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-  NSString* documentsDirectory = [paths firstObject];
-  NSURL* documentsURL = [NSURL fileURLWithPath:documentsDirectory];
-  NSURL* bundleURL = [documentsURL URLByAppendingPathComponent:@"bundle"];
-
   // Use the same path construction as downloadModelConfig
-  NSURL* modelDirURL = [bundleURL URLByAppendingPathComponent:modelId];
+  NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
   NSURL* modelConfigURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
 
   NSData* jsonData = [NSData dataWithContentsOfURL:modelConfigURL];
@@ -424,14 +407,8 @@ RCT_EXPORT_METHOD(prepareModel : (NSString*)instanceId resolve : (RCTPromiseReso
     return;
   }
 
-  // Get Documents directory path
-  NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-  NSString* documentsDirectory = [paths firstObject];
-  NSURL* documentsURL = [NSURL fileURLWithPath:documentsDirectory];
-  NSURL* bundleURL = [documentsURL URLByAppendingPathComponent:@"bundle"];
-
   // Check if config already exists
-  NSURL* modelDirURL = [bundleURL URLByAppendingPathComponent:modelId];
+  NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
   NSURL* modelConfigURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
   NSURL* ndarrayCacheURL = [modelDirURL URLByAppendingPathComponent:@"ndarray-cache.json"];
 
