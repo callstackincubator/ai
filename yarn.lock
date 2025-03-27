@@ -11245,6 +11245,8 @@ __metadata:
   peerDependencies:
     react: "*"
     react-native: "*"
+  bin:
+    mlc-prepare: scripts/package-models.js
   languageName: unknown
   linkType: soft
 

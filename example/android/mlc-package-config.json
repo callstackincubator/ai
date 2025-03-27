@@ -3,8 +3,8 @@
   "model_list": [
     {
       "model": "HF://mlc-ai/Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
-      "estimated_vram_bytes": 3980990464,
       "model_id": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+      "estimated_vram_bytes": 3043000000,
       "bundle_weight": false
     }
   ]
