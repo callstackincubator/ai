@@ -57,12 +57,11 @@ RCT_EXPORT_MODULE()
     NSURL* bundleConfigURL = [[[NSBundle mainBundle] bundleURL] URLByAppendingPathComponent:@"bundle/mlc-app-config.json"];
     NSURL* configURL = [_bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
 
-    if (![[NSFileManager defaultManager] fileExistsAtPath:[configURL path]]) {
-      NSError* copyError;
-      [[NSFileManager defaultManager] copyItemAtURL:bundleConfigURL toURL:configURL error:&copyError];
-      if (copyError) {
-        NSLog(@"Error copying config file: %@", copyError);
-      }
+    NSError* copyError;
+    [[NSFileManager defaultManager] removeItemAtURL:configURL error:nil]; // Remove existing file if it exists
+    [[NSFileManager defaultManager] copyItemAtURL:bundleConfigURL toURL:configURL error:&copyError];
+    if (copyError) {
+      NSLog(@"Error copying config file: %@", copyError);
     }
 
     // Read and parse JSON
