@@ -1427,7 +1427,7 @@ SPEC CHECKSUMS:
   React-jsitracing: 00f6151766dec0ab324e2854a9d4dfde0e1f30cc
   React-logger: 70e002e04cc56ff5c12157537405d1644c050703
   React-Mapbuffer: 8d1f0fc6e7280a8ed6da70ece5f283ac5c8032cb
-  react-native-ai: c355f3cba960773fa9295d8b027f2f9e06c55faa
+  react-native-ai: ad480d604d5d518d47fc5e2d1444c8776925ff6d
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-netinfo: ce102083db558237dac20cf64172ef569ebe2dd9
   React-nativeconfig: 9f223cd321823afdecf59ed00861ab2d69ee0fc1

@@ -1,6 +1,16 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
+
+# Check for MLC-LLM directory
+mlc_source_dir = if ENV['MLC_LLM_SOURCE_DIR'] && Dir.exist?(ENV['MLC_LLM_SOURCE_DIR'])
+  ENV['MLC_LLM_SOURCE_DIR']
+else
+  raise "❌ MLC-LLM directory not found! Please set MLC_LLM_SOURCE_DIR environment variable pointing to your MLC-LLM repository"
+end
+
+puts "✅ Using MLC-LLM from: #{mlc_source_dir}"
+
 folly_compiler_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma -Wno-shorten-64-to-32'
 
 Pod::Spec.new do |s|
@@ -16,15 +26,24 @@ Pod::Spec.new do |s|
 
   s.source_files = "ios/**/*.{h,m,mm}"
 
+  # Define and validate MLC-LLM header paths
+  mlc_header_paths = [
+    File.join(mlc_source_dir, '3rdparty', 'tvm', 'include'),
+    File.join(mlc_source_dir, '3rdparty', 'tvm', '3rdparty', 'dmlc-core', 'include'),
+    File.join(mlc_source_dir, '3rdparty', 'tvm', '3rdparty', 'dlpack', 'include')
+  ]
+
+  mlc_header_paths.each do |path|
+    unless Dir.exist?(path)
+      raise "❌ Required MLC-LLM header directory not found: #{path}"
+    end
+  end
+
   s.subspec 'MLCEngineObjC' do |ss|
     ss.source_files = 'ios/**/*.{h,m,mm}'
     ss.private_header_files = 'ios/ObjC/Private/*.h'
     ss.pod_target_xcconfig = {
-      'HEADER_SEARCH_PATHS' => [
-        '$(PODS_TARGET_SRCROOT)/3rdparty/tvm/include',
-        '$(PODS_TARGET_SRCROOT)/3rdparty/tvm/3rdparty/dmlc-core/include',
-        '$(PODS_TARGET_SRCROOT)/3rdparty/tvm/3rdparty/dlpack/include'
-      ]
+      'HEADER_SEARCH_PATHS' => mlc_header_paths
     }
   end
 
