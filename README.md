@@ -59,7 +59,9 @@ Read more about configuration for [Android](https://llm.mlc.ai/docs/deploy/andro
 
 You can also check out [example config](https://github.com/callstackincubator/ai/blob/main/example/mlc-config.json) in the repository.
 
-#### 4. **[Android only]** If you want to execute models also on Android you need to set `ANDROID_NDK` and `TVM_NDK_CC` environment variables. Everything is described in [MLC LLM docs](https://llm.mlc.ai/docs/deploy/android.html#id2).
+#### 4. **[Android only]**
+
+If you want to execute models also on Android you need to set `ANDROID_NDK` and `TVM_NDK_CC` environment variables. Everything is described in [MLC LLM docs](https://llm.mlc.ai/docs/deploy/android.html#id2).
 
 #### 5. **[iOS only]** If you want to execute models also on iOS you need to:
 
@@ -79,6 +81,8 @@ npm run react-native-ai mlc-prepare
 #### 7. Build the project! 🚀
 
 ## API
+
+TBD
 
 ## License
 
