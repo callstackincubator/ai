@@ -5,6 +5,7 @@ import ai.mlc.mlcllm.OpenAIProtocol.ChatCompletionMessage
 import android.os.Environment
 import android.util.Log
 import com.facebook.react.bridge.*
+import com.facebook.react.bridge.ReactContext.RCTDeviceEventEmitter
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.turbomodule.core.interfaces.TurboModule
 import com.google.gson.Gson
@@ -66,7 +67,15 @@ class AiModule(reactContext: ReactApplicationContext) :
       throw Error("Requested model config not found")
     }
 
-    return gson.fromJson(jsonString, ModelConfig::class.java)
+    val modelConfig = gson.fromJson(jsonString, ModelConfig::class.java)
+
+    modelConfig.apply {
+      modelId = modelRecord.modelId
+      modelUrl = modelRecord.modelUrl
+      modelLib = modelRecord.modelLib
+    }
+
+    return modelConfig
   }
 
   @ReactMethod
@@ -142,6 +151,53 @@ class AiModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun downloadModel(instanceId: String, promise: Promise) {
+    CoroutineScope(Dispatchers.IO).launch {
+      try {
+
+        val appConfig = getAppConfig()
+        val modelRecord = appConfig.modelList.find { modelRecord -> modelRecord.modelId == instanceId }
+        if (modelRecord == null) {
+          throw Error("There's no record for requested model")
+        }
+
+        val modelConfig = getModelConfig(modelRecord)
+
+        val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
+
+
+        val modelState = ModelState(modelConfig, modelDir)
+
+        modelState.initialize()
+
+        sendEvent("onDownloadStart", null)
+
+        CoroutineScope(Dispatchers.IO).launch {
+          modelState.progress.collect { newValue ->
+            val event: WritableMap = Arguments.createMap().apply {
+              putDouble("percentage", (newValue.toDouble() / modelState.total.intValue) * 100)
+            }
+            sendEvent("onDownloadProgress", event)
+          }
+        }
+
+        modelState.download()
+
+        sendEvent("onDownloadComplete", null)
+
+        withContext(Dispatchers.Main) { promise.resolve("Model downloaded: $instanceId") }
+      } catch (e: Exception) {
+        sendEvent("onDownloadError", e.message ?: "Unknown error")
+        withContext(Dispatchers.Main) { promise.reject("MODEL_ERROR", "Error downloading model", e) }
+      }
+    }
+  }
+
+  private fun sendEvent(eventName: String, data: Any?) {
+      reactApplicationContext.getJSModule(RCTDeviceEventEmitter::class.java)?.emit(eventName, data)
+  }
+
+  @ReactMethod
   fun prepareModel(instanceId: String, promise: Promise) {
     CoroutineScope(Dispatchers.IO).launch {
       try {
@@ -154,11 +210,6 @@ class AiModule(reactContext: ReactApplicationContext) :
         }
         val modelConfig = getModelConfig(modelRecord)
 
-        modelConfig.apply {
-          modelId = modelRecord.modelId
-          modelUrl = modelRecord.modelUrl
-          modelLib = modelRecord.modelLib
-        }
         val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
 
         val modelState = ModelState(modelConfig, modelDir)

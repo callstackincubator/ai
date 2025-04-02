@@ -50,6 +50,10 @@ export interface Message {
   content: string;
 }
 
+export interface DownloadProgress {
+  percentage: number;
+}
+
 class AiModel implements LanguageModelV1 {
   readonly specificationVersion = 'v1';
   readonly defaultObjectGenerationMode = 'json';
@@ -238,7 +242,77 @@ export async function getModels(): Promise<AiModelSettings[]> {
   return Ai.getModels();
 }
 
-export function prepareModel(modelId: string) {
+export async function downloadModel(
+  modelId: string,
+  callbacks?: {
+    onStart?: () => void;
+    onProgress?: (progress: DownloadProgress) => void;
+    onComplete?: () => void;
+    onError?: (error: Error) => void;
+  }
+): Promise<void> {
+  const eventEmitter = new NativeEventEmitter(NativeModules.Ai);
+
+  const downloadStartListener = eventEmitter.addListener(
+    'onDownloadStart',
+    () => {
+      console.log('🔵 [Download] Started downloading model:', modelId);
+      callbacks?.onStart?.();
+    }
+  );
+
+  const downloadProgressListener = eventEmitter.addListener(
+    'onDownloadProgress',
+    (progress: DownloadProgress) => {
+      console.log(
+        '🟢 [Download] Progress:',
+        progress.percentage.toFixed(2) + '%'
+      );
+      callbacks?.onProgress?.(progress);
+    }
+  );
+
+  const downloadCompleteListener = eventEmitter.addListener(
+    'onDownloadComplete',
+    () => {
+      console.log('✅ [Download] Completed downloading model:', modelId);
+      callbacks?.onComplete?.();
+      // Cleanup listeners
+      downloadStartListener.remove();
+      downloadProgressListener.remove();
+      downloadCompleteListener.remove();
+      downloadErrorListener.remove();
+    }
+  );
+
+  const downloadErrorListener = eventEmitter.addListener(
+    'onDownloadError',
+    (error) => {
+      console.error('🔴 [Download] Error downloading model:', error);
+      callbacks?.onError?.(
+        new Error(error.message || 'Unknown download error')
+      );
+      // Cleanup listeners
+      downloadStartListener.remove();
+      downloadProgressListener.remove();
+      downloadCompleteListener.remove();
+      downloadErrorListener.remove();
+    }
+  );
+
+  try {
+    await Ai.downloadModel(modelId);
+  } catch (error) {
+    // Cleanup listeners in case of error
+    downloadStartListener.remove();
+    downloadProgressListener.remove();
+    downloadCompleteListener.remove();
+    downloadErrorListener.remove();
+    throw error;
+  }
+}
+
+export async function prepareModel(modelId: string) {
   return Ai.prepareModel(modelId);
 }
 
