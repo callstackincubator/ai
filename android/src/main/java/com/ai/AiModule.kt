@@ -167,6 +167,7 @@ class AiModule(reactContext: ReactApplicationContext) :
             }
             sendEvent("onChatUpdate", event)
           }
+
           override fun onFinished(message: String) {
             val event: WritableMap = Arguments.createMap().apply {
               putString("content", message)
@@ -223,7 +224,7 @@ class AiModule(reactContext: ReactApplicationContext) :
   }
 
   private fun sendEvent(eventName: String, data: Any?) {
-      reactApplicationContext.getJSModule(RCTDeviceEventEmitter::class.java)?.emit(eventName, data)
+    reactApplicationContext.getJSModule(RCTDeviceEventEmitter::class.java)?.emit(eventName, data)
   }
 
   @ReactMethod

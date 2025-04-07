@@ -41,22 +41,22 @@ class Chat(modelConfig: ModelConfig, modelDir: File) {
 
         for (res in chatResponse) {
 
-              for (choice in res.choices) {
-                choice.delta.content?.let { content ->
-                  streamingText += content.asText()
-                }
-                choice.finish_reason?.let { finishReason ->
-                  if (finishReason == "length") {
-                    finishReasonLength = true
-                  }
-                }
+          for (choice in res.choices) {
+            choice.delta.content?.let { content ->
+              streamingText += content.asText()
+            }
+            choice.finish_reason?.let { finishReason ->
+              if (finishReason == "length") {
+                finishReasonLength = true
               }
+            }
+          }
 
-              callback.onUpdate(streamingText)
-              if (finishReasonLength) {
-                streamingText += " [output truncated due to context length limit...]"
-                callback.onUpdate(streamingText)
-              }
+          callback.onUpdate(streamingText)
+          if (finishReasonLength) {
+            streamingText += " [output truncated due to context length limit...]"
+            callback.onUpdate(streamingText)
+          }
         }
         callback.onFinished(streamingText)
       }

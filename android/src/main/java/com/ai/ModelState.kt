@@ -1,6 +1,5 @@
 package com.ai
 
-import android.util.Log
 import androidx.compose.runtime.mutableIntStateOf
 import com.ai.AiModule.Companion.MODEL_CONFIG_FILENAME
 import com.ai.AiModule.Companion.MODEL_URL_SUFFIX
@@ -17,7 +16,7 @@ import kotlinx.coroutines.withContext
 
 class ModelState(private val modelConfig: ModelConfig, private val modelDir: File) {
   private var paramsConfig = ParamsConfig(emptyList())
-  val progress  = MutableStateFlow(0)
+  val progress = MutableStateFlow(0)
   val total = mutableIntStateOf(1)
   val id: UUID = UUID.randomUUID()
   private val remainingTasks = emptySet<DownloadTask>().toMutableSet()

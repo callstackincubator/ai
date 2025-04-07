@@ -11217,7 +11217,6 @@ __metadata:
     react-native: 0.74.2
     react-native-get-random-values: ^1.11.0
     react-native-gifted-chat: ^2.4.0
-    react-native-polyfill-globals: ^3.1.0
     react-native-select-dropdown: ^4.0.1
     text-encoding: ^0.7.0
     uuid: ^10.0.0
@@ -11249,7 +11248,6 @@ __metadata:
     react: 18.2.0
     react-native: 0.74.2
     react-native-builder-bob: ^0.23.2
-    react-native-polyfill-globals: ^3.1.0
     release-it: ^15.0.0
     text-encoding: ^0.7.0
     turbo: ^2.4.2
@@ -11359,20 +11357,6 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: a8672a50bbc60c9d925b8935b484cda2ed976483fce156f31b497d799eb349b24b79934aa683576e606e3fd3d8d97877d0048eba95f702f15ae21263c2658fd5
-  languageName: node
-  linkType: hard
-
-"react-native-polyfill-globals@npm:^3.1.0":
-  version: 3.1.0
-  resolution: "react-native-polyfill-globals@npm:3.1.0"
-  peerDependencies:
-    base-64: "*"
-    react-native-fetch-api: "*"
-    react-native-get-random-values: "*"
-    react-native-url-polyfill: "*"
-    text-encoding: "*"
-    web-streams-polyfill: "*"
-  checksum: ff968f257a10c420c96fb1b5e838bf665f5312b9709ff23001fd57480a05991df6d0f8751a2f46250174f858dcc3ebfdaf5548c9f37b729d472d3152b99e3356
   languageName: node
   linkType: hard
 
