@@ -40,7 +40,6 @@ class Chat(modelConfig: ModelConfig, modelDir: File) {
         var streamingText = ""
 
         for (res in chatResponse) {
-
           for (choice in res.choices) {
             choice.delta.content?.let { content ->
               streamingText += content.asText()

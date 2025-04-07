@@ -144,6 +144,5 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
         )
       }
     }
-
   }
 }

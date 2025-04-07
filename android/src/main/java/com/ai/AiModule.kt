@@ -184,7 +184,6 @@ class AiModule(reactContext: ReactApplicationContext) :
   fun downloadModel(instanceId: String, promise: Promise) {
     CoroutineScope(Dispatchers.IO).launch {
       try {
-
         val appConfig = getAppConfig()
         val modelRecord = appConfig.modelList.find { modelRecord -> modelRecord.modelId == instanceId }
         if (modelRecord == null) {
@@ -194,7 +193,6 @@ class AiModule(reactContext: ReactApplicationContext) :
         val modelConfig = getModelConfig(modelRecord)
 
         val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
-
 
         val modelState = ModelState(modelConfig, modelDir)
 
