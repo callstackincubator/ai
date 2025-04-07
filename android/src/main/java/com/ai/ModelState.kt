@@ -11,11 +11,12 @@ import java.net.URL
 import java.nio.channels.Channels
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 
 class ModelState(private val modelConfig: ModelConfig, private val modelDir: File) {
   private var paramsConfig = ParamsConfig(emptyList())
-  val progress = mutableIntStateOf(0)
+  val progress = MutableStateFlow(0)
   val total = mutableIntStateOf(1)
   val id: UUID = UUID.randomUUID()
   private val remainingTasks = emptySet<DownloadTask>().toMutableSet()
@@ -60,12 +61,10 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
   }
 
   suspend fun download() {
-    for (downloadTask in remainingTasks.toList()) {
-      if (downloadingTasks.size < maxDownloadTasks) {
-        handleNewDownload(downloadTask)
-      } else {
-        break
-      }
+    while (remainingTasks.isNotEmpty() && downloadingTasks.size < maxDownloadTasks) {
+      val downloadTask = remainingTasks.first()
+      remainingTasks.remove(downloadTask)
+      handleNewDownload(downloadTask)
     }
   }
 
@@ -76,6 +75,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
     withContext(Dispatchers.IO) {
       val tempId = UUID.randomUUID().toString()
       val tempFile = File(modelDir, tempId)
+
       downloadTask.url.openStream().use {
         Channels.newChannel(it).use { src ->
           FileOutputStream(tempFile).use { fileOutputStream ->
@@ -86,31 +86,15 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
       require(tempFile.exists())
       tempFile.renameTo(downloadTask.file)
       require(downloadTask.file.exists())
+
       handleFinishDownload(downloadTask)
     }
   }
 
-  private suspend fun handleFinishDownload(downloadTask: DownloadTask) {
+  private fun handleFinishDownload(downloadTask: DownloadTask) {
     remainingTasks.remove(downloadTask)
     downloadingTasks.remove(downloadTask)
-    ++progress.intValue
-
-    if (remainingTasks.isEmpty()) {
-      if (downloadingTasks.isEmpty()) {
-        return
-      }
-    } else {
-      handleNextDownload()
-    }
-  }
-
-  private suspend fun handleNextDownload() {
-    for (downloadTask in remainingTasks) {
-      if (!downloadingTasks.contains(downloadTask)) {
-        handleNewDownload(downloadTask)
-        break
-      }
-    }
+    ++progress.value
   }
 
   private fun clear() {
@@ -128,14 +112,14 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
   }
 
   private fun indexModel() {
-    progress.intValue = 0
+    progress.value = 0
     total.intValue = modelConfig.tokenizerFiles.size + paramsConfig.paramsRecords.size
 
     // Adding Tokenizer to download tasks
     for (tokenizerFilename in modelConfig.tokenizerFiles) {
       val file = File(modelDir, tokenizerFilename)
       if (file.exists()) {
-        ++progress.intValue
+        ++progress.value
       } else {
         remainingTasks.add(
           DownloadTask(
@@ -150,7 +134,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
     for (paramsRecord in paramsConfig.paramsRecords) {
       val file = File(modelDir, paramsRecord.dataPath)
       if (file.exists()) {
-        ++progress.intValue
+        ++progress.value
       } else {
         remainingTasks.add(
           DownloadTask(

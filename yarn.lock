@@ -77,6 +77,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@azure/core-asynciterator-polyfill@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "@azure/core-asynciterator-polyfill@npm:1.0.2"
+  checksum: ccdad3bcf3f670e0b4f52e421cd1566368dce36ea4b3cb18a9b554c14ea0c1436868cb55e774b2377307dcb222e4eb3777b48e97249157c612e9c24654a56d16
+  languageName: node
+  linkType: hard
+
 "@babel/code-frame@npm:^7.0.0, @babel/code-frame@npm:^7.12.13, @babel/code-frame@npm:^7.24.7":
   version: 7.24.7
   resolution: "@babel/code-frame@npm:7.24.7"
@@ -468,7 +475,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-proposal-async-generator-functions@npm:^7.0.0":
+"@babel/plugin-proposal-async-generator-functions@npm:^7.0.0, @babel/plugin-proposal-async-generator-functions@npm:^7.20.7":
   version: 7.20.7
   resolution: "@babel/plugin-proposal-async-generator-functions@npm:7.20.7"
   dependencies:
@@ -11193,7 +11200,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "react-native-ai-example@workspace:example"
   dependencies:
+    "@azure/core-asynciterator-polyfill": ^1.0.2
     "@babel/core": ^7.20.0
+    "@babel/plugin-proposal-async-generator-functions": ^7.20.7
     "@babel/preset-env": ^7.20.0
     "@babel/runtime": ^7.20.0
     "@react-native-community/netinfo": ^11.3.2
@@ -11211,6 +11220,7 @@ __metadata:
     react-native-select-dropdown: ^4.0.1
     text-encoding: ^0.7.0
     uuid: ^10.0.0
+    web-streams-polyfill: 3.3.3
     zod: ^3.23.8
   languageName: unknown
   linkType: soft
@@ -11242,6 +11252,7 @@ __metadata:
     text-encoding: ^0.7.0
     turbo: ^2.4.2
     typescript: ^5.2.2
+    web-streams-polyfill: 3.3.3
   peerDependencies:
     react: "*"
     react-native: "*"
@@ -13553,7 +13564,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"web-streams-polyfill@npm:^3.0.3":
+"web-streams-polyfill@npm:3.3.3, web-streams-polyfill@npm:^3.0.3":
   version: 3.3.3
   resolution: "web-streams-polyfill@npm:3.3.3"
   checksum: 21ab5ea08a730a2ef8023736afe16713b4f2023ec1c7085c16c8e293ee17ed085dff63a0ad8722da30c99c4ccbd4ccd1b2e79c861829f7ef2963d7de7004c2cb
