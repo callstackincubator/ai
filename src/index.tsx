@@ -8,7 +8,11 @@ import {
   type LanguageModelV1StreamPart,
 } from '@ai-sdk/provider';
 import './polyfills';
-import { ReadableStream } from 'web-streams-polyfill/ponyfill';
+import type { EmitterSubscription } from 'react-native';
+import {
+  ReadableStream,
+  ReadableStreamDefaultController,
+} from 'web-streams-polyfill';
 
 const LINKING_ERROR =
   `The package 'react-native-ai' doesn't seem to be linked. Make sure: \n\n` +
@@ -129,9 +133,14 @@ class AiModel implements LanguageModelV1 {
     };
   }
 
-  stream = null;
-  controller = null;
-  streamId = null;
+  stream: ReadableStream<LanguageModelV1StreamPart> | null = null;
+  controller: ReadableStreamDefaultController<LanguageModelV1StreamPart> | null =
+    null;
+  streamId: string | null = null;
+  chatUpdateListener: EmitterSubscription | null = null;
+  chatCompleteListener: EmitterSubscription | null = null;
+  chatErrorListener: EmitterSubscription | null = null;
+  isStreamClosed: boolean = false;
 
   public doStream = async (
     options: LanguageModelV1CallOptions
@@ -141,90 +150,120 @@ class AiModel implements LanguageModelV1 {
     rawResponse?: { headers?: Record<string, string> };
     warnings?: LanguageModelV1CallWarning[];
   }> => {
-    console.debug('stream options:', options);
+    // Reset stream state
+    this.isStreamClosed = false;
+    const messages = options.prompt;
+    const extractedMessages = messages.map((message): Message => {
+      let content = '';
 
-    // const model = await this.getModel();
-    // const message =
-    //   options.prompt[options.prompt.length - 1]!.content[0]!.text!;
+      if (Array.isArray(message.content)) {
+        content = message.content
+          .map((messageContent) =>
+            messageContent.type === 'text'
+              ? messageContent.text
+              : messageContent
+          )
+          .join('');
+      }
 
-    const eventEmitter = new NativeEventEmitter(NativeModules.Ai);
-    eventEmitter.addListener('onChatUpdate', (data) => {
-      console.log({ data });
+      return {
+        role: message.role,
+        content: content,
+      };
     });
+    const model = await this.getModel();
 
-    eventEmitter.addListener('onChatComplete', () => {
-      console.log('onChatComplete');
+    const stream = new ReadableStream<LanguageModelV1StreamPart>({
+      start: (controller) => {
+        this.controller = controller;
+
+        const eventEmitter = new NativeEventEmitter(NativeModules.Ai);
+        this.chatCompleteListener = eventEmitter.addListener(
+          'onChatComplete',
+          () => {
+            try {
+              if (!this.isStreamClosed && this.controller) {
+                this.controller.enqueue({
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: {
+                    promptTokens: 0,
+                    completionTokens: 0,
+                  },
+                });
+                this.isStreamClosed = true;
+                this.controller.close();
+              }
+            } catch (error) {
+              console.error('🔴 [Stream] Error in complete handler:', error);
+            }
+          }
+        );
+
+        this.chatErrorListener = eventEmitter.addListener(
+          'onChatUpdate',
+          (data) => {
+            console.log(
+              '🟢 [Stream] Update data:',
+              JSON.stringify(data, null, 2)
+            );
+            try {
+              if (!this.isStreamClosed && this.controller) {
+                if (data.error) {
+                  this.controller.enqueue({ type: 'error', error: data.error });
+                  this.isStreamClosed = true;
+                  this.controller.close();
+                } else {
+                  this.controller.enqueue({
+                    type: 'text-delta',
+                    textDelta: data.content || '',
+                  });
+                }
+              } else {
+                console.log(
+                  '🟡 [Stream] Cannot update - stream closed or no controller'
+                );
+              }
+            } catch (error) {
+              console.error('🔴 [Stream] Error in update handler:', error);
+            }
+          }
+        );
+
+        if (!model) {
+          console.error('🔴 [Stream] Model not initialized');
+          throw new Error('Model not initialized');
+        }
+
+        console.log(
+          '🔵 [Stream] Starting native stream with model:',
+          model.modelId
+        );
+        Ai.doStream(model.modelId, extractedMessages);
+      },
+      cancel: () => {
+        console.log('🟡 [Stream] Stream cancelled, cleaning up');
+        this.isStreamClosed = true;
+        if (this.chatUpdateListener) {
+          console.log('🟡 [Stream] Removing chat update listener');
+          this.chatUpdateListener.remove();
+        }
+        if (this.chatCompleteListener) {
+          console.log('🟡 [Stream] Removing chat complete listener');
+          this.chatCompleteListener.remove();
+        }
+        if (this.chatErrorListener) {
+          console.log('🟡 [Stream] Removing chat error listener');
+          this.chatErrorListener.remove();
+        }
+      },
+      pull: (_controller) => {
+        console.log('🔵 [Stream] Pull called');
+      },
     });
-
-    // const stream = new ReadableStream({
-    //   start: async (controller) => {
-    //     this.controller = controller;
-
-    //     try {
-    //       this.streamId =
-    //         await StreamingChatModule.streamChatCompletion(message);
-
-    //       this.updateListener = eventEmitter.addListener(
-    //         'chatUpdate',
-    //         this.handleChatUpdate
-    //       );
-    //       this.completeListener = eventEmitter.addListener(
-    //         'chatComplete',
-    //         this.handleChatComplete
-    //       );
-    //       this.errorListener = eventEmitter.addListener(
-    //         'chatError',
-    //         this.handleChatError
-    //       );
-    //     } catch (error) {
-    //       controller.error(error);
-    //     }
-    //   },
-    //   cancel: () => {
-    //     this.cleanup();
-    //   },
-    // });
-
-    // Ai.doStream(model.modelId, message);
-
-    // const stream = new ReadableStream({
-    //   start: (controller) => {
-    //     this.controller = controller;
-
-    //     this.chatCompleteListener = eventEmitter.addListener(
-    //       'chatComplete',
-    //       (data) => {
-    //         console.log(data);
-    //       }
-    //     );
-    //     this.chatErrorListener = eventEmitter.addListener(
-    //       'chatError',
-    //       (data) => {
-    //         console.log(data);
-    //       }
-    //     );
-
-    //     Ai.doStream(model, message); // this should be called via model.doStream()
-    //   },
-    //   cancel: () => {
-    //     console.log('cancel');
-    //     console.log('cleanup?');
-    //     this.chatUpdateListener.remove();
-    //     this.chatCompleteListener.remove();
-    //     this.chatErrorListener.remove();
-    //   },
-    // });
-
-    // const promptStream = session.promptStreaming(message);
-    // const transformStream = new StreamAI(options.abortSignal);
-    // const stream = promptStream.pipeThrough(transformStream);
-
-    // TODO: how to convert event emitter to stream
 
     return {
-      stream: new ReadableStream({
-        start: () => {},
-      }),
+      stream,
       rawCall: { rawPrompt: options.prompt, rawSettings: this.options },
     };
   };

@@ -9,9 +9,15 @@ if (Platform.OS !== 'web') {
       '@stardazed/streams-text-encoding'
     );
 
+    const webStreamPolyfills = require('web-streams-polyfill/ponyfill/es6');
+
     if (!('structuredClone' in global)) {
       polyfillGlobal('structuredClone', () => structuredClone);
     }
+
+    polyfillGlobal('ReadableStream', () => webStreamPolyfills.ReadableStream);
+    polyfillGlobal('TransformStream', () => webStreamPolyfills.TransformStream);
+    polyfillGlobal('WritableStream', () => webStreamPolyfills.WritableStream);
 
     polyfillGlobal('TextDecoderStream', () => TextDecoderStream);
     polyfillGlobal('TextEncoderStream', () => TextEncoderStream);

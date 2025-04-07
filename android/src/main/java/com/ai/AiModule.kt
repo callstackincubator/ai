@@ -133,7 +133,7 @@ class AiModule(reactContext: ReactApplicationContext) :
       try {
         chat.generateResponse(
           messageList,
-          callback = object : Chat.ChatStateCallback {
+          callback = object : Chat.GenerateCallback {
             override fun onMessageReceived(message: String) {
               promise.resolve(message)
             }
@@ -146,8 +146,37 @@ class AiModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun doStream(instanceId: String, text: String, promise: Promise) {
-    promise.resolve("Streaming text for $instanceId: $text")
+  fun doStream(instanceId: String, messages: ReadableArray, promise: Promise) {
+    val messageList = mutableListOf<ChatCompletionMessage>()
+
+    for (i in 0 until messages.size()) {
+      val messageMap = messages.getMap(i) // Extract ReadableMap
+
+      val role = if (messageMap.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
+      val content = messageMap.getString("content") ?: ""
+
+      messageList.add(ChatCompletionMessage(role, content))
+    }
+    CoroutineScope(Dispatchers.Main).launch {
+      chat.streamResponse(
+        messageList,
+        callback = object : Chat.StreamCallback {
+          override fun onUpdate(message: String) {
+            val event: WritableMap = Arguments.createMap().apply {
+              putString("content", message)
+            }
+            sendEvent("onChatUpdate", event)
+          }
+          override fun onFinished(message: String) {
+            val event: WritableMap = Arguments.createMap().apply {
+              putString("content", message)
+            }
+            sendEvent("onChatComplete", event)
+          }
+        }
+      )
+    }
+    promise.resolve(null)
   }
 
   @ReactMethod
