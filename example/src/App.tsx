@@ -40,7 +40,6 @@ export default function Example() {
               }),
           });
 
-          let text = '';
           let firstChunk = true;
           for await (const chunk of textStream) {
             if (firstChunk) {
@@ -48,7 +47,7 @@ export default function Example() {
                 GiftedChat.append(previousMessages, {
                   // @ts-ignore
                   _id: uuid(),
-                  text,
+                  text: chunk,
                   createdAt: new Date(),
                   user: aiBot,
                 })
@@ -60,7 +59,7 @@ export default function Example() {
                 return [
                   {
                     _id: prevMessage?._id ?? uuid(),
-                    text: chunk,
+                    text: prevMessage?.text ? prevMessage.text + chunk : chunk,
                     createdAt: prevMessage?.createdAt ?? new Date(),
                     user: aiBot,
                   },
