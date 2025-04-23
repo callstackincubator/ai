@@ -26,7 +26,7 @@ export default function Example() {
     async (messages: IMessage[]) => {
       if (modelId) {
         try {
-          const { textStream } = await streamText({
+          const { textStream } = streamText({
             model: getModel(modelId),
             temperature: 0.6,
             messages: messages
