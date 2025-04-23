@@ -8,7 +8,7 @@
   "react-native": "src/index",
   "source": "src/index",
   "bin": {
-    "mlc-prepare": "scripts/package-models.js"
+    "mlc-prepare": "scripts/mlc-prepare.js"
   },
   "files": [
     "src",
@@ -17,6 +17,7 @@
     "ios",
     "cpp",
     "*.podspec",
+    "./scripts/mlc-prepare.js",
     "!ios/build",
     "!android/build",
     "!android/gradle",
