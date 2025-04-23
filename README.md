@@ -75,10 +75,37 @@ If you want to execute models also on Android you need to set `ANDROID_NDK` and 
 #### 6. Run the following command to prepare binaries and static libraries for the project
 
 ```
-npm run react-native-ai mlc-prepare
+npx react-native-ai mlc-prepare
 ```
 
-#### 7. Build the project! 🚀
+#### 7. Add missing polyfills
+
+To make the Vercel AI SDK work in your project, you should include polyfills by first installing these pacakges:
+
+```
+npm install @azure/core-asynciterator-polyfill @ungap/structured-clone web-streams-polyfill text-encoding
+```
+
+and creating `polyfills.ts` file which will contain following imports:
+
+```js
+import '@azure/core-asynciterator-polyfill';
+import structuredClone from '@ungap/structured-clone';
+import { polyfillGlobal } from 'react-native/Libraries/Utilities/PolyfillFunctions';
+
+const webStreamPolyfills = require('web-streams-polyfill/ponyfill/es6');
+
+polyfillGlobal('TextEncoder', () => require('text-encoding').TextEncoder);
+polyfillGlobal('ReadableStream', () => webStreamPolyfills.ReadableStream);
+polyfillGlobal('TransformStream', () => webStreamPolyfills.TransformStream);
+polyfillGlobal('WritableStream', () => webStreamPolyfills.WritableStream);
+polyfillGlobal('TextEncoderStream', () => webStreamPolyfills.TextEncoderStream);
+polyfillGlobal('structuredClone', () => structuredClone);
+```
+
+Make sure to include them inside `index.js` before registering the root component.
+
+#### 8. Build the project! 🚀
 
 ## API
 
