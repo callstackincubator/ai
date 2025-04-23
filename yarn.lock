@@ -11257,7 +11257,7 @@ __metadata:
     react: "*"
     react-native: "*"
   bin:
-    mlc-prepare: scripts/package-models.js
+    mlc-prepare: scripts/mlc-prepare.js
   languageName: unknown
   linkType: soft
 
