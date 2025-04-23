@@ -111,7 +111,6 @@ RCT_EXPORT_MODULE()
   return nil;
 }
 
-
 RCT_EXPORT_METHOD(doGenerate : (NSString*)instanceId messages : (NSArray<NSDictionary*>*)messages resolve : (RCTPromiseResolveBlock)
                       resolve reject : (RCTPromiseRejectBlock)reject) {
   NSLog(@"Generating for instance ID: %@, with text: %@", instanceId, messages);
@@ -651,12 +650,15 @@ RCT_EXPORT_METHOD(downloadModel : (NSString*)instanceId resolve : (RCTPromiseRes
         downloadedFiles++;
         if (self->hasListeners) {
           double percentage = (double)downloadedFiles / totalFiles * 100.0;
-          [self sendEventWithName:@"onDownloadProgress" body:@{@"percentage": @(percentage)}];
+          [self sendEventWithName:@"onDownloadProgress" body:@{@"percentage" : @(percentage)}];
         }
       };
 
       // Download config files
-      [self downloadAndSaveConfig:modelRecord[@"model_url"] configName:@"mlc-chat-config.json" toURL:[modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"] error:&error];
+      [self downloadAndSaveConfig:modelRecord[@"model_url"]
+                       configName:@"mlc-chat-config.json"
+                            toURL:[modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"]
+                            error:&error];
       if (error) {
         dispatch_async(dispatch_get_main_queue(), ^{
           reject(@"MODEL_ERROR", @"Failed to download config files", error);
@@ -732,7 +734,7 @@ RCT_EXPORT_METHOD(downloadModel : (NSString*)instanceId resolve : (RCTPromiseRes
 
     } @catch (NSException* exception) {
       if (self->hasListeners) {
-        [self sendEventWithName:@"onDownloadError" body:@{@"message": exception.reason ?: @"Unknown error"}];
+        [self sendEventWithName:@"onDownloadError" body:@{@"message" : exception.reason ?: @"Unknown error"}];
       }
       dispatch_async(dispatch_get_main_queue(), ^{
         reject(@"MODEL_ERROR", exception.reason, nil);
