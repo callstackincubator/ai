@@ -4,6 +4,35 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
+// Check for required dependencies
+function checkDependency(command, name) {
+  try {
+    execSync(`which ${command}`, { stdio: 'ignore' });
+    console.log(`✅ ${name} found in PATH`);
+    return true;
+  } catch (error) {
+    console.error(
+      `❌ ${name} not found in PATH. Please install ${name} first.`
+    );
+    return false;
+  }
+}
+
+// Validate required dependencies
+const hasGitLFS = checkDependency('git-lfs', 'Git LFS');
+const hasRustup = checkDependency('rustup', 'Rustup');
+
+if (!hasGitLFS || !hasRustup) {
+  console.error('\n🔧 Please install the missing dependencies:');
+  if (!hasGitLFS) {
+    console.error('- Git LFS: https://git-lfs.com');
+  }
+  if (!hasRustup) {
+    console.error('- Rustup: https://rustup.rs');
+  }
+  process.exit(1);
+}
+
 const projectRoot = process.cwd();
 
 const args = process.argv.slice(2);
