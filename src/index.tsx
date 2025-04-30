@@ -8,7 +8,7 @@ import {
   type LanguageModelV1StreamPart,
 } from '@ai-sdk/provider';
 import './polyfills';
-import type { EmitterSubscription } from 'react-native';
+import { LogBox, type EmitterSubscription } from 'react-native';
 import {
   ReadableStream,
   ReadableStreamDefaultController,
@@ -57,6 +57,8 @@ export interface Message {
 export interface DownloadProgress {
   percentage: number;
 }
+
+LogBox.ignoreLogs(['new NativeEventEmitter', 'Avatar:']); // Ignore log notification by message
 
 class AiModel implements LanguageModelV1 {
   readonly specificationVersion = 'v1';
@@ -177,7 +179,11 @@ class AiModel implements LanguageModelV1 {
       start: (controller) => {
         this.controller = controller;
 
-        const eventEmitter = new NativeEventEmitter(NativeModules.Ai);
+        const eventEmitter =
+          Platform.OS === 'android'
+            ? new NativeEventEmitter()
+            : new NativeEventEmitter(NativeModules.Ai);
+
         this.chatCompleteListener = eventEmitter.addListener(
           'onChatComplete',
           () => {
