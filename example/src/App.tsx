@@ -1,10 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import {
-  SafeAreaView,
-  StyleSheet,
-  View,
-  Text,
-} from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text } from 'react-native';
 import { GiftedChat, type IMessage } from 'react-native-gifted-chat';
 import {
   getModel,
@@ -25,7 +20,7 @@ const aiBot = {
 
 const ProgressBar = ({ progress }: { progress: number }) => {
   if (progress === 100) return null;
-  
+
   return (
     <View style={styles.progressContainer}>
       <View style={[styles.progressBar, { width: `${progress}%` }]} />

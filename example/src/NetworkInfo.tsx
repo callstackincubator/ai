@@ -14,7 +14,7 @@ const NetworkInfo = () => {
     <View style={styles.container}>
       <View style={[styles.statusIndicator, getStatusColor()]} />
       <Text style={styles.text}>
-        {netInfo.isConnected 
+        {netInfo.isConnected
           ? `Connected via ${netInfo.type} ${netInfo.isInternetReachable ? '✅' : '⚠️'}`
           : 'No network connection ❌'}
       </Text>
