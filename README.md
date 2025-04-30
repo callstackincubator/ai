@@ -2,7 +2,7 @@
 
 <div align="center">
 
-Run LLMs <b>locally</b> in React Native app via universal <a href="https://github.com/mlc-ai/mlc-llm">MLC LLM Engine</a> with compatibility for <a href="https://sdk.vercel.ai/docs/">Vercel AI SDK</a>.
+Run LLMs <b>on-device</b> in React Native via <a href="https://github.com/mlc-ai/mlc-llm">MLC LLM Engine</a> with compatibility for <a href="https://sdk.vercel.ai/docs/">Vercel AI SDK</a>.
 </div>
 
 
