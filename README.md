@@ -1,15 +1,17 @@
-<h1 align="center">`react-native-ai</h1>
+<h1 align="center">react-native-ai</h1>
 
-<p align="center">
-  <strong>Run LLMs locally in React Native app via Universal [MLC LLM Engine](https://github.com/mlc-ai/mlc-llm) with compatibility for [Vercel AI SDK](https://sdk.vercel.ai/docs/).</strong><br>
-</p>
+<div align="center">
+
+Run LLMs <b>locally</b> in React Native app via universal <a href="https://github.com/mlc-ai/mlc-llm">MLC LLM Engine</a> with compatibility for <a href="https://sdk.vercel.ai/docs/">Vercel AI SDK</a>.
+</div>
+
 
 <div align="center">
 
 [![mit licence](https://img.shields.io/dub/l/vibe-d.svg?style=for-the-badge)](https://github.com/callstackincubator/ai/blob/main/LICENSE)
-[![npm version](https://img.shields.io/npm/v/react-native-bottom-tabs?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
-[![npm downloads](https://img.shields.io/npm/dt/react-native-bottom-tabs.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
-[![npm downloads](https://img.shields.io/npm/dm/react-native-bottom-tabs.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
+[![npm version](https://img.shields.io/npm/v/react-native-ai?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
+[![npm downloads](https://img.shields.io/npm/dt/react-native-ai.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
+[![npm downloads](https://img.shields.io/npm/dm/react-native-ai.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
 
 </div>
 
@@ -84,6 +86,12 @@ If you want to execute models also on Android you need to set `ANDROID_NDK` and 
   ```
 
 #### 6. Run the following command to prepare binaries and static libraries for the project
+
+This command prepares the necessary binaries and static libraries for your React Native project by:
+- Validating required dependencies
+- Setting up platform-specific configurations (Android/iOS)
+- Running `mlc_llm package` for each platform to prepare model binaries
+- Handling environment variables and platform-specific requirements
 
 ```
 npx react-native-ai mlc-prepare
@@ -170,39 +178,23 @@ This library provides first-class compatibility with the [Vercel AI SDK](https:/
 Once a model is downloaded and prepared, you can use it with the Vercel AI SDK functions.
 
 ```typescript
-import { getModel, prepareModel, downloadModel } from 'react-native-ai';
+import { getModel, prepareModel } from 'react-native-ai';
 import { streamText, type CoreMessage } from 'ai';
 
 async function runInference(modelId: string, messages: CoreMessage[]) {
-  // Ensure model is downloaded and prepared first
-  // await downloadModel(modelId, { /* callbacks */ }); // Optional: if not already downloaded
   await prepareModel(modelId);
-
-  // Get the model instance compatible with Vercel AI SDK
   const llm = getModel(modelId);
-
-  // Use the model with streamText
+  
   const { textStream } = streamText({
     model: llm,
     messages: messages,
   });
 
-  // Process the stream
   for await (const textPart of textStream) {
     console.log(textPart);
   }
-
-  // You can also use generateText for non-streaming responses
-  /*
-  const { text } = await generateText({
-    model: llm,
-    prompt: 'Why is the sky blue?'
-  });
-  console.log(text);
-  */
 }
 
-// Example usage:
 const exampleMessages: CoreMessage[] = [
   { role: 'user', content: 'Hello! Tell me a short story.' },
 ];
@@ -211,10 +203,18 @@ runInference('Mistral-7B-Instruct-v0.2-q3f16_1', exampleMessages);
 
 This setup allows you to leverage the power of the Vercel AI SDK's unified API while running models directly on the user's device.
 
-## License
+## Contributing
 
-MIT
+Read the [contribution guidelines](/CONTRIBUTING.md) before contributing.
+
+## Made with ❤️ at Callstack
+
+<b>react-native-ai</b> is an open source project and will always remain free to use. If you think it's cool, please star it 🌟. 
+
+[Callstack][callstack-readme-with-love] is a group of React and React Native geeks, contact us at [hello@callstack.com](mailto:hello@callstack.com) if you need any help with these or just want to say hi!
 
 ---
 
 Made with [create-react-native-library](https://github.com/callstack/react-native-builder-bob)
+
+[callstack-readme-with-love]: https://callstack.com/?utm_source=github.com&utm_medium=referral&utm_campaign=react-native-ai&utm_term=readme-with-love
