@@ -3,6 +3,7 @@ package com.ai
 import ai.mlc.mlcllm.MLCEngine
 import ai.mlc.mlcllm.OpenAIProtocol
 import ai.mlc.mlcllm.OpenAIProtocol.ChatCompletionMessage
+import android.util.Log
 import java.io.File
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
@@ -39,10 +40,11 @@ class Chat(modelConfig: ModelConfig, modelDir: File) {
         var finishReasonLength = false
         var streamingText = ""
 
+
         for (res in chatResponse) {
           for (choice in res.choices) {
             choice.delta.content?.let { content ->
-              streamingText += content.asText()
+              streamingText = content.asText()
             }
             choice.finish_reason?.let { finishReason ->
               if (finishReason == "length") {
@@ -53,7 +55,7 @@ class Chat(modelConfig: ModelConfig, modelDir: File) {
 
           callback.onUpdate(streamingText)
           if (finishReasonLength) {
-            streamingText += " [output truncated due to context length limit...]"
+            streamingText = " [output truncated due to context length limit...]"
             callback.onUpdate(streamingText)
           }
         }
