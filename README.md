@@ -1,6 +1,17 @@
-# react-native-ai
+<h1 align="center">`react-native-ai</h1>
 
-Run LLMs locally in React Native app via Universal [MLC LLM Engine](https://github.com/mlc-ai/mlc-llm) with compatibility for [Vercel AI SDK](https://sdk.vercel.ai/docs/).
+<p align="center">
+  <strong>Run LLMs locally in React Native app via Universal [MLC LLM Engine](https://github.com/mlc-ai/mlc-llm) with compatibility for [Vercel AI SDK](https://sdk.vercel.ai/docs/).</strong><br>
+</p>
+
+<div align="center">
+
+[![mit licence](https://img.shields.io/dub/l/vibe-d.svg?style=for-the-badge)](https://github.com/callstackincubator/ai/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/react-native-bottom-tabs?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
+[![npm downloads](https://img.shields.io/npm/dt/react-native-bottom-tabs.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
+[![npm downloads](https://img.shields.io/npm/dm/react-native-bottom-tabs.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
+
+</div>
 
 ## Installation
 
