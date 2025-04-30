@@ -48,14 +48,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/szymonrybczak/react-native-ai.git"
+    "url": "git+https://github.com/callstackincubator/ai.git"
   },
   "author": "szymonrybczak <szymon.rybczak@gmail.com> (https://github.com/szymonrybczak)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/szymonrybczak/react-native-ai/issues"
+    "url": "https://github.com/callstackincubator/ai/issues"
   },
-  "homepage": "https://github.com/szymonrybczak/react-native-ai#readme",
+  "homepage": "https://github.com/callstackincubator/ai#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
