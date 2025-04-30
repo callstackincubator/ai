@@ -1,5 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import {
+  SafeAreaView,
+  StyleSheet,
+  View,
+  Text,
+} from 'react-native';
 import { GiftedChat, type IMessage } from 'react-native-gifted-chat';
 import {
   getModel,
@@ -18,9 +23,21 @@ const aiBot = {
   avatar: require('./../assets/avatar.png'),
 };
 
+const ProgressBar = ({ progress }: { progress: number }) => {
+  if (progress === 100) return null;
+  
+  return (
+    <View style={styles.progressContainer}>
+      <View style={[styles.progressBar, { width: `${progress}%` }]} />
+      <Text style={styles.progressText}>{progress.toFixed(1)}%</Text>
+    </View>
+  );
+};
+
 export default function Example() {
   const [modelId, setModelId] = useState<string>();
   const [displayedMessages, setDisplayedMessages] = useState<IMessage[]>([]);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
 
   const onSendMessage = useCallback(
     async (messages: IMessage[]) => {
@@ -100,12 +117,15 @@ export default function Example() {
             addAiBotMessage('Starting model download...');
           },
           onProgress: (progress) => {
-            addAiBotMessage(`Downloading: ${progress.percentage.toFixed(2)}%`);
+            setDownloadProgress(progress.percentage);
           },
           onComplete: () => {
+            setDownloadProgress(100);
+            // setTimeout(() => setDownloadProgress(0), 1000);
             addAiBotMessage('Model download complete!');
           },
           onError: (error) => {
+            setDownloadProgress(0);
             addAiBotMessage(`Error downloading model: ${error.message}`);
           },
         });
@@ -141,6 +161,11 @@ export default function Example() {
         user={{
           _id: 1,
         }}
+        renderFooter={() => (
+          <View style={styles.footerContainer}>
+            <ProgressBar progress={downloadProgress} />
+          </View>
+        )}
       />
     </SafeAreaView>
   );
@@ -150,5 +175,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  footerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  progressContainer: {
+    height: 28,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 14,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#34C759',
+    borderRadius: 14,
+  },
+  progressText: {
+    position: 'absolute',
+    width: '100%',
+    textAlign: 'center',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    lineHeight: 28,
   },
 });

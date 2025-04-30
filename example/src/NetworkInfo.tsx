@@ -13,8 +13,10 @@ const NetworkInfo = () => {
   return (
     <View style={styles.container}>
       <View style={[styles.statusIndicator, getStatusColor()]} />
-      <Text style={styles.statusText}>
-        {netInfo.isConnected ? 'Connected ✅' : 'Disconnected ❌'}
+      <Text style={styles.text}>
+        {netInfo.isConnected 
+          ? `Connected via ${netInfo.type} ${netInfo.isInternetReachable ? '✅' : '⚠️'}`
+          : 'No network connection ❌'}
       </Text>
     </View>
   );
@@ -43,7 +45,7 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
   },
-  statusText: {
+  text: {
     fontSize: 16,
     fontWeight: 'bold',
   },
