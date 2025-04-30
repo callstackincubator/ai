@@ -26,7 +26,7 @@ export const ModelSelection = ({ onModelIdSelected }: ModelSelectionProps) => {
         onSelect={onModelIdSelected}
         renderButton={(selectedItem) => {
           return (
-            <View style={styles.dropdownButtonStyle}>
+            <View style={[styles.dropdownButtonStyle, styles.buttonStyle]}>
               <Text style={styles.dropdownButtonTxtStyle}>
                 {(selectedItem && selectedItem.model_id) || 'Select model'}
               </Text>
@@ -54,16 +54,23 @@ export const ModelSelection = ({ onModelIdSelected }: ModelSelectionProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 10,
+    width: '100%',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  buttonStyle: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
   },
   dropdownButtonStyle: {
-    width: 200,
+    width: '100%',
     height: 50,
-    backgroundColor: '#E9ECEF',
-    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -71,37 +78,24 @@ const styles = StyleSheet.create({
   },
   dropdownButtonTxtStyle: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '500',
     color: '#151E26',
-  },
-  dropdownButtonArrowStyle: {
-    fontSize: 28,
-  },
-  dropdownButtonIconStyle: {
-    fontSize: 28,
-    marginRight: 8,
+    textAlign: 'center',
   },
   dropdownMenuStyle: {
-    backgroundColor: '#E9ECEF',
+    backgroundColor: '#F5F5F5',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
   },
   dropdownItemStyle: {
-    width: '100%',
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 8,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E8E8',
   },
   dropdownItemTxtStyle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 16,
     color: '#151E26',
-  },
-  dropdownItemIconStyle: {
-    fontSize: 28,
-    marginRight: 8,
   },
 });
