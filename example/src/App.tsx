@@ -121,7 +121,6 @@ export default function Example() {
           },
           onComplete: () => {
             setDownloadProgress(100);
-            // setTimeout(() => setDownloadProgress(0), 1000);
             addAiBotMessage('Model download complete!');
           },
           onError: (error) => {
