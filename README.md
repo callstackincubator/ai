@@ -12,7 +12,10 @@ Run LLMs <b>on-device</b> in React Native via <a href="https://github.com/mlc-ai
 [![npm version](https://img.shields.io/npm/v/react-native-ai?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
 [![npm downloads](https://img.shields.io/npm/dt/react-native-ai.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
 [![npm downloads](https://img.shields.io/npm/dm/react-native-ai.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
+</div>
 
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/443a6925-1e50-4eab-87a3-4f9c34e2de14" />
 </div>
 
 ## Installation
