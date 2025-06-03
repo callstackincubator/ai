@@ -105,27 +105,31 @@ export default function Example() {
     async (modelSettings: AiModelSettings) => {
       if (modelSettings.model_id) {
         setModelId(modelSettings.model_id);
-
-        addAiBotMessage('Downloading model...');
-        await downloadModel(modelSettings.model_id, {
-          onStart: () => {
-            addAiBotMessage('Starting model download...');
-          },
-          onProgress: (progress) => {
-            setDownloadProgress(progress.percentage);
-          },
-          onComplete: () => {
-            setDownloadProgress(100);
-            addAiBotMessage('Model download complete!');
-          },
-          onError: (error) => {
-            setDownloadProgress(0);
-            addAiBotMessage(`Error downloading model: ${error.message}`);
-          },
-        });
-
+        if (modelSettings.downloaded) {
+          addAiBotMessage('Model already downloaded!');
+          setDownloadProgress(100);
+        } else {
+          setDownloadProgress(0);
+          addAiBotMessage('Downloading model...');
+          await downloadModel(modelSettings.model_id, {
+            onStart: () => {
+              addAiBotMessage('Starting model download...');
+            },
+            onProgress: (progress) => {
+              setDownloadProgress(progress.percentage);
+            },
+            onComplete: () => {
+              setDownloadProgress(100);
+              addAiBotMessage('Model download complete!');
+            },
+            onError: (error) => {
+              setDownloadProgress(0);
+              addAiBotMessage(`Error downloading model: ${error.message}`);
+            },
+          });
+        }
+        addAiBotMessage('Preparing model...');
         await prepareModel(modelSettings.model_id);
-
         addAiBotMessage('Model ready for conversation.');
       }
     },
