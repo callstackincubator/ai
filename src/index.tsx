@@ -42,6 +42,7 @@ export default Ai;
 
 export interface AiModelSettings extends Record<string, unknown> {
   model_id?: string;
+  downloaded?: boolean;
 }
 
 export interface Model {
