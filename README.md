@@ -1,5 +1,4 @@
-![image](https://github.com/user-attachments/assets/027ccbc1-c6c4-46a0-aa62-7b89d4e62f24)
-
+[![image](https://github.com/user-attachments/assets/027ccbc1-c6c4-46a0-aa62-7b89d4e62f24)](https://www.callstack.com/open-source)
 <div align="center">
 
 Run LLMs <b>on-device</b> in React Native via <a href="https://github.com/mlc-ai/mlc-llm">MLC LLM Engine</a> with compatibility for <a href="https://sdk.vercel.ai/docs/">Vercel AI SDK</a>.

@@ -94,7 +94,7 @@ class AiModel implements LanguageModelV1 {
       rawSettings: Record<string, unknown>;
     };
   }> {
-    const model = await this.getModel();
+    // const model = await this.getModel();
     const messages = options.prompt;
     const extractedMessages = messages.map((message): Message => {
       let content = '';
@@ -116,9 +116,10 @@ class AiModel implements LanguageModelV1 {
     });
 
     let text = '';
-
+    console.warn('CALLING NOW', { messages });
     if (messages.length > 0) {
-      text = await Ai.doGenerate(model.modelId, extractedMessages);
+      text = await Ai.doGenerate(this.modelId, extractedMessages);
+      console.log('on js', text);
     }
 
     return {

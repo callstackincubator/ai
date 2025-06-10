@@ -2,6 +2,12 @@
 #import "MLCEngine.h"
 #import <SafariServices/SafariServices.h>
 
+#if __has_include("react_native_ai/react_native_ai-Swift.h")
+#import "react_native_ai/react_native_ai-Swift.h"
+#else
+#import "react_native_ai-Swift.h"
+#endif
+
 @interface Ai ()
 
 @property(nonatomic, strong) MLCEngine* engine;
@@ -114,46 +120,60 @@ RCT_EXPORT_MODULE()
 RCT_EXPORT_METHOD(doGenerate : (NSString*)instanceId messages : (NSArray<NSDictionary*>*)messages resolve : (RCTPromiseResolveBlock)
                       resolve reject : (RCTPromiseRejectBlock)reject) {
   NSLog(@"Generating for instance ID: %@, with text: %@", instanceId, messages);
-  _displayText = @"";
-  __block BOOL hasResolved = NO;
+//  _displayText = @"";
+//  __block BOOL hasResolved = NO;
+//
+//  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+//    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
+//    NSString* modelLocalPath = [modelLocalURL path];
+//
+//    [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
 
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
-    NSString* modelLocalPath = [modelLocalURL path];
+    // Extract the last message from the messages array
+    NSDictionary *lastMessage = [messages lastObject];
+    NSString *userMessage = lastMessage[@"content"]; // Assuming the key for the message text is "text"
 
-    [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
+    [AiModuleFoundation generateResponseWithSystemPrompt:@"" userMessage:userMessage completionHandler:^(NSString * _Nullable response, NSError * _Nullable error) {
+      if (error) {
+        NSLog(@"Error generating response: %@", error);
+        reject(@"generation_error", @"Failed to generate response", error);
+        return;
+      }
 
-    [self.engine chatCompletionWithMessages:messages
-                                 completion:^(id response) {
-                                   if ([response isKindOfClass:[NSString class]]) {
-                                     NSDictionary* parsedResponse = [self parseResponseString:response];
-                                     if (parsedResponse) {
-                                       NSString* content = parsedResponse[@"content"];
-                                       BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
-
-                                       if (content) {
-                                         self.displayText = [self.displayText stringByAppendingString:content];
-                                       }
-
-                                       if (isFinished && !hasResolved) {
-                                         hasResolved = YES;
-                                         resolve(self.displayText);
-                                       }
-
-                                     } else {
-                                       if (!hasResolved) {
-                                         hasResolved = YES;
-                                         reject(@"PARSE_ERROR", @"Failed to parse response", nil);
-                                       }
-                                     }
-                                   } else {
-                                     if (!hasResolved) {
-                                       hasResolved = YES;
-                                       reject(@"INVALID_RESPONSE", @"Received an invalid response type", nil);
-                                     }
-                                   }
-                                 }];
-  });
+      NSLog(@"Generated response: %@", response);
+      resolve(response);
+    }];
+    
+//    [self.engine chatCompletionWithMessages:messages
+//                                 completion:^(id response) {
+//                                   if ([response isKindOfClass:[NSString class]]) {
+//                                     NSDictionary* parsedResponse = [self parseResponseString:response];
+//                                     if (parsedResponse) {
+//                                       NSString* content = parsedResponse[@"content"];
+//                                       BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
+//
+//                                       if (content) {
+//                                         self.displayText = [self.displayText stringByAppendingString:content];
+//                                       }
+//
+//                                       if (isFinished && !hasResolved) {
+//                                         hasResolved = YES;
+//                                         resolve(self.displayText);
+//                                       }
+//
+//                                     } else {
+//                                       if (!hasResolved) {
+//                                         hasResolved = YES;
+//                                         reject(@"PARSE_ERROR", @"Failed to parse response", nil);
+//                                       }
+//                                     }
+//                                   } else {
+//                                     if (!hasResolved) {
+//                                       hasResolved = YES;
+//                                       reject(@"INVALID_RESPONSE", @"Received an invalid response type", nil);
+//                                     }
+//                                   }
+//                                 }];
 }
 
 RCT_EXPORT_METHOD(doStream : (NSString*)instanceId messages : (NSArray<NSDictionary*>*)messages resolve : (RCTPromiseResolveBlock)

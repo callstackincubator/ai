@@ -40,7 +40,7 @@ Pod::Spec.new do |s|
   end
 
   s.subspec 'MLCEngineObjC' do |ss|
-    ss.source_files = 'ios/**/*.{h,m,mm}'
+    ss.source_files = 'ios/**/*.{h,m,mm,swift}'
     ss.private_header_files = 'ios/ObjC/Private/*.h'
     ss.pod_target_xcconfig = {
       'HEADER_SEARCH_PATHS' => mlc_header_paths
