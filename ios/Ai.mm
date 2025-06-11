@@ -273,8 +273,38 @@ RCT_EXPORT_METHOD(getModels : (RCTPromiseResolveBlock)resolve reject : (RCTPromi
     reject(@"error", @"model_list is missing or invalid", nil);
     return;
   }
-  NSLog(@"models: %@", modelList);
-  resolve(modelList);
+
+  // Create mutable copy of model list to add download status
+  NSMutableArray* enhancedModelList = [NSMutableArray arrayWithCapacity:modelList.count];
+  
+  for (NSDictionary* model in modelList) {
+    NSMutableDictionary* enhancedModel = [model mutableCopy];
+    NSString* modelId = model[@"model_id"];
+    
+    if (modelId) {
+      // Check if model directory exists
+      NSURL* modelDirURL = [_bundleURL URLByAppendingPathComponent:modelId];
+      BOOL isDownloaded = [[NSFileManager defaultManager] fileExistsAtPath:[modelDirURL path]];
+      
+      // If directory exists, check for essential files
+      if (isDownloaded) {
+        NSURL* configURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
+        NSURL* ndarrayCacheURL = [modelDirURL URLByAppendingPathComponent:@"ndarray-cache.json"];
+        
+        isDownloaded = [[NSFileManager defaultManager] fileExistsAtPath:[configURL path]] &&
+                      [[NSFileManager defaultManager] fileExistsAtPath:[ndarrayCacheURL path]];
+      }
+      
+      [enhancedModel setObject:@(isDownloaded) forKey:@"downloaded"];
+    } else {
+      [enhancedModel setObject:@NO forKey:@"downloaded"];
+    }
+    
+    [enhancedModelList addObject:enhancedModel];
+  }
+
+  NSLog(@"models: %@", enhancedModelList);
+  resolve(enhancedModelList);
 }
 
 RCT_EXPORT_METHOD(prepareModel : (NSString*)instanceId resolve : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject) {
