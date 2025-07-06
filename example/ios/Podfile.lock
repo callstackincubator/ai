@@ -1,4 +1,6 @@
 PODS:
+  - AppleLLM (1.0.0):
+    - React-Core
   - boost (1.83.0)
   - DoubleConversion (1.1.6)
   - FBLazyVector (0.74.2)
@@ -935,49 +937,6 @@ PODS:
   - React-Mapbuffer (0.74.2):
     - glog
     - React-debug
-  - react-native-ai (0.1.0):
-    - DoubleConversion
-    - glog
-    - hermes-engine
-    - RCT-Folly (= 2024.01.01.00)
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Codegen
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - react-native-ai/MLCEngineObjC (= 0.1.0)
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-rendererdebug
-    - React-utils
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - Yoga
-  - react-native-ai/MLCEngineObjC (0.1.0):
-    - DoubleConversion
-    - glog
-    - hermes-engine
-    - RCT-Folly (= 2024.01.01.00)
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Codegen
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-rendererdebug
-    - React-utils
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - Yoga
   - react-native-get-random-values (1.11.0):
     - React-Core
   - react-native-netinfo (11.3.2):
@@ -1215,6 +1174,7 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
+  - AppleLLM (from `../../apple-llm`)
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -1247,7 +1207,6 @@ DEPENDENCIES:
   - React-jsitracing (from `../node_modules/react-native/ReactCommon/hermes/executor/`)
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
-  - react-native-ai (from `../..`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
   - React-nativeconfig (from `../node_modules/react-native/ReactCommon`)
@@ -1280,6 +1239,8 @@ SPEC REPOS:
     - SocketRocket
 
 EXTERNAL SOURCES:
+  AppleLLM:
+    :path: "../../apple-llm"
   boost:
     :podspec: "../node_modules/react-native/third-party-podspecs/boost.podspec"
   DoubleConversion:
@@ -1341,8 +1302,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/logger"
   React-Mapbuffer:
     :path: "../node_modules/react-native/ReactCommon"
-  react-native-ai:
-    :path: "../.."
   react-native-get-random-values:
     :path: "../node_modules/react-native-get-random-values"
   react-native-netinfo:
@@ -1397,6 +1356,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  AppleLLM: e6345e5f2e37b7c6ba6712d3728f5acc596deb66
   boost: d3f49c53809116a5d38da093a8aa78bf551aed09
   DoubleConversion: 76ab83afb40bddeeee456813d9c04f67f78771b5
   FBLazyVector: 4bc164e5b5e6cfc288d2b5ff28643ea15fa1a589
@@ -1427,7 +1387,6 @@ SPEC CHECKSUMS:
   React-jsitracing: 00f6151766dec0ab324e2854a9d4dfde0e1f30cc
   React-logger: 70e002e04cc56ff5c12157537405d1644c050703
   React-Mapbuffer: 8d1f0fc6e7280a8ed6da70ece5f283ac5c8032cb
-  react-native-ai: 6fcc12ee5477029d65698647c0937720b5de23fd
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-netinfo: ce102083db558237dac20cf64172ef569ebe2dd9
   React-nativeconfig: 9f223cd321823afdecf59ed00861ab2d69ee0fc1

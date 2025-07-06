@@ -8,8 +8,11 @@ module.exports = {
     },
   },
   dependencies: {
-    [pak.name]: {
-      root: path.join(__dirname, '..'),
-    },
+    // [pak.name]: {
+    //   root: path.join(__dirname, '..'),
+    // },
+    ['@react-native-ai/apple']: {
+      root: path.join(__dirname, '../apple-llm'),
+    }
   },
 };
