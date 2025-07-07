@@ -89,7 +89,8 @@
   },
   "workspaces": [
     "example",
-    "apple-llm"
+    "apple-llm",
+    "example-apple"
   ],
   "packageManager": "yarn@3.6.1",
   "jest": {
