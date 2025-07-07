@@ -14,6 +14,7 @@
 		5AC0B24EACC5EF2C1C45CA4D /* libPods-AiExample.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F5A580F3A03F10D1D84240FD /* libPods-AiExample.a */; };
 		77A8D6CFA3541403A1CD089B /* libPods-AiExample-AiExampleTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F6836EB189667A785F9ECDC5 /* libPods-AiExample-AiExampleTests.a */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		AC91505B2C4C37D100E4348A /* bundle in Resources */ = {isa = PBXBuildFile; fileRef = AC91505A2C4C37D100E4348A /* bundle */; };
 		FA9143FAE05E547962661C6F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1158F81499343192EE2DB0E3 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -44,6 +45,7 @@
 		343E007DBEC64776C70008D9 /* Pods-AiExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AiExample.release.xcconfig"; path = "Target Support Files/Pods-AiExample/Pods-AiExample.release.xcconfig"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = AiExample/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		AC9150592C4C347200E4348A /* AiExample.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = AiExample.entitlements; path = AiExample/AiExample.entitlements; sourceTree = "<group>"; };
+		AC91505A2C4C37D100E4348A /* bundle */ = {isa = PBXFileReference; lastKnownFileType = folder; name = bundle; path = dist/bundle; sourceTree = "<group>"; };
 		B6A0C2F5894D1E53418B241C /* Pods-AiExample-AiExampleTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AiExample-AiExampleTests.release.xcconfig"; path = "Target Support Files/Pods-AiExample-AiExampleTests/Pods-AiExample-AiExampleTests.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F5A580F3A03F10D1D84240FD /* libPods-AiExample.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-AiExample.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -113,10 +115,19 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Libraries;
+			sourceTree = "<group>";
+		};
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				AC91505A2C4C37D100E4348A /* bundle */,
 				13B07FAE1A68108700A75B9A /* AiExample */,
+				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				00E356EF1AD99517003FC87E /* AiExampleTests */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
@@ -240,6 +251,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC91505B2C4C37D100E4348A /* bundle in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				FA9143FAE05E547962661C6F /* PrivacyInfo.xcprivacy in Resources */,
@@ -273,13 +285,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample-AiExampleTests/Pods-AiExample-AiExampleTests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample-AiExampleTests/Pods-AiExample-AiExampleTests-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -294,13 +302,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample/Pods-AiExample-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample/Pods-AiExample-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -315,13 +319,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample-AiExampleTests/Pods-AiExample-AiExampleTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample-AiExampleTests/Pods-AiExample-AiExampleTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -336,13 +336,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample/Pods-AiExample-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AiExample/Pods-AiExample-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -483,7 +479,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = AiExample/AiExample.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LUP9V75BEB;
+				DEVELOPMENT_TEAM = ZK8L4ATDPD;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = AiExample/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -539,6 +535,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/fmt\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/glog\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/react-native-ai\"",
+					"\"$(PROJECT_DIR)/dist/lib\"",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -546,6 +543,12 @@
 					"-ObjC",
 					"-lc++",
 					"-Wl,-all_load",
+					"-lmodel_iphone",
+					"-lmlc_llm",
+					"-ltvm_runtime",
+					"-ltokenizers_cpp",
+					"-lsentencepiece",
+					"-ltokenizers_c",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = ai.example.demo;
 				PRODUCT_NAME = AiExample;
@@ -563,7 +566,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = AiExample/AiExample.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LUP9V75BEB;
+				DEVELOPMENT_TEAM = ZK8L4ATDPD;
 				INFOPLIST_FILE = AiExample/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -618,6 +621,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/fmt\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/glog\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/react-native-ai\"",
+					"\"$(PROJECT_DIR)/dist/lib\"",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -625,6 +629,12 @@
 					"-ObjC",
 					"-lc++",
 					"-Wl,-all_load",
+					"-lmodel_iphone",
+					"-lmlc_llm",
+					"-ltvm_runtime",
+					"-ltokenizers_cpp",
+					"-lsentencepiece",
+					"-ltokenizers_c",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = ai.example.demo;
 				PRODUCT_NAME = AiExample;
@@ -706,10 +716,12 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = "$(inherited)  ";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				USE_HERMES = true;
 			};
 			name = Debug;
@@ -779,7 +791,10 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = "$(inherited)  ";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
