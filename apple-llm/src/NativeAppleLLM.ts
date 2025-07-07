@@ -46,4 +46,4 @@ export interface Spec extends TurboModule {
   onStreamError: EventEmitter<StreamErrorEvent>;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('AppleLLM');
+export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleLLM');

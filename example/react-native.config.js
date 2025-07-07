@@ -13,6 +13,6 @@ module.exports = {
     // },
     ['@react-native-ai/apple']: {
       root: path.join(__dirname, '../apple-llm'),
-    }
+    },
   },
 };

@@ -6,21 +6,20 @@
 //
 
 import Foundation
-import React
 
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
 
-@objc(AppleLLM)
-class AppleLLM: RCTEventEmitter {
+@objc
+public class AppleLLMImpl: NSObject {
   
   private var streamTasks: [String: Task<Void, Never>] = [:]
   
   @objc
-  func isAvailable(
-    _ resolve: @escaping RCTPromiseResolveBlock,
-    rejecter reject: @escaping RCTPromiseRejectBlock
+  public func isAvailable(
+    _ resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
@@ -35,11 +34,11 @@ class AppleLLM: RCTEventEmitter {
   }
   
   @objc
-  func generateText(
+  public func generateText(
     _ messages: NSArray,
     options: NSDictionary?,
-    resolver resolve: @escaping RCTPromiseResolveBlock,
-    rejecter reject: @escaping RCTPromiseRejectBlock
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
@@ -82,11 +81,11 @@ class AppleLLM: RCTEventEmitter {
   }
   
   @objc
-  func startStream(
+  public func startStream(
     _ messages: NSArray,
     options: NSDictionary?,
-    resolver resolve: @escaping RCTPromiseResolveBlock,
-    rejecter reject: @escaping RCTPromiseRejectBlock
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
@@ -111,23 +110,23 @@ class AppleLLM: RCTEventEmitter {
           let responseStream = session.streamResponse(to: "", options: generationOptions)
           
           for try await chunk in responseStream {
-            self.sendEvent(withName: "onStreamUpdate", body: [
-              "streamId": streamId,
-              "content": chunk
-            ])
+//            self.sendEvent(withName: "onStreamUpdate", body: [
+//              "streamId": streamId,
+//              "content": chunk
+//            ])
           }
           
           // Send completion event only if not cancelled
           if !Task.isCancelled {
-            self.sendEvent(withName: "onStreamComplete", body: [
-              "streamId": streamId
-            ])
+//            self.sendEvent(withName: "onStreamComplete", body: [
+//              "streamId": streamId
+//            ])
           }
         } catch {
-          self.sendEvent(withName: "onStreamError", body: [
-            "streamId": streamId,
-            "error": error.localizedDescription
-          ])
+//          self.sendEvent(withName: "onStreamError", body: [
+//            "streamId": streamId,
+//            "error": error.localizedDescription
+//          ])
         }
         
         // Clean up task from map when completed
@@ -155,10 +154,10 @@ class AppleLLM: RCTEventEmitter {
   }
   
   @objc
-  func cancelStream(
+  public func cancelStream(
     _ streamId: NSString,
-    resolver resolve: @escaping RCTPromiseResolveBlock,
-    rejecter reject: @escaping RCTPromiseRejectBlock
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
   ) {
     let streamIdString = streamId as String
     
@@ -176,10 +175,10 @@ class AppleLLM: RCTEventEmitter {
   }
   
   @objc
-  func isModelAvailable(
+  public func isModelAvailable(
     _ modelId: String,
-    resolver resolve: @escaping RCTPromiseResolveBlock,
-    rejecter reject: @escaping RCTPromiseRejectBlock
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
