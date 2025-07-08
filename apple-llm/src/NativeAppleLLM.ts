@@ -32,11 +32,11 @@ export interface Spec extends TurboModule {
   isAvailable(): boolean;
   generateText(
     messages: AppleMessage[],
-    options?: AppleGenerationOptions
+    options: AppleGenerationOptions
   ): Promise<string>;
   generateStream(
     messages: AppleMessage[],
-    options?: AppleGenerationOptions
+    options: AppleGenerationOptions
   ): string;
   cancelStream(streamId: string): void;
 

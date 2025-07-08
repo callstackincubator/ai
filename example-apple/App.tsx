@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Alert, Button, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { NativeAppleLLM } from '@react-native-ai/apple';
+import { foundationModels } from '@react-native-ai/apple';
 
 export default function App() {
   const [text, setText] = useState('What is the meaning of life?');
-  const isAvailable = NativeAppleLLM.isAvailable();
+  const isAvailable = foundationModels.isAvailable();
 
   return (
     <View style={styles.container}>
@@ -16,7 +16,7 @@ export default function App() {
       <Button
         title="Generate"
         onPress={async () => {
-          const result = await NativeAppleLLM.generateText(
+          const result = await foundationModels.generateText(
             [
               {
                 role: 'user',
@@ -31,7 +31,7 @@ export default function App() {
       <Button
         title="Stream"
         onPress={async () => {
-          NativeAppleLLM.generateStream(
+          const stream = foundationModels.generateStream(
             [
               {
                 role: 'user',
@@ -40,14 +40,9 @@ export default function App() {
             ],
             {}
           );
-
-          NativeAppleLLM.onStreamUpdate((data) => {
-            console.log(data);
-          });
-
-          NativeAppleLLM.onStreamComplete((data) => {
-            console.log(data);
-          });
+          for await (const chunk of stream) {
+            console.log(chunk);
+          }
         }}
       />
       <StatusBar style="auto" />

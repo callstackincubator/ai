@@ -8809,12 +8809,14 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "example-apple@workspace:example-apple"
   dependencies:
+    "@azure/core-asynciterator-polyfill": ^1.0.2
     "@babel/core": ^7.20.0
     "@react-native-ai/apple": "workspace:*"
     expo: 54.0.0-canary-20250701-6a945c5
     expo-status-bar: 2.2.4-canary-20250701-6a945c5
     react: 19.1.0
     react-native: 0.80.1
+    web-streams-polyfill: ^4.1.0
   languageName: unknown
   linkType: soft
 
@@ -17298,6 +17300,13 @@ __metadata:
   version: 3.3.3
   resolution: "web-streams-polyfill@npm:3.3.3"
   checksum: 21ab5ea08a730a2ef8023736afe16713b4f2023ec1c7085c16c8e293ee17ed085dff63a0ad8722da30c99c4ccbd4ccd1b2e79c861829f7ef2963d7de7004c2cb
+  languageName: node
+  linkType: hard
+
+"web-streams-polyfill@npm:^4.1.0":
+  version: 4.1.0
+  resolution: "web-streams-polyfill@npm:4.1.0"
+  checksum: bce16f6bcca895439131fb21e4df15659a34d6f31fedd34b1680ab4fe9c438e02aabd336e4641eb1821e04a8da38dd03c6219fa8ca149ee9a002858a0d32f90d
   languageName: node
   linkType: hard
 

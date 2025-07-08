@@ -2,11 +2,10 @@ import {
   type LanguageModelV1Prompt,
   type LanguageModelV1,
   type LanguageModelV1CallOptions,
-  type LanguageModelV1StreamPart,
 } from '@ai-sdk/provider';
-import { ReadableStream } from 'web-streams-polyfill';
 
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM';
+import { foundationModels } from '.';
 
 export class AppleLLMChatLanguageModel implements LanguageModelV1 {
   readonly specificationVersion = 'v1';
@@ -47,8 +46,8 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
     return {
       text,
       finishReason: 'stop' as const,
-      // Apple LLM doesn't provide token counts. We will have to handle this ourselves in the future
-      // to avoid errors.
+      // Apple LLM doesn't provide token counts.
+      // We will have to handle this ourselves in the future to avoid errors.
       usage: {
         promptTokens: 0,
         completionTokens: 0,
@@ -63,71 +62,11 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
   async doStream(options: LanguageModelV1CallOptions) {
     const messages = this.convertMessages(options.prompt);
 
-    let streamId: string | null = null;
-    let listeners: Array<{ remove(): void }> = [];
-
-    const cleanup = () => {
-      listeners.forEach((listener) => listener.remove());
-      listeners = [];
-    };
-
-    const stream = new ReadableStream<LanguageModelV1StreamPart>({
-      async start(controller) {
-        try {
-          streamId = NativeAppleLLM.generateStream(messages, {
-            maxTokens: options.maxTokens,
-            temperature: options.temperature,
-            topP: options.topP,
-            topK: options.topK,
-          });
-
-          const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
-            if (data.streamId === streamId) {
-              controller.enqueue({
-                type: 'text-delta',
-                textDelta: data.content,
-              });
-            }
-          });
-
-          const completeListener = NativeAppleLLM.onStreamComplete((data) => {
-            if (data.streamId === streamId) {
-              controller.enqueue({
-                type: 'finish',
-                finishReason: 'stop',
-                usage: {
-                  promptTokens: 0,
-                  completionTokens: 0,
-                },
-              });
-              cleanup();
-              controller.close();
-            }
-          });
-
-          const errorListener = NativeAppleLLM.onStreamError((data) => {
-            if (data.streamId === streamId) {
-              controller.enqueue({
-                type: 'error',
-                error: data.error,
-              });
-              cleanup();
-              controller.close();
-            }
-          });
-
-          listeners = [updateListener, completeListener, errorListener];
-        } catch (error) {
-          cleanup();
-          controller.error(new Error(`Apple LLM stream failed: ${error}`));
-        }
-      },
-      cancel() {
-        cleanup();
-        if (streamId) {
-          NativeAppleLLM.cancelStream(streamId);
-        }
-      },
+    const stream = foundationModels.generateStream(messages, {
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      topP: options.topP,
+      topK: options.topK,
     });
 
     return {

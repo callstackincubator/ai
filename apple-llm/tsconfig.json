@@ -12,7 +12,8 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "jsx": "react-native"
+    "jsx": "react-native",
+    "types": ["web-streams-polyfill"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "lib"]
