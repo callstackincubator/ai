@@ -1,5 +1,5 @@
 import {
-  LanguageModelV1Prompt,
+  type LanguageModelV1Prompt,
   type LanguageModelV1,
   type LanguageModelV1CallOptions,
   type LanguageModelV1StreamPart,
