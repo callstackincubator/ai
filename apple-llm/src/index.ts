@@ -1,9 +1,9 @@
-import { LanguageModelV1StreamPart } from '@ai-sdk/provider';
+import type { LanguageModelV1StreamPart } from '@ai-sdk/provider';
 import { AppleLLMChatLanguageModel } from './ai-sdk';
 
 import NativeAppleLLMSpec, {
-  AppleMessage,
-  AppleGenerationOptions,
+  type AppleMessage,
+  type AppleGenerationOptions,
 } from './NativeAppleLLM';
 
 export function apple(): AppleLLMChatLanguageModel {
