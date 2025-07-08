@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@react-native-ai/apple": ["../apple-llm/src"]
+    }
+  },
+  "extends": "expo/tsconfig.base"
+}

@@ -1,0 +1,50 @@
+{
+  "name": "@react-native-ai/apple",
+  "version": "0.1.0",
+  "description": "Apple LLM provider for Vercel AI SDK",
+  "main": "lib/commonjs/index",
+  "module": "lib/module/index",
+  "types": "lib/typescript/src/index.d.ts",
+  "react-native": "src/index",
+  "source": "src/index",
+  "license": "MIT",
+  "homepage": "https://github.com/callstackincubator/ai#readme",
+  "author": "Mike Grabowski <grabbou@gmail.com>",
+  "dependencies": {
+    "@ai-sdk/provider": "^1.1.3"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "^0.80.0"
+  },
+  "devDependencies": {
+    "react-native": "0.80.0",
+    "typescript": "^5.0.0"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module"
+    ]
+  },
+  "codegenConfig": {
+    "name": "NativeAppleLLM",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "ios": {
+      "modulesProvider": {
+        "NativeAppleLLM": "AppleLLM"
+      }
+    }
+  },
+  "keywords": [
+    "react-native",
+    "apple",
+    "llm",
+    "ai",
+    "sdk",
+    "vercel"
+  ]
+}
