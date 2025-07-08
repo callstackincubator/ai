@@ -5,7 +5,12 @@
 //  Created by Mike Grabowski on 06/07/2025.
 //
 
+#if __has_include("AppleLLM/AppleLLM-Swift.h")
+#import "AppleLLM/AppleLLM-Swift.h"
+#else
 #import "AppleLLM-Swift.h"
+#endif
+
 #import <NativeAppleLLM/NativeAppleLLM.h>
 
 @interface AppleLLM : NativeAppleLLMSpecBase <NativeAppleLLMSpec>
