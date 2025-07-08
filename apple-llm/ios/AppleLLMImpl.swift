@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import React
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -17,26 +18,22 @@ public class AppleLLMImpl: NSObject {
   private var streamTasks: [String: Task<Void, Never>] = [:]
   
   @objc
-  public func isAvailable(
-    _ resolve: @escaping (Any?) -> Void,
-    reject: @escaping (String, String, Error?) -> Void
-  ) {
+  public func isAvailable() -> Bool {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      let isAvailable = SystemLanguageModel.default.availability == .available
-      resolve(isAvailable)
+      return SystemLanguageModel.default.availability == .available
     } else {
-      resolve(false)
+      return false
     }
 #else
-    resolve(false)
+    return false
 #endif
   }
   
   @objc
   public func generateText(
-    _ messages: NSArray,
-    options: NSDictionary?,
+    _ messages: [[String: Any]],
+    options: [String: Any]?,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
@@ -50,83 +47,69 @@ public class AppleLLMImpl: NSObject {
         )
         return
       }
-      
       Task {
         do {
-          let transcript = try self.createTranscript(from: messages as? [[String: Any]] ?? [])
+          let transcript = try self.createTranscript(from: messages)
       
           let session = try self.createSession(from: transcript)
-          let generationOptions = try self.createGenerationOptions(from: options as? [String: Any] ?? [:])
+          let generationOptions = try self.createGenerationOptions(from: options ?? [:])
           
+          // TODO: - Get prompt from Transcript
+          // This works right now, but produces warning. Last segment in transcript is user prompt.
+          // We should instead include it here.
           let response = try await session.respond(to: "", options: generationOptions)
-          resolve(response)
+          resolve(response.content)
         } catch {
-          reject("GENERATION_ERROR", error.localizedDescription, error)
+          reject("AppeLLM", error.localizedDescription, error)
         }
       }
     } else {
-      reject(
-        "UNSUPPORTED_OS",
-        "Apple Intelligence not available on this iOS version",
-        nil
-      )
+      let error = AppleLLMError.unsupportedOS
+      reject("AppleLLM", error.localizedDescription, error)
     }
 #else
-    reject(
-      "UNSUPPORTED_OS",
-      "Apple Intelligence not available on this iOS version",
-      nil
-    )
+    let error = AppleLLMError.unsupportedOS
+    reject("AppleLLM", error.localizedDescription, error)
 #endif
   }
   
   @objc
-  public func startStream(
-    _ messages: NSArray,
-    options: NSDictionary?,
-    resolve: @escaping (Any?) -> Void,
-    reject: @escaping (String, String, Error?) -> Void
-  ) {
+  public func generateStream(
+    _ messages: [[String: Any]],
+    options: [String: Any]?,
+    onUpdate: @escaping (String, String) -> Void,
+    onComplete: @escaping (String) -> Void,
+    onError: @escaping (String, String) -> Void
+  ) throws -> String {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
       guard SystemLanguageModel.default.availability == .available else {
-        reject(
-          "MODEL_UNAVAILABLE",
-          "Apple Intelligence model is not available",
-          nil
-        )
-        return
+        let streamId = UUID().uuidString
+        onError(streamId, "Apple Intelligence model is not available")
+        return streamId
       }
       
       let streamId = UUID().uuidString
       
       let task = Task {
         do {
-          let transcript = try self.createTranscript(from: messages as? [[String: Any]] ?? [])
+          let transcript = try self.createTranscript(from: messages)
           
           let session = try self.createSession(from: transcript)
-          let generationOptions = try self.createGenerationOptions(from: options as? [String: Any] ?? [:])
+          let generationOptions = try self.createGenerationOptions(from: options ?? [:])
           
           let responseStream = session.streamResponse(to: "", options: generationOptions)
           
           for try await chunk in responseStream {
-//            self.sendEvent(withName: "onStreamUpdate", body: [
-//              "streamId": streamId,
-//              "content": chunk
-//            ])
+            onUpdate(streamId, chunk)
           }
           
           // Send completion event only if not cancelled
           if !Task.isCancelled {
-//            self.sendEvent(withName: "onStreamComplete", body: [
-//              "streamId": streamId
-//            ])
+            onComplete(streamId)
           }
         } catch {
-//          self.sendEvent(withName: "onStreamError", body: [
-//            "streamId": streamId,
-//            "error": error.localizedDescription
-//          ])
+          onError(streamId, error.localizedDescription)
         }
         
         // Clean up task from map when completed
@@ -136,41 +119,22 @@ public class AppleLLMImpl: NSObject {
       // Store task in map
       streamTasks[streamId] = task
       
-      resolve(streamId)
+      return streamId
     } else {
-      reject(
-        "UNSUPPORTED_OS",
-        "Apple Intelligence not available on this iOS version",
-        nil
-      )
+      throw AppleLLMError.unsupportedOS
     }
 #else
-    reject(
-      "UNSUPPORTED_OS",
-      "Apple Intelligence not available on this iOS version",
-      nil
-    )
+    throw AppleLLMError.unsupportedOS
 #endif
   }
   
   @objc
-  public func cancelStream(
-    _ streamId: NSString,
-    resolve: @escaping (Any?) -> Void,
-    reject: @escaping (String, String, Error?) -> Void
-  ) {
+  public func cancelStream(_ streamId: NSString) {
     let streamIdString = streamId as String
     
     if let task = streamTasks[streamIdString] {
       task.cancel()
       streamTasks.removeValue(forKey: streamIdString)
-      resolve(nil)
-    } else {
-      reject(
-        "STREAM_NOT_FOUND",
-        "Stream with ID \(streamIdString) not found",
-        nil
-      )
     }
   }
   
@@ -236,13 +200,7 @@ public class AppleLLMImpl: NSObject {
         let response = Transcript.Response(assetIDs: [], segments: [segment])
         entries.append(.response(response))
       default:
-        throw NSError(
-          domain: "AppleLLM",
-          code: 2,
-          userInfo: [
-            NSLocalizedDescriptionKey: "Invalid message role '\(role)'. Supported roles are: system, user, assistant"
-          ]
-        )
+        throw AppleLLMError.invalidMessage(role)
       }
     }
     
@@ -267,13 +225,7 @@ public class AppleLLMImpl: NSObject {
     let topK = options["topK"] as? Int
     
     if topP != nil && topK != nil {
-      throw NSError(
-        domain: "AppleLLM",
-        code: 2,
-        userInfo: [
-          NSLocalizedDescriptionKey: "Cannot specify both topP and topK parameters simultaneously. Please use only one sampling method."
-        ]
-      )
+      throw AppleLLMError.conflictingSamplingMethods
     }
     
     if let topP {
@@ -290,4 +242,41 @@ public class AppleLLMImpl: NSObject {
   }
   
 #endif
+}
+
+enum AppleLLMError: Error, LocalizedError {
+  case modelUnavailable
+  case unsupportedOS
+  case generationError(String)
+  case streamNotFound(String)
+  case invalidMessage(String)
+  case conflictingSamplingMethods
+  
+  var errorDescription: String? {
+    switch self {
+    case .modelUnavailable:
+      return "Apple Intelligence model is not available"
+    case .unsupportedOS:
+      return "Apple Intelligence not available on this iOS version"
+    case .generationError(let message):
+      return "Generation error: \(message)"
+    case .streamNotFound(let id):
+      return "Stream with ID \(id) not found"
+    case .invalidMessage(let role):
+      return "Invalid message role '\(role)'. Supported roles are: system, user, assistant"
+    case .conflictingSamplingMethods:
+      return "Cannot specify both topP and topK parameters simultaneously. Please use only one sampling method."
+    }
+  }
+  
+  var code: Int {
+    switch self {
+    case .modelUnavailable: return 1
+    case .unsupportedOS: return 2
+    case .generationError: return 3
+    case .streamNotFound: return 4
+    case .invalidMessage: return 5
+    case .conflictingSamplingMethods: return 6
+    }
+  }
 }

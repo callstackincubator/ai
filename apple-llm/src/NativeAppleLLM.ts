@@ -29,17 +29,16 @@ export type StreamErrorEvent = {
 };
 
 export interface Spec extends TurboModule {
-  isAvailable(): Promise<boolean>;
+  isAvailable(): boolean;
   generateText(
     messages: AppleMessage[],
     options?: AppleGenerationOptions
   ): Promise<string>;
-  startStream(
+  generateStream(
     messages: AppleMessage[],
     options?: AppleGenerationOptions
-  ): Promise<string>;
-  cancelStream(streamId: string): Promise<void>;
-  isModelAvailable(modelId: string): Promise<boolean>;
+  ): string;
+  cancelStream(streamId: string): void;
 
   onStreamUpdate: EventEmitter<StreamUpdateEvent>;
   onStreamComplete: EventEmitter<StreamCompleteEvent>;

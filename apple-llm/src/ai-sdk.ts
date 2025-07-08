@@ -74,7 +74,7 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
     const stream = new ReadableStream<LanguageModelV1StreamPart>({
       async start(controller) {
         try {
-          streamId = await NativeAppleLLM.startStream(messages, {
+          streamId = NativeAppleLLM.generateStream(messages, {
             maxTokens: options.maxTokens,
             temperature: options.temperature,
             topP: options.topP,

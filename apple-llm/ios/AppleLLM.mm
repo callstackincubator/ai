@@ -8,7 +8,7 @@
 #import "AppleLLM-Swift.h"
 #import <NativeAppleLLM/NativeAppleLLM.h>
 
-@interface AppleLLM : NSObject <NativeAppleLLMSpec>
+@interface AppleLLM : NativeAppleLLMSpecBase <NativeAppleLLMSpec>
 @property (strong, nonatomic) AppleLLMImpl *llm;
 @end
 
@@ -32,12 +32,6 @@ using namespace JS::NativeAppleLLM;
   return std::make_shared<facebook::react::NativeAppleLLMSpecJSI>(params);
 }
 
-- (void)cancelStream:(nonnull NSString *)streamId
-             resolve:(nonnull RCTPromiseResolveBlock)resolve
-              reject:(nonnull RCTPromiseRejectBlock)reject {
-  [_llm cancelStream:streamId resolve:resolve reject:reject];
-}
-
 - (void)generateText:(nonnull NSArray *)messages
              options:(AppleGenerationOptions &)options
              resolve:(nonnull RCTPromiseResolveBlock)resolve
@@ -54,30 +48,48 @@ using namespace JS::NativeAppleLLM;
   [_llm generateText:messages options:opts resolve:resolve reject:reject];
 }
 
-- (void)isAvailable:(nonnull RCTPromiseResolveBlock)resolve
-             reject:(nonnull RCTPromiseRejectBlock)reject {
-  [_llm isAvailable:resolve reject:reject];
+- (void)cancelStream:(nonnull NSString *)streamId {
+  [_llm cancelStream:streamId];
 }
 
-- (void)isModelAvailable:(nonnull NSString *)modelId
-                 resolve:(nonnull RCTPromiseResolveBlock)resolve
-                  reject:(nonnull RCTPromiseRejectBlock)reject {
-  [_llm isModelAvailable:modelId resolve:resolve reject:reject];
-}
 
-- (void)startStream:(nonnull NSArray *)messages
-            options:(AppleGenerationOptions &)options
-            resolve:(nonnull RCTPromiseResolveBlock)resolve
-             reject:(nonnull RCTPromiseRejectBlock)reject {
+- (nonnull NSString *)generateStream:(nonnull NSArray *)messages options:(JS::NativeAppleLLM::AppleGenerationOptions &)options {
   NSDictionary *opts = @{
     @"temperature": options.temperature().has_value() ? @(options.temperature().value()) : [NSNull null],
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
   };
-  [_llm startStream:messages options:opts resolve:resolve reject:reject];
+  
+  NSError *error;
+  
+  NSString *streamId = [_llm generateStream:messages
+                                    options:opts
+                                      error: &error
+                                   onUpdate:^(NSString *streamId, NSString *content) {
+    [self emitOnStreamUpdate:@{@"streamId": streamId, @"content": content}];
+  }
+                                 onComplete:^(NSString *streamId) {
+    [self emitOnStreamComplete:@{@"streamId": streamId}];
+  }
+                                    onError:^(NSString *streamId, NSString *error) {
+    [self emitOnStreamError:@{@"streamId": streamId, @"error": error}];
+  }];
+  
+  if (error) {
+    @throw [NSException exceptionWithName:@"AppleLLM"
+                                   reason:error.localizedDescription
+                                 userInfo:nil];
+  }
+  
+  return streamId;
+  
+}
+
+- (nonnull NSNumber *)isAvailable {
+  return @([_llm isAvailable]);
 }
 
 @end
-  
-  
+
+
