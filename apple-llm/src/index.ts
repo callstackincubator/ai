@@ -1,34 +1,10 @@
+import { LanguageModelV1StreamPart } from '@ai-sdk/provider';
 import { AppleLLMChatLanguageModel } from './ai-sdk';
 
 import NativeAppleLLMSpec, {
   AppleMessage,
   AppleGenerationOptions,
 } from './NativeAppleLLM';
-
-type StreamPart =
-  | {
-      type: 'text-delta';
-      textDelta: string;
-    }
-  | {
-      type: 'finish';
-      finishReason:
-        | 'stop'
-        | 'length'
-        | 'content-filter'
-        | 'tool-calls'
-        | 'error'
-        | 'other'
-        | 'unknown';
-      usage: {
-        promptTokens: number;
-        completionTokens: number;
-      };
-    }
-  | {
-      type: 'error';
-      error: unknown;
-    };
 
 export function apple(): AppleLLMChatLanguageModel {
   return new AppleLLMChatLanguageModel();
@@ -45,7 +21,7 @@ export const foundationModels = {
   generateStream(
     messages: AppleMessage[],
     options: AppleGenerationOptions = {}
-  ): ReadableStream<StreamPart> {
+  ): ReadableStream<LanguageModelV1StreamPart> {
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
         `ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.`
@@ -60,7 +36,7 @@ export const foundationModels = {
       listeners = [];
     };
 
-    const stream = new ReadableStream<StreamPart>({
+    const stream = new ReadableStream<LanguageModelV1StreamPart>({
       async start(controller) {
         try {
           streamId = NativeAppleLLMSpec.generateStream(messages, options);

@@ -33,7 +33,7 @@ if (isAvailable) {
 }
 ```
 
-### With AI SDK
+### AI SDK
 
 ```typescript
 import { generateText } from 'ai';
@@ -47,14 +47,21 @@ const { text } = await generateText({
 
 ## Streaming
 
-> [!WARNING]
+> [!NOTE]
 > If you're using streaming functionality, you'll need to provide a polyfill for ReadableStream. You can use `web-streams-polyfill`:
 > 
 > ```bash
 > npm install web-streams-polyfill
 > ```
 > 
+> We also recommend installing AsyncIterator polyfill to enable the simple `for await...of` syntax:
+> 
+> ```bash
+> npm install @azure/core-asynciterator-polyfill
+> ```
+> 
 > ```typescript
+> import '@azure/core-asynciterator-polyfill';
 > import 'web-streams-polyfill/polyfill';
 > ```
 
@@ -74,7 +81,7 @@ for await (const chunk of stream) {
 }
 ```
 
-### AI SD
+### AI SDK
 
 ```typescript
 import { streamText } from 'ai';
