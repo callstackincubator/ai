@@ -5,7 +5,7 @@ import {
 } from '@ai-sdk/provider';
 
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM';
-import { foundationModels } from '.';
+import { generateStream } from './streaming';
 
 export class AppleLLMChatLanguageModel implements LanguageModelV1 {
   readonly specificationVersion = 'v1';
@@ -62,7 +62,7 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
   async doStream(options: LanguageModelV1CallOptions) {
     const messages = this.convertMessages(options.prompt);
 
-    const stream = foundationModels.generateStream(messages, {
+    const stream = generateStream(messages, {
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       topP: options.topP,
