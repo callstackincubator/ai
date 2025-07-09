@@ -72,6 +72,9 @@
       "@react-native",
       "prettier"
     ],
+    "parserOptions": {
+      "requireConfigFile": false
+    },
     "rules": {
       "prettier/prettier": [
         "error",
