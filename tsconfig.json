@@ -2,8 +2,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "react-native-ai": ["./src/index"],
-      "@react-native-ai/apple": ["./apple-llm/src"]
+      "react-native-ai": ["./packages/mlc/src/index"],
+      "@react-native-ai/apple": ["./packages/apple-llm/src"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

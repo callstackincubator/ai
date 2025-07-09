@@ -1,0 +1,60 @@
+{
+  "name": "react-native-ai",
+  "version": "0.1.0",
+  "summary": "React Native AI",
+  "homepage": "https://github.com/callstackincubator/ai#readme",
+  "license": "MIT",
+  "authors": "szymonrybczak <szymon.rybczak@gmail.com> (https://github.com/szymonrybczak)",
+  "platforms": {
+    "ios": "13.4"
+  },
+  "source": {
+    "git": "https://github.com/callstackincubator/ai.git",
+    "tag": "0.1.0"
+  },
+  "source_files": "ios/**/*.{h,m,mm}",
+  "compiler_flags": "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DFOLLY_CFG_NO_COROUTINES=1 -DFOLLY_HAVE_CLOCK_GETTIME=1 -Wno-comma -Wno-shorten-64-to-32",
+  "dependencies": {
+    "React-Core": [],
+    "RCT-Folly": [
+      "2024.01.01.00"
+    ],
+    "glog": [],
+    "React-RCTFabric": [],
+    "React-Codegen": [],
+    "RCTRequired": [],
+    "RCTTypeSafety": [],
+    "ReactCommon/turbomodule/bridging": [],
+    "ReactCommon/turbomodule/core": [],
+    "React-NativeModulesApple": [],
+    "Yoga": [],
+    "React-Fabric": [],
+    "React-graphics": [],
+    "React-utils": [],
+    "React-featureflags": [],
+    "React-debug": [],
+    "React-ImageManager": [],
+    "React-rendererdebug": [],
+    "DoubleConversion": [],
+    "hermes-engine": []
+  },
+  "pod_target_xcconfig": {
+    "HEADER_SEARCH_PATHS": "\"$(PODS_ROOT)/boost\" \"$(PODS_ROOT)/Headers/Private/Yoga\"",
+    "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
+    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DFOLLY_CFG_NO_COROUTINES=1 -DFOLLY_HAVE_CLOCK_GETTIME=1 -Wno-comma -Wno-shorten-64-to-32"
+  },
+  "subspecs": [
+    {
+      "name": "MLCEngineObjC",
+      "source_files": "ios/**/*.{h,m,mm,swift}",
+      "private_header_files": "ios/ObjC/Private/*.h",
+      "pod_target_xcconfig": {
+        "HEADER_SEARCH_PATHS": [
+          "/Users/szymonrybczak/Developer/mlc-llm/3rdparty/tvm/include",
+          "/Users/szymonrybczak/Developer/mlc-llm/3rdparty/tvm/3rdparty/dmlc-core/include",
+          "/Users/szymonrybczak/Developer/mlc-llm/3rdparty/tvm/3rdparty/dlpack/include"
+        ]
+      }
+    }
+  ]
+}

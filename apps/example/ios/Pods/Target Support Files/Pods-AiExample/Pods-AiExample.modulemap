@@ -1,0 +1,6 @@
+module Pods_AiExample {
+  umbrella header "Pods-AiExample-umbrella.h"
+
+  export *
+  module * { export * }
+}
