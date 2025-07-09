@@ -71,7 +71,6 @@ if (!fs.existsSync(configPath)) {
   process.exit(1);
 }
 
-
 console.log(config);
 
 if (platforms.includes('android')) {
