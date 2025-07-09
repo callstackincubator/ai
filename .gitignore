@@ -43,7 +43,7 @@ android.iml
 
 # Cocoapods
 #
-apps/example/ios/Pods
+apps/example/ios/Pods/
 
 # Ruby
 apps/example/vendor/
