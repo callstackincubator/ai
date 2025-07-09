@@ -8,7 +8,7 @@
     "build:ios": "cd ios && xcodebuild -workspace AiExample.xcworkspace -configuration Debug -scheme AiExample -sdk iphoneos",
     "ios": "react-native run-ios",
     "start": "react-native start",
-    "prestart": "node ../scripts/mlc-prepare.js --root ."
+    "prestart": "node ../../packages/mlc/scripts/mlc-prepare.js --root ."
   },
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",
