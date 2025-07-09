@@ -43,7 +43,11 @@ const rootDir = rootIndex !== -1 ? args[rootIndex + 1] : projectRoot;
 const platformArg =
   platformIndex !== -1 ? args[platformIndex + 1]?.toLowerCase() : null;
 
-let platforms = ['android', 'ios'];
+const configPath = path.join(rootDir, 'mlc-config.json');
+const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+let platforms = Object.keys(config);
+
 if (platformArg) {
   if (platformArg !== 'android' && platformArg !== 'ios') {
     console.error('❌ Invalid platform. Must be either "android" or "ios"');
@@ -59,7 +63,6 @@ if (!process.env.MLC_LLM_SOURCE_DIR) {
   process.exit(1);
 }
 
-const configPath = path.join(rootDir, 'mlc-config.json');
 const androidPath = path.join(rootDir, 'android');
 const iosPath = path.join(rootDir, 'ios');
 
@@ -68,7 +71,6 @@ if (!fs.existsSync(configPath)) {
   process.exit(1);
 }
 
-const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 console.log(config);
 
 if (platforms.includes('android')) {
