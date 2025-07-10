@@ -36,17 +36,17 @@ jobs:
         run: cd packages/mlc && yarn prepare
     
   # TODO: uncomment when we have a script to build the apple-llm package
-  # build-apple-llm:
-  #   runs-on: macos-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v3
+  build-apple-llm:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-  #     - name: Setup
-  #       uses: ./.github/actions/setup
+      - name: Setup
+        uses: ./.github/actions/setup
 
-  #     - name: Build package
-  #       run: cd packages/apple-llm && yarn prepare
+      - name: Build package
+        run: cd packages/apple-llm && yarn prepare
 
   # TODO: Bring it back with all the following steps with setting up the environment variables related to MLC
   # build-android:
