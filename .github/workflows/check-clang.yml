@@ -6,13 +6,13 @@ on:
       - main
     paths:
       - '.github/workflows/check-clang.yml'
-      - 'ios/**'
+      - 'packages/mlc/ios/**'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/check-clang.yml'
-      - 'ios/**'
+      - 'packages/mlc/ios/**'
 
 jobs:
   CLang-Format:
@@ -23,6 +23,6 @@ jobs:
         run: brew install clang-format
       - name: Check ios clang formatting
         run: |
-          ./scripts/format-ios.sh
+          ./packages/mlc/scripts/format-ios.sh
       - name: Check for changes
         run: git diff --exit-code HEAD

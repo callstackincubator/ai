@@ -1247,7 +1247,7 @@ DEPENDENCIES:
   - React-jsitracing (from `../node_modules/react-native/ReactCommon/hermes/executor/`)
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
-  - react-native-ai (from `../..`)
+  - react-native-ai (from `../../../packages/mlc`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
   - React-nativeconfig (from `../node_modules/react-native/ReactCommon`)
@@ -1342,7 +1342,7 @@ EXTERNAL SOURCES:
   React-Mapbuffer:
     :path: "../node_modules/react-native/ReactCommon"
   react-native-ai:
-    :path: "../.."
+    :path: "../../../packages/mlc"
   react-native-get-random-values:
     :path: "../node_modules/react-native-get-random-values"
   react-native-netinfo:
@@ -1427,7 +1427,7 @@ SPEC CHECKSUMS:
   React-jsitracing: 00f6151766dec0ab324e2854a9d4dfde0e1f30cc
   React-logger: 70e002e04cc56ff5c12157537405d1644c050703
   React-Mapbuffer: 8d1f0fc6e7280a8ed6da70ece5f283ac5c8032cb
-  react-native-ai: 6fcc12ee5477029d65698647c0937720b5de23fd
+  react-native-ai: 4bf7c16a3558b623a725ea163a5985e5f91b5e4b
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-netinfo: ce102083db558237dac20cf64172ef569ebe2dd9
   React-nativeconfig: 9f223cd321823afdecf59ed00861ab2d69ee0fc1

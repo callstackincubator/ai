@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import { type AiModelSettings, getModels } from 'react-native-ai';
+import { type AiModelSettings, getModels } from '../../../packages/mlc/src';
 import SelectDropdown from 'react-native-select-dropdown';
 
 type ModelSelectionProps = {

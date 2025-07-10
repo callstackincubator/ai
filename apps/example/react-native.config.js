@@ -1,5 +1,5 @@
 const path = require('path');
-const pak = require('../package.json');
+const pak = require('../../packages/mlc/package.json');
 
 module.exports = {
   project: {
@@ -9,7 +9,7 @@ module.exports = {
   },
   dependencies: {
     [pak.name]: {
-      root: path.join(__dirname, '..'),
+      root: path.join(__dirname, '../../packages/mlc'),
     },
   },
 };

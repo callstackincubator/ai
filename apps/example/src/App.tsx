@@ -6,7 +6,7 @@ import {
   type AiModelSettings,
   prepareModel,
   downloadModel,
-} from 'react-native-ai';
+} from '../../../packages/mlc/src';
 import { streamText, type CoreMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
 import NetworkInfo from './NetworkInfo';
