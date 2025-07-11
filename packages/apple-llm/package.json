@@ -10,6 +10,10 @@
   "license": "MIT",
   "homepage": "https://github.com/callstackincubator/ai#readme",
   "author": "Mike Grabowski <grabbou@gmail.com>",
+  "scripts": {
+    "clean": "del-cli lib",
+    "prepare": "bob build"
+  },
   "dependencies": {
     "@ai-sdk/provider": "^1.1.3",
     "zod": "^4.0.0"
