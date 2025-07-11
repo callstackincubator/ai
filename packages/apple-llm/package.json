@@ -10,12 +10,9 @@
   "license": "MIT",
   "homepage": "https://github.com/callstackincubator/ai#readme",
   "author": "Mike Grabowski <grabbou@gmail.com>",
-  "scripts": {
-    "prepare": "bob build"
-  },
   "dependencies": {
     "@ai-sdk/provider": "^1.1.3",
-    "react-native-builder-bob": "^0.23.2"
+    "zod": "^4.0.0"
   },
   "peerDependencies": {
     "react": "*",

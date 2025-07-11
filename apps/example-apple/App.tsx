@@ -4,9 +4,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Alert, Button, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { foundationModels } from '@react-native-ai/apple';
+import z from 'zod';
+
+const schema = z.object({
+  name: z.string(),
+});
 
 export default function App() {
-  const [text, setText] = useState('What is the meaning of life?');
+  const [text, setText] = useState('What is the name of Apple founder?');
   const isAvailable = foundationModels.isAvailable();
 
   return (
@@ -23,9 +28,12 @@ export default function App() {
                 content: text,
               },
             ],
-            {}
+            {
+              schema,
+              temperature: 0.5,
+            }
           );
-          Alert.alert(result);
+          Alert.alert(result.name);
         }}
       />
       <Button
@@ -38,7 +46,9 @@ export default function App() {
                 content: text,
               },
             ],
-            {}
+            {
+              schema,
+            }
           );
           for await (const chunk of stream) {
             console.log(chunk);

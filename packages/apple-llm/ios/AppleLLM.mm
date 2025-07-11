@@ -49,6 +49,7 @@ using namespace JS::NativeAppleLLM;
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
+    @"schema": options.schema()
   };
   [_llm generateText:messages options:opts resolve:resolve reject:reject];
 }
@@ -64,6 +65,7 @@ using namespace JS::NativeAppleLLM;
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
+    @"schema": options.schema()
   };
   
   NSError *error;
