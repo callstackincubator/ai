@@ -6,7 +6,7 @@ import NativeAppleLLMSpec, {
   type AppleGenerationOptions,
 } from './NativeAppleLLM';
 import z from 'zod';
-import { LanguageModelV1StreamPart } from '@ai-sdk/provider';
+import type { LanguageModelV1StreamPart } from '@ai-sdk/provider';
 
 export function apple(): AppleLLMChatLanguageModel {
   return new AppleLLMChatLanguageModel();
