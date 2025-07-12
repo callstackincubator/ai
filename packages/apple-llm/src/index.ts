@@ -12,18 +12,19 @@ export function apple(): AppleLLMChatLanguageModel {
   return new AppleLLMChatLanguageModel();
 }
 
-interface StructuredGenerationOptions<T> extends AppleGenerationOptions {
-  schema: z.ZodType<T>;
+interface StructuredGenerationOptions<T extends z.ZodObject<any, any>>
+  extends AppleGenerationOptions {
+  schema: T;
 }
 
 interface GenerationOptions extends AppleGenerationOptions {
   schema?: undefined;
 }
 
-async function generateText<T>(
+async function generateText<T extends z.ZodObject<any, any>>(
   messages: AppleMessage[],
   options: StructuredGenerationOptions<T>
-): Promise<T>;
+): Promise<z.infer<T>>;
 
 async function generateText(
   messages: AppleMessage[],
@@ -32,13 +33,13 @@ async function generateText(
 
 async function generateText(
   messages: AppleMessage[],
-  options: StructuredGenerationOptions<unknown> | GenerationOptions = {}
+  options: StructuredGenerationOptions<any> | GenerationOptions = {}
 ): Promise<unknown> {
   const schema = 'schema' in options ? options.schema : undefined;
 
   const generationOptions = {
     ...options,
-    ...(schema instanceof z.ZodType ? { schema: z.toJSONSchema(schema) } : {}),
+    ...(schema ? { schema: z.toJSONSchema(schema) } : {}),
   };
 
   const response = await NativeAppleLLMSpec.generateText(
@@ -46,7 +47,7 @@ async function generateText(
     generationOptions
   );
 
-  if (schema instanceof z.ZodType) {
+  if (schema) {
     const parsed = schema.parse(JSON.parse(response));
     return parsed;
   }

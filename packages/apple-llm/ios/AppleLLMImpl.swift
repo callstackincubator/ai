@@ -55,17 +55,18 @@ public class AppleLLMImpl: NSObject {
       }
       Task {
         do {
-          let transcript = try self.createTranscript(from: messages)
+          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages)
           
           let session = try self.createSession(from: transcript)
           let generationOptions = try self.createGenerationOptions(from: options ?? [:])
           
           if let schemaObj = options?["schema"] {
-            let generationSchema = try self.createGenerationSchema(from: schemaObj)
-            let response = try await session.respond(to: "", schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
+             let generationSchema = try self.createGenerationSchema(from: schemaObj)
+             let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
+            
             resolve(try response.rawValue())
           } else {
-            let response = try await session.respond(to: "", options: generationOptions)
+            let response = try await session.respond(to: userPrompt, options: generationOptions)
             resolve(response.content)
           }
         } catch {
@@ -100,7 +101,7 @@ public class AppleLLMImpl: NSObject {
       
       let task = Task {
         do {
-          let transcript = try self.createTranscript(from: messages)
+          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages)
           
           let session = try self.createSession(from: transcript)
           let generationOptions = try self.createGenerationOptions(from: options ?? [:])
@@ -108,7 +109,7 @@ public class AppleLLMImpl: NSObject {
           if let schemaOption = options?["schema"] {
             let generationSchema = try self.createGenerationSchema(from: schemaOption)
             let responseStream = session.streamResponse(
-              to: "",
+              to: userPrompt,
               schema: generationSchema,
               includeSchemaInPrompt: true,
               options: generationOptions
@@ -117,7 +118,7 @@ public class AppleLLMImpl: NSObject {
               onUpdate(streamId, String(reflecting: chunk))
             }
           } else {
-            let responseStream = session.streamResponse(to: "", options: generationOptions)
+            let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
             for try await chunk in responseStream {
               onUpdate(streamId, chunk)
             }
@@ -194,10 +195,23 @@ public class AppleLLMImpl: NSObject {
   //   • Investigate assetIDs parameter usage in Transcript.Response
   //   • Implement tool calling support
   @available(iOS 26, *)
-  private func createTranscript(from messages: [[String: Any]]) throws -> Transcript {
+  private func createTranscriptAndPrompt(from messages: [[String: Any]]) throws -> (Transcript, String) {
+    guard !messages.isEmpty else {
+      throw AppleLLMError.invalidMessage("Messages array cannot be empty")
+    }
+    
+    guard let lastMessage = messages.last,
+          let lastRole = lastMessage["role"] as? String,
+          let userPrompt = lastMessage["content"] as? String,
+          lastRole == "user" else {
+      throw AppleLLMError.invalidMessage("Last message must be from user role")
+    }
+    
     var entries: [Transcript.Entry] = []
     
-    for message in messages {
+    let transcriptMessages = Array(messages.dropLast())
+    
+    for message in transcriptMessages {
       guard let role = message["role"] as? String,
             let content = message["content"] as? String else {
         continue
@@ -222,7 +236,7 @@ public class AppleLLMImpl: NSObject {
       }
     }
     
-    return Transcript(entries: entries)
+    return (Transcript(entries: entries), userPrompt)
   }
   
   @available(iOS 26, *)
@@ -271,12 +285,11 @@ public class AppleLLMImpl: NSObject {
   @available(iOS 26, *)
   private func parseDynamicSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
     let type = schemaDict["type"] as? String
-    let name = schemaDict["name"] as? String
-    let description = schemaDict["description"] as? String
     
     if let anyOfArray = schemaDict["anyOf"] as? [[String: Any]] {
-      let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
-      return DynamicGenerationSchema(name: "", description: schemaDict["description"] as? String, anyOf: parsedSchemas)
+      throw AppleLLMError.invalidSchema("Unsupported schema type: anyOf")
+//      let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
+//      return DynamicGenerationSchema(name: "", description: schemaDict["description"] as? String, anyOf: parsedSchemas)
     }
     
     switch type {
@@ -511,8 +524,15 @@ extension LanguageModelSession.Response<GeneratedContent> {
       throw RawValueExtractionError.notAResponseEntry
     }
     
-    guard let lastSegment = res.segments.last,
-          case let .structure(structureSegment) = lastSegment else {
+    guard let lastSegment = res.segments.last else {
+      throw RawValueExtractionError.noSegments
+    }
+    
+    if case let .text(textSegment) = lastSegment {
+      return textSegment.content
+    }
+    
+    guard case let .structure(structureSegment) = lastSegment else {
       throw RawValueExtractionError.notAStructuredSegment
     }
     

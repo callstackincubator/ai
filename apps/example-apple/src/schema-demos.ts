@@ -1,0 +1,112 @@
+import { foundationModels } from '@react-native-ai/apple';
+import { z } from 'zod';
+
+export async function basicStringDemo() {
+  const schema = z
+    .object({
+      value: z.string().describe('A simple text string'),
+    })
+    .describe('String response');
+
+  return await foundationModels.generateText(
+    [{ role: 'user', content: 'Generate a city name' }],
+    { schema }
+  );
+}
+
+export async function colorEnumDemo() {
+  const schema = z
+    .object({
+      color: z.enum(['red', 'blue', 'green']).describe('Pick a color'),
+    })
+    .describe('Color response');
+
+  return await foundationModels.generateText(
+    [{ role: 'user', content: 'Choose a color' }],
+    { schema }
+  );
+}
+
+export async function basicNumberDemo() {
+  const schema = z
+    .object({
+      value: z.number().min(1).max(10).describe('A number between 1 and 10'),
+    })
+    .describe('Number response');
+
+  return await foundationModels.generateText(
+    [{ role: 'user', content: 'Pick a number' }],
+    { schema }
+  );
+}
+
+export async function basicBooleanDemo() {
+  const schema = z
+    .object({
+      answer: z.boolean().describe('True or false'),
+    })
+    .describe('Boolean response');
+
+  return await foundationModels.generateText(
+    [{ role: 'user', content: 'Is the sky blue?' }],
+    { schema }
+  );
+}
+
+export async function basicObjectDemo() {
+  const schema = z
+    .object({
+      name: z.string().describe('Person name'),
+      age: z.number().int().min(1).max(100).describe('Age'),
+      active: z.boolean().describe('Is active'),
+    })
+    .describe('Basic person info');
+
+  return await foundationModels.generateText(
+    [{ role: 'user', content: 'Create a simple person' }],
+    { schema }
+  );
+}
+
+// export async function basicUnionDemo() {
+//   const schema = z.object({
+//     response: z.union([
+//       z.object({
+//         greeting: z.string().describe('A friendly greeting'),
+//       }),
+//       z.object({
+//         question: z.string().describe('A simple question'),
+//       }),
+//     ]),
+//   });
+
+//   return await foundationModels.generateText(
+//     [{ role: 'user', content: 'Hello Apple, how are you?' }],
+//     { schema }
+//   );
+// }
+
+export async function basicArrayDemo() {
+  const schema = z
+    .object({
+      items: z.array(z.string()).min(2).max(4).describe('List of items'),
+    })
+    .describe('Array response');
+
+  return await foundationModels.generateText(
+    [{ role: 'user', content: 'List some fruits' }],
+    { schema }
+  );
+}
+
+export const schemaDemos = {
+  basicString: { name: 'String', func: basicStringDemo },
+  colorEnum: { name: 'Enum', func: colorEnumDemo },
+  basicNumber: { name: 'Number', func: basicNumberDemo },
+  basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
+  basicObject: { name: 'Object', func: basicObjectDemo },
+  // basicUnion: { name: 'Union (anyOf)', func: basicUnionDemo },
+  basicArray: { name: 'Array', func: basicArrayDemo },
+};
+
+export type DemoKey = keyof typeof schemaDemos;
