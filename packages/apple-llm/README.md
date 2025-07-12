@@ -1,6 +1,16 @@
 # Apple LLM
 
-Use Apple's local LLM functionality (Apple Intelligence) with the Vercel AI SDK.
+Use Apple's local LLM functionality (Apple Intelligence) in React Native. Standalone, or with Vercel AI SDK.
+
+## Features
+
+### Supported
+- Text generation
+- Streaming
+- Structured output (JSON Schema via Zod)
+
+### Coming Soon
+- Tool calling
 
 ## Installation
 
@@ -10,19 +20,19 @@ npm install @react-native-ai/apple
 
 ### Requirements
 
-- New Architecture
+- React Native New Architecture
 - iOS 26+
 - Apple Intelligence enabled device
 
 ## Usage
 
-### Pure Usage
+### Standalone
 
 ```typescript
 import { foundationModels } from '@react-native-ai/apple';
 
 // Check if Apple Intelligence is available
-const isAvailable = await foundationModels.isAvailable();
+const isAvailable = await foundationModels.isAvailable()
 
 if (isAvailable) {
   // Generate text
@@ -65,7 +75,7 @@ const { text } = await generateText({
 > import 'web-streams-polyfill/polyfill';
 > ```
 
-### Pure Usage
+### Standalone
 
 ```typescript
 import { foundationModels } from '@react-native-ai/apple';
@@ -97,3 +107,37 @@ for await (const delta of textStream) {
   process.stdout.write(delta);
 }
 ```
+
+## Options
+
+// tbd second argument is options, temperature, topK, topN, schema (more on that in next point)
+
+## Structured Output
+
+Apple LLM supports structured outputs using JSON Schema via Zod.
+
+### Usage
+
+```typescript
+import { foundationModels } from '@react-native-ai/apple';
+import { z } from 'zod';
+
+const schema = z.object({
+  name: z.string(),
+  age: z.number().int().min(0).max(150),
+  email: z.string().email(),
+});
+
+const result = await foundationModels.generateText([
+  { role: 'user', content: 'Create a user profile' }
+], { schema });
+```
+
+### Supported Types
+
+> [!INFO]
+> Same subset of JSON Schema as OpenAI is supported, except for `anyOf`. For details, read [OpenAI documenttion](https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#json-mode).
+
+- Objects, arrays, strings, numbers, booleans, enums
+- String formats: `date-time`, `time`, `date`, `duration`, `email`, `hostname`, `ipv4`, `ipv6`, `uuid`
+- Number constraints: `min`, `max`, `exclusiveMin`, `exclusiveMax`
