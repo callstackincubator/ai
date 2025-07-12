@@ -370,15 +370,6 @@ public class AppleLLMImpl: NSObject {
       return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
     }
     
-    // Handle custom formats
-    if let format = schemaDict["format"] as? String {
-      guard Self.supportedStringFormats.contains(format) else {
-        throw AppleLLMError.invalidSchema("Unsupported string format '\(format)'")
-      }
-      let guide = try StringFormatGuides.guide(for: format)
-      return DynamicGenerationSchema(type: String.self, guides: [guide])
-    }
-    
     // Handle regular expressions
     if let pattern = schemaDict["pattern"] as? String {
       do {
