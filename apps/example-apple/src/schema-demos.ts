@@ -71,24 +71,6 @@ export async function basicObjectDemo() {
   );
 }
 
-// export async function basicUnionDemo() {
-//   const schema = z.object({
-//     response: z.union([
-//       z.object({
-//         greeting: z.string().describe('A friendly greeting'),
-//       }),
-//       z.object({
-//         question: z.string().describe('A simple question'),
-//       }),
-//     ]),
-//   });
-
-//   return await foundationModels.generateText(
-//     [{ role: 'user', content: 'Hello Apple, how are you?' }],
-//     { schema }
-//   );
-// }
-
 export async function basicArrayDemo() {
   const schema = z
     .object({
@@ -108,7 +90,6 @@ export const schemaDemos = {
   basicNumber: { name: 'Number', func: basicNumberDemo },
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
   basicObject: { name: 'Object', func: basicObjectDemo },
-  // basicUnion: { name: 'Union (anyOf)', func: basicUnionDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
 };
 

@@ -61,8 +61,8 @@ public class AppleLLMImpl: NSObject {
           let generationOptions = try self.createGenerationOptions(from: options ?? [:])
           
           if let schemaObj = options?["schema"] {
-             let generationSchema = try self.createGenerationSchema(from: schemaObj)
-             let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
+            let generationSchema = try self.createGenerationSchema(from: schemaObj)
+            let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
             
             resolve(try response.rawValue())
           } else {
@@ -287,9 +287,12 @@ public class AppleLLMImpl: NSObject {
     let type = schemaDict["type"] as? String
     
     if let anyOfArray = schemaDict["anyOf"] as? [[String: Any]] {
-      throw AppleLLMError.invalidSchema("Unsupported schema type: anyOf")
-//      let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
-//      return DynamicGenerationSchema(name: "", description: schemaDict["description"] as? String, anyOf: parsedSchemas)
+      let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
+      return DynamicGenerationSchema(
+        name: schemaDict["title"] as? String ?? "",
+        description: schemaDict["description"] as? String,
+        anyOf: parsedSchemas
+      )
     }
     
     switch type {
@@ -402,7 +405,7 @@ public class AppleLLMImpl: NSObject {
       return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
     }
     
-    if let multipleOf = schemaDict["multipleOf"] as? Double {
+    if schemaDict["multipleOf"] != nil {
       throw AppleLLMError.invalidSchema("MultipleOf is not supported by Apple Foundational models.")
     }
     
