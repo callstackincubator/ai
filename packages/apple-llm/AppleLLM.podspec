@@ -15,6 +15,7 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/callstackincubator/ai.git", :tag => "#{s.version}" }
   
   s.source_files = "ios/**/*.{h,m,mm,swift}"
+  s.exclude_files = "ios/Tests/**/*"
 
   install_modules_dependencies(s)
 end

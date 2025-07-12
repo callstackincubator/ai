@@ -17,6 +17,12 @@ public class AppleLLMImpl: NSObject {
   
   private var streamTasks: [String: Task<Void, Never>] = [:]
   
+  // MARK: - Constants
+  
+  private static let supportedStringFormats: Set<String> = [
+    "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid"
+  ]
+  
   @objc
   public func isAvailable() -> Bool {
 #if canImport(FoundationModels)
@@ -49,17 +55,18 @@ public class AppleLLMImpl: NSObject {
       }
       Task {
         do {
-          let transcript = try self.createTranscript(from: messages)
+          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages)
           
           let session = try self.createSession(from: transcript)
           let generationOptions = try self.createGenerationOptions(from: options ?? [:])
           
           if let schemaObj = options?["schema"] {
             let generationSchema = try self.createGenerationSchema(from: schemaObj)
-            let response = try await session.respond(to: "", schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
+            let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
+            
             resolve(try response.rawValue())
           } else {
-            let response = try await session.respond(to: "", options: generationOptions)
+            let response = try await session.respond(to: userPrompt, options: generationOptions)
             resolve(response.content)
           }
         } catch {
@@ -94,7 +101,7 @@ public class AppleLLMImpl: NSObject {
       
       let task = Task {
         do {
-          let transcript = try self.createTranscript(from: messages)
+          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages)
           
           let session = try self.createSession(from: transcript)
           let generationOptions = try self.createGenerationOptions(from: options ?? [:])
@@ -102,7 +109,7 @@ public class AppleLLMImpl: NSObject {
           if let schemaOption = options?["schema"] {
             let generationSchema = try self.createGenerationSchema(from: schemaOption)
             let responseStream = session.streamResponse(
-              to: "",
+              to: userPrompt,
               schema: generationSchema,
               includeSchemaInPrompt: true,
               options: generationOptions
@@ -111,7 +118,7 @@ public class AppleLLMImpl: NSObject {
               onUpdate(streamId, String(reflecting: chunk))
             }
           } else {
-            let responseStream = session.streamResponse(to: "", options: generationOptions)
+            let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
             for try await chunk in responseStream {
               onUpdate(streamId, chunk)
             }
@@ -187,12 +194,24 @@ public class AppleLLMImpl: NSObject {
   // TODO:
   //   • Investigate assetIDs parameter usage in Transcript.Response
   //   • Implement tool calling support
-  //   • Implement structured outputs
   @available(iOS 26, *)
-  private func createTranscript(from messages: [[String: Any]]) throws -> Transcript {
+  private func createTranscriptAndPrompt(from messages: [[String: Any]]) throws -> (Transcript, String) {
+    guard !messages.isEmpty else {
+      throw AppleLLMError.invalidMessage("Messages array cannot be empty")
+    }
+    
+    guard let lastMessage = messages.last,
+          let lastRole = lastMessage["role"] as? String,
+          let userPrompt = lastMessage["content"] as? String,
+          lastRole == "user" else {
+      throw AppleLLMError.invalidMessage("Last message must be from user role")
+    }
+    
     var entries: [Transcript.Entry] = []
     
-    for message in messages {
+    let transcriptMessages = Array(messages.dropLast())
+    
+    for message in transcriptMessages {
       guard let role = message["role"] as? String,
             let content = message["content"] as? String else {
         continue
@@ -217,7 +236,7 @@ public class AppleLLMImpl: NSObject {
       }
     }
     
-    return Transcript(entries: entries)
+    return (Transcript(entries: entries), userPrompt)
   }
   
   @available(iOS 26, *)
@@ -266,30 +285,34 @@ public class AppleLLMImpl: NSObject {
   @available(iOS 26, *)
   private func parseDynamicSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
     let type = schemaDict["type"] as? String
-    let name = schemaDict["name"] as? String
-    let description = schemaDict["description"] as? String
+    
+    if let anyOfArray = schemaDict["anyOf"] as? [[String: Any]] {
+      let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
+      return DynamicGenerationSchema(
+        name: schemaDict["title"] as? String ?? "",
+        description: schemaDict["description"] as? String,
+        anyOf: parsedSchemas
+      )
+    }
     
     switch type {
     case "object":
-      return try parseObjectSchema(from: schemaDict, name: name, description: description)
+      return try parseObjectSchema(from: schemaDict)
     case "array":
-      return try parseArraySchema(from: schemaDict, name: name, description: description)
+      return try parseArraySchema(from: schemaDict)
     case "string":
-      return try parseStringSchema(from: schemaDict, name: name, description: description)
+      return try parseStringSchema(from: schemaDict)
     case "number", "integer":
-      return try parseNumberSchema(from: schemaDict, name: name, description: description)
-    case nil:
-      if let ref = schemaDict["$ref"] as? String {
-        return DynamicGenerationSchema(referenceTo: ref)
-      }
-      fallthrough
+      return try parseNumberSchema(from: schemaDict)
+    case "boolean":
+      return try parseBooleanSchema(from: schemaDict)
     default:
-      throw AppleLLMError.invalidSchema("Unsupported schema type: \(type ?? "unknown"). Supported types: object, array, string, number, integer")
+      throw AppleLLMError.invalidSchema("Unsupported schema type: \(type ?? "unknown"). Supported types: object, array, string, number, integer, boolean")
     }
   }
   
   @available(iOS 26, *)
-  private func parseObjectSchema(from schemaDict: [String: Any], name: String?, description: String?) throws -> DynamicGenerationSchema {
+  private func parseObjectSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
     var properties: [DynamicGenerationSchema.Property] = []
     
     if let propertiesDict = schemaDict["properties"] as? [String: Any] {
@@ -316,19 +339,20 @@ public class AppleLLMImpl: NSObject {
     }
     
     return DynamicGenerationSchema(
-      name: name ?? "",
-      description: description,
+      name: schemaDict["title"] as? String ?? "",
+      description: schemaDict["description"] as? String,
       properties: properties
     )
   }
   
   @available(iOS 26, *)
-  private func parseArraySchema(from schemaDict: [String: Any], name: String?, description: String?) throws -> DynamicGenerationSchema {
+  private func parseArraySchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
     guard let itemsSchema = schemaDict["items"] as? [String: Any] else {
       throw AppleLLMError.invalidSchema("Array schema must have items definition")
     }
     
     let itemDynamicSchema = try parseDynamicSchema(from: itemsSchema)
+    
     let minItems = schemaDict["minItems"] as? Int
     let maxItems = schemaDict["maxItems"] as? Int
     
@@ -340,25 +364,102 @@ public class AppleLLMImpl: NSObject {
   }
   
   @available(iOS 26, *)
-  private func parseStringSchema(from schemaDict: [String: Any], name: String?, description: String?) throws -> DynamicGenerationSchema {
+  private func parseStringSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+    // Handle enum values
     if let enumValues = schemaDict["enum"] as? [String] {
-      guard let name = name else {
-        throw AppleLLMError.invalidSchema("String enum schema must have a name")
+      return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
+    }
+    
+    // Handle regular expressions
+    if let pattern = schemaDict["pattern"] as? String {
+      do {
+        let regex = try Regex(pattern)
+        return DynamicGenerationSchema(type: String.self, guides: [
+          GenerationGuide.pattern(regex)
+        ])
+      } catch {
+        throw AppleLLMError.invalidSchema("Invalid regex pattern '\(pattern)': \(error.localizedDescription)")
       }
-      
-      return DynamicGenerationSchema(
-        name: name,
-        description: description,
-        anyOf: enumValues
-      )
+    }
+    
+    // Handle custom formats
+    if let format = schemaDict["format"] as? String {
+      guard Self.supportedStringFormats.contains(format) else {
+        throw AppleLLMError.invalidSchema("Unsupported string format '\(format)'")
+      }
+      let guide = try StringFormatGuides.guide(for: format)
+      return DynamicGenerationSchema(type: String.self, guides: [guide])
+    }
+    
+    return DynamicGenerationSchema(type: String.self, guides: [])
+  }
+  
+  @available(iOS 26, *)
+  private func parseNumberSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+    let type = schemaDict["type"] as! String
+    
+    // Handle numeric enums - use string representation since Apple's GenerationGuide.anyOf only supports [String]
+    // The JavaScript side will parse these back to numbers after generation
+    
+    if let enumValues = schemaDict["enum"] as? [String] {
+      return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
+    }
+    
+    if schemaDict["multipleOf"] != nil {
+      throw AppleLLMError.invalidSchema("MultipleOf is not supported by Apple Foundational models.")
+    }
+    
+    if let maximum = schemaDict["maximum"] as? Double {
+      if type == "integer" {
+        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(Int(maximum))])
+      } else {
+        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(maximum)])
+      }
+    }
+    
+    if let minimum = schemaDict["minimum"] as? Double {
+      if type == "integer" {
+        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(Int(minimum))])
+      } else {
+        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(minimum)])
+      }
+    }
+    
+    // Apple's GenerationGuide only supports inclusive bounds (≤, ≥)
+    // We convert exclusive bounds (< , >) to the nearest inclusive equivalent:
+    // - exclusiveMaximum: value < N → maximum(N-1 for int, N.nextDown for double)
+    // - exclusiveMinimum: value > N → minimum(N+1 for int, N.nextUp for double)
+    
+    if let exclusiveMaximum = schemaDict["exclusiveMaximum"] as? Double {
+      if type == "integer" {
+        let approximateMax = Int(exclusiveMaximum) - 1
+        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(approximateMax)])
+      } else {
+        let approximateMax = exclusiveMaximum.nextDown
+        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(approximateMax)])
+      }
+    }
+    
+    if let exclusiveMinimum = schemaDict["exclusiveMinimum"] as? Double {
+      if type == "integer" {
+        let approximateMin = Int(exclusiveMinimum) + 1
+        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(approximateMin)])
+      } else {
+        let approximateMin = exclusiveMinimum.nextUp
+        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(approximateMin)])
+      }
+    }
+    
+    if type == "integer" {
+      return DynamicGenerationSchema(type: Int.self, guides: [])
     } else {
-      return DynamicGenerationSchema(type: String.self, guides: [])
+      return DynamicGenerationSchema(type: Double.self, guides: [])
     }
   }
   
   @available(iOS 26, *)
-  private func parseNumberSchema(from schemaDict: [String: Any], name: String?, description: String?) throws -> DynamicGenerationSchema {
-    return DynamicGenerationSchema(type: Double.self, guides: [])
+  private func parseBooleanSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+    return DynamicGenerationSchema(type: Bool.self, guides: [])
   }
   
 #endif
@@ -426,8 +527,15 @@ extension LanguageModelSession.Response<GeneratedContent> {
       throw RawValueExtractionError.notAResponseEntry
     }
     
-    guard let lastSegment = res.segments.last,
-          case let .structure(structureSegment) = lastSegment else {
+    guard let lastSegment = res.segments.last else {
+      throw RawValueExtractionError.noSegments
+    }
+    
+    if case let .text(textSegment) = lastSegment {
+      return textSegment.content
+    }
+    
+    guard case let .structure(structureSegment) = lastSegment else {
       throw RawValueExtractionError.notAStructuredSegment
     }
     
