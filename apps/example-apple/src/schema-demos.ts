@@ -22,7 +22,7 @@ export async function colorEnumDemo() {
     .describe('Color response');
 
   return await foundationModels.generateText(
-    [{ role: 'user', content: 'Choose a color' }],
+    [{ role: 'user', content: 'What color is the grass?' }],
     { schema }
   );
 }
@@ -35,7 +35,10 @@ export async function basicNumberDemo() {
     .describe('Number response');
 
   return await foundationModels.generateText(
-    [{ role: 'user', content: 'Pick a number' }],
+    [
+      { role: 'system', content: 'There are 3 people in the room.' },
+      { role: 'user', content: 'How many people are in the room?' },
+    ],
     { schema }
   );
 }
@@ -43,7 +46,7 @@ export async function basicNumberDemo() {
 export async function basicBooleanDemo() {
   const schema = z
     .object({
-      answer: z.boolean().describe('True or false'),
+      answer: z.boolean(),
     })
     .describe('Boolean response');
 
