@@ -84,6 +84,19 @@ export async function basicArrayDemo() {
   );
 }
 
+export async function stringFormatsDemo() {
+  const schema = z
+    .object({
+      email: z.email(),
+    })
+    .describe('Contact with network info');
+
+  return await foundationModels.generateText(
+    [{ role: 'user', content: 'Create contact information for a user' }],
+    { schema }
+  );
+}
+
 export const schemaDemos = {
   basicString: { name: 'String', func: basicStringDemo },
   colorEnum: { name: 'Enum', func: colorEnumDemo },
@@ -91,6 +104,7 @@ export const schemaDemos = {
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
   basicObject: { name: 'Object', func: basicObjectDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
+  stringFormats: { name: 'String Formats', func: stringFormatsDemo },
 };
 
 export type DemoKey = keyof typeof schemaDemos;
