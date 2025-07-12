@@ -11,11 +11,13 @@
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",
     "@react-native-ai/apple": "workspace:*",
+    "ai": "^4.3.17",
     "expo": "54.0.0-canary-20250701-6a945c5",
     "expo-status-bar": "2.2.4-canary-20250701-6a945c5",
     "react": "19.1.0",
     "react-native": "0.80.1",
-    "web-streams-polyfill": "^4.1.0"
+    "web-streams-polyfill": "^4.1.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

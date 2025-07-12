@@ -1,6 +1,9 @@
 import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
-import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
+import type {
+  EventEmitter,
+  UnsafeObject,
+} from 'react-native/Libraries/Types/CodegenTypes';
 
 export interface AppleMessage {
   role: 'assistant' | 'system' | 'tool' | 'user';
@@ -12,6 +15,7 @@ export interface AppleGenerationOptions {
   maxTokens?: number;
   topP?: number;
   topK?: number;
+  schema?: UnsafeObject;
 }
 
 export type StreamUpdateEvent = {
