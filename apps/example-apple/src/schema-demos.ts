@@ -74,13 +74,13 @@ export async function basicObjectDemo() {
 export async function basicArrayDemo() {
   const schema = z
     .object({
-      items: z.array(z.string()).min(2).max(4).describe('List of items'),
+      items: z.array(z.string()).min(2).max(3).describe('List of items'),
     })
     .describe('Array response');
 
   return await foundationModels.generateText(
-    [{ role: 'user', content: 'List some fruits' }],
-    { schema }
+    [{ role: 'user', content: 'Random list of fruits' }],
+    { schema, topK: 50, temperature: 1 }
   );
 }
 
