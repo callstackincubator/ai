@@ -162,12 +162,13 @@ const result = await foundationModels.generateText([
 
 ### Supported Types
 
-> [!INFO]
-> Same subset of JSON Schema as OpenAI is supported, except for `anyOf`. For details, read [OpenAI documenttion](https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat#json-mode).
-
 - Objects, arrays, strings, numbers, booleans, enums
-- String formats: `date-time`, `time`, `date`, `duration`, `email`, `hostname`, `ipv4`, `ipv6`, `uuid`
 - Number constraints: `min`, `max`, `exclusiveMin`, `exclusiveMax`
+
+### Unsupported Types
+
+- String formats: `date-time`, `time`, `date`, `duration`, `email`, `hostname`, `ipv4`, `ipv6`, `uuid`
+- AnyOf
 
 ## License
 
