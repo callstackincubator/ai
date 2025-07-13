@@ -11,6 +11,7 @@
   "homepage": "https://github.com/callstackincubator/ai#readme",
   "author": "Mike Grabowski <grabbou@gmail.com>",
   "scripts": {
+    "clean": "del-cli lib",
     "prepare": "bob build"
   },
   "dependencies": {

@@ -1,6 +1,16 @@
 # Apple LLM
 
-Use Apple's local LLM functionality (Apple Intelligence) with the Vercel AI SDK.
+Use Apple's local LLM functionality (Apple Intelligence) in React Native. Standalone, or with Vercel AI SDK.
+
+## Features
+
+### Supported
+- Text generation
+- Streaming
+- Structured output (JSON Schema via Zod)
+
+### Coming Soon
+- Tool calling
 
 ## Installation
 
@@ -10,19 +20,19 @@ npm install @react-native-ai/apple
 
 ### Requirements
 
-- New Architecture
+- React Native New Architecture
 - iOS 26+
 - Apple Intelligence enabled device
 
 ## Usage
 
-### Pure Usage
+### Standalone
 
 ```typescript
 import { foundationModels } from '@react-native-ai/apple';
 
 // Check if Apple Intelligence is available
-const isAvailable = await foundationModels.isAvailable();
+const isAvailable = await foundationModels.isAvailable()
 
 if (isAvailable) {
   // Generate text
@@ -65,7 +75,7 @@ const { text } = await generateText({
 > import 'web-streams-polyfill/polyfill';
 > ```
 
-### Pure Usage
+### Standalone
 
 ```typescript
 import { foundationModels } from '@react-native-ai/apple';
@@ -97,3 +107,73 @@ for await (const delta of textStream) {
   process.stdout.write(delta);
 }
 ```
+
+## Options
+
+Both `generateText` and `generateStream` accept an optional second parameter with generation options:
+
+### Available Options
+
+- `temperature` (number): Controls randomness of output. Higher values = more creative, lower values = more focused. Maximum value is `2.0`
+- `maxTokens` (number): Maximum number of tokens in the response
+- `topK` (number): Limits sampling to top K most likely tokens
+- `topP` (number): Nucleus sampling threshold (cannot be used with topK). Maximum value is `1.0`.
+- `schema` (ZodObject): Zod schema for structured output
+
+> [!NOTE]
+> You cannot specify both `topK` and `topP` simultaneously
+
+### Example
+
+```typescript
+const result = await foundationModels.generateText(messages, {
+  temperature: 0.7,
+  maxTokens: 500,
+  topP: 0.9,
+});
+```
+
+## Structured Output
+
+Apple LLM supports structured outputs using JSON Schema via Zod.
+
+### Usage
+
+> [!INFO]
+> For more examples, check [example code](../../apps/example-apple/src/schema-demos.ts)
+
+```typescript
+import { foundationModels } from '@react-native-ai/apple';
+import { z } from 'zod';
+
+const schema = z.object({
+  name: z.string(),
+  age: z.number().int().min(0).max(150),
+  email: z.string().email(),
+});
+
+const result = await foundationModels.generateText([
+  { role: 'user', content: 'Create a user profile' }
+], { schema });
+
+// Result is properly typed:
+// { name: string, age: number, email: string }
+```
+
+### Supported Types
+
+- Objects, arrays, strings, numbers, booleans, enums
+- Number constraints: `min`, `max`, `exclusiveMin`, `exclusiveMax`
+
+### Unsupported Types
+
+- String formats: `date-time`, `time`, `date`, `duration`, `email`, `hostname`, `ipv4`, `ipv6`, `uuid`
+- AnyOf
+
+## License
+
+MIT
+
+---
+
+Made with ❤️ and [create-react-native-library](https://github.com/callstack/react-native-builder-bob)
