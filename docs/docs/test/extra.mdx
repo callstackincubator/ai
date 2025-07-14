@@ -1,0 +1,91 @@
+import { PackageManagerTabs, Tabs, Tab } from '@theme';
+
+# Hello World!
+
+## Start
+
+Write something to build your own docs! 🎁
+
+## Tabs
+
+<Tabs>
+  <Tab label="first tab">npm</Tab>
+  <Tab label="second tab">
+    ```bash title="codeblock"
+    npm install rspress -D
+    ```
+  </Tab>
+</Tabs>
+
+## Package Manager Tabs
+
+<PackageManagerTabs command="install rspress -D" />
+
+## Example Table
+
+Here is a simple markdown table:
+
+| Name   | Age | City      |
+|--------|-----|-----------|
+| Alice  | 24  | New York  |
+| Bob    | 29  | San Francisco |
+| Carol  | 32  | Chicago   |
+
+## Inline Code Block
+
+`npm install rspress -D`
+
+## Code Block
+
+```
+npm install rspress -D
+```
+
+## Code Block with Highlight
+
+```ts title=codeblock.ts {1,3}
+const a = 1;
+const b = 2;
+const c = 3;
+const d = 4;
+```
+
+## Container cases
+
+:::info
+
+The command is started through the React Native Community CLI's `start` command, which is overridden [inside `react-native.config.js`](/) to spawn Re.Pack's dev server.
+
+:::
+
+:::warning This plugin is primarily intended for Rspack users.
+
+The main purpose of this plugin is to limit the **build performance impact** of the `react-native-reanimated` babel plugin.
+
+If you're using webpack with `babel-loader`, you probably don't need this plugin. Instead, you should follow the [official Reanimated documentation](https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started/#step-2-add-reanimateds-babel-plugin) and add the Reanimated Babel plugin directly to your `babel.config.js`:
+
+```js
+module.exports = {
+  presets: ["module:@react-native/babel-preset"],
+  plugins: ["react-native-reanimated/plugin"],
+};
+```
+
+:::
+
+:::danger Platform-Specific Output
+By default, extracted asset files are copied to `assets/` directory for iOS and `drawable-*` directories (e.g. `drawable-mdpi`, `drawable-hdpi`, etc.) for Android which matches Metro's asset handling behavior.
+:::
+
+:::tip Guides related to AssetsLoader
+Looking to do more with your assets? Check out the guides on:
+
+- [Inlining assets as base64 strings](/docs/guides/inline-assets)
+- [Converting to remote assets](/docs/guides/remote-assets)
+- [Adding SVG support](/docs/guides/svg)
+
+:::
+
+:::details
+This loader uses `flow-remove-types` under the hood. You can learn more about it [here](https://github.com/facebook/flow/tree/main/packages/flow-remove-types).
+:::

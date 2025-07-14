@@ -1,0 +1,17 @@
+[
+  {
+    "type": "file",
+    "name": "index",
+    "label": "Overview"
+  },
+  {
+    "type": "file",
+    "name": "guide",
+    "label": "Guide"
+  },
+  {
+    "type": "file",
+    "name": "extra",
+    "label": "Extra"
+  }
+]

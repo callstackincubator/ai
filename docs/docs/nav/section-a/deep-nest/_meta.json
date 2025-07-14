@@ -1,0 +1,11 @@
+[
+  "deep-nest-1",
+  {
+    "type": "dir",
+    "name": "level-3",
+    "label": "Level 3",
+    "collapsible": true,
+    "collapsed": false
+  },
+  "deep-nest"
+]

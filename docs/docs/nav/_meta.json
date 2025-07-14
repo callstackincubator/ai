@@ -1,0 +1,72 @@
+[
+  {
+    "type": "dir",
+    "name": "section-a",
+    "label": "Section A",
+    "collapsible": true,
+    "collapsed": false
+  },
+  {
+    "type": "dir",
+    "name": "section-b",
+    "label": "Section B (MDX)",
+    "collapsible": true,
+    "collapsed": false
+  },
+  { "type": "divider" },
+  {
+    "type": "file",
+    "name": "file",
+    "label": "File Test"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link 1",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link 2",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link 3",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link 4",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link 5",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link 6",
+    "link": "https://rspress.dev/"
+  },
+  {
+    "type": "custom-link",
+    "label": "Custom Link 7",
+    "link": "https://rspress.dev/"
+  }
+]
