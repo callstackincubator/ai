@@ -1,18 +1,6 @@
 {
+  "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
-    "lib": ["es2020"],
-    "declaration": true,
-    "outDir": "./lib",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "jsx": "react-native",
     "types": ["web-streams-polyfill"]
   },
   "include": ["src/**/*"],

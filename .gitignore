@@ -30,6 +30,9 @@ DerivedData
 project.xcworkspace
 .xcode.env.local
 
+# AI
+.claude
+
 # Android/IJ
 #
 .classpath

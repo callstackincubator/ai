@@ -4,7 +4,7 @@
   "description": "Apple LLM provider for Vercel AI SDK",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
-  "types": "lib/typescript/src/index.d.ts",
+  "types": "lib/typescript/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
   "license": "MIT",
@@ -24,6 +24,7 @@
     "react-native": "^0.80.0"
   },
   "devDependencies": {
+    "@react-native/typescript-config": "^0.80.1",
     "react-native": "0.80.0",
     "typescript": "^5.0.0"
   },
@@ -32,7 +33,8 @@
     "output": "lib",
     "targets": [
       "commonjs",
-      "module"
+      "module",
+      "typescript"
     ]
   },
   "codegenConfig": {

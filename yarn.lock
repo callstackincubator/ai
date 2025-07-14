@@ -2570,6 +2570,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@babel/plugin-transform-strict-mode@npm:^7.27.1":
+  version: 7.27.1
+  resolution: "@babel/plugin-transform-strict-mode@npm:7.27.1"
+  dependencies:
+    "@babel/helper-plugin-utils": ^7.27.1
+  peerDependencies:
+    "@babel/core": ^7.0.0-0
+  checksum: 0c5bbc9f913b2cea1a1f5697bac320f11575016eed2eee16d2430af5ddceff5382ad3f1b70bf7158ff458db38568a903fab03b308150753453354785365667ec
+  languageName: node
+  linkType: hard
+
 "@babel/plugin-transform-template-literals@npm:^7.24.7":
   version: 7.24.7
   resolution: "@babel/plugin-transform-template-literals@npm:7.24.7"
@@ -4426,6 +4437,8 @@ __metadata:
   resolution: "@react-native-ai/apple@workspace:packages/apple-llm"
   dependencies:
     "@ai-sdk/provider": ^1.1.3
+    "@babel/plugin-transform-strict-mode": ^7.27.1
+    "@react-native/typescript-config": ^0.80.1
     react-native: 0.80.0
     react-native-builder-bob: ^0.23.2
     typescript: ^5.0.0
@@ -5252,6 +5265,13 @@ __metadata:
   version: 0.74.85
   resolution: "@react-native/typescript-config@npm:0.74.85"
   checksum: d53a3a41c021553399148f697764d8f9861689e4bfaa4d344e8ec8698b28715c2741c974efd8b71795463b2396376f59ff07479e89eb01cd7aff9653beb0b1d2
+  languageName: node
+  linkType: hard
+
+"@react-native/typescript-config@npm:^0.80.1":
+  version: 0.80.1
+  resolution: "@react-native/typescript-config@npm:0.80.1"
+  checksum: e427edeefd9e5be9ee8c7d247243ed231973662cf2904741c24534aab3620a51159fe38cd1907f1ea90ce41a33e1266e34e414918aff1b30b444bac26db23e6d
   languageName: node
   linkType: hard
 
