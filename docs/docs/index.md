@@ -20,20 +20,20 @@ hero:
 features:
   - title: On-device LLM execution
     details: Run large language models directly on mobile devices without requiring cloud infrastructure or internet connectivity.
-    icon: cpu
+    icon: <img src="./device.svg" />
   - title: Vercel AI SDK compatibility
     details: Seamless integration with Vercel AI SDK, allowing you to use familiar functions like streamText and generateText with local models.
-    icon: code
+    icon: <img src="./code.svg" />
   - title: Apple Foundation Models
     details: Native support for Apple's Foundation Models on iOS 26+ devices with Apple Intelligence, providing seamless integration with Apple's on-device AI capabilities.
-    icon: apple
+    icon: <img src="./apple.svg" />
   - title: MLC LLM Engine powered
     details: Built on top of MLC LLM Engine, providing optimized performance and efficient model execution on mobile devices.
-    icon: zap
+    icon: <img src="./zap.svg" />
   - title: Cross-platform support
     details: Full support for both iOS and Android platforms with platform-specific optimizations and configurations.
-    icon: smartphone
+    icon: <img src="./smartphone.svg" />
   - title: Privacy-first approach
     details: All AI processing happens locally on the device, ensuring user data privacy and eliminating the need for cloud-based AI services.
-    icon: shield
+    icon: <img src="./shield.svg" />
 ---
