@@ -10,7 +10,7 @@ function checkDependency(command, name) {
     execSync(`which ${command}`, { stdio: 'ignore' })
     console.log(`✅ ${name} found in PATH`)
     return true
-  } catch (error) {
+  } catch (_error) {
     console.error(`❌ ${name} not found in PATH. Please install ${name} first.`)
     return false
   }

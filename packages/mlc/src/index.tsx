@@ -24,7 +24,8 @@ const LINKING_ERROR =
 const isTurboModuleEnabled = global.__turboModuleProxy != null
 
 const AiModule = isTurboModuleEnabled
-  ? require('./NativeAi').default
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('./NativeAi').default
   : NativeModules.Ai
 
 const Ai = AiModule
@@ -83,7 +84,7 @@ class AiModel implements LanguageModelV1 {
 
   async doGenerate(options: LanguageModelV1CallOptions): Promise<{
     text?: string
-    toolCalls?: Array<LanguageModelV1FunctionToolCall>
+    toolCalls?: LanguageModelV1FunctionToolCall[]
     finishReason: LanguageModelV1FinishReason
     usage: {
       promptTokens: number

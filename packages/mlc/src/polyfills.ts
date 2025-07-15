@@ -9,7 +9,7 @@ import { polyfillGlobal } from 'react-native/Libraries/Utilities/PolyfillFunctio
 
 if (Platform.OS !== 'web') {
   const setupPolyfills = async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const webStreamPolyfills = require('web-streams-polyfill/ponyfill/es6')
 
     if (!('structuredClone' in global)) {

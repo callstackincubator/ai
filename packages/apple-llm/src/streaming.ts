@@ -16,7 +16,7 @@ export function generateStream(
   }
 
   let streamId: string | null = null
-  let listeners: Array<{ remove(): void }> = []
+  let listeners: { remove(): void }[] = []
 
   const cleanup = () => {
     listeners.forEach((listener) => listener.remove())

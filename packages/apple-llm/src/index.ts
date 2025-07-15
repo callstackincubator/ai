@@ -1,5 +1,5 @@
 import { type LanguageModelV1StreamPart } from '@ai-sdk/provider'
-import z from 'zod'
+import { z } from 'zod'
 
 import { AppleLLMChatLanguageModel } from './ai-sdk'
 import NativeAppleLLMSpec, {
