@@ -2,6 +2,10 @@
   "compilerOptions": {
     "allowJs": true,
     "esModuleInterop": true,
+    "paths": {
+      "@react-native-ai/mlc": ["./packages/mlc/src/index"],
+      "@react-native-ai/apple": ["./packages/apple-llm/src"]
+    },
     "jsx": "react-native",
     "lib": ["DOM", "ESNext"],
     "module": "preserve",

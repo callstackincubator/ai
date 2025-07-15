@@ -21,7 +21,8 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "@types/react": "^19.1.8"
   },
   "private": true
 }

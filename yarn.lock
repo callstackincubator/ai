@@ -5716,7 +5716,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react@npm:*":
+"@types/react@npm:*, @types/react@npm:^19.1.8":
   version: 19.1.8
   resolution: "@types/react@npm:19.1.8"
   dependencies:
@@ -9577,6 +9577,7 @@ __metadata:
     "@azure/core-asynciterator-polyfill": ^1.0.2
     "@babel/core": ^7.20.0
     "@react-native-ai/apple": "workspace:*"
+    "@types/react": ^19.1.8
     ai: ^4.3.17
     expo: 54.0.0-canary-20250701-6a945c5
     expo-status-bar: 2.2.4-canary-20250701-6a945c5
