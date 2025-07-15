@@ -10,6 +10,7 @@ export default defineConfig({
     light: '/logo-light.png',
     dark: '/logo-dark.png',
   },
+  globalStyles: path.join(__dirname, 'theme/styles.css'),
   themeConfig: {
     editLink: {
       docRepoBaseUrl: 'https://github.com/callstackincubator/ai/docs',
