@@ -1,47 +1,47 @@
 import {
-  type LanguageModelV1Prompt,
   type LanguageModelV1,
   type LanguageModelV1CallOptions,
-} from '@ai-sdk/provider';
+  type LanguageModelV1Prompt,
+} from '@ai-sdk/provider'
 
-import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM';
-import { generateStream } from './streaming';
+import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
+import { generateStream } from './streaming'
 
 export class AppleLLMChatLanguageModel implements LanguageModelV1 {
-  readonly specificationVersion = 'v1';
-  readonly defaultObjectGenerationMode = 'json';
+  readonly specificationVersion = 'v1'
+  readonly defaultObjectGenerationMode = 'json'
 
-  readonly provider = 'apple-llm';
-  readonly modelId = 'default';
+  readonly provider = 'apple-llm'
+  readonly modelId = 'default'
 
   private convertMessages(messages: LanguageModelV1Prompt): AppleMessage[] {
     return messages.map((message): AppleMessage => {
       const content = Array.isArray(message.content)
         ? message.content.reduce((acc, part) => {
             if (part.type === 'text') {
-              return acc + part.text;
+              return acc + part.text
             }
-            console.warn('Unsupported message content type:', part);
-            return acc;
+            console.warn('Unsupported message content type:', part)
+            return acc
           }, '')
-        : message.content;
+        : message.content
 
       return {
         role: message.role,
         content,
-      };
-    });
+      }
+    })
   }
 
   async doGenerate(options: LanguageModelV1CallOptions) {
-    const messages = this.convertMessages(options.prompt);
+    const messages = this.convertMessages(options.prompt)
 
     const text = await NativeAppleLLM.generateText(messages, {
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       topP: options.topP,
       topK: options.topK,
-    });
+    })
 
     return {
       text,
@@ -56,18 +56,18 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
         rawPrompt: options.prompt,
         rawSettings: {},
       },
-    };
+    }
   }
 
   async doStream(options: LanguageModelV1CallOptions) {
-    const messages = this.convertMessages(options.prompt);
+    const messages = this.convertMessages(options.prompt)
 
     const stream = generateStream(messages, {
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       topP: options.topP,
       topK: options.topK,
-    });
+    })
 
     return {
       stream,
@@ -75,6 +75,6 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
         rawPrompt: options.prompt,
         rawSettings: {},
       },
-    };
+    }
   }
 }

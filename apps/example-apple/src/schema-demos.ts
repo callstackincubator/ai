@@ -1,17 +1,17 @@
-import { foundationModels } from '@react-native-ai/apple';
-import { z } from 'zod';
+import { foundationModels } from '@react-native-ai/apple'
+import { z } from 'zod'
 
 export async function basicStringDemo() {
   const schema = z
     .object({
       value: z.string().describe('A simple text string'),
     })
-    .describe('String response');
+    .describe('String response')
 
   return await foundationModels.generateText(
     [{ role: 'user', content: 'Generate a city name' }],
     { schema }
-  );
+  )
 }
 
 export async function colorEnumDemo() {
@@ -19,12 +19,12 @@ export async function colorEnumDemo() {
     .object({
       color: z.enum(['red', 'blue', 'green']).describe('Pick a color'),
     })
-    .describe('Color response');
+    .describe('Color response')
 
   return await foundationModels.generateText(
     [{ role: 'user', content: 'What color is the grass?' }],
     { schema }
-  );
+  )
 }
 
 export async function basicNumberDemo() {
@@ -32,7 +32,7 @@ export async function basicNumberDemo() {
     .object({
       value: z.number().min(1).max(10).describe('A number between 1 and 10'),
     })
-    .describe('Number response');
+    .describe('Number response')
 
   return await foundationModels.generateText(
     [
@@ -40,7 +40,7 @@ export async function basicNumberDemo() {
       { role: 'user', content: 'How many people are in the room?' },
     ],
     { schema }
-  );
+  )
 }
 
 export async function basicBooleanDemo() {
@@ -48,12 +48,12 @@ export async function basicBooleanDemo() {
     .object({
       answer: z.boolean(),
     })
-    .describe('Boolean response');
+    .describe('Boolean response')
 
   return await foundationModels.generateText(
     [{ role: 'user', content: 'Is the sky blue?' }],
     { schema }
-  );
+  )
 }
 
 export async function basicObjectDemo() {
@@ -63,12 +63,12 @@ export async function basicObjectDemo() {
       age: z.number().int().min(1).max(100).describe('Age'),
       active: z.boolean().describe('Is active'),
     })
-    .describe('Basic person info');
+    .describe('Basic person info')
 
   return await foundationModels.generateText(
     [{ role: 'user', content: 'Create a simple person' }],
     { schema }
-  );
+  )
 }
 
 export async function basicArrayDemo() {
@@ -76,12 +76,12 @@ export async function basicArrayDemo() {
     .object({
       items: z.array(z.string()).min(2).max(3).describe('List of items'),
     })
-    .describe('Array response');
+    .describe('Array response')
 
   return await foundationModels.generateText(
     [{ role: 'user', content: 'Random list of fruits' }],
     { schema, topK: 50, temperature: 1 }
-  );
+  )
 }
 
 export const schemaDemos = {
@@ -91,6 +91,6 @@ export const schemaDemos = {
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
   basicObject: { name: 'Object', func: basicObjectDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
-};
+}
 
-export type DemoKey = keyof typeof schemaDemos;
+export type DemoKey = keyof typeof schemaDemos

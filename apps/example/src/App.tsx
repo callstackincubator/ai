@@ -1,38 +1,39 @@
-import React, { useCallback, useState } from 'react';
-import { SafeAreaView, StyleSheet, View, Text } from 'react-native';
-import { GiftedChat, type IMessage } from 'react-native-gifted-chat';
+import { type CoreMessage, streamText } from 'ai'
+import React, { useCallback, useState } from 'react'
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native'
+import { GiftedChat, type IMessage } from 'react-native-gifted-chat'
+import { v4 as uuid } from 'uuid'
+
 import {
-  getModel,
   type AiModelSettings,
-  prepareModel,
   downloadModel,
-} from '../../../packages/mlc/src';
-import { streamText, type CoreMessage } from 'ai';
-import { v4 as uuid } from 'uuid';
-import NetworkInfo from './NetworkInfo';
-import { ModelSelection } from './ModelSelection';
+  getModel,
+  prepareModel,
+} from '../../../packages/mlc/src'
+import { ModelSelection } from './ModelSelection'
+import NetworkInfo from './NetworkInfo'
 
 const aiBot = {
   _id: 2,
   name: 'AI Chat Bot',
   avatar: require('./../assets/avatar.png'),
-};
+}
 
 const ProgressBar = ({ progress }: { progress: number }) => {
-  if (progress === 100) return null;
+  if (progress === 100) return null
 
   return (
     <View style={styles.progressContainer}>
       <View style={[styles.progressBar, { width: `${progress}%` }]} />
       <Text style={styles.progressText}>{progress.toFixed(1)}%</Text>
     </View>
-  );
-};
+  )
+}
 
 export default function Example() {
-  const [modelId, setModelId] = useState<string>();
-  const [displayedMessages, setDisplayedMessages] = useState<IMessage[]>([]);
-  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [modelId, setModelId] = useState<string>()
+  const [displayedMessages, setDisplayedMessages] = useState<IMessage[]>([])
+  const [downloadProgress, setDownloadProgress] = useState<number>(0)
 
   const onSendMessage = useCallback(
     async (messages: IMessage[]) => {
@@ -48,11 +49,11 @@ export default function Example() {
                 return {
                   content: message.text,
                   role: message.user._id === 2 ? 'assistant' : 'user',
-                };
+                }
               }),
-          });
+          })
 
-          let firstChunk = true;
+          let firstChunk = true
           for await (const chunk of textStream) {
             if (firstChunk) {
               setDisplayedMessages((previousMessages) =>
@@ -63,11 +64,11 @@ export default function Example() {
                   createdAt: new Date(),
                   user: aiBot,
                 })
-              );
+              )
             } else {
               setDisplayedMessages((previousMessages) => {
-                let newMessages = [...previousMessages];
-                const prevMessage = newMessages.shift();
+                const newMessages = [...previousMessages]
+                const prevMessage = newMessages.shift()
                 return [
                   {
                     _id: prevMessage?._id ?? uuid(),
@@ -76,18 +77,18 @@ export default function Example() {
                     user: aiBot,
                   },
                   ...newMessages,
-                ];
-              });
+                ]
+              })
             }
-            firstChunk = false;
+            firstChunk = false
           }
         } catch (error) {
-          console.log('Error:', error);
+          console.log('Error:', error)
         }
       }
     },
     [modelId]
-  );
+  )
 
   const addAiBotMessage = useCallback((text: string) => {
     setDisplayedMessages((previousMessages) =>
@@ -98,52 +99,52 @@ export default function Example() {
         createdAt: new Date(),
         user: aiBot,
       })
-    );
-  }, []);
+    )
+  }, [])
 
   const selectModel = useCallback(
     async (modelSettings: AiModelSettings) => {
       if (modelSettings.model_id) {
-        setModelId(modelSettings.model_id);
+        setModelId(modelSettings.model_id)
 
-        addAiBotMessage('Downloading model...');
+        addAiBotMessage('Downloading model...')
         await downloadModel(modelSettings.model_id, {
           onStart: () => {
-            addAiBotMessage('Starting model download...');
+            addAiBotMessage('Starting model download...')
           },
           onProgress: (progress) => {
-            setDownloadProgress(progress.percentage);
+            setDownloadProgress(progress.percentage)
           },
           onComplete: () => {
-            setDownloadProgress(100);
-            addAiBotMessage('Model download complete!');
+            setDownloadProgress(100)
+            addAiBotMessage('Model download complete!')
           },
           onError: (error) => {
-            setDownloadProgress(0);
-            addAiBotMessage(`Error downloading model: ${error.message}`);
+            setDownloadProgress(0)
+            addAiBotMessage(`Error downloading model: ${error.message}`)
           },
-        });
+        })
 
-        await prepareModel(modelSettings.model_id);
+        await prepareModel(modelSettings.model_id)
 
-        addAiBotMessage('Model ready for conversation.');
+        addAiBotMessage('Model ready for conversation.')
       }
     },
     [addAiBotMessage]
-  );
+  )
 
   const onSend = useCallback(
     (newMessage: IMessage[]) => {
       if (newMessage[0]) {
         setDisplayedMessages((previousMessages) =>
           GiftedChat.append(previousMessages, newMessage)
-        );
+        )
 
-        onSendMessage([newMessage[0], ...displayedMessages]);
+        onSendMessage([newMessage[0], ...displayedMessages])
       }
     },
     [onSendMessage, displayedMessages]
-  );
+  )
 
   return (
     <SafeAreaView style={styles.container}>
@@ -162,7 +163,7 @@ export default function Example() {
         )}
       />
     </SafeAreaView>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -195,4 +196,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     lineHeight: 28,
   },
-});
+})

@@ -1,4 +1,5 @@
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import './polyfills'
+
 import {
   type LanguageModelV1,
   type LanguageModelV1CallOptions,
@@ -6,26 +7,26 @@ import {
   type LanguageModelV1FinishReason,
   type LanguageModelV1FunctionToolCall,
   type LanguageModelV1StreamPart,
-} from '@ai-sdk/provider';
-import './polyfills';
-import { LogBox, type EmitterSubscription } from 'react-native';
+} from '@ai-sdk/provider'
+import { NativeEventEmitter, NativeModules, Platform } from 'react-native'
+import { type EmitterSubscription, LogBox } from 'react-native'
 import {
   ReadableStream,
   ReadableStreamDefaultController,
-} from 'web-streams-polyfill';
+} from 'web-streams-polyfill'
 
 const LINKING_ERROR =
   `The package 'react-native-ai' doesn't seem to be linked. Make sure: \n\n` +
   Platform.select({ ios: "- You have run 'pod install'\n", default: '' }) +
   '- You rebuilt the app after installing the package\n' +
-  '- You are not using Expo Go\n';
+  '- You are not using Expo Go\n'
 
-// @ts-expect-error
-const isTurboModuleEnabled = global.__turboModuleProxy != null;
+const isTurboModuleEnabled = global.__turboModuleProxy != null
 
 const AiModule = isTurboModuleEnabled
-  ? require('./NativeAi').default
-  : NativeModules.Ai;
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('./NativeAi').default
+  : NativeModules.Ai
 
 const Ai = AiModule
   ? AiModule
@@ -33,71 +34,71 @@ const Ai = AiModule
       {},
       {
         get() {
-          throw new Error(LINKING_ERROR);
+          throw new Error(LINKING_ERROR)
         },
       }
-    );
+    )
 
-export default Ai;
+export default Ai
 
 export interface AiModelSettings extends Record<string, unknown> {
-  model_id?: string;
+  model_id?: string
 }
 
 export interface Model {
-  modelId: string;
-  modelLib: string;
+  modelId: string
+  modelLib: string
 }
 
 export interface Message {
-  role: 'assistant' | 'system' | 'tool' | 'user';
-  content: string;
+  role: 'assistant' | 'system' | 'tool' | 'user'
+  content: string
 }
 
 export interface DownloadProgress {
-  percentage: number;
+  percentage: number
 }
 
-LogBox.ignoreLogs(['new NativeEventEmitter', 'Avatar:']); // Ignore log notification by message
+LogBox.ignoreLogs(['new NativeEventEmitter', 'Avatar:']) // Ignore log notification by message
 
 class AiModel implements LanguageModelV1 {
-  readonly specificationVersion = 'v1';
-  readonly defaultObjectGenerationMode = 'json';
-  readonly provider = 'gemini-nano';
-  public modelId: string;
-  private options: AiModelSettings;
+  readonly specificationVersion = 'v1'
+  readonly defaultObjectGenerationMode = 'json'
+  readonly provider = 'gemini-nano'
+  public modelId: string
+  private options: AiModelSettings
 
   constructor(modelId: string, options: AiModelSettings = {}) {
-    this.modelId = modelId;
-    this.options = options;
+    this.modelId = modelId
+    this.options = options
 
-    console.debug('init:', this.modelId);
+    console.debug('init:', this.modelId)
   }
 
-  private model!: Model;
+  private model!: Model
   async getModel() {
-    this.model = await Ai.getModel(this.modelId);
+    this.model = await Ai.getModel(this.modelId)
 
-    return this.model;
+    return this.model
   }
 
   async doGenerate(options: LanguageModelV1CallOptions): Promise<{
-    text?: string;
-    toolCalls?: Array<LanguageModelV1FunctionToolCall>;
-    finishReason: LanguageModelV1FinishReason;
+    text?: string
+    toolCalls?: LanguageModelV1FunctionToolCall[]
+    finishReason: LanguageModelV1FinishReason
     usage: {
-      promptTokens: number;
-      completionTokens: number;
-    };
+      promptTokens: number
+      completionTokens: number
+    }
     rawCall: {
-      rawPrompt: unknown;
-      rawSettings: Record<string, unknown>;
-    };
+      rawPrompt: unknown
+      rawSettings: Record<string, unknown>
+    }
   }> {
-    const model = await this.getModel();
-    const messages = options.prompt;
+    const model = await this.getModel()
+    const messages = options.prompt
     const extractedMessages = messages.map((message): Message => {
-      let content = '';
+      let content = ''
 
       if (Array.isArray(message.content)) {
         content = message.content
@@ -106,19 +107,19 @@ class AiModel implements LanguageModelV1 {
               ? messageContent.text
               : messageContent
           )
-          .join('');
+          .join('')
       }
 
       return {
         role: message.role,
-        content: content,
-      };
-    });
+        content,
+      }
+    })
 
-    let text = '';
+    let text = ''
 
     if (messages.length > 0) {
-      text = await Ai.doGenerate(model.modelId, extractedMessages);
+      text = await Ai.doGenerate(model.modelId, extractedMessages)
     }
 
     return {
@@ -132,31 +133,31 @@ class AiModel implements LanguageModelV1 {
         rawPrompt: options,
         rawSettings: {},
       },
-    };
+    }
   }
 
-  stream: ReadableStream<LanguageModelV1StreamPart> | null = null;
+  stream: ReadableStream<LanguageModelV1StreamPart> | null = null
   controller: ReadableStreamDefaultController<LanguageModelV1StreamPart> | null =
-    null;
-  streamId: string | null = null;
-  chatUpdateListener: EmitterSubscription | null = null;
-  chatCompleteListener: EmitterSubscription | null = null;
-  chatErrorListener: EmitterSubscription | null = null;
-  isStreamClosed: boolean = false;
+    null
+  streamId: string | null = null
+  chatUpdateListener: EmitterSubscription | null = null
+  chatCompleteListener: EmitterSubscription | null = null
+  chatErrorListener: EmitterSubscription | null = null
+  isStreamClosed: boolean = false
 
   public doStream = async (
     options: LanguageModelV1CallOptions
   ): Promise<{
-    stream: ReadableStream<LanguageModelV1StreamPart>;
-    rawCall: { rawPrompt: unknown; rawSettings: Record<string, unknown> };
-    rawResponse?: { headers?: Record<string, string> };
-    warnings?: LanguageModelV1CallWarning[];
+    stream: ReadableStream<LanguageModelV1StreamPart>
+    rawCall: { rawPrompt: unknown; rawSettings: Record<string, unknown> }
+    rawResponse?: { headers?: Record<string, string> }
+    warnings?: LanguageModelV1CallWarning[]
   }> => {
     // Reset stream state
-    this.isStreamClosed = false;
-    const messages = options.prompt;
+    this.isStreamClosed = false
+    const messages = options.prompt
     const extractedMessages = messages.map((message): Message => {
-      let content = '';
+      let content = ''
 
       if (Array.isArray(message.content)) {
         content = message.content
@@ -165,24 +166,24 @@ class AiModel implements LanguageModelV1 {
               ? messageContent.text
               : messageContent
           )
-          .join('');
+          .join('')
       }
 
       return {
         role: message.role,
-        content: content,
-      };
-    });
-    const model = await this.getModel();
+        content,
+      }
+    })
+    const model = await this.getModel()
 
     const stream = new ReadableStream<LanguageModelV1StreamPart>({
       start: (controller) => {
-        this.controller = controller;
+        this.controller = controller
 
         const eventEmitter =
           Platform.OS === 'android'
             ? new NativeEventEmitter()
-            : new NativeEventEmitter(NativeModules.Ai);
+            : new NativeEventEmitter(NativeModules.Ai)
 
         this.chatCompleteListener = eventEmitter.addListener(
           'onChatComplete',
@@ -196,15 +197,15 @@ class AiModel implements LanguageModelV1 {
                     promptTokens: 0,
                     completionTokens: 0,
                   },
-                });
-                this.isStreamClosed = true;
-                this.controller.close();
+                })
+                this.isStreamClosed = true
+                this.controller.close()
               }
             } catch (error) {
-              console.error('🔴 [Stream] Error in complete handler:', error);
+              console.error('🔴 [Stream] Error in complete handler:', error)
             }
           }
-        );
+        )
 
         this.chatErrorListener = eventEmitter.addListener(
           'onChatUpdate',
@@ -212,99 +213,99 @@ class AiModel implements LanguageModelV1 {
             console.log(
               '🟢 [Stream] Update data:',
               JSON.stringify(data, null, 2)
-            );
+            )
             try {
               if (!this.isStreamClosed && this.controller) {
                 if (data.error) {
-                  this.controller.enqueue({ type: 'error', error: data.error });
-                  this.isStreamClosed = true;
-                  this.controller.close();
+                  this.controller.enqueue({ type: 'error', error: data.error })
+                  this.isStreamClosed = true
+                  this.controller.close()
                 } else {
                   this.controller.enqueue({
                     type: 'text-delta',
                     textDelta: data.content || '',
-                  });
+                  })
                 }
               } else {
                 console.log(
                   '🟡 [Stream] Cannot update - stream closed or no controller'
-                );
+                )
               }
             } catch (error) {
-              console.error('🔴 [Stream] Error in update handler:', error);
+              console.error('🔴 [Stream] Error in update handler:', error)
             }
           }
-        );
+        )
 
         if (!model) {
-          console.error('🔴 [Stream] Model not initialized');
-          throw new Error('Model not initialized');
+          console.error('🔴 [Stream] Model not initialized')
+          throw new Error('Model not initialized')
         }
 
         console.log(
           '🔵 [Stream] Starting native stream with model:',
           model.modelId
-        );
-        Ai.doStream(model.modelId, extractedMessages);
+        )
+        Ai.doStream(model.modelId, extractedMessages)
       },
       cancel: () => {
-        console.log('🟡 [Stream] Stream cancelled, cleaning up');
-        this.isStreamClosed = true;
+        console.log('🟡 [Stream] Stream cancelled, cleaning up')
+        this.isStreamClosed = true
         if (this.chatUpdateListener) {
-          console.log('🟡 [Stream] Removing chat update listener');
-          this.chatUpdateListener.remove();
+          console.log('🟡 [Stream] Removing chat update listener')
+          this.chatUpdateListener.remove()
         }
         if (this.chatCompleteListener) {
-          console.log('🟡 [Stream] Removing chat complete listener');
-          this.chatCompleteListener.remove();
+          console.log('🟡 [Stream] Removing chat complete listener')
+          this.chatCompleteListener.remove()
         }
         if (this.chatErrorListener) {
-          console.log('🟡 [Stream] Removing chat error listener');
-          this.chatErrorListener.remove();
+          console.log('🟡 [Stream] Removing chat error listener')
+          this.chatErrorListener.remove()
         }
       },
-      pull: (_controller) => {
-        console.log('🔵 [Stream] Pull called');
+      pull: () => {
+        console.log('🔵 [Stream] Pull called')
       },
-    });
+    })
 
     return {
       stream,
       rawCall: { rawPrompt: options.prompt, rawSettings: this.options },
-    };
-  };
+    }
+  }
 
   // Add other methods here as needed
 }
 
-type ModelOptions = {};
+type ModelOptions = Record<string, unknown>
 
 export function getModel(modelId: string, options: ModelOptions = {}): AiModel {
-  return new AiModel(modelId, options);
+  return new AiModel(modelId, options)
 }
 
 export async function getModels(): Promise<AiModelSettings[]> {
-  return Ai.getModels();
+  return Ai.getModels()
 }
 
 export async function downloadModel(
   modelId: string,
   callbacks?: {
-    onStart?: () => void;
-    onProgress?: (progress: DownloadProgress) => void;
-    onComplete?: () => void;
-    onError?: (error: Error) => void;
+    onStart?: () => void
+    onProgress?: (progress: DownloadProgress) => void
+    onComplete?: () => void
+    onError?: (error: Error) => void
   }
 ): Promise<void> {
-  const eventEmitter = new NativeEventEmitter(NativeModules.Ai);
+  const eventEmitter = new NativeEventEmitter(NativeModules.Ai)
 
   const downloadStartListener = eventEmitter.addListener(
     'onDownloadStart',
     () => {
-      console.log('🔵 [Download] Started downloading model:', modelId);
-      callbacks?.onStart?.();
+      console.log('🔵 [Download] Started downloading model:', modelId)
+      callbacks?.onStart?.()
     }
-  );
+  )
 
   const downloadProgressListener = eventEmitter.addListener(
     'onDownloadProgress',
@@ -312,55 +313,53 @@ export async function downloadModel(
       console.log(
         '🟢 [Download] Progress:',
         progress.percentage.toFixed(2) + '%'
-      );
-      callbacks?.onProgress?.(progress);
+      )
+      callbacks?.onProgress?.(progress)
     }
-  );
+  )
 
   const downloadCompleteListener = eventEmitter.addListener(
     'onDownloadComplete',
     () => {
-      console.log('✅ [Download] Completed downloading model:', modelId);
-      callbacks?.onComplete?.();
+      console.log('✅ [Download] Completed downloading model:', modelId)
+      callbacks?.onComplete?.()
       // Cleanup listeners
-      downloadStartListener.remove();
-      downloadProgressListener.remove();
-      downloadCompleteListener.remove();
-      downloadErrorListener.remove();
+      downloadStartListener.remove()
+      downloadProgressListener.remove()
+      downloadCompleteListener.remove()
+      downloadErrorListener.remove()
     }
-  );
+  )
 
   const downloadErrorListener = eventEmitter.addListener(
     'onDownloadError',
     (error) => {
-      console.error('🔴 [Download] Error downloading model:', error);
-      callbacks?.onError?.(
-        new Error(error.message || 'Unknown download error')
-      );
+      console.error('🔴 [Download] Error downloading model:', error)
+      callbacks?.onError?.(new Error(error.message || 'Unknown download error'))
       // Cleanup listeners
-      downloadStartListener.remove();
-      downloadProgressListener.remove();
-      downloadCompleteListener.remove();
-      downloadErrorListener.remove();
+      downloadStartListener.remove()
+      downloadProgressListener.remove()
+      downloadCompleteListener.remove()
+      downloadErrorListener.remove()
     }
-  );
+  )
 
   try {
-    await Ai.downloadModel(modelId);
+    await Ai.downloadModel(modelId)
   } catch (error) {
     // Cleanup listeners in case of error
-    downloadStartListener.remove();
-    downloadProgressListener.remove();
-    downloadCompleteListener.remove();
-    downloadErrorListener.remove();
-    throw error;
+    downloadStartListener.remove()
+    downloadProgressListener.remove()
+    downloadCompleteListener.remove()
+    downloadErrorListener.remove()
+    throw error
   }
 }
 
 export async function prepareModel(modelId: string) {
-  return Ai.prepareModel(modelId);
+  return Ai.prepareModel(modelId)
 }
 
-const { doGenerate, doStream } = Ai;
+const { doGenerate, doStream } = Ai
 
-export { doGenerate, doStream };
+export { doGenerate, doStream }

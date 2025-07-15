@@ -1,52 +1,52 @@
-import type { TurboModule } from 'react-native';
-import { TurboModuleRegistry } from 'react-native';
+import type { TurboModule } from 'react-native'
+import { TurboModuleRegistry } from 'react-native'
 import type {
   EventEmitter,
   UnsafeObject,
-} from 'react-native/Libraries/Types/CodegenTypes';
+} from 'react-native/Libraries/Types/CodegenTypes'
 
 export interface AppleMessage {
-  role: 'assistant' | 'system' | 'tool' | 'user';
-  content: string;
+  role: 'assistant' | 'system' | 'tool' | 'user'
+  content: string
 }
 
 export interface AppleGenerationOptions {
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-  topK?: number;
-  schema?: UnsafeObject;
+  temperature?: number
+  maxTokens?: number
+  topP?: number
+  topK?: number
+  schema?: UnsafeObject
 }
 
 export type StreamUpdateEvent = {
-  streamId: string;
-  content: string;
-};
+  streamId: string
+  content: string
+}
 
 export type StreamCompleteEvent = {
-  streamId: string;
-};
+  streamId: string
+}
 
 export type StreamErrorEvent = {
-  streamId: string;
-  error: string;
-};
+  streamId: string
+  error: string
+}
 
 export interface Spec extends TurboModule {
-  isAvailable(): boolean;
+  isAvailable(): boolean
   generateText(
     messages: AppleMessage[],
     options: AppleGenerationOptions
-  ): Promise<string>;
+  ): Promise<string>
   generateStream(
     messages: AppleMessage[],
     options: AppleGenerationOptions
-  ): string;
-  cancelStream(streamId: string): void;
+  ): string
+  cancelStream(streamId: string): void
 
-  onStreamUpdate: EventEmitter<StreamUpdateEvent>;
-  onStreamComplete: EventEmitter<StreamCompleteEvent>;
-  onStreamError: EventEmitter<StreamErrorEvent>;
+  onStreamUpdate: EventEmitter<StreamUpdateEvent>
+  onStreamComplete: EventEmitter<StreamCompleteEvent>
+  onStreamError: EventEmitter<StreamErrorEvent>
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleLLM');
+export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleLLM')

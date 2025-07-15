@@ -1,28 +1,21 @@
 {
   "compilerOptions": {
-    "rootDir": ".",
+    "allowJs": true,
+    "esModuleInterop": true,
     "paths": {
-      "react-native-ai": ["./packages/mlc/src/index"],
+      "@react-native-ai/mlc": ["./packages/mlc/src/index"],
       "@react-native-ai/apple": ["./packages/apple-llm/src"]
     },
-    "allowUnreachableCode": false,
-    "allowUnusedLabels": false,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "jsx": "react-jsx",
-    "lib": ["esnext"],
-    "module": "esnext",
-    "moduleResolution": "node",
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "noImplicitUseStrict": false,
-    "noStrictGenericChecks": false,
-    "noUncheckedIndexedAccess": true,
+    "jsx": "react-native",
+    "lib": ["DOM", "ESNext"],
+    "module": "preserve",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "customConditions": ["react-native"],
+    "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "strict": true,
-    "target": "esnext",
-    "verbatimModuleSyntax": true
+    "target": "ESNext"
   },
-  "exclude": ["3rdparty/"]
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js", "jest.config.js"],
 }

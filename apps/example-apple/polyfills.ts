@@ -1,2 +1,2 @@
-import '@azure/core-asynciterator-polyfill';
-import 'web-streams-polyfill/polyfill';
+import '@azure/core-asynciterator-polyfill'
+import 'web-streams-polyfill/polyfill'

@@ -1,5 +1,5 @@
-const path = require('path');
-const pak = require('../../packages/mlc/package.json');
+const path = require('path')
+const pak = require('../../packages/mlc/package.json')
 
 module.exports = {
   project: {
@@ -12,4 +12,4 @@ module.exports = {
       root: path.join(__dirname, '../../packages/mlc'),
     },
   },
-};
+}

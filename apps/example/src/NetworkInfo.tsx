@@ -1,14 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useNetInfo } from '@react-native-community/netinfo';
+import { useNetInfo } from '@react-native-community/netinfo'
+import React from 'react'
+import { StyleSheet, Text, View } from 'react-native'
 
 const NetworkInfo = () => {
-  const netInfo = useNetInfo();
+  const netInfo = useNetInfo()
 
   const getStatusColor = () => {
-    if (netInfo.isConnected) return styles.connected;
-    return styles.disconnected;
-  };
+    if (netInfo.isConnected) return styles.connected
+    return styles.disconnected
+  }
 
   return (
     <View style={styles.container}>
@@ -19,8 +19,8 @@ const NetworkInfo = () => {
           : 'No network connection ❌'}
       </Text>
     </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -53,6 +53,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-});
+})
 
-export default NetworkInfo;
+export default NetworkInfo

@@ -1,5 +1,5 @@
 {
-  "extends": "@react-native/typescript-config",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "types": ["web-streams-polyfill"]
   },

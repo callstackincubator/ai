@@ -1,5 +1,5 @@
-const path = require('path');
-const pak = require('../../packages/mlc/package.json');
+const path = require('path')
+const pak = require('../../packages/mlc/package.json')
 
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
@@ -15,4 +15,4 @@ module.exports = {
       },
     ],
   ],
-};
+}
