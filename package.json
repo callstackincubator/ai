@@ -9,10 +9,6 @@
     "type": "git",
     "url": "git+https://github.com/callstackincubator/ai.git"
   },
-  "author": "szymonrybczak <szymon.rybczak@gmail.com> (https://github.com/szymonrybczak)",
-  "contributors": [
-    "Mike Grabowski <grabbou@gmail.com> (https://github.com/grabbou)"
-  ],
   "license": "MIT",
   "devDependencies": {
     "@babel/plugin-transform-strict-mode": "^7.27.1",

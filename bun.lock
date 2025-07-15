@@ -85,6 +85,7 @@
       },
       "devDependencies": {
         "react-native": "0.80.0",
+        "typescript": "^5.8.3",
       },
       "peerDependencies": {
         "react": "*",
