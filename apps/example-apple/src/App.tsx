@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { foundationModels } from '@react-native-ai/apple'
+import { StatusBar } from 'expo-status-bar'
+import React, { useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -7,32 +9,31 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { foundationModels } from '@react-native-ai/apple';
-import { schemaDemos, type DemoKey } from './schema-demos';
+} from 'react-native'
+
+import { type DemoKey, schemaDemos } from './schema-demos'
 
 export default function App() {
-  const [loading, setLoading] = useState<string | null>(null);
-  const isAvailable = foundationModels.isAvailable();
+  const [loading, setLoading] = useState<string | null>(null)
+  const isAvailable = foundationModels.isAvailable()
 
   const runDemo = async (key: DemoKey) => {
-    if (loading) return;
+    if (loading) return
 
-    setLoading(key);
+    setLoading(key)
 
     try {
-      const result = await schemaDemos[key].func();
-      Alert.alert('Success', JSON.stringify(result, null, 2));
+      const result = await schemaDemos[key].func()
+      Alert.alert('Success', JSON.stringify(result, null, 2))
     } catch (error) {
       Alert.alert(
         'Error',
         error instanceof Error ? error.message : String(error)
-      );
+      )
     } finally {
-      setLoading(null);
+      setLoading(null)
     }
-  };
+  }
 
   return (
     <View style={styles.container}>
@@ -68,7 +69,7 @@ export default function App() {
 
       <StatusBar style="auto" />
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -122,4 +123,4 @@ const styles = StyleSheet.create({
   spinner: {
     marginRight: 8,
   },
-});
+})

@@ -1,58 +1,58 @@
-import { AppleLLMChatLanguageModel } from './ai-sdk';
-import { generateStream } from './streaming';
+import { type LanguageModelV1StreamPart } from '@ai-sdk/provider'
+import z from 'zod'
 
+import { AppleLLMChatLanguageModel } from './ai-sdk'
 import NativeAppleLLMSpec, {
-  type AppleMessage,
   type AppleGenerationOptions,
-} from './NativeAppleLLM';
-import z from 'zod';
-import { type LanguageModelV1StreamPart } from '@ai-sdk/provider';
+  type AppleMessage,
+} from './NativeAppleLLM'
+import { generateStream } from './streaming'
 
 export function apple(): AppleLLMChatLanguageModel {
-  return new AppleLLMChatLanguageModel();
+  return new AppleLLMChatLanguageModel()
 }
 
 interface StructuredGenerationOptions<T extends z.ZodObject<any, any>>
   extends AppleGenerationOptions {
-  schema: T;
+  schema: T
 }
 
 interface GenerationOptions extends AppleGenerationOptions {
-  schema?: undefined;
+  schema?: undefined
 }
 
 async function generateText<T extends z.ZodObject<any, any>>(
   messages: AppleMessage[],
   options: StructuredGenerationOptions<T>
-): Promise<z.infer<T>>;
+): Promise<z.infer<T>>
 
 async function generateText(
   messages: AppleMessage[],
   options?: GenerationOptions
-): Promise<string>;
+): Promise<string>
 
 async function generateText(
   messages: AppleMessage[],
   options: StructuredGenerationOptions<any> | GenerationOptions = {}
 ): Promise<unknown> {
-  const schema = 'schema' in options ? options.schema : undefined;
+  const schema = 'schema' in options ? options.schema : undefined
 
   const generationOptions = {
     ...options,
     ...(schema ? { schema: z.toJSONSchema(schema) } : {}),
-  };
+  }
 
   const response = await NativeAppleLLMSpec.generateText(
     messages,
     generationOptions
-  );
+  )
 
   if (schema) {
-    const parsed = schema.parse(JSON.parse(response));
-    return parsed;
+    const parsed = schema.parse(JSON.parse(response))
+    return parsed
   }
 
-  return response;
+  return response
 }
 
 export const foundationModels = {
@@ -63,8 +63,8 @@ export const foundationModels = {
     options: AppleGenerationOptions = {}
   ): ReadableStream<LanguageModelV1StreamPart> {
     if (options.schema instanceof z.ZodObject) {
-      options.schema = z.toJSONSchema(options.schema);
+      options.schema = z.toJSONSchema(options.schema)
     }
-    return generateStream(messages, options);
+    return generateStream(messages, options)
   },
-};
+}

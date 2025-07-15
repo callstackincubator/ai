@@ -1,23 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
-import { type AiModelSettings, getModels } from '../../../packages/mlc/src';
-import SelectDropdown from 'react-native-select-dropdown';
+import React, { useEffect, useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import SelectDropdown from 'react-native-select-dropdown'
+
+import { type AiModelSettings, getModels } from '../../../packages/mlc/src'
 
 type ModelSelectionProps = {
-  onModelIdSelected: (modelSettings: AiModelSettings) => void;
-};
+  onModelIdSelected: (modelSettings: AiModelSettings) => void
+}
 
 export const ModelSelection = ({ onModelIdSelected }: ModelSelectionProps) => {
-  const [availableModels, setAvailableModels] = useState<AiModelSettings[]>([]);
+  const [availableModels, setAvailableModels] = useState<AiModelSettings[]>([])
 
   useEffect(() => {
     const getAvailableModels = async () => {
-      const models = await getModels();
-      setAvailableModels(models);
-    };
+      const models = await getModels()
+      setAvailableModels(models)
+    }
 
-    getAvailableModels();
-  }, []);
+    getAvailableModels()
+  }, [])
 
   return (
     <View style={styles.container}>
@@ -31,7 +32,7 @@ export const ModelSelection = ({ onModelIdSelected }: ModelSelectionProps) => {
                 {(selectedItem && selectedItem.model_id) || 'Select model'}
               </Text>
             </View>
-          );
+          )
         }}
         renderItem={(item, isSelected) => {
           return (
@@ -43,14 +44,14 @@ export const ModelSelection = ({ onModelIdSelected }: ModelSelectionProps) => {
             >
               <Text style={styles.dropdownItemTxtStyle}>{item.model_id}</Text>
             </View>
-          );
+          )
         }}
         showsVerticalScrollIndicator={false}
         dropdownStyle={styles.dropdownMenuStyle}
       />
     </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -98,4 +99,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#151E26',
   },
-});
+})

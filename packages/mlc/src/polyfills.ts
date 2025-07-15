@@ -1,27 +1,28 @@
 // @ts-nocheck
-import { Platform } from 'react-native';
-import structuredClone from '@ungap/structured-clone';
-import { polyfillGlobal } from 'react-native/Libraries/Utilities/PolyfillFunctions';
 import {
-  TextEncoderStream,
   TextDecoderStream,
-} from '@stardazed/streams-text-encoding';
+  TextEncoderStream,
+} from '@stardazed/streams-text-encoding'
+import structuredClone from '@ungap/structured-clone'
+import { Platform } from 'react-native'
+import { polyfillGlobal } from 'react-native/Libraries/Utilities/PolyfillFunctions'
 
 if (Platform.OS !== 'web') {
   const setupPolyfills = async () => {
-    const webStreamPolyfills = require('web-streams-polyfill/ponyfill/es6');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const webStreamPolyfills = require('web-streams-polyfill/ponyfill/es6')
 
     if (!('structuredClone' in global)) {
-      polyfillGlobal('structuredClone', () => structuredClone);
+      polyfillGlobal('structuredClone', () => structuredClone)
     }
 
-    polyfillGlobal('ReadableStream', () => webStreamPolyfills.ReadableStream);
-    polyfillGlobal('TransformStream', () => webStreamPolyfills.TransformStream);
-    polyfillGlobal('WritableStream', () => webStreamPolyfills.WritableStream);
+    polyfillGlobal('ReadableStream', () => webStreamPolyfills.ReadableStream)
+    polyfillGlobal('TransformStream', () => webStreamPolyfills.TransformStream)
+    polyfillGlobal('WritableStream', () => webStreamPolyfills.WritableStream)
 
-    polyfillGlobal('TextDecoderStream', () => TextDecoderStream);
-    polyfillGlobal('TextEncoderStream', () => TextEncoderStream);
-  };
+    polyfillGlobal('TextDecoderStream', () => TextDecoderStream)
+    polyfillGlobal('TextEncoderStream', () => TextEncoderStream)
+  }
 
-  setupPolyfills();
+  setupPolyfills()
 }

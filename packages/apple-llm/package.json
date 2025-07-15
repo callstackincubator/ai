@@ -12,6 +12,7 @@
   "author": "Mike Grabowski <grabbou@gmail.com>",
   "scripts": {
     "clean": "del-cli lib",
+    "typecheck": "tsc --noEmit",
     "prepare": "bob build"
   },
   "dependencies": {
@@ -24,7 +25,6 @@
     "react-native": "^0.80.0"
   },
   "devDependencies": {
-    "@react-native/typescript-config": "^0.80.1",
     "react-native": "0.80.0",
     "typescript": "^5.0.0"
   },
