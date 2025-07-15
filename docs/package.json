@@ -1,18 +1,15 @@
 {
-  "name": "rspress-tester",
-  "version": "1.0.0",
+  "name": "docs",
+  "version": "0.0.1",
   "private": true,
-  "description": "Rspress doc site for testing the theme",
-  "author": "Jakub Romańczyk <jakub.romanczyk@callstack.com>",
-  "license": "MIT",
   "scripts": {
     "dev": "rspress dev",
     "build": "rspress build",
     "preview": "rspress preview"
   },
   "dependencies": {
-    "@callstack/rspress-theme": "^0.1.1",
-    "rspress": "^2.0.0-beta.18"
+    "@callstack/rspress-theme": "^0.2.0",
+    "rspress": "^2.0.0-beta.21"
   },
   "devDependencies": {
     "@types/node": "^22",

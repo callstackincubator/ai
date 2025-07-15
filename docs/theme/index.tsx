@@ -1,12 +1,10 @@
 import {
-  Announcement,
   HomeBanner,
   HomeFeature,
   HomeFooter,
   HomeHero,
   OutlineCTA,
   PrevNextPage,
-  VersionBadge,
 } from '@callstack/rspress-theme';
 import {
   HomeLayout as RspressHomeLayout,
@@ -15,10 +13,7 @@ import {
 
 const Layout = () => {
   return (
-    <RspressLayout
-      beforeDocContent={<VersionBadge version="v5" />}
-      afterOutline={<OutlineCTA href="https://callstack.com" />}
-    />
+    <RspressLayout afterOutline={<OutlineCTA href="https://callstack.com" />} />
   );
 };
 

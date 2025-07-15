@@ -1,0 +1,21 @@
+[
+  {
+    "type": "file",
+    "name": "index",
+    "label": "Introduction"
+  },
+  {
+    "type": "dir",
+    "name": "mlc",
+    "label": "MLC",
+    "collapsible": true,
+    "collapsed": false
+  },
+  {
+    "type": "dir",
+    "name": "apple",
+    "label": "Apple Foundation Model",
+    "collapsible": true,
+    "collapsed": false
+  }
+]
