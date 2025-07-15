@@ -2,7 +2,7 @@
   "name": "@react-native-ai/monorepo",
   "private": true,
   "scripts": {
-    "typecheck": "yarn workspaces foreach --all --parallel run typecheck",
+    "typecheck": "bun run --filter='*' typecheck",
     "lint": "eslint \"**/*.{js,ts,tsx}\""
   },
   "repository": {
@@ -41,7 +41,7 @@
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "yarn@3.6.1",
+  "packageManager": "bun@1.0.0",
   "commitlint": {
     "extends": [
       "@commitlint/config-conventional"
