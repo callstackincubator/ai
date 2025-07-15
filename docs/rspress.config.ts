@@ -1,6 +1,7 @@
-import * as path from 'node:path';
-import { pluginCallstackTheme } from '@callstack/rspress-theme/plugin';
-import { defineConfig } from 'rspress/config';
+import * as path from 'node:path'
+
+import { pluginCallstackTheme } from '@callstack/rspress-theme/plugin'
+import { defineConfig } from 'rspress/config'
 
 export default defineConfig({
   root: path.join(__dirname, 'docs'),
@@ -13,7 +14,7 @@ export default defineConfig({
   globalStyles: path.join(__dirname, 'theme/styles.css'),
   themeConfig: {
     editLink: {
-      docRepoBaseUrl: 'https://github.com/callstackincubator/ai/docs',
+      docRepoBaseUrl: 'https://github.com/callstackincubator/ai/blob/main/docs',
       text: 'Edit this page on GitHub',
     },
     socialLinks: [
@@ -35,4 +36,4 @@ export default defineConfig({
     ],
   },
   plugins: [pluginCallstackTheme()],
-});
+})

@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   HomeBanner,
   HomeFeature,
@@ -6,17 +5,18 @@ import {
   HomeHero,
   OutlineCTA,
   PrevNextPage,
-} from '@callstack/rspress-theme';
+} from '@callstack/rspress-theme'
+import React from 'react'
 import {
   HomeLayout as RspressHomeLayout,
   Layout as RspressLayout,
-} from 'rspress/theme';
+} from 'rspress/theme'
 
 const Layout = () => {
   return (
     <RspressLayout afterOutline={<OutlineCTA href="https://callstack.com" />} />
-  );
-};
+  )
+}
 
 const HomeLayout = () => {
   return (
@@ -28,9 +28,9 @@ const HomeLayout = () => {
         </>
       }
     />
-  );
-};
+  )
+}
 
-export { Layout, HomeLayout, PrevNextPage, HomeFeature, HomeHero };
+export { HomeFeature, HomeHero, HomeLayout, Layout, PrevNextPage }
 
-export * from 'rspress/theme';
+export * from 'rspress/theme'
