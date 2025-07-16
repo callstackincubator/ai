@@ -18,10 +18,10 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Lint files
-        run: yarn lint
+        run: bun run lint
 
       - name: Typecheck files
-        run: yarn typecheck
+        run: bun run typecheck
 
   build-library:
     runs-on: ubuntu-latest
@@ -33,9 +33,8 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Build package
-        run: cd packages/mlc && yarn prepare
+        run: cd packages/mlc && bun run prepare
     
-  # TODO: uncomment when we have a script to build the apple-llm package
   build-apple-llm:
     runs-on: macos-latest
     steps:
@@ -46,7 +45,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Build package
-        run: cd packages/apple-llm && yarn prepare
+        run: cd packages/apple-llm && bun run prepare
 
   # TODO: Bring it back with all the following steps with setting up the environment variables related to MLC
   # build-android:

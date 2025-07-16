@@ -3,6 +3,5 @@
   "compilerOptions": {
     "types": ["web-streams-polyfill"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "lib"]
+  "include": ["src/**/*"]
 }

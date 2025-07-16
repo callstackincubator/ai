@@ -1,4 +1,4 @@
 {
   "extends": "../../tsconfig.json",
-  "exclude": ["3rdparty/"]
+  "include": ["src/**/*"]
 }

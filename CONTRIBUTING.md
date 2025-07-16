@@ -1,153 +1,131 @@
 # Contributing
 
-Contributions are always welcome, no matter how large or small!
+Thank you for your interest in contributing to React Native AI! This guide will help you get started.
 
-We want this community to be friendly and respectful to each other. Please follow it in all your interactions with the project. Before contributing, please read the [code of conduct](./CODE_OF_CONDUCT.md).
+## Prerequisites
 
-## Development workflow
+- **Bun** (latest version recommended)
+- **React Native development environment** (Android Studio, Xcode)
 
-This project is a monorepo managed using [Yarn workspaces](https://yarnpkg.com/features/workspaces). It contains the following packages:
+## Project Structure
 
-- The library package in the root directory.
-- An example app in the `example/` directory.
+This is a monorepo with the following packages:
 
-To get started with the project, run `yarn` in the root directory to install the required dependencies for each package:
+- **`packages/mlc/`** - MLC-LLM integration for React Native
+- **`packages/apple-llm/`** - Apple Intelligence turbo module for iOS
+- **`apps/example/`** - React Native CLI example app
+- **`apps/example-apple/`** - Expo example app showcasing Apple Intelligence
 
-```sh
-yarn
-```
+## Quick Start
 
-> Since the project relies on Yarn workspaces, you cannot use [`npm`](https://github.com/npm/cli) for development.
-
-The [example app](/example/) demonstrates usage of the library. You need to run it to test any changes you make.
-
-It is configured to use the local version of the library, so any changes you make to the library's source code will be reflected in the example app. Changes to the library's JavaScript code will be reflected in the example app without a rebuild, but native code changes will require a rebuild of the example app.
-
-If you want to use Android Studio or XCode to edit the native code, you can open the `example/android` or `example/ios` directories respectively in those editors. To edit the Objective-C or Swift files, open `example/ios/AiExample.xcworkspace` in XCode and find the source files at `Pods > Development Pods > react-native-ai`.
-
-To edit the the Kotlin files, open `example/android` in Android studio and find the source files at `react-native-ai` under `Android`.
-
-You can use various commands from the root directory to work with the project.
-
-To start the packager:
-
-```sh
-yarn example start
-```
-
-To run the example app on Android:
-
-```sh
-yarn example android
-```
-
-To run the example app on iOS:
-
-```sh
-yarn example ios
-```
-
-By default, the example is configured to build with the old architecture. To run the example with the new architecture, you can do the following:
-
-1. For Android, run:
-
-   ```sh
-   ORG_GRADLE_PROJECT_newArchEnabled=true yarn example android
+1. **Clone and install dependencies:**
+   ```bash
+   git clone https://github.com/callstackincubator/ai.git
+   cd ai
+   bun install
    ```
 
-2. For iOS, run:
-
-   ```sh
-   cd example/ios
-   RCT_NEW_ARCH_ENABLED=1 pod install
-   cd -
-   yarn example ios
+2. **Run quality checks:**
+   ```bash
+   bun run typecheck
+   bun run lint
    ```
 
-If you are building for a different architecture than your previous build, make sure to remove the build folders first. You can run the following command to cleanup all build folders:
+3. **Test your changes:**
+   ```bash
+   # Run React Native example (MLC)
+   cd apps/example
+   bun run start
+   bun run android  # or ios
+   
+   # Run Expo example (Apple Intelligence)
+   cd apps/example-apple
+   bun run start
+   bun run ios
+   ```
 
-```sh
-yarn clean
+## Development Guidelines
+
+### Code Quality
+
+- Follow existing code style and patterns
+- Ensure TypeScript types are properly defined
+- Run `bun run lint --fix` to fix formatting issues
+
+### Native Code
+
+- **Android**: Use Kotlin, follow existing patterns in `packages/*/android/`
+- **iOS**: Use Swift/Objective-C++, follow existing patterns in `packages/*/ios/`
+
+### Commit Messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` new features
+- `fix:` bug fixes
+- `docs:` documentation changes
+- `refactor:` code refactoring
+- `test:` test additions/updates
+- `chore:` tooling/config changes
+
+## Pull Request Process
+
+1. **Fork** the repository
+2. **Create a feature branch** from `main`
+3. **Make your changes** following the guidelines above
+4. **Test thoroughly** with both example apps
+5. **Submit a pull request** with:
+   - Clear description of changes
+   - Screenshots/videos for UI changes
+   - Test plan for reviewers
+
+## Common Tasks
+
+### Working with packages
+
+Build all packages
+
+```bash 
+bun run --filter='packages/*' prepare
 ```
 
-To confirm that the app is running with the new architecture, you can check the Metro logs for a message like this:
+Work on specific package
 
-```sh
-Running "AiExample" with {"fabric":true,"initialProps":{"concurrentRoot":true},"rootTag":1}
+```bash
+cd packages/mlc
+bun run typecheck
 ```
 
-Note the `"fabric":true` and `"concurrentRoot":true` properties.
+### Running examples
 
-Make sure your code passes TypeScript and ESLint. Run the following to verify:
+MLC example (React Native CLI)
 
-```sh
-yarn typecheck
-yarn lint
+```bash
+cd apps/example
+bun run prestart    # Setup MLC dependencies
+bun run start
+bun run android
 ```
 
-To fix formatting errors, run the following:
+Apple Intelligence example (Expo)
 
-```sh
-yarn lint --fix
+```bash
+cd apps/example-apple
+bun run ios
 ```
 
-Remember to add tests for your change if possible. Run the unit tests by:
+### Native Development
 
-```sh
-yarn test
-```
+- **Android**: Open `apps/example/android` in Android Studio
+- **iOS MLC**: Open `apps/example/ios/AiExample.xcworkspace` in Xcode
 
-### Commit message convention
+- **iOS Apple Intelligence**: Open `apps/example-apple/ios/exampleapple.xcworkspace` in Xcode
+  - The Apple Intelligence package is a Turbo Module - work directly from the integrated Xcode project
+  - Native code is in `packages/apple-llm/ios/` but best developed through the example app
 
-We follow the [conventional commits specification](https://www.conventionalcommits.org/en) for our commit messages:
+## Need Help?
 
-- `fix`: bug fixes, e.g. fix crash due to deprecated method.
-- `feat`: new features, e.g. add new method to the module.
-- `refactor`: code refactor, e.g. migrate from class components to hooks.
-- `docs`: changes into documentation, e.g. add usage example for the module..
-- `test`: adding or updating tests, e.g. add integration tests using detox.
-- `chore`: tooling changes, e.g. change CI config.
+- Check existing [issues](https://github.com/callstackincubator/ai/issues)
+- Review the [code of conduct](CODE_OF_CONDUCT.md)
+- Ask questions in pull request discussions
 
-Our pre-commit hooks verify that your commit message matches this format when committing.
-
-### Linting and tests
-
-[ESLint](https://eslint.org/), [Prettier](https://prettier.io/), [TypeScript](https://www.typescriptlang.org/)
-
-We use [TypeScript](https://www.typescriptlang.org/) for type checking, [ESLint](https://eslint.org/) with [Prettier](https://prettier.io/) for linting and formatting the code, and [Jest](https://jestjs.io/) for testing.
-
-Our pre-commit hooks verify that the linter and tests pass when committing.
-
-### Publishing to npm
-
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
-
-To publish new versions, run the following:
-
-```sh
-yarn release
-```
-
-### Scripts
-
-The `package.json` file contains various scripts for common tasks:
-
-- `yarn`: setup project by installing dependencies.
-- `yarn typecheck`: type-check files with TypeScript.
-- `yarn lint`: lint files with ESLint.
-- `yarn test`: run unit tests with Jest.
-- `yarn example start`: start the Metro server for the example app.
-- `yarn example android`: run the example app on Android.
-- `yarn example ios`: run the example app on iOS.
-
-### Sending a pull request
-
-> **Working on your first pull request?** You can learn how from this _free_ series: [How to Contribute to an Open Source Project on GitHub](https://app.egghead.io/playlists/how-to-contribute-to-an-open-source-project-on-github).
-
-When you're sending a pull request:
-
-- Prefer small pull requests focused on one change.
-- Verify that linters and tests are passing.
-- Review the documentation to make sure it looks good.
-- Follow the pull request template when opening a pull request.
-- For pull requests that change the API or implementation, discuss with maintainers first by opening an issue.
+We appreciate all contributions, big and small! 🚀
