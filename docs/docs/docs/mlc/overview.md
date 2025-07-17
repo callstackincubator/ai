@@ -17,7 +17,7 @@ git submodule update --init --recursive
 MLC_LLM_SOURCE_DIR=$(pwd) // Add this to your environment variables e.g. in .zshrc
 ```
 
-> [!IMPORTANT]
+> [!WARNING]
 > Ensure that `mlc_llm` works and `MLC_LLM_SOURCE_DIR` is set in your environment variables.
 
 #### 3. Install `mlc_llm` CLI:
