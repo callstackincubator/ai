@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Quick Start
-      link: /guide/
+      link: /docs/
     - theme: alt
       text: GitHub
       link: https://github.com/callstackincubator/ai

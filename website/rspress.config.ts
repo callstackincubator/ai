@@ -4,7 +4,7 @@ import { pluginCallstackTheme } from '@callstack/rspress-theme/plugin'
 import { defineConfig } from 'rspress/config'
 
 export default defineConfig({
-  root: path.join(__dirname, 'docs'),
+  root: path.join(__dirname, 'src'),
   title: 'React Native AI',
   icon: '/rspress-icon.png',
   logo: {
