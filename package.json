@@ -36,7 +36,7 @@
   "workspaces": [
     "packages/*",
     "apps/*",
-    "docs"
+    "website"
   ],
   "packageManager": "bun@1.0.0",
   "commitlint": {
