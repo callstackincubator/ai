@@ -1,0 +1,8 @@
+[
+  { "type": "file", "name": "getting-started", "label": "Getting Started" },
+  { "type": "file", "name": "generating-text", "label": "Generating Text" },
+  { "type": "file", "name": "streaming", "label": "Streaming" },
+  { "type": "file", "name": "structured-output", "label": "Structured Output" },
+  { "type": "file", "name": "options", "label": "Options" },
+  { "type": "file", "name": "vercel-ai-sdk", "label": "Vercel AI SDK" }
+]

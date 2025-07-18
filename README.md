@@ -1,7 +1,7 @@
 [![image](https://github.com/user-attachments/assets/027ccbc1-c6c4-46a0-aa62-7b89d4e62f24)](https://www.callstack.com/open-source?utm_campaign=generic&utm_source=github&utm_medium=referral&utm_content=react-native-ai)
 <div align="center">
 
-Run LLMs <b>on-device</b> in React Native via <a href="https://github.com/mlc-ai/mlc-llm">MLC LLM Engine</a> with compatibility for <a href="https://sdk.vercel.ai/docs/">Vercel AI SDK</a>.
+Run LLMs <b>on-device</b> in React Native. Use any LLM with the <a href="https://github.com/mlc-ai/mlc-llm">MLC LLM Engine</a>, or use built-in models, such as Apple Intelligence. All with compatibility for the <a href="https://sdk.vercel.ai/docs/">Vercel AI SDK</a>.
 </div>
 
 
@@ -19,7 +19,7 @@ Run LLMs <b>on-device</b> in React Native via <a href="https://github.com/mlc-ai
 
 ## Read more 
 
-For installation instructions and comprehensive documentation, visit [callstack.com](https://callstack.com).
+For installation instructions and comprehensive documentation, visit [react-native-ai.dev](https://react-native-ai.dev).
 
 ## Contributing
 
