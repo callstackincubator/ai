@@ -76,18 +76,6 @@
         "@types/react": "^19.1.8",
       },
     },
-    "docs": {
-      "name": "docs",
-      "version": "0.0.1",
-      "dependencies": {
-        "@callstack/rspress-theme": "^0.2.0",
-        "rspress": "^2.0.0-beta.21",
-      },
-      "devDependencies": {
-        "@types/node": "^22",
-        "@types/react": "^19",
-      },
-    },
     "packages/apple-llm": {
       "name": "@react-native-ai/apple",
       "version": "0.1.0",
@@ -126,6 +114,18 @@
       "peerDependencies": {
         "react": "*",
         "react-native": "*",
+      },
+    },
+    "website": {
+      "name": "docs",
+      "version": "0.0.1",
+      "dependencies": {
+        "@callstack/rspress-theme": "^0.2.0",
+        "rspress": "^2.0.0-beta.21",
+      },
+      "devDependencies": {
+        "@types/node": "^22",
+        "@types/react": "^19",
       },
     },
   },
@@ -1368,7 +1368,7 @@
 
     "dir-glob": ["dir-glob@3.0.1", "", { "dependencies": { "path-type": "^4.0.0" } }, "sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA=="],
 
-    "docs": ["docs@workspace:docs"],
+    "docs": ["docs@workspace:website"],
 
     "doctrine": ["doctrine@2.1.0", "", { "dependencies": { "esutils": "^2.0.2" } }, "sha512-35mSku4ZXK0vfCuHEDAwt55dg2jNajHZ1odvF+8SSr82EsZY4QmXfuWso8oEd8zRhVObSN18aM0CjSdoBX7zIw=="],
 
