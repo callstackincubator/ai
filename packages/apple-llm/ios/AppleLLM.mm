@@ -11,10 +11,15 @@
 #import "AppleLLM-Swift.h"
 #endif
 
+#import <React/RCTBridge+Private.h>
+#import <React/RCTUtils.h>
+#import <jsi/jsi.h>
+
 #import <NativeAppleLLM/NativeAppleLLM.h>
 
 @interface AppleLLM : NativeAppleLLMSpecBase <NativeAppleLLMSpec>
 @property (strong, nonatomic) AppleLLMImpl *llm;
+@property (nonatomic) facebook::react::CallInvoker *callInvoker;
 @end
 
 using namespace JS::NativeAppleLLM;
@@ -33,7 +38,39 @@ using namespace JS::NativeAppleLLM;
   return @"AppleLLM";
 }
 
+- (facebook::jsi::Runtime *)runtime {
+  RCTBridge* bridge = [RCTBridge currentBridge];
+  RCTCxxBridge* cxxBridge = (RCTCxxBridge*)bridge;
+  
+  facebook::jsi::Runtime *runtime = (facebook::jsi::Runtime*)cxxBridge.runtime;
+  if (runtime == nullptr) {
+    @throw [NSException exceptionWithName:@"AppleLLM"
+                                   reason:@"No runtime available"
+                                 userInfo:nil];
+  }
+  
+  return runtime;
+}
+
+- (NSString *)callFunctionWithName:(NSString *)name {
+  NSString *response;
+  self.callInvoker->invokeSync([&response](facebook::jsi::Runtime& rt) {
+    auto global = rt.global();
+    
+    auto tools = global.getPropertyAsObject(rt, "__APPLE_LLM_TOOLS__");
+    
+    auto func = tools.getPropertyAsFunction(rt, [@"test" UTF8String]);
+    
+    auto result = func.call(rt).getString(rt);
+    
+    auto str = result.utf8(rt);
+    response = [NSString stringWithUTF8String:str.c_str()];
+  });
+  return response;
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const facebook::react::ObjCTurboModule::InitParams &)params {
+  self.callInvoker = params.jsInvoker.get();
   return std::make_shared<facebook::react::NativeAppleLLMSpecJSI>(params);
 }
 
@@ -41,9 +78,6 @@ using namespace JS::NativeAppleLLM;
              options:(AppleGenerationOptions &)options
              resolve:(nonnull RCTPromiseResolveBlock)resolve
               reject:(nonnull RCTPromiseRejectBlock)reject {
-  // TODO: Consider direct C++ struct passing to avoid NSDictionary conversion overhead.
-  // Current approach converts C++ optional values to NSNull/NSNumber for Swift interop,
-  // but direct struct marshalling could eliminate this bridge layer entirely.
   NSDictionary *opts = @{
     @"temperature": options.temperature().has_value() ? @(options.temperature().value()) : [NSNull null],
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
@@ -51,6 +85,10 @@ using namespace JS::NativeAppleLLM;
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema()
   };
+  
+  // Call and print result
+  NSString *rest = [self callFunctionWithName:@"test"];
+  
   [_llm generateText:messages options:opts resolve:resolve reject:reject];
 }
 
@@ -98,5 +136,3 @@ using namespace JS::NativeAppleLLM;
 }
 
 @end
-
-
