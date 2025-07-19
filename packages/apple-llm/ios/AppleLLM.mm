@@ -11,20 +11,22 @@
 #import "AppleLLM-Swift.h"
 #endif
 
-#import <React/RCTBridge+Private.h>
-#import <React/RCTUtils.h>
+#import <React/RCTCallInvokerModule.h>
+#import <React/RCTCallInvoker.h>
 #import <jsi/jsi.h>
 
 #import <NativeAppleLLM/NativeAppleLLM.h>
 
-@interface AppleLLM : NativeAppleLLMSpecBase <NativeAppleLLMSpec>
+@interface AppleLLM : NativeAppleLLMSpecBase <NativeAppleLLMSpec, RCTCallInvokerModule>
 @property (strong, nonatomic) AppleLLMImpl *llm;
-@property (nonatomic) facebook::react::CallInvoker *callInvoker;
 @end
 
+using namespace facebook;
 using namespace JS::NativeAppleLLM;
 
 @implementation AppleLLM
+
+@synthesize callInvoker;
 
 - (instancetype)init {
   self = [super init];
@@ -38,23 +40,9 @@ using namespace JS::NativeAppleLLM;
   return @"AppleLLM";
 }
 
-- (facebook::jsi::Runtime *)runtime {
-  RCTBridge* bridge = [RCTBridge currentBridge];
-  RCTCxxBridge* cxxBridge = (RCTCxxBridge*)bridge;
-  
-  facebook::jsi::Runtime *runtime = (facebook::jsi::Runtime*)cxxBridge.runtime;
-  if (runtime == nullptr) {
-    @throw [NSException exceptionWithName:@"AppleLLM"
-                                   reason:@"No runtime available"
-                                 userInfo:nil];
-  }
-  
-  return runtime;
-}
-
 - (NSString *)callFunctionWithName:(NSString *)name {
   NSString *response;
-  self.callInvoker->invokeSync([&response](facebook::jsi::Runtime& rt) {
+  [self.callInvoker callInvoker]->invokeSync([&response](jsi::Runtime& rt) {
     auto global = rt.global();
     
     auto tools = global.getPropertyAsObject(rt, "__APPLE_LLM_TOOLS__");
@@ -69,9 +57,8 @@ using namespace JS::NativeAppleLLM;
   return response;
 }
 
-- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const facebook::react::ObjCTurboModule::InitParams &)params {
-  self.callInvoker = params.jsInvoker.get();
-  return std::make_shared<facebook::react::NativeAppleLLMSpecJSI>(params);
+- (std::shared_ptr<react::TurboModule>)getTurboModule:(const react::ObjCTurboModule::InitParams &)params {
+  return std::make_shared<react::NativeAppleLLMSpecJSI>(params);
 }
 
 - (void)generateText:(nonnull NSArray *)messages
