@@ -1,4 +1,5 @@
-import { foundationModels } from '@react-native-ai/apple'
+import { foundationModels, registerTools } from '@react-native-ai/apple'
+import { tool } from 'ai'
 import { StatusBar } from 'expo-status-bar'
 import React, { useState } from 'react'
 import {
@@ -10,8 +11,21 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import * as z from 'zod'
 
 import { type DemoKey, schemaDemos } from './schema-demos'
+
+registerTools({
+  test: tool({
+    description: 'Get the weather for a given city',
+    parameters: z.object({
+      city: z.string().describe('The city to get the weather for'),
+    }),
+    execute: () => {
+      return `The weather is sunny`
+    },
+  }),
+})
 
 export default function App() {
   const [loading, setLoading] = useState<string | null>(null)

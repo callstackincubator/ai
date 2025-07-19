@@ -68,3 +68,5 @@ export const foundationModels = {
     return generateStream(messages, options)
   },
 }
+
+export { registerTools } from './tools'
