@@ -1,4 +1,5 @@
 import { foundationModels } from '@react-native-ai/apple'
+import { tool } from 'ai'
 import { z } from 'zod'
 
 export async function basicStringDemo() {
@@ -16,7 +17,20 @@ export async function basicStringDemo() {
       },
       { role: 'user', content: 'What is the weather in Kielce?' },
     ],
-    { schema }
+    {
+      schema,
+      tools: {
+        getWeather: tool({
+          description: 'Get the weather for a given city',
+          parameters: z.object({
+            city: z.string().describe('The city to get the weather for'),
+          }),
+          execute: async (args) => {
+            return `The weather in ${args.city} is sunny`
+          },
+        }),
+      },
+    }
   )
 }
 
