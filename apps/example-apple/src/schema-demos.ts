@@ -5,7 +5,7 @@ import { z } from 'zod'
 export async function basicStringDemo() {
   const schema = z
     .object({
-      value: z.string().describe('A simple text string'),
+      response: z.string(),
     })
     .describe('String response')
 
@@ -13,9 +13,9 @@ export async function basicStringDemo() {
     [
       {
         role: 'system',
-        content: 'Help the person with getting weather information.',
+        content: `Help the person with getting weather information.`,
       },
-      { role: 'user', content: 'What is the weather in Kielce?' },
+      { role: 'user', content: 'Is it hotter in Wroclaw or in Warsaw?' },
     ],
     {
       schema,
@@ -26,7 +26,8 @@ export async function basicStringDemo() {
             city: z.string().describe('The city to get the weather for'),
           }),
           execute: async (args) => {
-            return `The weather in ${args.city} is sunny`
+            const temperature = Math.floor(Math.random() * 20) + 10
+            return `Weather forecast for ${args.city}: ${temperature}°C`
           },
         }),
       },

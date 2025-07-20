@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import * as z from 'zod'
 
 import { type DemoKey, schemaDemos } from './schema-demos'
 
