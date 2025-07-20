@@ -9,7 +9,13 @@ export async function basicStringDemo() {
     .describe('String response')
 
   return await foundationModels.generateText(
-    [{ role: 'user', content: 'Generate a city name' }],
+    [
+      {
+        role: 'system',
+        content: 'Help the person with getting weather information.',
+      },
+      { role: 'user', content: 'What is the weather in Kielce?' },
+    ],
     { schema }
   )
 }

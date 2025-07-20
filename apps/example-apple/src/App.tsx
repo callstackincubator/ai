@@ -16,13 +16,13 @@ import * as z from 'zod'
 import { type DemoKey, schemaDemos } from './schema-demos'
 
 registerTools({
-  test: tool({
+  getWeather: tool({
     description: 'Get the weather for a given city',
     parameters: z.object({
       city: z.string().describe('The city to get the weather for'),
     }),
-    execute: () => {
-      return `The weather is sunny`
+    execute: async ({ city }) => {
+      return `The weather in ${city} is sunny`
     },
   }),
 })

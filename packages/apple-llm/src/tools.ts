@@ -7,13 +7,9 @@ declare global {
 }
 
 export function registerTools(tools: Record<string, Tool>): void {
-  if (globalThis.__APPLE_LLM_TOOLS__) {
-    throw new Error('Tools already initialized')
-  }
   globalThis.__APPLE_LLM_TOOLS__ = Object.fromEntries(
     Object.entries(tools).map(([name, tool]) => [name, tool.execute])
   )
-  console.log(globalThis.__APPLE_LLM_TOOLS__)
 }
 
 export function getRegisteredTools(): Tools {

@@ -13,6 +13,8 @@
 
 #import <React/RCTCallInvokerModule.h>
 #import <React/RCTCallInvoker.h>
+#import <ReactCommon/RCTTurboModule.h>
+
 #import <jsi/jsi.h>
 
 #import <NativeAppleLLM/NativeAppleLLM.h>
@@ -40,21 +42,63 @@ using namespace JS::NativeAppleLLM;
   return @"AppleLLM";
 }
 
-- (NSString *)callFunctionWithName:(NSString *)name {
-  NSString *response;
-  [self.callInvoker callInvoker]->invokeSync([&response](jsi::Runtime& rt) {
-    auto global = rt.global();
-    
-    auto tools = global.getPropertyAsObject(rt, "__APPLE_LLM_TOOLS__");
-    
-    auto func = tools.getPropertyAsFunction(rt, [@"test" UTF8String]);
-    
-    auto result = func.call(rt).getString(rt);
-    
-    auto str = result.utf8(rt);
-    response = [NSString stringWithUTF8String:str.c_str()];
+- (void)callToolWithName:(NSString *)toolName
+               arguments:(NSDictionary *)arguments
+              completion:(void (^)(id result, NSError *error))completion {
+  [self.callInvoker callInvoker]->invokeAsync([toolName, arguments, completion](jsi::Runtime& rt) {
+    @try {
+      auto global = rt.global();
+      auto tools = global.getPropertyAsObject(rt, "__APPLE_LLM_TOOLS__");
+      auto tool = tools.getPropertyAsFunction(rt, [toolName UTF8String]);
+      
+      auto args = react::TurboModuleConvertUtils::convertObjCObjectToJSIValue(rt, arguments).getObject(rt);
+      
+      auto result = tool.call(rt, args);
+      
+      auto isPromise = result.isObject() && result.asObject(rt).hasProperty(rt, "then");
+      
+      if (!isPromise) {
+        id response = react::TurboModuleConvertUtils::convertJSIValueToObjCObject(rt, result, nullptr, false);
+        completion(response, nil);
+        return;
+      }
+      
+      auto promiseObj = result.asObject(rt);
+      
+      auto onResolve = jsi::Function::createFromHostFunction(rt,
+                                                             jsi::PropNameID::forAscii(rt, "resolve"),
+                                                             1,
+                                                             [completion](jsi::Runtime& rt,
+                                                                          const jsi::Value&,
+                                                                          const jsi::Value* args,
+                                                                          size_t count) {
+        id response = react::TurboModuleConvertUtils::convertJSIValueToObjCObject(rt, args[0], nullptr, false);
+        completion(response, nil);
+        return jsi::Value::undefined();
+      });
+      
+      auto onReject = jsi::Function::createFromHostFunction(rt,
+                                                            jsi::PropNameID::forAscii(rt, "reject"),
+                                                            1,
+                                                            [completion](jsi::Runtime& rt,
+                                                                         const jsi::Value&,
+                                                                         const jsi::Value* args,
+                                                                         size_t count) {
+        NSError *error = [NSError errorWithDomain:@"AppleLLM"
+                                             code:1
+                                         userInfo:@{NSLocalizedDescriptionKey: @"There was an error calling tool"}];
+        completion(nil, error);
+        return jsi::Value::undefined();
+      });
+      
+      promiseObj.getPropertyAsFunction(rt, "then").callWithThis(rt, promiseObj, onResolve, onReject);
+    } @catch (NSException *exception) {
+      NSError *error = [NSError errorWithDomain:@"AppleLLM"
+                                           code:1
+                                       userInfo:@{NSLocalizedDescriptionKey: exception.reason}];
+      completion(nil, error);
+    }
   });
-  return response;
 }
 
 - (std::shared_ptr<react::TurboModule>)getTurboModule:(const react::ObjCTurboModule::InitParams &)params {
@@ -73,10 +117,11 @@ using namespace JS::NativeAppleLLM;
     @"schema": options.schema()
   };
   
-  // Call and print result
-  NSString *rest = [self callFunctionWithName:@"test"];
+  auto callToolBlock = ^(NSString *toolName, NSDictionary *parameters, void (^completion)(id, NSError *)) {
+    [self callToolWithName:toolName arguments:parameters completion:completion];
+  };
   
-  [_llm generateText:messages options:opts resolve:resolve reject:reject];
+  [_llm generateText:messages options:opts resolve:resolve reject:reject toolInvoker:callToolBlock];
 }
 
 - (void)cancelStream:(nonnull NSString *)streamId {

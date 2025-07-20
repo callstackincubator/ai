@@ -41,7 +41,8 @@ public class AppleLLMImpl: NSObject {
     _ messages: [[String: Any]],
     options: [String: Any]?,
     resolve: @escaping (Any?) -> Void,
-    reject: @escaping (String, String, Error?) -> Void
+    reject: @escaping (String, String, Error?) -> Void,
+    toolInvoker: @escaping @Sendable (String, [String: Any], @escaping (Any?, Error?) -> Void) -> Void
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
@@ -55,9 +56,16 @@ public class AppleLLMImpl: NSObject {
       }
       Task {
         do {
-          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages)
+          let tools = [DummyTool(javaScriptToolInvoker: toolInvoker)]
+          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
           
-          let session = try self.createSession(from: transcript)
+          let session = LanguageModelSession.init(
+            model: SystemLanguageModel.default,
+            guardrails: LanguageModelSession.Guardrails.default,
+            tools: tools,
+            transcript: transcript
+          )
+          
           let generationOptions = try self.createGenerationOptions(from: options ?? [:])
           
           if let schemaObj = options?["schema"] {
@@ -101,9 +109,15 @@ public class AppleLLMImpl: NSObject {
       
       let task = Task {
         do {
-          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages)
+          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: [])
           
-          let session = try self.createSession(from: transcript)
+          let session = LanguageModelSession.init(
+            model: SystemLanguageModel.default,
+            guardrails: LanguageModelSession.Guardrails.default,
+            tools: [],
+            transcript: transcript
+          )
+          
           let generationOptions = try self.createGenerationOptions(from: options ?? [:])
           
           if let schemaOption = options?["schema"] {
@@ -177,25 +191,11 @@ public class AppleLLMImpl: NSObject {
   
   // MARK: - Private Methods
 #if canImport(FoundationModels)
-  
-  // TODO:
-  //   • Provide support for adapters in the future
-  //   • Provide shorter method for creating sessions (with simple instruction and prompt)
-  @available(iOS 26, *)
-  private func createSession(from transcript: Transcript) throws -> LanguageModelSession {
-    return LanguageModelSession.init(
-      model: SystemLanguageModel.default,
-      guardrails: LanguageModelSession.Guardrails.default,
-      tools: [],
-      transcript: transcript
-    )
-  }
-  
   // TODO:
   //   • Investigate assetIDs parameter usage in Transcript.Response
   //   • Implement tool calling support
   @available(iOS 26, *)
-  private func createTranscriptAndPrompt(from messages: [[String: Any]]) throws -> (Transcript, String) {
+  private func createTranscriptAndPrompt(from messages: [[String: Any]], tools: [any Tool]) throws -> (Transcript, String) {
     guard !messages.isEmpty else {
       throw AppleLLMError.invalidMessage("Messages array cannot be empty")
     }
@@ -223,7 +223,10 @@ public class AppleLLMImpl: NSObject {
       
       switch role {
       case "system":
-        let instructions = Transcript.Instructions.init(segments: [segment], toolDefinitions: [])
+        let toolDefinitions = tools.map {
+          Transcript.ToolDefinition(name: $0.name, description: $0.description, parameters: $0.parameters)
+        }
+        let instructions = Transcript.Instructions(segments: [segment], toolDefinitions: toolDefinitions)
         entries.append(.instructions(instructions))
       case "user":
         let prompt = Transcript.Prompt(segments: [segment])
@@ -498,4 +501,41 @@ extension LanguageModelSession.Response<GeneratedContent> {
     throw RawValueExtractionError.rawValueNotFound
   }
 }
+
+@available(iOS 26, *)
+struct DummyTool : Tool {
+  var name : String = "getWeather"
+  var description: String = "Retrieve the latest weather information for a city"
+  
+  private let invokeJavaScriptTool: @Sendable (String, [String: Any], @escaping (Any?, Error?) -> Void) -> Void
+  
+  init(javaScriptToolInvoker: @escaping @Sendable (String, [String: Any], @escaping (Any?, Error?) -> Void) -> Void) {
+    self.invokeJavaScriptTool = javaScriptToolInvoker
+  }
+  
+  @Generable
+  struct Arguments {
+    @Guide(description: "The city to get the weather for")
+    var city: String
+  }
+  
+  func call(arguments: Arguments) async throws -> ToolOutput {
+    let params: [String: Any] = [
+      "city": arguments.city
+    ]
+    
+    return try await withCheckedThrowingContinuation { continuation in
+      invokeJavaScriptTool("getWeather", params) { result, error in
+        if let error = error {
+          continuation.resume(throwing: AppleLLMError.toolCallError(error))
+        } else if let output = result as? String {
+          continuation.resume(returning: ToolOutput(output))
+        } else {
+          continuation.resume(throwing: AppleLLMError.unknownToolCallError)
+        }
+      }
+    }
+  }
+}
 #endif
+
