@@ -327,7 +327,7 @@ public class AppleLLMImpl: NSObject {
     }
     
     func call(arguments: GeneratedContent) async throws -> ToolOutput {
-      let argsDict = try AppleLLMSchemaParser.extractContentToDictionary(from: arguments, using: schemaDict)
+      let argsDict = try arguments.toDictionary(using: schemaDict)
       
       return try await withCheckedThrowingContinuation { continuation in
         invokeJavaScriptTool(self.name, argsDict) { result, error in
@@ -524,72 +524,7 @@ public class AppleLLMImpl: NSObject {
       return DynamicGenerationSchema(type: Bool.self, guides: [])
     }
     
-    static func extractContentToDictionary(from content: GeneratedContent, using schemaDict: [String: Any]) throws -> [String: Any] {
-      var result: [String: Any] = [:]
-      
-      guard let properties = schemaDict["properties"] as? [String: Any] else {
-        throw AppleLLMError.invalidSchema("Object schema has invalid shape: \(schemaDict)")
-      }
-      
-      for (propertyName, propertySchema) in properties {
-        guard let property = propertySchema as? [String: Any],
-              let type = property["type"] as? String else {
-          throw AppleLLMError.invalidSchema("Schema must have type and properties: \(propertySchema)")
-        }
-        
-        do {
-          switch type {
-          case "string":
-            result[propertyName] = try content.value(String.self, forProperty: propertyName)
-          case "number":
-            result[propertyName] = try content.value(Double.self, forProperty: propertyName)
-          case "integer":
-            result[propertyName] = try content.value(Int.self, forProperty: propertyName)
-          case "boolean":
-            result[propertyName] = try content.value(Bool.self, forProperty: propertyName)
-          case "array":
-            result[propertyName] = try extractArrayContent(from: content.value(GeneratedContent.self, forProperty: propertyName), using: property)
-          case "object":
-            result[propertyName] = try extractContentToDictionary(from: content.value(GeneratedContent.self, forProperty: propertyName), using: property)
-          default:
-            throw AppleLLMError.invalidSchema("Unsupported property type \(type) for \(propertyName)")
-          }
-        } catch {
-          throw AppleLLMError.invalidSchema("There was an error parsing \(propertyName): \(error.localizedDescription)")
-        }
-      }
-      
-      return result
-    }
     
-    static func extractArrayContent(from content: GeneratedContent, using schema: [String: Any]) throws -> [Any] {
-      guard let itemsSchema = schema["items"] as? [String: Any] else {
-        throw AppleLLMError.invalidSchema("Array schema must have items definition")
-      }
-      
-      let itemType = itemsSchema["type"] as? String
-      
-      switch itemType {
-      case "string":
-        let arrayValue: [String] = try content.value([String].self)
-        return arrayValue
-      case "number":
-        let arrayValue: [Double] = try content.value([Double].self)
-        return arrayValue
-      case "integer":
-        let arrayValue: [Int] = try content.value([Int].self)
-        return arrayValue
-      case "boolean":
-        let arrayValue: [Bool] = try content.value([Bool].self)
-        return arrayValue
-      case "object":
-        return try content.elements().map { element in
-          try extractContentToDictionary(from: element, using: itemsSchema)
-        }
-      default:
-        throw AppleLLMError.invalidSchema("Unsupported array item type: \(itemType ?? "unknown")")
-      }
-    }
   }
   
   #endif
@@ -637,5 +572,75 @@ extension LanguageModelSession.Response<GeneratedContent> {
     throw RawValueExtractionError.rawValueNotFound
   }
 }
+
+@available(iOS 26, *)
+extension GeneratedContent {
+  func toDictionary(using schemaDict: [String: Any]) throws -> [String: Any] {
+    var result: [String: Any] = [:]
+    
+    guard let properties = schemaDict["properties"] as? [String: Any] else {
+      throw AppleLLMError.invalidSchema("Object schema has invalid shape: \(schemaDict)")
+    }
+    
+    for (propertyName, propertySchema) in properties {
+      guard let property = propertySchema as? [String: Any],
+            let type = property["type"] as? String else {
+        throw AppleLLMError.invalidSchema("Schema must have type and properties: \(propertySchema)")
+      }
+      
+      do {
+        switch type {
+        case "string":
+          result[propertyName] = try self.value(String.self, forProperty: propertyName)
+        case "number":
+          result[propertyName] = try self.value(Double.self, forProperty: propertyName)
+        case "integer":
+          result[propertyName] = try self.value(Int.self, forProperty: propertyName)
+        case "boolean":
+          result[propertyName] = try self.value(Bool.self, forProperty: propertyName)
+        case "array":
+          result[propertyName] = try self.value(GeneratedContent.self, forProperty: propertyName).toArray(using: property)
+        case "object":
+          result[propertyName] = try self.value(GeneratedContent.self, forProperty: propertyName).toDictionary(using: property)
+        default:
+          throw AppleLLMError.invalidSchema("Unsupported property type \(type) for \(propertyName)")
+        }
+      } catch {
+        throw AppleLLMError.invalidSchema("There was an error parsing \(propertyName): \(error.localizedDescription)")
+      }
+    }
+    
+    return result
+  }
   
+  private func toArray(using schema: [String: Any]) throws -> [Any] {
+    guard let itemsSchema = schema["items"] as? [String: Any] else {
+      throw AppleLLMError.invalidSchema("Array schema must have items definition")
+    }
+    
+    let itemType = itemsSchema["type"] as? String
+    
+    switch itemType {
+    case "string":
+      let arrayValue: [String] = try self.value([String].self)
+      return arrayValue
+    case "number":
+      let arrayValue: [Double] = try self.value([Double].self)
+      return arrayValue
+    case "integer":
+      let arrayValue: [Int] = try self.value([Int].self)
+      return arrayValue
+    case "boolean":
+      let arrayValue: [Bool] = try self.value([Bool].self)
+      return arrayValue
+    case "object":
+      return try self.elements().map { element in
+        try element.toDictionary(using: itemsSchema)
+      }
+    default:
+      throw AppleLLMError.invalidSchema("Unsupported array item type: \(itemType ?? "unknown")")
+    }
+  }
+}
+
 #endif
