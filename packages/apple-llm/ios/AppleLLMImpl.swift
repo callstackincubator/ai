@@ -1,3 +1,4 @@
+
 //
 //  AppleLLM.swift
 //  AppleLLM
@@ -11,6 +12,8 @@ import React
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
+
+public typealias ToolInvoker = @Sendable (String, [String : Any], @escaping (Any?, Error?) -> Void) -> Void
 
 @objc
 public class AppleLLMImpl: NSObject {
@@ -42,7 +45,7 @@ public class AppleLLMImpl: NSObject {
     options: [String: Any]?,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void,
-    toolInvoker: @escaping @Sendable (String, [String: Any], @escaping (Any?, Error?) -> Void) -> Void
+    toolInvoker: @escaping ToolInvoker
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
@@ -193,7 +196,7 @@ public class AppleLLMImpl: NSObject {
 #if canImport(FoundationModels)
   
   @available(iOS 26, *)
-  private func createTools(from options: [String: Any], toolInvoker: @escaping @Sendable (String, [String: Any], @escaping (Any?, Error?) -> Void) -> Void) throws -> [any Tool] {
+  private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {
     guard let toolsDict = options["tools"] as? [String: [String: Any]] else {
       throw AppleLLMError.invalidSchema("Tools must be an object with tool definitions")
     }
@@ -218,225 +221,6 @@ public class AppleLLMImpl: NSObject {
     return tools
   }
   
-@available(iOS 26, *)
-struct JSITool : Tool {
-  var name: String
-  var description: String
-  var parameters: GenerationSchema
-  
-  private let invokeJavaScriptTool: @Sendable (String, [String: Any], @escaping (Any?, Error?) -> Void) -> Void
-  
-  init(name: String,
-       description: String,
-       parameters: [String : Any],
-       javaScriptToolInvoker: @escaping @Sendable (String, [String: Any], @escaping (Any?, Error?) -> Void) -> Void) throws {
-    self.name = name
-    self.description = description
-    self.invokeJavaScriptTool = javaScriptToolInvoker
-    self.parameters = try AppleLLMSchemaParser.createGenerationSchema(from: parameters)
-  }
-  
-  func call(arguments: GeneratedContent) async throws -> ToolOutput {
-    // TODO - convert arguments to object automatically knowing schema
-    let args: [String: Any] = [
-      "city": try arguments.value(String.self, forProperty: "city")
-    ]
-    
-    return try await withCheckedThrowingContinuation { continuation in
-      invokeJavaScriptTool(self.name, args) { result, error in
-        if let error = error {
-          continuation.resume(throwing: AppleLLMError.toolCallError(error))
-        } else if let output = result as? String {
-          continuation.resume(returning: ToolOutput(output))
-        } else {
-          continuation.resume(throwing: AppleLLMError.unknownToolCallError)
-        }
-      }
-    }
-  }
-}
-
-@available(iOS 26, *)
-struct AppleLLMSchemaParser {
-  
-  // MARK: - Constants
-  private static let supportedStringFormats: Set<String> = [
-    "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid"
-  ]
-  
-  static func createGenerationSchema(from schemaObj: Any) throws -> GenerationSchema {
-    guard let schemaDict = schemaObj as? [String: Any] else {
-      throw AppleLLMError.invalidSchema("Schema must be an object")
-    }
-    let dynamicSchemas = try parseDynamicSchema(from: schemaDict)
-    return try GenerationSchema(root: dynamicSchemas, dependencies: [])
-  }
-  
-  static func parseDynamicSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
-    let type = schemaDict["type"] as? String
-    
-    if let anyOfArray = schemaDict["anyOf"] as? [[String: Any]] {
-      let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
-      return DynamicGenerationSchema(
-        name: schemaDict["title"] as? String ?? "",
-        description: schemaDict["description"] as? String,
-        anyOf: parsedSchemas
-      )
-    }
-    
-    switch type {
-    case "object":
-      return try parseObjectSchema(from: schemaDict)
-    case "array":
-      return try parseArraySchema(from: schemaDict)
-    case "string":
-      return try parseStringSchema(from: schemaDict)
-    case "number", "integer":
-      return try parseNumberSchema(from: schemaDict)
-    case "boolean":
-      return try parseBooleanSchema(from: schemaDict)
-    default:
-      throw AppleLLMError.invalidSchema("Unsupported schema type: \(type ?? "unknown"). Supported types: object, array, string, number, integer, boolean")
-    }
-  }
-  
-  static func parseObjectSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
-    var properties: [DynamicGenerationSchema.Property] = []
-    
-    if let propertiesDict = schemaDict["properties"] as? [String: Any] {
-      let requiredFields = schemaDict["required"] as? [String] ?? []
-      
-      for (propertyName, propertySchema) in propertiesDict {
-        guard let propertySchemaDict = propertySchema as? [String: Any] else {
-          continue
-        }
-        
-        let isOptional = !requiredFields.contains(propertyName)
-        let propertyDescription = propertySchemaDict["description"] as? String
-        
-        let nestedSchema = try parseDynamicSchema(from: propertySchemaDict)
-        
-        let property = DynamicGenerationSchema.Property(
-          name: propertyName,
-          description: propertyDescription,
-          schema: nestedSchema,
-          isOptional: isOptional
-        )
-        properties.append(property)
-      }
-    }
-    
-    return DynamicGenerationSchema(
-      name: schemaDict["title"] as? String ?? "",
-      description: schemaDict["description"] as? String,
-      properties: properties
-    )
-  }
-  
-  static func parseArraySchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
-    guard let itemsSchema = schemaDict["items"] as? [String: Any] else {
-      throw AppleLLMError.invalidSchema("Array schema must have items definition")
-    }
-    
-    let itemDynamicSchema = try parseDynamicSchema(from: itemsSchema)
-    
-    let minItems = schemaDict["minItems"] as? Int
-    let maxItems = schemaDict["maxItems"] as? Int
-    
-    return DynamicGenerationSchema(
-      arrayOf: itemDynamicSchema,
-      minimumElements: minItems,
-      maximumElements: maxItems
-    )
-  }
-  
-  static func parseStringSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
-    // Handle enum values
-    if let enumValues = schemaDict["enum"] as? [String] {
-      return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
-    }
-    
-    // Handle regular expressions
-    if let pattern = schemaDict["pattern"] as? String {
-      do {
-        let regex = try Regex(pattern)
-        return DynamicGenerationSchema(type: String.self, guides: [
-          GenerationGuide.pattern(regex)
-        ])
-      } catch {
-        throw AppleLLMError.invalidSchema("Invalid regex pattern '\(pattern)': \(error.localizedDescription)")
-      }
-    }
-    
-    return DynamicGenerationSchema(type: String.self, guides: [])
-  }
-  
-  static func parseNumberSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
-    let type = schemaDict["type"] as! String
-    
-    // Handle numeric enums - use string representation since Apple's GenerationGuide.anyOf only supports [String]
-    // The JavaScript side will parse these back to numbers after generation
-    
-    if let enumValues = schemaDict["enum"] as? [String] {
-      return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
-    }
-    
-    if schemaDict["multipleOf"] != nil {
-      throw AppleLLMError.invalidSchema("MultipleOf is not supported by Apple Foundational models.")
-    }
-    
-    if let maximum = schemaDict["maximum"] as? Double {
-      if type == "integer" {
-        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(Int(maximum))])
-      } else {
-        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(maximum)])
-      }
-    }
-    
-    if let minimum = schemaDict["minimum"] as? Double {
-      if type == "integer" {
-        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(Int(minimum))])
-      } else {
-        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(minimum)])
-      }
-    }
-    
-    // Apple's GenerationGuide only supports inclusive bounds (≤, ≥)
-    // We convert exclusive bounds (< , >) to the nearest inclusive equivalent:
-    // - exclusiveMaximum: value < N → maximum(N-1 for int, N.nextDown for double)
-    // - exclusiveMinimum: value > N → minimum(N+1 for int, N.nextUp for double)
-    
-    if let exclusiveMaximum = schemaDict["exclusiveMaximum"] as? Double {
-      if type == "integer" {
-        let approximateMax = Int(exclusiveMaximum) - 1
-        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(approximateMax)])
-      } else {
-        let approximateMax = exclusiveMaximum.nextDown
-        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(approximateMax)])
-      }
-    }
-    
-    if let exclusiveMinimum = schemaDict["exclusiveMinimum"] as? Double {
-      if type == "integer" {
-        let approximateMin = Int(exclusiveMinimum) + 1
-        return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(approximateMin)])
-      } else {
-        let approximateMin = exclusiveMinimum.nextUp
-        return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(approximateMin)])
-      }
-    }
-    
-    if type == "integer" {
-      return DynamicGenerationSchema(type: Int.self, guides: [])
-    } else {
-      return DynamicGenerationSchema(type: Double.self, guides: [])
-    }
-  }
-  
-  static func parseBooleanSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
-    return DynamicGenerationSchema(type: Bool.self, guides: [])
-  }
-}
   // TODO:
   //   • Investigate assetIDs parameter usage in Transcript.Response
   //   • Implement tool calling support
@@ -522,9 +306,295 @@ struct AppleLLMSchemaParser {
     )
   }
   
-#endif
+  @available(iOS 26, *)
+  struct JSITool : Tool {
+    var name: String
+    var description: String
+    var parameters: GenerationSchema
+    
+    private let invokeJavaScriptTool: ToolInvoker
+    private nonisolated let schemaDict: [String: Any]
+    
+    init(name: String,
+         description: String,
+         parameters: [String : Any],
+         javaScriptToolInvoker: @escaping ToolInvoker) throws {
+      self.name = name
+      self.description = description
+      self.invokeJavaScriptTool = javaScriptToolInvoker
+      self.schemaDict = parameters
+      self.parameters = try AppleLLMSchemaParser.createGenerationSchema(from: parameters)
+    }
+    
+    func call(arguments: GeneratedContent) async throws -> ToolOutput {
+      let argsDict = try AppleLLMSchemaParser.extractContentToDictionary(from: arguments, using: schemaDict)
+      
+      return try await withCheckedThrowingContinuation { continuation in
+        invokeJavaScriptTool(self.name, argsDict) { result, error in
+          if let error = error {
+            continuation.resume(throwing: AppleLLMError.toolCallError(error))
+          } else if let output = result as? String {
+            continuation.resume(returning: ToolOutput(output))
+          } else {
+            continuation.resume(throwing: AppleLLMError.unknownToolCallError)
+          }
+        }
+      }
+    }
+  }
+  
+  @available(iOS 26, *)
+  struct AppleLLMSchemaParser {
+    
+    // MARK: - Constants
+    private static let supportedStringFormats: Set<String> = [
+      "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid"
+    ]
+    
+    static func createGenerationSchema(from schemaObj: Any) throws -> GenerationSchema {
+      guard let schemaDict = schemaObj as? [String: Any] else {
+        throw AppleLLMError.invalidSchema("Schema must be an object")
+      }
+      let dynamicSchemas = try parseDynamicSchema(from: schemaDict)
+      return try GenerationSchema(root: dynamicSchemas, dependencies: [])
+    }
+    
+    static func parseDynamicSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+      let type = schemaDict["type"] as? String
+      
+      if let anyOfArray = schemaDict["anyOf"] as? [[String: Any]] {
+        let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
+        return DynamicGenerationSchema(
+          name: schemaDict["title"] as? String ?? "",
+          description: schemaDict["description"] as? String,
+          anyOf: parsedSchemas
+        )
+      }
+      
+      switch type {
+      case "object":
+        return try parseObjectSchema(from: schemaDict)
+      case "array":
+        return try parseArraySchema(from: schemaDict)
+      case "string":
+        return try parseStringSchema(from: schemaDict)
+      case "number", "integer":
+        return try parseNumberSchema(from: schemaDict)
+      case "boolean":
+        return try parseBooleanSchema(from: schemaDict)
+      default:
+        throw AppleLLMError.invalidSchema("Unsupported schema type: \(type ?? "unknown"). Supported types: object, array, string, number, integer, boolean")
+      }
+    }
+    
+    static func parseObjectSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+      var properties: [DynamicGenerationSchema.Property] = []
+      
+      if let propertiesDict = schemaDict["properties"] as? [String: Any] {
+        let requiredFields = schemaDict["required"] as? [String] ?? []
+        
+        for (propertyName, propertySchema) in propertiesDict {
+          guard let propertySchemaDict = propertySchema as? [String: Any] else {
+            continue
+          }
+          
+          let isOptional = !requiredFields.contains(propertyName)
+          let propertyDescription = propertySchemaDict["description"] as? String
+          
+          let nestedSchema = try parseDynamicSchema(from: propertySchemaDict)
+          
+          let property = DynamicGenerationSchema.Property(
+            name: propertyName,
+            description: propertyDescription,
+            schema: nestedSchema,
+            isOptional: isOptional
+          )
+          properties.append(property)
+        }
+      }
+      
+      return DynamicGenerationSchema(
+        name: schemaDict["title"] as? String ?? "",
+        description: schemaDict["description"] as? String,
+        properties: properties
+      )
+    }
+    
+    static func parseArraySchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+      guard let itemsSchema = schemaDict["items"] as? [String: Any] else {
+        throw AppleLLMError.invalidSchema("Array schema must have items definition")
+      }
+      
+      let itemDynamicSchema = try parseDynamicSchema(from: itemsSchema)
+      
+      let minItems = schemaDict["minItems"] as? Int
+      let maxItems = schemaDict["maxItems"] as? Int
+      
+      return DynamicGenerationSchema(
+        arrayOf: itemDynamicSchema,
+        minimumElements: minItems,
+        maximumElements: maxItems
+      )
+    }
+    
+    static func parseStringSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+      // Handle enum values
+      if let enumValues = schemaDict["enum"] as? [String] {
+        return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
+      }
+      
+      // Handle regular expressions
+      if let pattern = schemaDict["pattern"] as? String {
+        do {
+          let regex = try Regex(pattern)
+          return DynamicGenerationSchema(type: String.self, guides: [
+            GenerationGuide.pattern(regex)
+          ])
+        } catch {
+          throw AppleLLMError.invalidSchema("Invalid regex pattern '\(pattern)': \(error.localizedDescription)")
+        }
+      }
+      
+      return DynamicGenerationSchema(type: String.self, guides: [])
+    }
+    
+    static func parseNumberSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+      let type = schemaDict["type"] as! String
+      
+      // Handle numeric enums - use string representation since Apple's GenerationGuide.anyOf only supports [String]
+      // The JavaScript side will parse these back to numbers after generation
+      
+      if let enumValues = schemaDict["enum"] as? [String] {
+        return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
+      }
+      
+      if schemaDict["multipleOf"] != nil {
+        throw AppleLLMError.invalidSchema("MultipleOf is not supported by Apple Foundational models.")
+      }
+      
+      if let maximum = schemaDict["maximum"] as? Double {
+        if type == "integer" {
+          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(Int(maximum))])
+        } else {
+          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(maximum)])
+        }
+      }
+      
+      if let minimum = schemaDict["minimum"] as? Double {
+        if type == "integer" {
+          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(Int(minimum))])
+        } else {
+          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(minimum)])
+        }
+      }
+      
+      // Apple's GenerationGuide only supports inclusive bounds (≤, ≥)
+      // We convert exclusive bounds (< , >) to the nearest inclusive equivalent:
+      // - exclusiveMaximum: value < N → maximum(N-1 for int, N.nextDown for double)
+      // - exclusiveMinimum: value > N → minimum(N+1 for int, N.nextUp for double)
+      
+      if let exclusiveMaximum = schemaDict["exclusiveMaximum"] as? Double {
+        if type == "integer" {
+          let approximateMax = Int(exclusiveMaximum) - 1
+          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(approximateMax)])
+        } else {
+          let approximateMax = exclusiveMaximum.nextDown
+          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(approximateMax)])
+        }
+      }
+      
+      if let exclusiveMinimum = schemaDict["exclusiveMinimum"] as? Double {
+        if type == "integer" {
+          let approximateMin = Int(exclusiveMinimum) + 1
+          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(approximateMin)])
+        } else {
+          let approximateMin = exclusiveMinimum.nextUp
+          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(approximateMin)])
+        }
+      }
+      
+      if type == "integer" {
+        return DynamicGenerationSchema(type: Int.self, guides: [])
+      } else {
+        return DynamicGenerationSchema(type: Double.self, guides: [])
+      }
+    }
+    
+    static func parseBooleanSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+      return DynamicGenerationSchema(type: Bool.self, guides: [])
+    }
+    
+    static func extractContentToDictionary(from content: GeneratedContent, using schemaDict: [String: Any]) throws -> [String: Any] {
+      var result: [String: Any] = [:]
+      
+      guard let properties = schemaDict["properties"] as? [String: Any] else {
+        throw AppleLLMError.invalidSchema("Object schema has invalid shape: \(schemaDict)")
+      }
+      
+      for (propertyName, propertySchema) in properties {
+        guard let property = propertySchema as? [String: Any],
+              let type = property["type"] as? String else {
+          throw AppleLLMError.invalidSchema("Schema must have type and properties: \(propertySchema)")
+        }
+        
+        do {
+          switch type {
+          case "string":
+            result[propertyName] = try content.value(String.self, forProperty: propertyName)
+          case "number":
+            result[propertyName] = try content.value(Double.self, forProperty: propertyName)
+          case "integer":
+            result[propertyName] = try content.value(Int.self, forProperty: propertyName)
+          case "boolean":
+            result[propertyName] = try content.value(Bool.self, forProperty: propertyName)
+          case "array":
+            result[propertyName] = try extractArrayContent(from: content.value(GeneratedContent.self, forProperty: propertyName), using: property)
+          case "object":
+            result[propertyName] = try extractContentToDictionary(from: content.value(GeneratedContent.self, forProperty: propertyName), using: property)
+          default:
+            throw AppleLLMError.invalidSchema("Unsupported property type \(type) for \(propertyName)")
+          }
+        } catch {
+          throw AppleLLMError.invalidSchema("There was an error parsing \(propertyName): \(error.localizedDescription)")
+        }
+      }
+      
+      return result
+    }
+    
+    static func extractArrayContent(from content: GeneratedContent, using schema: [String: Any]) throws -> [Any] {
+      guard let itemsSchema = schema["items"] as? [String: Any] else {
+        throw AppleLLMError.invalidSchema("Array schema must have items definition")
+      }
+      
+      let itemType = itemsSchema["type"] as? String
+      
+      switch itemType {
+      case "string":
+        let arrayValue: [String] = try content.value([String].self)
+        return arrayValue
+      case "number":
+        let arrayValue: [Double] = try content.value([Double].self)
+        return arrayValue
+      case "integer":
+        let arrayValue: [Int] = try content.value([Int].self)
+        return arrayValue
+      case "boolean":
+        let arrayValue: [Bool] = try content.value([Bool].self)
+        return arrayValue
+      case "object":
+        return try content.elements().map { element in
+          try extractContentToDictionary(from: element, using: itemsSchema)
+        }
+      default:
+        throw AppleLLMError.invalidSchema("Unsupported array item type: \(itemType ?? "unknown")")
+      }
+    }
+  }
+  
+  #endif
 }
-
+  
 #if canImport(FoundationModels)
 
 @available(iOS 26, *)
@@ -567,7 +637,5 @@ extension LanguageModelSession.Response<GeneratedContent> {
     throw RawValueExtractionError.rawValueNotFound
   }
 }
-
-
+  
 #endif
-

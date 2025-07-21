@@ -118,8 +118,8 @@ using namespace JS::NativeAppleLLM;
     @"tools": options.tools()
   };
   
-  auto callToolBlock = ^(NSString *toolName, NSDictionary *parameters, void (^completion)(id, NSError *)) {
-    [self callToolWithName:toolName arguments:parameters completion:completion];
+  auto callToolBlock = ^(NSString *toolName, id parameters, void (^completion)(id, NSError *)) {
+    [self callToolWithName:toolName arguments:(NSDictionary *)parameters completion:completion];
   };
   
   [_llm generateText:messages options:opts resolve:resolve reject:reject toolInvoker:callToolBlock];
