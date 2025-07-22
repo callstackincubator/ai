@@ -14,17 +14,13 @@ import FoundationModels
 #endif
 
 public typealias ToolInvoker = @Sendable (String, [String : Any], @escaping (Any?, Error?) -> Void) -> Void
+public typealias ResolveBlock = @escaping (Any?) -> Void
+public typealias RejectBlock = @escaping (String, String, Error?) -> Void
 
 @objc
 public class AppleLLMImpl: NSObject {
   
   private var streamTasks: [String: Task<Void, Never>] = [:]
-  
-  // MARK: - Constants
-  
-  private static let supportedStringFormats: Set<String> = [
-    "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid"
-  ]
   
   @objc
   public func isAvailable() -> Bool {
@@ -43,8 +39,8 @@ public class AppleLLMImpl: NSObject {
   public func generateText(
     _ messages: [[String: Any]],
     options: [String: Any],
-    resolve: @escaping (Any?) -> Void,
-    reject: @escaping (String, String, Error?) -> Void,
+    resolve: ResolveBlock,
+    reject: RejectBlock,
     toolInvoker: @escaping ToolInvoker
   ) {
 #if canImport(FoundationModels)
@@ -178,8 +174,8 @@ public class AppleLLMImpl: NSObject {
   @objc
   public func isModelAvailable(
     _ modelId: String,
-    resolve: @escaping (Any?) -> Void,
-    reject: @escaping (String, String, Error?) -> Void
+    resolve: ResolveBlock,
+    reject: RejectBlock
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
@@ -345,12 +341,6 @@ public class AppleLLMImpl: NSObject {
   
   @available(iOS 26, *)
   struct AppleLLMSchemaParser {
-    
-    // MARK: - Constants
-    private static let supportedStringFormats: Set<String> = [
-      "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid"
-    ]
-    
     static func createGenerationSchema(from schemaDict: [String: Any]) throws -> GenerationSchema {
       let dynamicSchemas = try parseDynamicSchema(from: schemaDict)
       return try GenerationSchema(root: dynamicSchemas, dependencies: [])
