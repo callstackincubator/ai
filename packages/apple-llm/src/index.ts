@@ -1,5 +1,5 @@
 import { type LanguageModelV1StreamPart } from '@ai-sdk/provider'
-import { type Tool } from 'ai'
+import { generateId, type Tool } from 'ai'
 import { z } from 'zod'
 
 import { AppleLLMChatLanguageModel } from './ai-sdk'
@@ -8,7 +8,7 @@ import NativeAppleLLMSpec, {
   type AppleMessage,
 } from './NativeAppleLLM'
 import { generateStream } from './streaming'
-import { registerTools } from './tools'
+import { clearTools, registerTools } from './tools'
 
 export function apple(): AppleLLMChatLanguageModel {
   return new AppleLLMChatLanguageModel()
@@ -48,11 +48,12 @@ async function generateText(
       ? {
           tools: Object.fromEntries(
             Object.entries(options.tools).map(([name, tool]) => [
-              name,
+              generateId(),
               {
                 name,
                 description: tool.description,
                 parameters: z.toJSONSchema(tool.parameters),
+                execute: tool.execute,
               },
             ])
           ),
@@ -60,16 +61,18 @@ async function generateText(
       : {}),
   }
 
-  // TODO: This is not concurrent-safe at the moment, we should also clean-up later
-  // TODO: Wrap execute to parse back the arguments to correct types
-  if (options.tools) {
-    registerTools(options.tools)
+  if (generationOptions.tools) {
+    registerTools(generationOptions.tools)
   }
 
   const response = await NativeAppleLLMSpec.generateText(
     messages,
     generationOptions
   )
+
+  if (generationOptions.tools) {
+    clearTools(Object.keys(generationOptions.tools))
+  }
 
   return response
 }
