@@ -5,6 +5,6 @@
   "framework": null,
   "installCommand": "bun install",
   "rewrites": [{ "source": "/(.*)", "destination": "/404.html" }],
-  "outputDirectory": "build",
+  "outputDirectory": "doc_build",
   "trailingSlash": false
 } 
