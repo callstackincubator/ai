@@ -182,14 +182,16 @@ public class AppleLLMImpl: NSObject {
     
     var tools: [any Tool] = []
     
-    for (toolName, toolDef) in toolsDict {
-      guard let description = toolDef["description"] as? String?,
+    for (toolId, toolDef) in toolsDict {
+      guard let name = toolDef["name"] as? String,
+            let description = toolDef["description"] as? String?,
             let parameters = toolDef["parameters"] as? [String: Any]? else {
-        throw AppleLLMError.invalidSchema("Invalid tool definition for \(toolName)")
+        throw AppleLLMError.invalidSchema("Invalid tool definition for \(toolId)")
       }
       
       let tool = try JSITool(
-        name: toolName,
+        toolId: toolId,
+        name: name,
         description: description ?? "",
         parameters: parameters ?? [:],
         javaScriptToolInvoker: toolInvoker
@@ -293,11 +295,14 @@ public class AppleLLMImpl: NSObject {
     
     private let invokeJavaScriptTool: ToolInvoker
     private nonisolated let schemaDict: [String: Any]
+    private let toolId: String
     
-    init(name: String,
+    init(toolId: String,
+         name: String,
          description: String,
-         parameters: [String : Any],
+         parameters: [String: Any],
          javaScriptToolInvoker: @escaping ToolInvoker) throws {
+      self.toolId = toolId
       self.name = name
       self.description = description
       self.invokeJavaScriptTool = javaScriptToolInvoker
@@ -309,7 +314,7 @@ public class AppleLLMImpl: NSObject {
       let argsDict = try arguments.toDictionary(using: schemaDict)
       
       return try await withCheckedThrowingContinuation { continuation in
-        invokeJavaScriptTool(self.name, argsDict) { result, error in
+        invokeJavaScriptTool(self.toolId, argsDict) { result, error in
           if let error = error {
             continuation.resume(throwing: AppleLLMError.toolCallError(error))
           } else if let output = result as? String {

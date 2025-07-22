@@ -6,12 +6,21 @@ declare global {
   var __APPLE_LLM_TOOLS__: Record<string, Function>
 }
 
+globalThis.__APPLE_LLM_TOOLS__ = {}
+
 export function registerTools(tools: Record<string, Tool>): void {
-  globalThis.__APPLE_LLM_TOOLS__ = Object.fromEntries(
-    Object.entries(tools).map(([name, tool]) => [name, tool.execute])
-  )
+  for (const [id, tool] of Object.entries(tools)) {
+    globalThis.__APPLE_LLM_TOOLS__[id] = tool.execute
+  }
+  console.log(globalThis.__APPLE_LLM_TOOLS__)
 }
 
 export function getRegisteredTools(): Tools {
   return __APPLE_LLM_TOOLS__
+}
+
+export function clearTools(keys: string[]): void {
+  for (const key of keys) {
+    globalThis.__APPLE_LLM_TOOLS__[key] = undefined
+  }
 }
