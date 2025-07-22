@@ -206,7 +206,7 @@ public class AppleLLMImpl: NSObject {
     for (toolName, toolDef) in toolsDict {
       guard let description = toolDef["description"] as? String?,
             let parameters = toolDef["parameters"] as? [String: Any]? else {
-        continue
+        throw AppleLLMError.invalidSchema("Invalid tool definition for \(toolName)")
       }
       
       let tool = try JSITool(
@@ -244,7 +244,7 @@ public class AppleLLMImpl: NSObject {
     for message in transcriptMessages {
       guard let role = message["role"] as? String,
             let content = message["content"] as? String else {
-        continue
+        throw AppleLLMError.invalidMessage("Message must have role and content")
       }
       
       let segment = Transcript.Segment.text(
@@ -395,7 +395,7 @@ public class AppleLLMImpl: NSObject {
         
         for (propertyName, propertySchema) in propertiesDict {
           guard let propertySchemaDict = propertySchema as? [String: Any] else {
-            continue
+            throw AppleLLMError.invalidSchema("Property \(propertyName) schema must be an object")
           }
           
           let isOptional = !requiredFields.contains(propertyName)
