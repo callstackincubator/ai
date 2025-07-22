@@ -14,8 +14,6 @@ import FoundationModels
 #endif
 
 public typealias ToolInvoker = @Sendable (String, [String : Any], @escaping (Any?, Error?) -> Void) -> Void
-public typealias ResolveBlock = @escaping (Any?) -> Void
-public typealias RejectBlock = @escaping (String, String, Error?) -> Void
 
 @objc
 public class AppleLLMImpl: NSObject {
@@ -39,8 +37,8 @@ public class AppleLLMImpl: NSObject {
   public func generateText(
     _ messages: [[String: Any]],
     options: [String: Any],
-    resolve: ResolveBlock,
-    reject: RejectBlock,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void,
     toolInvoker: @escaping ToolInvoker
   ) {
 #if canImport(FoundationModels)
@@ -67,7 +65,8 @@ public class AppleLLMImpl: NSObject {
           
           let generationOptions = try self.createGenerationOptions(from: options)
           
-          if let schema = options["schema"] as? [String: Any] {
+          if let schemaObj = options["schema"], !(schemaObj is NSNull),
+             let schema = schemaObj as? [String: Any] {
             let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schema)
             let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
             
@@ -171,30 +170,14 @@ public class AppleLLMImpl: NSObject {
     }
   }
   
-  @objc
-  public func isModelAvailable(
-    _ modelId: String,
-    resolve: ResolveBlock,
-    reject: RejectBlock
-  ) {
-#if canImport(FoundationModels)
-    if #available(iOS 26, *) {
-      resolve(SystemLanguageModel.default.availability == .available)
-    } else {
-      resolve(false)
-    }
-#else
-    resolve(false)
-#endif
-  }
-  
   // MARK: - Private Methods
 #if canImport(FoundationModels)
   
   @available(iOS 26, *)
   private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {
-    guard let toolsDict = options["tools"] as? [String: [String: Any]] else {
-      throw AppleLLMError.invalidSchema("Tools must be an object with tool definitions")
+    guard let toolsObj = options["tools"], !(toolsObj is NSNull),
+          let toolsDict = toolsObj as? [String: [String: Any]] else {
+      return []
     }
     
     var tools: [any Tool] = []
@@ -516,6 +499,8 @@ public class AppleLLMImpl: NSObject {
   
   #endif
 }
+
+#if canImport(FoundationModels)
 
 @available(iOS 26, *)
 extension GeneratedContent {
