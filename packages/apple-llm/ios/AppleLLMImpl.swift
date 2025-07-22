@@ -20,12 +20,6 @@ public class AppleLLMImpl: NSObject {
   
   private var streamTasks: [String: Task<Void, Never>] = [:]
   
-  // MARK: - Constants
-  
-  private static let supportedStringFormats: Set<String> = [
-    "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid"
-  ]
-  
   @objc
   public func isAvailable() -> Bool {
 #if canImport(FoundationModels)
@@ -42,7 +36,7 @@ public class AppleLLMImpl: NSObject {
   @objc
   public func generateText(
     _ messages: [[String: Any]],
-    options: [String: Any]?,
+    options: [String: Any],
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void,
     toolInvoker: @escaping ToolInvoker
@@ -59,7 +53,7 @@ public class AppleLLMImpl: NSObject {
       }
       Task {
         do {
-          let tools = try self.createTools(from: options ?? [:], toolInvoker: toolInvoker)
+          let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
           let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
           
           let session = LanguageModelSession.init(
@@ -69,13 +63,14 @@ public class AppleLLMImpl: NSObject {
             transcript: transcript
           )
           
-          let generationOptions = try self.createGenerationOptions(from: options ?? [:])
+          let generationOptions = try self.createGenerationOptions(from: options)
           
-          if let schemaObj = options?["schema"] {
-            let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schemaObj)
+          if let schemaObj = options["schema"], !(schemaObj is NSNull),
+             let schema = schemaObj as? [String: Any] {
+            let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schema)
             let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
             
-            resolve(try response.rawValue())
+            resolve(try response.content.toDictionary(using: schema))
           } else {
             let response = try await session.respond(to: userPrompt, options: generationOptions)
             resolve(response.content)
@@ -97,7 +92,7 @@ public class AppleLLMImpl: NSObject {
   @objc
   public func generateStream(
     _ messages: [[String: Any]],
-    options: [String: Any]?,
+    options: [String: Any],
     onUpdate: @escaping (String, String) -> Void,
     onComplete: @escaping (String) -> Void,
     onError: @escaping (String, String) -> Void
@@ -121,9 +116,9 @@ public class AppleLLMImpl: NSObject {
             transcript: transcript
           )
           
-          let generationOptions = try self.createGenerationOptions(from: options ?? [:])
+          let generationOptions = try self.createGenerationOptions(from: options)
           
-          if let schemaOption = options?["schema"] {
+          if let schemaOption = options["schema"] as? [String: Any] {
             let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schemaOption)
             let responseStream = session.streamResponse(
               to: userPrompt,
@@ -175,30 +170,14 @@ public class AppleLLMImpl: NSObject {
     }
   }
   
-  @objc
-  public func isModelAvailable(
-    _ modelId: String,
-    resolve: @escaping (Any?) -> Void,
-    reject: @escaping (String, String, Error?) -> Void
-  ) {
-#if canImport(FoundationModels)
-    if #available(iOS 26, *) {
-      resolve(SystemLanguageModel.default.availability == .available)
-    } else {
-      resolve(false)
-    }
-#else
-    resolve(false)
-#endif
-  }
-  
   // MARK: - Private Methods
 #if canImport(FoundationModels)
   
   @available(iOS 26, *)
   private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {
-    guard let toolsDict = options["tools"] as? [String: [String: Any]] else {
-      throw AppleLLMError.invalidSchema("Tools must be an object with tool definitions")
+    guard let toolsObj = options["tools"], !(toolsObj is NSNull),
+          let toolsDict = toolsObj as? [String: [String: Any]] else {
+      return []
     }
     
     var tools: [any Tool] = []
@@ -345,16 +324,7 @@ public class AppleLLMImpl: NSObject {
   
   @available(iOS 26, *)
   struct AppleLLMSchemaParser {
-    
-    // MARK: - Constants
-    private static let supportedStringFormats: Set<String> = [
-      "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid"
-    ]
-    
-    static func createGenerationSchema(from schemaObj: Any) throws -> GenerationSchema {
-      guard let schemaDict = schemaObj as? [String: Any] else {
-        throw AppleLLMError.invalidSchema("Schema must be an object")
-      }
+    static func createGenerationSchema(from schemaDict: [String: Any]) throws -> GenerationSchema {
       let dynamicSchemas = try parseDynamicSchema(from: schemaDict)
       return try GenerationSchema(root: dynamicSchemas, dependencies: [])
     }
@@ -529,49 +499,8 @@ public class AppleLLMImpl: NSObject {
   
   #endif
 }
-  
-#if canImport(FoundationModels)
 
-@available(iOS 26, *)
-extension LanguageModelSession.Response<GeneratedContent> {
-  enum RawValueExtractionError: Error {
-    case noTranscriptEntries
-    case notAResponseEntry
-    case noSegments
-    case notAStructuredSegment
-    case rawValueNotFound
-  }
-  
-  func rawValue() throws -> String {
-    guard let lastEntry = transcriptEntries.last else {
-      throw RawValueExtractionError.noTranscriptEntries
-    }
-    
-    guard case let .response(res) = lastEntry else {
-      throw RawValueExtractionError.notAResponseEntry
-    }
-    
-    guard let lastSegment = res.segments.last else {
-      throw RawValueExtractionError.noSegments
-    }
-    
-    if case let .text(textSegment) = lastSegment {
-      return textSegment.content
-    }
-    
-    guard case let .structure(structureSegment) = lastSegment else {
-      throw RawValueExtractionError.notAStructuredSegment
-    }
-    
-    for child in Mirror(reflecting: structureSegment).children {
-      if child.label == "rawValue", let rawValue = child.value as? String {
-        return rawValue
-      }
-    }
-    
-    throw RawValueExtractionError.rawValueNotFound
-  }
-}
+#if canImport(FoundationModels)
 
 @available(iOS 26, *)
 extension GeneratedContent {

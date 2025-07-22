@@ -71,11 +71,6 @@ async function generateText(
     generationOptions
   )
 
-  if (schema) {
-    const parsed = schema.parse(JSON.parse(response))
-    return parsed
-  }
-
   return response
 }
 

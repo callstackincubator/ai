@@ -36,7 +36,7 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
   async doGenerate(options: LanguageModelV1CallOptions) {
     const messages = this.convertMessages(options.prompt)
 
-    const text = await NativeAppleLLM.generateText(messages, {
+    const response = await NativeAppleLLM.generateText(messages, {
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       topP: options.topP,
@@ -44,7 +44,7 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
     })
 
     return {
-      text,
+      text: typeof response === 'string' ? response : JSON.stringify(response),
       finishReason: 'stop' as const,
       // Apple LLM doesn't provide token counts.
       // We will have to handle this ourselves in the future to avoid errors.
