@@ -15,6 +15,8 @@ enum AppleLLMError: Error, LocalizedError {
   case invalidMessage(String)
   case conflictingSamplingMethods
   case invalidSchema(String)
+  case toolCallError(Error)
+  case unknownToolCallError
   
   var errorDescription: String? {
     switch self {
@@ -32,7 +34,12 @@ enum AppleLLMError: Error, LocalizedError {
       return "Cannot specify both topP and topK parameters simultaneously. Please use only one sampling method."
     case .invalidSchema(let message):
       return "Invalid schema: \(message)"
+    case .toolCallError(let error):
+      return "Error calling tool: \(error.localizedDescription)"
+    case .unknownToolCallError:
+      return "Unknown tool call error"
     }
+    
   }
   
   var code: Int {
@@ -44,6 +51,8 @@ enum AppleLLMError: Error, LocalizedError {
     case .invalidMessage: return 5
     case .conflictingSamplingMethods: return 6
     case .invalidSchema: return 7
+    case .unknownToolCallError: return 8
+    case .toolCallError: return 9
     }
   }
 }

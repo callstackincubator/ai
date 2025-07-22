@@ -16,6 +16,7 @@ export interface AppleGenerationOptions {
   topP?: number
   topK?: number
   schema?: UnsafeObject
+  tools?: UnsafeObject
 }
 
 export type StreamUpdateEvent = {

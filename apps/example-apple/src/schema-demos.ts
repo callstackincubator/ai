@@ -1,16 +1,37 @@
 import { foundationModels } from '@react-native-ai/apple'
+import { tool } from 'ai'
 import { z } from 'zod'
 
 export async function basicStringDemo() {
   const schema = z
     .object({
-      value: z.string().describe('A simple text string'),
+      response: z.string(),
     })
     .describe('String response')
 
   return await foundationModels.generateText(
-    [{ role: 'user', content: 'Generate a city name' }],
-    { schema }
+    [
+      {
+        role: 'system',
+        content: `Help the person with getting weather information.`,
+      },
+      { role: 'user', content: 'Is it hotter in Wroclaw or in Warsaw?' },
+    ],
+    {
+      schema,
+      tools: {
+        getWeather: tool({
+          description: 'Get the weather for a given city',
+          parameters: z.object({
+            city: z.string().describe('The city to get the weather for'),
+          }),
+          execute: async (args) => {
+            const temperature = Math.floor(Math.random() * 20) + 10
+            return `Weather forecast for ${args.city}: ${temperature}°C`
+          },
+        }),
+      },
+    }
   )
 }
 
