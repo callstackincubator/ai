@@ -15,6 +15,7 @@ type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
 
 interface AppleProvider extends ProviderV2 {
   (): LanguageModelV2
+  isAvailable: () => boolean
 }
 
 export function createAppleProvider(tools: ToolSet): AppleProvider {
@@ -24,6 +25,7 @@ export function createAppleProvider(tools: ToolSet): AppleProvider {
   const provider = function () {
     return createLanguageModel()
   }
+  provider.isAvailable = () => NativeAppleLLM.isAvailable()
   provider.languageModel = createLanguageModel
   provider.textEmbeddingModel = () => {
     throw new Error('Text embedding models are not supported by Apple LLM')

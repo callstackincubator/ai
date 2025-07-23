@@ -11,12 +11,11 @@ import {
   View,
 } from 'react-native'
 
-import { type DemoKey, schemaDemos } from './schema-demos'
+import { apple, type DemoKey, schemaDemos } from './schema-demos'
 
 export default function App() {
   const [loading, setLoading] = useState<string | null>(null)
-  // todo: add it later
-  const isAvailable = true
+  const isAvailable = apple.isAvailable()
 
   const runDemo = async (key: DemoKey) => {
     if (loading) return

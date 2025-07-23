@@ -13,7 +13,7 @@ const getWeather = tool({
   },
 })
 
-const apple = createAppleProvider({
+export const apple = createAppleProvider({
   getWeather,
 })
 
