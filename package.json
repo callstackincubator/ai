@@ -38,7 +38,7 @@
     "apps/*",
     "website"
   ],
-  "packageManager": "bun@1.0.0",
+  "packageManager": "bun@1.2.19",
   "commitlint": {
     "extends": [
       "@commitlint/config-conventional"
