@@ -1,4 +1,4 @@
-import { foundationModels } from '@react-native-ai/apple'
+// import { foundationModels } from '@react-native-ai/apple'
 import { StatusBar } from 'expo-status-bar'
 import React, { useState } from 'react'
 import {
@@ -15,7 +15,8 @@ import { type DemoKey, schemaDemos } from './schema-demos'
 
 export default function App() {
   const [loading, setLoading] = useState<string | null>(null)
-  const isAvailable = foundationModels.isAvailable()
+  // todo: add it later
+  const isAvailable = true
 
   const runDemo = async (key: DemoKey) => {
     if (loading) return

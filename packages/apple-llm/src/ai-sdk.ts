@@ -1,20 +1,55 @@
-import {
-  type LanguageModelV1,
-  type LanguageModelV1CallOptions,
-  type LanguageModelV1Prompt,
+import type {
+  LanguageModelV2,
+  LanguageModelV2CallOptions,
+  LanguageModelV2FunctionTool,
+  LanguageModelV2Prompt,
+  LanguageModelV2ProviderDefinedTool,
+  ProviderV2,
 } from '@ai-sdk/provider'
+import { generateId, ToolSet } from 'ai'
 
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
-import { generateStream } from './streaming'
+import { generateStream } from './stream'
 
-export class AppleLLMChatLanguageModel implements LanguageModelV1 {
-  readonly specificationVersion = 'v1'
-  readonly defaultObjectGenerationMode = 'json'
+type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
+
+interface AppleProvider extends ProviderV2 {
+  (): LanguageModelV2
+}
+
+export function createAppleProvider(tools: ToolSet): AppleProvider {
+  const createLanguageModel = () => {
+    return new AppleLLMChatLanguageModel(tools)
+  }
+  const provider = function () {
+    return createLanguageModel()
+  }
+  provider.languageModel = createLanguageModel
+  provider.textEmbeddingModel = () => {
+    throw new Error('Text embedding models are not supported by Apple LLM')
+  }
+  provider.imageModel = () => {
+    throw new Error('Image generation models are not supported by Apple LLM')
+  }
+  return provider
+}
+
+export const apple = createAppleProvider({})
+
+class AppleLLMChatLanguageModel implements LanguageModelV2 {
+  readonly specificationVersion = 'v2'
+  readonly supportedUrls = {}
 
   readonly provider = 'apple-llm'
-  readonly modelId = 'default'
+  readonly modelId = 'system-default'
 
-  private convertMessages(messages: LanguageModelV1Prompt): AppleMessage[] {
+  private tools: ToolSet
+
+  constructor(tools: ToolSet) {
+    this.tools = tools
+  }
+
+  private prepareMessages(messages: LanguageModelV2Prompt): AppleMessage[] {
     return messages.map((message): AppleMessage => {
       const content = Array.isArray(message.content)
         ? message.content.reduce((acc, part) => {
@@ -33,37 +68,65 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
     })
   }
 
-  async doGenerate(options: LanguageModelV1CallOptions) {
-    const messages = this.convertMessages(options.prompt)
+  private prepareTools(tools: Tool[]) {
+    return tools.map((tool) => {
+      if (tool.type === 'function') {
+        return {
+          ...this.tools[tool.name],
+          ...tool,
+          id: generateId(),
+        }
+      }
+      throw new Error('Unsupported tool type')
+    })
+  }
+
+  async doGenerate(options: LanguageModelV2CallOptions) {
+    const messages = this.prepareMessages(options.prompt)
+    const tools = this.prepareTools(options.tools)
+
+    for (const tool of tools) {
+      globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
+    }
 
     const response = await NativeAppleLLM.generateText(messages, {
-      maxTokens: options.maxTokens,
+      maxTokens: options.maxOutputTokens,
       temperature: options.temperature,
       topP: options.topP,
       topK: options.topK,
+      tools,
+      schema:
+        options.responseFormat?.type === 'json'
+          ? options.responseFormat.schema
+          : undefined,
     })
 
+    for (const tool of tools) {
+      globalThis.__APPLE_LLM_TOOLS__[tool.id] = undefined
+    }
+
     return {
-      text: typeof response === 'string' ? response : JSON.stringify(response),
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify(response),
+        },
+      ],
       finishReason: 'stop' as const,
-      // Apple LLM doesn't provide token counts.
-      // We will have to handle this ourselves in the future to avoid errors.
       usage: {
-        promptTokens: 0,
-        completionTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
       },
-      rawCall: {
-        rawPrompt: options.prompt,
-        rawSettings: {},
-      },
+      warnings: [],
     }
   }
 
-  async doStream(options: LanguageModelV1CallOptions) {
-    const messages = this.convertMessages(options.prompt)
+  async doStream(options: LanguageModelV2CallOptions) {
+    const messages = this.prepareMessages(options.prompt)
 
     const stream = generateStream(messages, {
-      maxTokens: options.maxTokens,
+      maxTokens: options.maxOutputTokens,
       temperature: options.temperature,
       topP: options.topP,
       topK: options.topK,
@@ -78,3 +141,9 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
     }
   }
 }
+
+declare global {
+  var __APPLE_LLM_TOOLS__: Record<string, Function>
+}
+
+globalThis.__APPLE_LLM_TOOLS__ = {}
