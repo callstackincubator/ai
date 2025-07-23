@@ -4,14 +4,15 @@ import type {
   LanguageModelV2FunctionTool,
   LanguageModelV2Prompt,
   LanguageModelV2ProviderDefinedTool,
+  LanguageModelV2StreamPart,
   ProviderV2,
 } from '@ai-sdk/provider'
-import { generateId, ToolSet } from 'ai'
+import { generateId, type Tool as ToolDefinition } from '@ai-sdk/provider-utils'
 
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
-import { generateStream } from './stream'
 
 type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
+type ToolSet = Record<string, ToolDefinition>
 
 interface AppleProvider extends ProviderV2 {
   (): LanguageModelV2
@@ -73,10 +74,14 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
   private prepareTools(tools: Tool[]) {
     return tools.map((tool) => {
       if (tool.type === 'function') {
+        const toolDefinition = this.tools[tool.name]
+        if (!toolDefinition) {
+          throw new Error(`Tool ${tool.name} not found`)
+        }
         return {
-          ...this.tools[tool.name],
           ...tool,
           id: generateId(),
+          execute: toolDefinition.execute,
         }
       }
       throw new Error('Unsupported tool type')
@@ -127,11 +132,83 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
   async doStream(options: LanguageModelV2CallOptions) {
     const messages = this.prepareMessages(options.prompt)
 
-    const stream = generateStream(messages, {
-      maxTokens: options.maxOutputTokens,
-      temperature: options.temperature,
-      topP: options.topP,
-      topK: options.topK,
+    if (typeof ReadableStream === 'undefined') {
+      throw new Error(
+        `ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.`
+      )
+    }
+
+    let streamId: string | null = null
+    let listeners: { remove(): void }[] = []
+
+    const cleanup = () => {
+      listeners.forEach((listener) => listener.remove())
+      listeners = []
+    }
+
+    const stream = new ReadableStream<LanguageModelV2StreamPart>({
+      async start(controller) {
+        try {
+          streamId = NativeAppleLLM.generateStream(messages, options)
+
+          controller.enqueue({
+            type: 'text-start',
+            id: streamId,
+          })
+
+          const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
+            if (data.streamId === streamId) {
+              controller.enqueue({
+                type: 'text-delta',
+                delta: data.content,
+                id: data.streamId,
+              })
+            }
+          })
+
+          const completeListener = NativeAppleLLM.onStreamComplete((data) => {
+            if (data.streamId === streamId) {
+              controller.enqueue({
+                type: 'text-end',
+                id: streamId,
+              })
+              controller.enqueue({
+                type: 'finish',
+                finishReason: 'stop',
+                usage: {
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  totalTokens: 0,
+                },
+              })
+              cleanup()
+              controller.close()
+            }
+          })
+
+          const errorListener = NativeAppleLLM.onStreamError((data) => {
+            if (data.streamId === streamId) {
+              controller.enqueue({
+                type: 'error',
+                error: data.error,
+              })
+              cleanup()
+              controller.close()
+            }
+          })
+
+          listeners = [updateListener, completeListener, errorListener]
+        } catch (error) {
+          cleanup()
+          controller.error(new Error(`Apple LLM stream failed: ${error}`))
+        }
+      },
+      cancel() {
+        cleanup()
+        if (streamId) {
+          NativeAppleLLM.cancelStream(streamId)
+        }
+      },
     })
 
     return {
