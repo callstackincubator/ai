@@ -1,8 +1,9 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
       "@react-native-ai/apple": ["../../packages/apple-llm/src"]
     }
-  }
+  },
+  "include": ["src/**/*"]
 }
