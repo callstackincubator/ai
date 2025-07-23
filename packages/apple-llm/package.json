@@ -24,7 +24,8 @@
     "react-native": "^0.80.0"
   },
   "devDependencies": {
-    "react-native": "0.80.0"
+    "react-native": "0.80.0",
+    "@types/node": "^22"
   },
   "react-native-builder-bob": {
     "source": "src",
