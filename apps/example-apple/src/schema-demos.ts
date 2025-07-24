@@ -1,5 +1,11 @@
 import { createAppleProvider } from '@react-native-ai/apple'
-import { generateObject, generateText, tool } from 'ai'
+import {
+  generateObject,
+  generateText,
+  streamObject,
+  streamText,
+  tool,
+} from 'ai'
 import { z } from 'zod'
 
 const getWeather = tool({
@@ -28,6 +34,17 @@ export async function basicStringDemo() {
       getWeather,
     },
   })
+  // const response = streamObject({
+  //   model: apple(),
+  //   system: `Help the person with getting weather information.`,
+  //   prompt: 'What is the weather in Wroclaw?',
+  //   schema: z.object({
+  //     essey: z
+  //       .string()
+  //       .describe('The 500 characters long answer to user question'),
+  //     length: z.number().describe('The length of the answer'),
+  //   }),
+  // })
   return response.text
 }
 

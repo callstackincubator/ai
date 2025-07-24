@@ -185,20 +185,39 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
         try {
-          streamId = NativeAppleLLM.generateStream(messages, options)
+          const schema =
+            options.responseFormat?.type === 'json'
+              ? options.responseFormat.schema
+              : undefined
+
+          streamId = NativeAppleLLM.generateStream(messages, {
+            maxTokens: options.maxOutputTokens,
+            temperature: options.temperature,
+            topP: options.topP,
+            topK: options.topK,
+            schema,
+          })
 
           controller.enqueue({
             type: 'text-start',
             id: streamId,
           })
 
+          let previousContent = ''
+
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
             if (data.streamId === streamId) {
-              controller.enqueue({
-                type: 'text-delta',
-                delta: data.content,
-                id: data.streamId,
-              })
+              if (schema) {
+                // TODO: Different handling of incoming partially generated objects
+              } else {
+                const delta = data.content.slice(previousContent.length)
+                controller.enqueue({
+                  type: 'text-delta',
+                  delta,
+                  id: data.streamId,
+                })
+                previousContent = data.content
+              }
             }
           })
 
