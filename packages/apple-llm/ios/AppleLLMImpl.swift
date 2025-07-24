@@ -69,11 +69,10 @@ public class AppleLLMImpl: NSObject {
              let schema = schemaObj as? [String: Any] {
             let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schema)
             let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
-            
-            resolve(try response.content.toDictionary(using: schema))
+            resolve(try response.toModelMessages())
           } else {
             let response = try await session.respond(to: userPrompt, options: generationOptions)
-            resolve(response.content)
+            resolve(try response.toModelMessages())
           }
         } catch {
           reject("AppleLLM", error.localizedDescription, error)
@@ -506,10 +505,79 @@ public class AppleLLMImpl: NSObject {
     
   }
   
-  #endif
+#endif
 }
 
 #if canImport(FoundationModels)
+
+@available(iOS 26, *)
+extension LanguageModelSession.Response {
+  func toModelMessages() throws -> [[String: Any]] {
+    return try transcriptEntries.flatMap { entry -> [[String: Any]] in
+      switch entry {
+      case .response(let response):
+        return [["type": "text", "text": try response.segments.rawValue()]]
+      case .toolCalls(let calls):
+        return try calls.compactMap { toolCall in
+          return ["type": "tool-call", "toolName": toolCall.toolName, "input": try toolCall.rawValue()]
+        }
+      case .toolOutput(let toolCall):
+        return [["type": "tool-result", "toolName": toolCall.toolName, "output": try toolCall.segments.rawValue()]]
+      case .instructions, .prompt:
+        return []
+      default:
+        return []
+      }
+    }
+  }
+}
+
+@available(iOS 26, *)
+extension Array<Transcript.Segment> {
+  enum SegmentExtractionError: Error {
+    case noSegments
+    case notAStructuredSegment
+    case rawValueNotFound
+  }
+  
+  func rawValue() throws -> String {
+    guard let lastSegment = last else {
+      throw SegmentExtractionError.noSegments
+    }
+    
+    if case let .text(textSegment) = lastSegment {
+      return textSegment.content
+    }
+    
+    guard case let .structure(structureSegment) = lastSegment else {
+      throw SegmentExtractionError.notAStructuredSegment
+    }
+    
+    for child in Mirror(reflecting: structureSegment).children {
+      if child.label == "rawValue", let rawValue = child.value as? String {
+        return rawValue
+      }
+    }
+    
+    throw SegmentExtractionError.rawValueNotFound
+  }
+}
+
+@available(iOS 26, *)
+extension Transcript.ToolCall {
+  enum ToolCallExtractionError: Error {
+    case rawValueNotFound
+  }
+  
+  func rawValue() throws -> String {
+    for child in Mirror(reflecting: self).children {
+      if child.label == "rawArguments", let rawValue = child.value as? String {
+        return rawValue
+      }
+    }
+    throw ToolCallExtractionError.rawValueNotFound
+  }
+}
 
 @available(iOS 26, *)
 extension GeneratedContent {

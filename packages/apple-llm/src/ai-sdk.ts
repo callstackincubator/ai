@@ -20,6 +20,11 @@ interface AppleProvider extends ProviderV2 {
 }
 
 export function createAppleProvider(tools: ToolSet): AppleProvider {
+  if (typeof structuredClone === 'undefined') {
+    throw new Error(
+      'structuredClone is not available in this environment. Please load a polyfill, such as @ungap/structured-clone.'
+    )
+  }
   const createLanguageModel = () => {
     return new AppleLLMChatLanguageModel(tools)
   }
@@ -113,12 +118,26 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     }
 
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify(response),
-        },
-      ],
+      content: response.map((part) => {
+        switch (part.type) {
+          case 'text':
+            return part
+          case 'tool-call':
+            return {
+              type: 'tool-call' as const,
+              toolCallId: '',
+              toolName: part.toolName,
+              input: part.input,
+            }
+          case 'tool-result':
+            return {
+              type: 'tool-result' as const,
+              toolCallId: '',
+              toolName: part.toolName,
+              result: part.output,
+            }
+        }
+      }),
       finishReason: 'stop' as const,
       usage: {
         inputTokens: 0,
