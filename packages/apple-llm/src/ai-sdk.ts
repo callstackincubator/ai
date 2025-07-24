@@ -7,7 +7,13 @@ import type {
   LanguageModelV2StreamPart,
   ProviderV2,
 } from '@ai-sdk/provider'
-import { generateId, type Tool as ToolDefinition } from '@ai-sdk/provider-utils'
+import {
+  generateId,
+  jsonSchema,
+  parseJSON,
+  type Tool as ToolDefinition,
+  ToolCallOptions,
+} from '@ai-sdk/provider-utils'
 
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
 
@@ -20,6 +26,11 @@ interface AppleProvider extends ProviderV2 {
 }
 
 export function createAppleProvider(tools: ToolSet): AppleProvider {
+  if (typeof structuredClone === 'undefined') {
+    throw new Error(
+      'structuredClone is not available in this environment. Please load a polyfill, such as @ungap/structured-clone.'
+    )
+  }
   const createLanguageModel = () => {
     return new AppleLLMChatLanguageModel(tools)
   }
@@ -78,10 +89,17 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
         if (!toolDefinition) {
           throw new Error(`Tool ${tool.name} not found`)
         }
+        const schema = jsonSchema(tool.inputSchema)
         return {
           ...tool,
           id: generateId(),
-          execute: toolDefinition.execute,
+          execute: async (modelInput: any, opts: ToolCallOptions) => {
+            const toolCallArguments = await parseJSON({
+              text: modelInput,
+              schema,
+            })
+            return toolDefinition.execute(toolCallArguments, opts)
+          },
         }
       }
       throw new Error('Unsupported tool type')
@@ -113,12 +131,26 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     }
 
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify(response),
-        },
-      ],
+      content: response.map((part) => {
+        switch (part.type) {
+          case 'text':
+            return part
+          case 'tool-call':
+            return {
+              type: 'tool-call' as const,
+              toolCallId: '',
+              toolName: part.toolName,
+              input: part.input,
+            }
+          case 'tool-result':
+            return {
+              type: 'tool-result' as const,
+              toolCallId: '',
+              toolName: part.toolName,
+              result: part.output,
+            }
+        }
+      }),
       finishReason: 'stop' as const,
       usage: {
         inputTokens: 0,
