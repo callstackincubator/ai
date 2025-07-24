@@ -4,5 +4,6 @@
     "paths": {
       "@react-native-ai/apple": ["../../packages/apple-llm/src"]
     }
-  }
+  },
+  "include": ["src/**/*"]
 }
