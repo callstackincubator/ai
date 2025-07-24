@@ -1,16 +1,26 @@
 # Apple LLM
 
-Use Apple's local LLM functionality (Apple Intelligence) in React Native. Standalone, or with Vercel AI SDK.
+Use Apple's local LLM functionality (Apple Intelligence) in React Native, with Vercel AI SDK.
+
+```ts
+import { apple } from '@react-native-ai/apple'
+import { generateText } from 'ai'
+
+await generateText({
+  model: apple(),
+  prompt: 'What is the meaning of life?'
+})
+```
 
 ## Features
 
 ### Supported
 - Text generation
-- Streaming
-- Structured output (JSON Schema via Zod)
-
-### Coming Soon
+- Structured output
 - Tool calling
+
+### Cooming soon
+- Streaming
 
 ## Read more 
 

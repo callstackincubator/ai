@@ -1,20 +1,58 @@
-import {
-  type LanguageModelV1,
-  type LanguageModelV1CallOptions,
-  type LanguageModelV1Prompt,
+import type {
+  LanguageModelV2,
+  LanguageModelV2CallOptions,
+  LanguageModelV2FunctionTool,
+  LanguageModelV2Prompt,
+  LanguageModelV2ProviderDefinedTool,
+  LanguageModelV2StreamPart,
+  ProviderV2,
 } from '@ai-sdk/provider'
+import { generateId, type Tool as ToolDefinition } from '@ai-sdk/provider-utils'
 
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
-import { generateStream } from './streaming'
 
-export class AppleLLMChatLanguageModel implements LanguageModelV1 {
-  readonly specificationVersion = 'v1'
-  readonly defaultObjectGenerationMode = 'json'
+type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
+type ToolSet = Record<string, ToolDefinition>
+
+interface AppleProvider extends ProviderV2 {
+  (): LanguageModelV2
+  isAvailable: () => boolean
+}
+
+export function createAppleProvider(tools: ToolSet): AppleProvider {
+  const createLanguageModel = () => {
+    return new AppleLLMChatLanguageModel(tools)
+  }
+  const provider = function () {
+    return createLanguageModel()
+  }
+  provider.isAvailable = () => NativeAppleLLM.isAvailable()
+  provider.languageModel = createLanguageModel
+  provider.textEmbeddingModel = () => {
+    throw new Error('Text embedding models are not supported by Apple LLM')
+  }
+  provider.imageModel = () => {
+    throw new Error('Image generation models are not supported by Apple LLM')
+  }
+  return provider
+}
+
+export const apple = createAppleProvider({})
+
+class AppleLLMChatLanguageModel implements LanguageModelV2 {
+  readonly specificationVersion = 'v2'
+  readonly supportedUrls = {}
 
   readonly provider = 'apple-llm'
-  readonly modelId = 'default'
+  readonly modelId = 'system-default'
 
-  private convertMessages(messages: LanguageModelV1Prompt): AppleMessage[] {
+  private tools: ToolSet
+
+  constructor(tools: ToolSet) {
+    this.tools = tools
+  }
+
+  private prepareMessages(messages: LanguageModelV2Prompt): AppleMessage[] {
     return messages.map((message): AppleMessage => {
       const content = Array.isArray(message.content)
         ? message.content.reduce((acc, part) => {
@@ -33,40 +71,144 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
     })
   }
 
-  async doGenerate(options: LanguageModelV1CallOptions) {
-    const messages = this.convertMessages(options.prompt)
+  private prepareTools(tools: Tool[] = []) {
+    return tools.map((tool) => {
+      if (tool.type === 'function') {
+        const toolDefinition = this.tools[tool.name]
+        if (!toolDefinition) {
+          throw new Error(`Tool ${tool.name} not found`)
+        }
+        return {
+          ...tool,
+          id: generateId(),
+          execute: toolDefinition.execute,
+        }
+      }
+      throw new Error('Unsupported tool type')
+    })
+  }
+
+  async doGenerate(options: LanguageModelV2CallOptions) {
+    const messages = this.prepareMessages(options.prompt)
+    const tools = this.prepareTools(options.tools)
+
+    for (const tool of tools) {
+      globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
+    }
 
     const response = await NativeAppleLLM.generateText(messages, {
-      maxTokens: options.maxTokens,
+      maxTokens: options.maxOutputTokens,
       temperature: options.temperature,
       topP: options.topP,
       topK: options.topK,
+      tools,
+      schema:
+        options.responseFormat?.type === 'json'
+          ? options.responseFormat.schema
+          : undefined,
     })
 
+    for (const tool of tools) {
+      globalThis.__APPLE_LLM_TOOLS__[tool.id] = undefined
+    }
+
     return {
-      text: typeof response === 'string' ? response : JSON.stringify(response),
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify(response),
+        },
+      ],
       finishReason: 'stop' as const,
-      // Apple LLM doesn't provide token counts.
-      // We will have to handle this ourselves in the future to avoid errors.
       usage: {
-        promptTokens: 0,
-        completionTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
       },
-      rawCall: {
-        rawPrompt: options.prompt,
-        rawSettings: {},
-      },
+      warnings: [],
     }
   }
 
-  async doStream(options: LanguageModelV1CallOptions) {
-    const messages = this.convertMessages(options.prompt)
+  async doStream(options: LanguageModelV2CallOptions) {
+    const messages = this.prepareMessages(options.prompt)
 
-    const stream = generateStream(messages, {
-      maxTokens: options.maxTokens,
-      temperature: options.temperature,
-      topP: options.topP,
-      topK: options.topK,
+    if (typeof ReadableStream === 'undefined') {
+      throw new Error(
+        `ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.`
+      )
+    }
+
+    let streamId: string | null = null
+    let listeners: { remove(): void }[] = []
+
+    const cleanup = () => {
+      listeners.forEach((listener) => listener.remove())
+      listeners = []
+    }
+
+    const stream = new ReadableStream<LanguageModelV2StreamPart>({
+      async start(controller) {
+        try {
+          streamId = NativeAppleLLM.generateStream(messages, options)
+
+          controller.enqueue({
+            type: 'text-start',
+            id: streamId,
+          })
+
+          const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
+            if (data.streamId === streamId) {
+              controller.enqueue({
+                type: 'text-delta',
+                delta: data.content,
+                id: data.streamId,
+              })
+            }
+          })
+
+          const completeListener = NativeAppleLLM.onStreamComplete((data) => {
+            if (data.streamId === streamId) {
+              controller.enqueue({
+                type: 'text-end',
+                id: streamId,
+              })
+              controller.enqueue({
+                type: 'finish',
+                finishReason: 'stop',
+                usage: {
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  totalTokens: 0,
+                },
+              })
+              cleanup()
+              controller.close()
+            }
+          })
+
+          const errorListener = NativeAppleLLM.onStreamError((data) => {
+            if (data.streamId === streamId) {
+              controller.enqueue({
+                type: 'error',
+                error: data.error,
+              })
+              cleanup()
+              controller.close()
+            }
+          })
+
+          listeners = [updateListener, completeListener, errorListener]
+        } catch (error) {
+          cleanup()
+          controller.error(new Error(`Apple LLM stream failed: ${error}`))
+        }
+      },
+      cancel() {
+        cleanup()
+        if (streamId) {
+          NativeAppleLLM.cancelStream(streamId)
+        }
+      },
     })
 
     return {
@@ -78,3 +220,9 @@ export class AppleLLMChatLanguageModel implements LanguageModelV1 {
     }
   }
 }
+
+declare global {
+  var __APPLE_LLM_TOOLS__: Record<string, Function>
+}
+
+globalThis.__APPLE_LLM_TOOLS__ = {}

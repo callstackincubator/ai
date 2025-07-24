@@ -16,7 +16,8 @@
     "prepare": "bob build"
   },
   "dependencies": {
-    "@ai-sdk/provider": "^1.1.3",
+    "@ai-sdk/provider": "^2.0.0-beta.1",
+    "@ai-sdk/provider-utils": "^3.0.0-beta.5",
     "zod": "^4.0.0"
   },
   "peerDependencies": {

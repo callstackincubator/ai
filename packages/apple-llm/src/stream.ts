@@ -1,4 +1,4 @@
-import type { LanguageModelV1StreamPart } from '@ai-sdk/provider'
+import type { LanguageModelV2StreamPart } from '@ai-sdk/provider'
 
 import NativeAppleLLMSpec, {
   type AppleGenerationOptions,
@@ -8,7 +8,7 @@ import NativeAppleLLMSpec, {
 export function generateStream(
   messages: AppleMessage[],
   options: AppleGenerationOptions = {}
-): ReadableStream<LanguageModelV1StreamPart> {
+): ReadableStream<LanguageModelV2StreamPart> {
   if (typeof ReadableStream === 'undefined') {
     throw new Error(
       `ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.`
@@ -23,16 +23,22 @@ export function generateStream(
     listeners = []
   }
 
-  const stream = new ReadableStream<LanguageModelV1StreamPart>({
+  const stream = new ReadableStream<LanguageModelV2StreamPart>({
     async start(controller) {
       try {
         streamId = NativeAppleLLMSpec.generateStream(messages, options)
+
+        controller.enqueue({
+          type: 'text-start',
+          id: streamId,
+        })
 
         const updateListener = NativeAppleLLMSpec.onStreamUpdate((data) => {
           if (data.streamId === streamId) {
             controller.enqueue({
               type: 'text-delta',
-              textDelta: data.content,
+              delta: data.content,
+              id: data.streamId,
             })
           }
         })
@@ -40,11 +46,16 @@ export function generateStream(
         const completeListener = NativeAppleLLMSpec.onStreamComplete((data) => {
           if (data.streamId === streamId) {
             controller.enqueue({
+              type: 'text-end',
+              id: streamId,
+            })
+            controller.enqueue({
               type: 'finish',
               finishReason: 'stop',
               usage: {
-                promptTokens: 0,
-                completionTokens: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
               },
             })
             cleanup()
