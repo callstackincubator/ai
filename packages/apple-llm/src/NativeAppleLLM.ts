@@ -38,7 +38,21 @@ export interface Spec extends TurboModule {
   generateText(
     messages: AppleMessage[],
     options: AppleGenerationOptions
-  ): Promise<string | UnsafeObject>
+  ): Promise<
+    (
+      | { type: 'text'; text: string }
+      | {
+          type: 'tool-call'
+          toolName: string
+          input: string
+        }
+      | {
+          type: 'tool-result'
+          toolName: string
+          output: string
+        }
+    )[]
+  >
   generateStream(
     messages: AppleMessage[],
     options: AppleGenerationOptions
