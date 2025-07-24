@@ -52,10 +52,22 @@ const result = await generateText({
 });
 ```
 
-## Inspecting
+## Inspecting Tool Calls
 
-You can inspect various details with: [tbd]
-```ts
-result.toolCalls
-result.toolResults
+You can inspect tool calls and their results after generation:
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  prompt: 'What is the weather in Paris?',
+  tools: { getWeather }
+});
+
+// Inspect tool calls made during generation
+console.log(result.toolCalls);
+// Example: [{ toolCallId: '<< redacted >>', toolName: 'getWeather', input: '{"city":"Paris"}' }]
+
+// Inspect tool results returned
+console.log(result.toolResults);  
+// Example: [{ toolCallId: '<< redacted >>', toolName: 'getWeather', result: 'Weather in Paris: Sunny, 25°C' }]
 ```

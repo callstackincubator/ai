@@ -42,7 +42,20 @@ console.log(result.object);
 
 ### Supported features
 
-[tbd - what is supported, what is not?]
+We aim to cover most of the OpenAI supported formats, including the following:
+
+- **Objects**: `z.object({})` with nested properties
+- **Arrays**: `z.array()` with `minItems` and `maxItems` constraints
+- **Strings**: `z.string()`
+- **Numbers**: `z.number()` with `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`
+- **Booleans**: `z.boolean()`
+- **Enums**: `z.enum([])` for string and number values
+
+The following features are currently not supported due to underlying model limitations:
+
+- **String formats**: `email()`, `url()`, `uuid()`, `datetime()` etc.
+- **Regular expressions**: Due to a
+- **Unions**: `z.union()`, `z.discriminatedUnion()`
 
 ## Availability Check
 

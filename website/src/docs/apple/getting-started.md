@@ -17,7 +17,7 @@ npm install @react-native-ai/apple ai@beta
 - **React Native New Architecture** - Required for native module functionality
 - **Vercel AI SDK v5** - This provider requires AI SDK v5 or later
 
-> ![IMPORTANT]
+> [!IMPORTANT]
 > You must install required polyfills as explained in the [Vercel AI documentation](https://v5.ai-sdk.dev/docs/getting-started/expo#polyfills).
 
 ## Basic Usage
