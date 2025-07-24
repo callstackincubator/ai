@@ -48,21 +48,6 @@ export async function basicStringStreamingDemo() {
   return response.text
 }
 
-// export async function basicObjectStreamingDemo() {
-//   const response = streamObject({
-//     model: apple(),
-//     prompt: 'Write me short essay on the meaning of life',
-//     schema: z.object({
-//       essay: z.string().describe('The essay'),
-//       length: z.number().describe('The length of the essay'),
-//     }),
-//   })
-//   for await (const chunk of response.partialObjectStream) {
-//     console.log(chunk)
-//   }
-//   return response.object
-// }
-
 export async function colorEnumDemo() {
   const response = await generateObject({
     model: apple(),
@@ -139,10 +124,6 @@ export const schemaDemos = {
     name: 'String Streaming',
     func: basicStringStreamingDemo,
   },
-  // basicObjectStreaming: {
-  //   name: 'Object Streaming',
-  //   func: basicObjectStreamingDemo,
-  // },
   colorEnum: { name: 'Enum', func: colorEnumDemo },
   basicNumber: { name: 'Number', func: basicNumberDemo },
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },

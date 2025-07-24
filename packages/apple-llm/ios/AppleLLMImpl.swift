@@ -126,7 +126,7 @@ public class AppleLLMImpl: NSObject {
               options: generationOptions
             )
             for try await chunk in responseStream {
-              onUpdate(streamId, String(reflecting: chunk))
+              onUpdate(streamId, String(reflecting: chunk.generatedContent))
             }
           } else {
             let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
