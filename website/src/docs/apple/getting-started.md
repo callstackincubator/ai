@@ -1,29 +1,35 @@
 # Getting Started
 
-Use Apple's local LLM functionality (Apple Intelligence) in React Native. Standalone, or with Vercel AI SDK.
+The Apple provider enables you to use Apple Foundation Models with the Vercel AI SDK in React Native applications.
 
 ## Installation
 
+Install the Apple provider and required dependencies
+
 ```bash
-npm install @react-native-ai/apple
+npm install @react-native-ai/apple ai@beta
 ```
 
-### Requirements
+## Requirements
 
-- React Native New Architecture
-- iOS 26+
-- Apple Intelligence enabled device
+- **iOS 26+** - Apple Foundation Models require iOS 26 or later
+- **Apple Intelligence enabled device** - Device must support Apple Intelligence
+- **React Native New Architecture** - Required for native module functionality
+- **Vercel AI SDK v5** - This provider requires AI SDK v5 or later
 
-## Usage
+> [!NOTE]
+> You must install required polyfills as explained in the [Vercel AI documentation](https://v5.ai-sdk.dev/docs/getting-started/expo#polyfills).
+
+## Basic Usage
+
+Import the Apple provider and use it with the AI SDK:
 
 ```typescript
-import { foundationModels } from '@react-native-ai/apple';
+import { apple } from '@react-native-ai/apple';
+import { generateText } from 'ai';
 
-const response = await foundationModels.generateText([
-  { role: 'user', content: 'Explain quantum computing in simple terms' }
-]);
+const result = await generateText({
+  model: apple(),
+  prompt: 'Explain quantum computing in simple terms'
+});
 ```
-
-## Next Steps
-
-Continue reading to learn more about generating text, streaming responses, and integrating with the Vercel AI SDK.

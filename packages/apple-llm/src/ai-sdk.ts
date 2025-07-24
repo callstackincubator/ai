@@ -25,14 +25,18 @@ interface AppleProvider extends ProviderV2 {
   isAvailable: () => boolean
 }
 
-export function createAppleProvider(tools: ToolSet): AppleProvider {
+export function createAppleProvider({
+  availableTools,
+}: {
+  availableTools?: ToolSet
+} = {}): AppleProvider {
   if (typeof structuredClone === 'undefined') {
     throw new Error(
       'structuredClone is not available in this environment. Please load a polyfill, such as @ungap/structured-clone.'
     )
   }
   const createLanguageModel = () => {
-    return new AppleLLMChatLanguageModel(tools)
+    return new AppleLLMChatLanguageModel(availableTools)
   }
   const provider = function () {
     return createLanguageModel()
@@ -48,7 +52,7 @@ export function createAppleProvider(tools: ToolSet): AppleProvider {
   return provider
 }
 
-export const apple = createAppleProvider({})
+export const apple = createAppleProvider()
 
 class AppleLLMChatLanguageModel implements LanguageModelV2 {
   readonly specificationVersion = 'v2'
@@ -59,7 +63,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
 
   private tools: ToolSet
 
-  constructor(tools: ToolSet) {
+  constructor(tools: ToolSet = {}) {
     this.tools = tools
   }
 

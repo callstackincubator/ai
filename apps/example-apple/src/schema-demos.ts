@@ -14,7 +14,9 @@ const getWeather = tool({
 })
 
 export const apple = createAppleProvider({
-  getWeather,
+  availableTools: {
+    getWeather,
+  },
 })
 
 export async function basicStringDemo() {
