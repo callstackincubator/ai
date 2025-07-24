@@ -175,18 +175,18 @@ public class AppleLLMImpl: NSObject {
   
   @available(iOS 26, *)
   private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {
-    guard let toolsObj = options["tools"], !(toolsObj is NSNull),
-          let toolsDict = toolsObj as? [String: [String: Any]] else {
+    guard let toolsDict = options["tools"] as? [[String: Any]] else {
       return []
     }
     
     var tools: [any Tool] = []
     
-    for (toolId, toolDef) in toolsDict {
-      guard let name = toolDef["name"] as? String,
+    for toolDef in toolsDict {
+      guard let toolId = toolDef["id"] as? String,
+            let name = toolDef["name"] as? String,
             let description = toolDef["description"] as? String?,
-            let parameters = toolDef["parameters"] as? [String: Any]? else {
-        throw AppleLLMError.invalidSchema("Invalid tool definition for \(toolId)")
+            let parameters = toolDef["inputSchema"] as? [String: Any]? else {
+        throw AppleLLMError.invalidSchema("Invalid tool definition: \(toolsDict)")
       }
       
       let tool = try JSITool(

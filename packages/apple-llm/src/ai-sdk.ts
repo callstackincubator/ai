@@ -71,7 +71,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     })
   }
 
-  private prepareTools(tools: Tool[]) {
+  private prepareTools(tools: Tool[] = []) {
     return tools.map((tool) => {
       if (tool.type === 'function') {
         const toolDefinition = this.tools[tool.name]
