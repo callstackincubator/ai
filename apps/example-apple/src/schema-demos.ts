@@ -3,7 +3,7 @@ import { generateObject, generateText, tool } from 'ai'
 import { z } from 'zod'
 
 const getWeather = tool({
-  description: 'Get the weather for a given city',
+  description: 'Retrieve the weather for a given city',
   inputSchema: z.object({
     city: z.string().describe('The city to get the weather for'),
   }),
@@ -21,7 +21,7 @@ export async function basicStringDemo() {
   const response = await generateText({
     model: apple(),
     system: `Help the person with getting weather information.`,
-    prompt: 'Is it hotter in Wroclaw or in Warsaw?',
+    prompt: 'What is the weather in Wroclaw?',
     tools: {
       getWeather,
     },

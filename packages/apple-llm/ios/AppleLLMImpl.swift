@@ -65,7 +65,7 @@ public class AppleLLMImpl: NSObject {
           
           let generationOptions = try self.createGenerationOptions(from: options)
           
-          if let schemaObj = options["schema"], !(schemaObj is NSNull),
+          if let schemaObj = options["schema"],
              let schema = schemaObj as? [String: Any] {
             let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schema)
             let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
@@ -310,7 +310,7 @@ public class AppleLLMImpl: NSObject {
       self.parameters = try AppleLLMSchemaParser.createGenerationSchema(from: parameters)
     }
     
-    func call(arguments: GeneratedContent) async throws -> ToolOutput {
+    func call(arguments: GeneratedContent) async throws -> String {
       let argsDict = try arguments.toDictionary(using: schemaDict)
       
       return try await withCheckedThrowingContinuation { continuation in
@@ -318,7 +318,11 @@ public class AppleLLMImpl: NSObject {
           if let error = error {
             continuation.resume(throwing: AppleLLMError.toolCallError(error))
           } else if let output = result as? String {
-            continuation.resume(returning: ToolOutput(output))
+            continuation.resume(returning: output)
+          } else if let result,
+                    let encodedData = try? JSONSerialization.data(withJSONObject: result, options: .prettyPrinted),
+                    let jsonString = String(data: encodedData, encoding: .utf8) {
+            continuation.resume(returning: jsonString)
           } else {
             continuation.resume(throwing: AppleLLMError.unknownToolCallError)
           }
