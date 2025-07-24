@@ -1,11 +1,5 @@
 import { createAppleProvider } from '@react-native-ai/apple'
-import {
-  generateObject,
-  generateText,
-  streamObject,
-  streamText,
-  tool,
-} from 'ai'
+import { generateObject, generateText, Output, streamText, tool } from 'ai'
 import { z } from 'zod'
 
 const getWeather = tool({
