@@ -143,6 +143,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
             return {
               type: 'tool-call' as const,
               toolCallId: '',
+              providerExecuted: true,
               toolName: part.toolName,
               input: part.input,
             }
@@ -150,6 +151,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
             return {
               type: 'tool-result' as const,
               toolCallId: '',
+              providerExecuted: true,
               toolName: part.toolName,
               result: part.output,
             }
