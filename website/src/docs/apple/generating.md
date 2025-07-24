@@ -40,6 +40,27 @@ console.log(result.object);
 // Result is properly typed: { name: string, age: number, email: string, occupation: string }
 ```
 
+### Tool calling
+
+You can also use [`experimental_output`](https://v5.ai-sdk.dev/docs/reference/ai-sdk-core/generate-text#experimental_output) to generate structured output with `generateText`. This is useful when you want to perform tool calls at the same time.
+
+```typescript
+const response = await generateText({
+  model: apple(),
+  system: `Help the person with getting weather information.`,
+  prompt: 'What is the weather in Wroclaw?',
+  tools: {
+    getWeather,
+  },
+  experimental_output: Output.object({
+    schema: z.object({
+      weather: z.string(),
+      city: z.string(),
+    }),
+  }),
+})
+```
+
 ### Supported features
 
 We aim to cover most of the OpenAI supported formats, including the following:
