@@ -174,6 +174,15 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
       )
     }
 
+    const schema =
+      options.responseFormat?.type === 'json'
+        ? options.responseFormat.schema
+        : undefined
+
+    if (schema) {
+      throw new Error('Streaming JSON responses is not yet supported.')
+    }
+
     let streamId: string | null = null
     let listeners: { remove(): void }[] = []
 
@@ -185,11 +194,6 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
         try {
-          const schema =
-            options.responseFormat?.type === 'json'
-              ? options.responseFormat.schema
-              : undefined
-
           streamId = NativeAppleLLM.generateStream(messages, {
             maxTokens: options.maxOutputTokens,
             temperature: options.temperature,
@@ -207,17 +211,13 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
 
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
             if (data.streamId === streamId) {
-              if (schema) {
-                // TODO: Different handling of incoming partially generated objects
-              } else {
-                const delta = data.content.slice(previousContent.length)
-                controller.enqueue({
-                  type: 'text-delta',
-                  delta,
-                  id: data.streamId,
-                })
-                previousContent = data.content
-              }
+              const delta = data.content.slice(previousContent.length)
+              controller.enqueue({
+                type: 'text-delta',
+                delta,
+                id: data.streamId,
+              })
+              previousContent = data.content
             }
           })
 

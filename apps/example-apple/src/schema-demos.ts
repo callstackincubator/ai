@@ -34,19 +34,34 @@ export async function basicStringDemo() {
       getWeather,
     },
   })
-  // const response = streamObject({
-  //   model: apple(),
-  //   system: `Help the person with getting weather information.`,
-  //   prompt: 'What is the weather in Wroclaw?',
-  //   schema: z.object({
-  //     essey: z
-  //       .string()
-  //       .describe('The 500 characters long answer to user question'),
-  //     length: z.number().describe('The length of the answer'),
-  //   }),
-  // })
   return response.text
 }
+
+export async function basicStringStreamingDemo() {
+  const response = streamText({
+    model: apple(),
+    prompt: 'Write me short essay on the meaning of life',
+  })
+  for await (const chunk of response.textStream) {
+    console.log(chunk)
+  }
+  return response.text
+}
+
+// export async function basicObjectStreamingDemo() {
+//   const response = streamObject({
+//     model: apple(),
+//     prompt: 'Write me short essay on the meaning of life',
+//     schema: z.object({
+//       essay: z.string().describe('The essay'),
+//       length: z.number().describe('The length of the essay'),
+//     }),
+//   })
+//   for await (const chunk of response.partialObjectStream) {
+//     console.log(chunk)
+//   }
+//   return response.object
+// }
 
 export async function colorEnumDemo() {
   const response = await generateObject({
@@ -120,6 +135,14 @@ export async function basicArrayDemo() {
 
 export const schemaDemos = {
   basicString: { name: 'String', func: basicStringDemo },
+  basicStringStreaming: {
+    name: 'String Streaming',
+    func: basicStringStreamingDemo,
+  },
+  // basicObjectStreaming: {
+  //   name: 'Object Streaming',
+  //   func: basicObjectStreamingDemo,
+  // },
   colorEnum: { name: 'Enum', func: colorEnumDemo },
   basicNumber: { name: 'Number', func: basicNumberDemo },
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
