@@ -43,7 +43,7 @@ using namespace JS::NativeAppleLLM;
 }
 
 - (void)callToolWithId:(NSString *)toolId
-             arguments:(NSDictionary *)arguments
+             arguments:(NSString *)arguments
             completion:(void (^)(id result, NSError *error))completion {
   [self.callInvoker callInvoker]->invokeAsync([toolId, arguments, completion](jsi::Runtime& rt) {
     @try {
@@ -51,7 +51,7 @@ using namespace JS::NativeAppleLLM;
       auto tools = global.getPropertyAsObject(rt, "__APPLE_LLM_TOOLS__");
       auto tool = tools.getPropertyAsFunction(rt, [toolId UTF8String]);
       
-      auto args = react::TurboModuleConvertUtils::convertObjCObjectToJSIValue(rt, arguments).getObject(rt);
+      auto args = jsi::String::createFromUtf8(rt, [arguments UTF8String]);
       
       auto result = tool.call(rt, args);
       
@@ -118,8 +118,8 @@ using namespace JS::NativeAppleLLM;
     @"tools": options.tools() ?: [NSNull null]
   };
   
-  auto callToolBlock = ^(NSString *toolId, id parameters, void (^completion)(id, NSError *)) {
-    [self callToolWithId:toolId arguments:(NSDictionary *)parameters completion:completion];
+  auto callToolBlock = ^(NSString *toolId, NSString *arguments, void (^completion)(id, NSError *)) {
+    [self callToolWithId:toolId arguments:arguments completion:completion];
   };
   
   [_llm generateText:messages options:opts resolve:resolve reject:reject toolInvoker:callToolBlock];

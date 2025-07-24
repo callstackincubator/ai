@@ -7,7 +7,13 @@ import type {
   LanguageModelV2StreamPart,
   ProviderV2,
 } from '@ai-sdk/provider'
-import { generateId, type Tool as ToolDefinition } from '@ai-sdk/provider-utils'
+import {
+  generateId,
+  jsonSchema,
+  parseJSON,
+  type Tool as ToolDefinition,
+  ToolCallOptions,
+} from '@ai-sdk/provider-utils'
 
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
 
@@ -83,10 +89,17 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
         if (!toolDefinition) {
           throw new Error(`Tool ${tool.name} not found`)
         }
+        const schema = jsonSchema(tool.inputSchema)
         return {
           ...tool,
           id: generateId(),
-          execute: toolDefinition.execute,
+          execute: async (modelInput: any, opts: ToolCallOptions) => {
+            const toolCallArguments = await parseJSON({
+              text: modelInput,
+              schema,
+            })
+            return toolDefinition.execute(toolCallArguments, opts)
+          },
         }
       }
       throw new Error('Unsupported tool type')

@@ -13,7 +13,7 @@ import React
 import FoundationModels
 #endif
 
-public typealias ToolInvoker = @Sendable (String, [String : Any], @escaping (Any?, Error?) -> Void) -> Void
+public typealias ToolInvoker = @Sendable (String, String, @escaping (Any?, Error?) -> Void) -> Void
 
 @objc
 public class AppleLLMImpl: NSObject {
@@ -69,10 +69,10 @@ public class AppleLLMImpl: NSObject {
              let schema = schemaObj as? [String: Any] {
             let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schema)
             let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
-            resolve(try response.toModelMessages())
+            resolve(response.toModelMessages())
           } else {
             let response = try await session.respond(to: userPrompt, options: generationOptions)
-            resolve(try response.toModelMessages())
+            resolve(response.toModelMessages())
           }
         } catch {
           reject("AppleLLM", error.localizedDescription, error)
@@ -293,7 +293,6 @@ public class AppleLLMImpl: NSObject {
     var parameters: GenerationSchema
     
     private let invokeJavaScriptTool: ToolInvoker
-    private nonisolated let schemaDict: [String: Any]
     private let toolId: String
     
     init(toolId: String,
@@ -305,15 +304,12 @@ public class AppleLLMImpl: NSObject {
       self.name = name
       self.description = description
       self.invokeJavaScriptTool = javaScriptToolInvoker
-      self.schemaDict = parameters
       self.parameters = try AppleLLMSchemaParser.createGenerationSchema(from: parameters)
     }
     
     func call(arguments: GeneratedContent) async throws -> String {
-      let argsDict = try arguments.toDictionary(using: schemaDict)
-      
       return try await withCheckedThrowingContinuation { continuation in
-        invokeJavaScriptTool(self.toolId, argsDict) { result, error in
+        invokeJavaScriptTool(self.toolId, String(describing: arguments)) { result, error in
           if let error = error {
             continuation.resume(throwing: AppleLLMError.toolCallError(error))
           } else if let output = result as? String {
@@ -512,139 +508,22 @@ public class AppleLLMImpl: NSObject {
 
 @available(iOS 26, *)
 extension LanguageModelSession.Response {
-  func toModelMessages() throws -> [[String: Any]] {
-    return try transcriptEntries.flatMap { entry -> [[String: Any]] in
+  func toModelMessages() -> [[String: Any]] {
+    return transcriptEntries.flatMap { entry -> [[String: Any]] in
       switch entry {
       case .response(let response):
-        return [["type": "text", "text": try response.segments.rawValue()]]
+        return [["type": "text", "text": String(describing: response.segments.last!)]]
       case .toolCalls(let calls):
-        return try calls.compactMap { toolCall in
-          return ["type": "tool-call", "toolName": toolCall.toolName, "input": try toolCall.rawValue()]
+        return calls.compactMap { toolCall in
+          return ["type": "tool-call", "toolName": toolCall.toolName, "input": String(describing: toolCall.arguments)]
         }
       case .toolOutput(let toolCall):
-        return [["type": "tool-result", "toolName": toolCall.toolName, "output": try toolCall.segments.rawValue()]]
+        return [["type": "tool-result", "toolName": toolCall.toolName, "output": String(describing: toolCall.segments.last!)]]
       case .instructions, .prompt:
         return []
       default:
         return []
       }
-    }
-  }
-}
-
-@available(iOS 26, *)
-extension Array<Transcript.Segment> {
-  enum SegmentExtractionError: Error {
-    case noSegments
-    case notAStructuredSegment
-    case rawValueNotFound
-  }
-  
-  func rawValue() throws -> String {
-    guard let lastSegment = last else {
-      throw SegmentExtractionError.noSegments
-    }
-    
-    if case let .text(textSegment) = lastSegment {
-      return textSegment.content
-    }
-    
-    guard case let .structure(structureSegment) = lastSegment else {
-      throw SegmentExtractionError.notAStructuredSegment
-    }
-    
-    for child in Mirror(reflecting: structureSegment).children {
-      if child.label == "rawValue", let rawValue = child.value as? String {
-        return rawValue
-      }
-    }
-    
-    throw SegmentExtractionError.rawValueNotFound
-  }
-}
-
-@available(iOS 26, *)
-extension Transcript.ToolCall {
-  enum ToolCallExtractionError: Error {
-    case rawValueNotFound
-  }
-  
-  func rawValue() throws -> String {
-    for child in Mirror(reflecting: self).children {
-      if child.label == "rawArguments", let rawValue = child.value as? String {
-        return rawValue
-      }
-    }
-    throw ToolCallExtractionError.rawValueNotFound
-  }
-}
-
-@available(iOS 26, *)
-extension GeneratedContent {
-  func toDictionary(using schemaDict: [String: Any]) throws -> [String: Any] {
-    var result: [String: Any] = [:]
-    
-    guard let properties = schemaDict["properties"] as? [String: Any] else {
-      throw AppleLLMError.invalidSchema("Object schema has invalid shape: \(schemaDict)")
-    }
-    
-    for (propertyName, propertySchema) in properties {
-      guard let property = propertySchema as? [String: Any],
-            let type = property["type"] as? String else {
-        throw AppleLLMError.invalidSchema("Schema must have type and properties: \(propertySchema)")
-      }
-      
-      do {
-        switch type {
-        case "string":
-          result[propertyName] = try self.value(String.self, forProperty: propertyName)
-        case "number":
-          result[propertyName] = try self.value(Double.self, forProperty: propertyName)
-        case "integer":
-          result[propertyName] = try self.value(Int.self, forProperty: propertyName)
-        case "boolean":
-          result[propertyName] = try self.value(Bool.self, forProperty: propertyName)
-        case "array":
-          result[propertyName] = try self.value(GeneratedContent.self, forProperty: propertyName).toArray(using: property)
-        case "object":
-          result[propertyName] = try self.value(GeneratedContent.self, forProperty: propertyName).toDictionary(using: property)
-        default:
-          throw AppleLLMError.invalidSchema("Unsupported property type \(type) for \(propertyName)")
-        }
-      } catch {
-        throw AppleLLMError.invalidSchema("There was an error parsing \(propertyName): \(error.localizedDescription)")
-      }
-    }
-    
-    return result
-  }
-  
-  private func toArray(using schema: [String: Any]) throws -> [Any] {
-    guard let itemsSchema = schema["items"] as? [String: Any] else {
-      throw AppleLLMError.invalidSchema("Array schema must have items definition")
-    }
-    
-    let itemType = itemsSchema["type"] as? String
-    
-    switch itemType {
-    case "string":
-      let arrayValue: [String] = try self.value([String].self)
-      return arrayValue
-    case "number":
-      let arrayValue: [Double] = try self.value([Double].self)
-      return arrayValue
-    case "integer":
-      let arrayValue: [Int] = try self.value([Int].self)
-      return arrayValue
-    case "boolean":
-      let arrayValue: [Bool] = try self.value([Bool].self)
-      return arrayValue
-    case "object":
-      return try self.elements().map { element in
-        try element.toDictionary(using: itemsSchema)
-      }
-    default:
-      throw AppleLLMError.invalidSchema("Unsupported array item type: \(itemType ?? "unknown")")
     }
   }
 }
