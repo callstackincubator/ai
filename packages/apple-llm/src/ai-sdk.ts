@@ -143,6 +143,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
             return {
               type: 'tool-call' as const,
               toolCallId: '',
+              providerExecuted: true,
               toolName: part.toolName,
               input: part.input,
             }
@@ -150,6 +151,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
             return {
               type: 'tool-result' as const,
               toolCallId: '',
+              providerExecuted: true,
               toolName: part.toolName,
               result: part.output,
             }
@@ -167,11 +169,25 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
 
   async doStream(options: LanguageModelV2CallOptions) {
     const messages = this.prepareMessages(options.prompt)
+    const tools = this.prepareTools(options.tools)
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
         `ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.`
       )
+    }
+
+    const schema =
+      options.responseFormat?.type === 'json'
+        ? options.responseFormat.schema
+        : undefined
+
+    if (schema) {
+      throw new Error('Streaming JSON responses is not yet supported.')
+    }
+
+    for (const tool of tools) {
+      globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
     }
 
     let streamId: string | null = null
@@ -180,25 +196,40 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     const cleanup = () => {
       listeners.forEach((listener) => listener.remove())
       listeners = []
+
+      for (const tool of tools) {
+        globalThis.__APPLE_LLM_TOOLS__[tool.id] = undefined
+      }
     }
 
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
         try {
-          streamId = NativeAppleLLM.generateStream(messages, options)
+          streamId = NativeAppleLLM.generateStream(messages, {
+            maxTokens: options.maxOutputTokens,
+            temperature: options.temperature,
+            topP: options.topP,
+            topK: options.topK,
+            tools,
+            schema,
+          })
 
           controller.enqueue({
             type: 'text-start',
             id: streamId,
           })
 
+          let previousContent = ''
+
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
             if (data.streamId === streamId) {
+              const delta = data.content.slice(previousContent.length)
               controller.enqueue({
                 type: 'text-delta',
-                delta: data.content,
+                delta,
                 id: data.streamId,
               })
+              previousContent = data.content
             }
           })
 

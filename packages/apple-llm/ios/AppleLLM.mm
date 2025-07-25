@@ -136,10 +136,15 @@ using namespace JS::NativeAppleLLM;
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
-    @"schema": options.schema() ?: [NSNull null]
+    @"schema": options.schema() ?: [NSNull null],
+    @"tools": options.tools() ?: [NSNull null],
   };
   
   NSError *error;
+  
+  auto callToolBlock = ^(NSString *toolId, NSString *arguments, void (^completion)(id, NSError *)) {
+    [self callToolWithId:toolId arguments:arguments completion:completion];
+  };
   
   NSString *streamId = [_llm generateStream:messages
                                     options:opts
@@ -152,7 +157,8 @@ using namespace JS::NativeAppleLLM;
   }
                                     onError:^(NSString *streamId, NSString *error) {
     [self emitOnStreamError:@{@"streamId": streamId, @"error": error}];
-  }];
+  }
+                                toolInvoker:callToolBlock];
   
   if (error) {
     @throw [NSException exceptionWithName:@"AppleLLM"

@@ -1,5 +1,5 @@
 import { createAppleProvider } from '@react-native-ai/apple'
-import { generateObject, generateText, tool } from 'ai'
+import { generateObject, generateText, streamText, tool } from 'ai'
 import { z } from 'zod'
 
 const getWeather = tool({
@@ -8,6 +8,7 @@ const getWeather = tool({
     city: z.string().describe('The city to get the weather for'),
   }),
   execute: async ({ city }) => {
+    console.log('Executing tool for city:', city)
     const temperature = Math.floor(Math.random() * 20) + 10
     return `Weather forecast for ${city}: ${temperature}°C`
   },
@@ -20,14 +21,28 @@ export const apple = createAppleProvider({
 })
 
 export async function basicStringDemo() {
-  const response = await generateText({
+  const response = streamText({
     model: apple(),
-    system: `Help the person with getting weather information.`,
+    system: `Help the person with getting weather information. Use tools to get the weather.`,
     prompt: 'What is the weather in Wroclaw?',
     tools: {
       getWeather,
     },
   })
+  for await (const chunk of response.textStream) {
+    console.log(chunk)
+  }
+  return response.text
+}
+
+export async function basicStringStreamingDemo() {
+  const response = streamText({
+    model: apple(),
+    prompt: 'Write me short essay on the meaning of life',
+  })
+  for await (const chunk of response.textStream) {
+    console.log(chunk)
+  }
   return response.text
 }
 
@@ -103,6 +118,10 @@ export async function basicArrayDemo() {
 
 export const schemaDemos = {
   basicString: { name: 'String', func: basicStringDemo },
+  basicStringStreaming: {
+    name: 'String Streaming',
+    func: basicStringStreamingDemo,
+  },
   colorEnum: { name: 'Enum', func: colorEnumDemo },
   basicNumber: { name: 'Number', func: basicNumberDemo },
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
