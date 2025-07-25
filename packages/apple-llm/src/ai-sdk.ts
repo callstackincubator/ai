@@ -169,6 +169,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
 
   async doStream(options: LanguageModelV2CallOptions) {
     const messages = this.prepareMessages(options.prompt)
+    const tools = this.prepareTools(options.tools)
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
@@ -185,12 +186,20 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
       throw new Error('Streaming JSON responses is not yet supported.')
     }
 
+    for (const tool of tools) {
+      globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
+    }
+
     let streamId: string | null = null
     let listeners: { remove(): void }[] = []
 
     const cleanup = () => {
       listeners.forEach((listener) => listener.remove())
       listeners = []
+
+      for (const tool of tools) {
+        globalThis.__APPLE_LLM_TOOLS__[tool.id] = undefined
+      }
     }
 
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
@@ -201,6 +210,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
             temperature: options.temperature,
             topP: options.topP,
             topK: options.topK,
+            tools,
             schema,
           })
 

@@ -94,7 +94,8 @@ public class AppleLLMImpl: NSObject {
     options: [String: Any],
     onUpdate: @escaping (String, String) -> Void,
     onComplete: @escaping (String) -> Void,
-    onError: @escaping (String, String) -> Void
+    onError: @escaping (String, String) -> Void,
+    toolInvoker: @escaping ToolInvoker
   ) throws -> String {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
@@ -106,12 +107,13 @@ public class AppleLLMImpl: NSObject {
       
       let task = Task {
         do {
-          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: [])
+          let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
+          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
           
           let session = LanguageModelSession.init(
             model: SystemLanguageModel.default,
             guardrails: LanguageModelSession.Guardrails.default,
-            tools: [],
+            tools: tools,
             transcript: transcript
           )
           
@@ -126,7 +128,7 @@ public class AppleLLMImpl: NSObject {
               options: generationOptions
             )
             for try await chunk in responseStream {
-              onUpdate(streamId, String(reflecting: chunk.generatedContent))
+              onUpdate(streamId, String(describing: chunk.generatedContent))
             }
           } else {
             let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
