@@ -1,11 +1,12 @@
 import type {
+  EmbeddingModelV2,
+  JSONValue,
   LanguageModelV2,
   LanguageModelV2CallOptions,
   LanguageModelV2FunctionTool,
   LanguageModelV2Prompt,
   LanguageModelV2ProviderDefinedTool,
   LanguageModelV2StreamPart,
-  ProviderV2,
 } from '@ai-sdk/provider'
 import {
   generateId,
@@ -15,21 +16,17 @@ import {
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
+import NativeAppleEmbeddings from './NativeAppleEmbeddings'
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
 
 type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
 type ToolSet = Record<string, ToolDefinition>
 
-interface AppleProvider extends ProviderV2 {
-  (): LanguageModelV2
-  isAvailable: () => boolean
-}
-
 export function createAppleProvider({
   availableTools,
 }: {
   availableTools?: ToolSet
-} = {}): AppleProvider {
+} = {}) {
   if (typeof structuredClone === 'undefined') {
     throw new Error(
       'structuredClone is not available in this environment. Please load a polyfill, such as @ungap/structured-clone.'
@@ -43,8 +40,11 @@ export function createAppleProvider({
   }
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
   provider.languageModel = createLanguageModel
-  provider.textEmbeddingModel = () => {
-    throw new Error('Text embedding models are not supported by Apple LLM')
+  provider.textEmbeddingModel = (modelId: string = 'NLContextualEmbedding') => {
+    if (modelId !== 'NLContextualEmbedding') {
+      throw new Error('Only the default model is supported')
+    }
+    return new AppleTextEmbeddingModel()
   }
   provider.imageModel = () => {
     throw new Error('Image generation models are not supported by Apple LLM')
@@ -54,11 +54,35 @@ export function createAppleProvider({
 
 export const apple = createAppleProvider()
 
+class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
+  readonly specificationVersion = 'v2'
+  readonly provider = 'apple'
+
+  readonly modelId: string = 'NLContextualEmbedding'
+  readonly maxEmbeddingsPerCall = Infinity
+  readonly supportsParallelCalls = false
+
+  async doEmbed(options: {
+    values: string[]
+    providerOptions?: Record<string, JSONValue>
+  }) {
+    const language = String(options.providerOptions?.language ?? 'en')
+    await NativeAppleEmbeddings.prepare(language)
+    const embeddings = await NativeAppleEmbeddings.generateEmbeddings(
+      options.values,
+      language
+    )
+    return {
+      embeddings,
+    }
+  }
+}
+
 class AppleLLMChatLanguageModel implements LanguageModelV2 {
   readonly specificationVersion = 'v2'
   readonly supportedUrls = {}
 
-  readonly provider = 'apple-llm'
+  readonly provider = 'apple'
   readonly modelId = 'system-default'
 
   private tools: ToolSet

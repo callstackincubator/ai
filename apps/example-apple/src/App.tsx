@@ -24,7 +24,6 @@ export default function App() {
 
     try {
       const result = await schemaDemos[key].func()
-      Alert.alert('Success', JSON.stringify(result, null, 2))
     } catch (error) {
       Alert.alert(
         'Error',

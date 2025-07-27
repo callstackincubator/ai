@@ -42,7 +42,8 @@
     "jsSrcsDir": "src",
     "ios": {
       "modulesProvider": {
-        "NativeAppleLLM": "AppleLLM"
+        "NativeAppleLLM": "AppleLLM",
+        "NativeAppleEmbeddings": "AppleEmbeddings"
       }
     }
   },
