@@ -1,4 +1,5 @@
 import { createAppleProvider } from '@react-native-ai/apple'
+import NativeAppleEmbeddings from '@react-native-ai/apple/src/NativeAppleEmbeddings'
 import {
   cosineSimilarity,
   embed,
@@ -125,6 +126,7 @@ export async function basicArrayDemo() {
 }
 
 export async function basicEmbeddingDemo() {
+  console.log(await NativeAppleEmbeddings.getInfo('en'))
   const response = await embedMany({
     model: apple.textEmbeddingModel(),
     values: [
