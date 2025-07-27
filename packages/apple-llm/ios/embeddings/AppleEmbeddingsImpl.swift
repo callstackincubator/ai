@@ -14,6 +14,34 @@ import Accelerate
 @objc
 public class AppleEmbeddingsImpl: NSObject {
   @objc
+  public func getInfo(_ language: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
+    if #available(iOS 17.0, *) {
+      guard let nlLanguage = try? convertToNLLanguage(language),
+            let model = NLContextualEmbedding(language: nlLanguage) else {
+        reject("AppleEmbeddings", "Failed to create NLContextualEmbedding for language: \(language)", nil)
+        return
+      }
+      
+      let languages = model.languages.map { $0.rawValue }
+      let scripts = model.scripts.map { $0.rawValue }
+      
+      let info: [String: Any] = [
+        "hasAvailableAssets": model.hasAvailableAssets,
+        "dimension": model.dimension,
+        "languages": languages,
+        "maximumSequenceLength": model.maximumSequenceLength,
+        "modelIdentifier": model.modelIdentifier,
+        "revision": model.revision,
+        "scripts": scripts
+      ]
+      
+      resolve(info)
+    } else {
+      reject("AppleEmbeddings", "NLContextualEmbedding is not supported on this device", nil)
+    }
+  }
+  
+  @objc
   public func prepare(_ language: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
     if #available(iOS 17.0, *) {
       guard let nlLanguage = try? convertToNLLanguage(language),

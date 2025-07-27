@@ -44,6 +44,10 @@ using namespace JS::NativeAppleLLM;
   return std::make_shared<react::NativeAppleEmbeddingsSpecJSI>(params);
 }
 
+- (void)getInfo:(nonnull NSString *)language resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_embeddings getInfo:language resolve:resolve reject:reject];
+}
+
 - (void)prepare:(nonnull NSString *)language resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
   [_embeddings prepare:language resolve:resolve reject:reject];
 }
