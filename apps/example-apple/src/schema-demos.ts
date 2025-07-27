@@ -126,7 +126,6 @@ export async function basicArrayDemo() {
 }
 
 export async function basicEmbeddingDemo() {
-  console.log(await NativeAppleEmbeddings.getInfo('en'))
   const response = await embedMany({
     model: apple.textEmbeddingModel(),
     values: [
@@ -164,7 +163,7 @@ export async function basicEmbeddingDemo() {
   console.log('Best similarity score:', bestScore)
   console.log('Best match:', response.values[bestIndex])
 
-  return response.embeddings
+  return response.values[bestIndex]
 }
 
 export const schemaDemos = {
