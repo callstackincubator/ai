@@ -8,7 +8,6 @@
 
 import Foundation
 import React
-import NaturalLanguage
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -33,7 +32,6 @@ public class AppleLLMImpl: NSObject {
     return false
 #endif
   }
-  
 
   @objc
   public func generateText(
