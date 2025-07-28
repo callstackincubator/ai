@@ -13,7 +13,7 @@ Bring on-device AI to React Native apps. Use instantly available built-in models
 [![npm downloads](https://img.shields.io/npm/dm/react-native-ai.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
 </div>
 
-## Why Choose react-native-ai?
+## Why choose `react-native-ai`?
 
 - **Complete AI toolkit** - Build apps with text generation, voice transcription, speech synthesis, and embeddings
 - **Instant AI** - Built-in models work immediately, no downloads or setup required  
