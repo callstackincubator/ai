@@ -120,3 +120,13 @@ export interface EmbeddingInfo {
   scripts: string[]
 }
 ```
+
+## Benchmarks
+
+Performance results showing processing time in milliseconds per embedding across different text lengths:
+
+| Device         | Short (~10 tokens) | Medium (~30 tokens) | Long (~90 tokens) |
+|----------------|--------------------|----------------------|-------------------|
+| iPhone 16 Pro  | 19.19              | 21.53                | 33.59             |
+
+Each category is tested with 5 consecutive runs to calculate reliable averages and account for system variability.
