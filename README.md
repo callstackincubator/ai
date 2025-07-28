@@ -1,7 +1,7 @@
 [![image](https://github.com/user-attachments/assets/027ccbc1-c6c4-46a0-aa62-7b89d4e62f24)](https://www.callstack.com/open-source?utm_campaign=generic&utm_source=github&utm_medium=referral&utm_content=react-native-ai)
 <div align="center">
 
-<b>react-native-ai</b> brings on-device AI to React Native apps. Use instantly available built-in models (Apple Intelligence, Gemini Nano) for immediate AI capabilities, or download and run any model locally with popular runtimes such as MLC Engine. Compatible with Vercel AI SDK interface.
+Bring on-device AI to React Native apps. Use instantly available built-in models (Apple Intelligence, Gemini Nano) for immediate AI capabilities, or download and run any model locally with popular runtimes such as MLC Engine. Compatible with Vercel AI SDK interface.
 
 </div>
 
@@ -15,11 +15,11 @@
 
 ## Why Choose react-native-ai?
 
-• **Complete AI toolkit** - Build apps with text generation, voice transcription, speech synthesis, and embeddings
-• **Instant AI** - Built-in models work immediately, no downloads or setup required  
-• **Run anything** - Download and use any LLM locally when you need specific models
-• **Drop-in replacement** - Uses familiar Vercel AI SDK functions
-• **Privacy-first** - All processing happens on-device, your data stays local
+- **Complete AI toolkit** - Build apps with text generation, voice transcription, speech synthesis, and embeddings
+- **Instant AI** - Built-in models work immediately, no downloads or setup required  
+- **Run anything** - Download and use any LLM locally when you need specific models
+- **Drop-in replacement** - Uses familiar Vercel AI SDK functions
+- **Privacy-first** - All processing happens on-device, your data stays local
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/443a6925-1e50-4eab-87a3-4f9c34e2de14" />
