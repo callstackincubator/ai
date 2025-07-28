@@ -1,24 +1,27 @@
 # Getting Started
 
-The Apple provider enables you to use Apple Foundation Models with the Vercel AI SDK in React Native applications.
+The Apple provider enables you to use Apple's on-device AI capabilities with the Vercel AI SDK in React Native applications. This includes language models, text embeddings, and other Apple-provided AI features that run entirely on-device for privacy and performance.
 
 ## Installation
 
-Install the Apple provider and required dependencies
+Install the Apple provider:
 
 ```bash
-npm install @react-native-ai/apple ai@beta
+npm install @react-native-ai/apple
+```
+
+While you can use the Apple provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](https://v5.ai-sdk.dev/docs/getting-started/expo#polyfills):
+
+```bash
+npm install ai@beta
 ```
 
 ## Requirements
 
-- **iOS 26+** - Apple Foundation Models require iOS 26 or later
-- **Apple Intelligence enabled device** - Device must support Apple Intelligence
 - **React Native New Architecture** - Required for native module functionality
-- **Vercel AI SDK v5** - This provider requires AI SDK v5 or later
 
 > [!NOTE]
-> You must install required polyfills as explained in the [Vercel AI documentation](https://v5.ai-sdk.dev/docs/getting-started/expo#polyfills).
+> Different Apple AI features have varying iOS version requirements. Check the specific API documentation for compatibility details.
 
 ## Basic Usage
 

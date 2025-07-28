@@ -16,6 +16,12 @@ NLContextualEmbedding uses a transformer-based architecture trained with masked 
 
 Each model is multilingual within its script family, enabling cross-lingual semantic understanding. The models are compressed and optimized for Apple's Neural Engine, typically under 100MB when downloaded.
 
+## Requirements
+
+- **iOS 17+** - NLContextualEmbedding requires iOS 17 or later
+
+## Usage
+
 ### Single Text
 
 ```tsx
@@ -85,21 +91,21 @@ The asset management system is designed to be efficient and user-friendly. When 
 
 ## Direct API Access
 
-For advanced use cases, you can access the native Apple embeddings API directly:
+For advanced use cases, you can access the embeddings API directly:
 
-### NativeAppleEmbeddings
+### AppleEmbeddings
 
 ```tsx
-import { NativeAppleEmbeddings } from '@react-native-ai/apple'
+import { AppleEmbeddings } from '@react-native-ai/apple'
 
 // Get embedding model information
-await NativeAppleEmbeddings.getInfo(language: string): Promise<EmbeddingInfo>
+const modelInfo: EmbeddingInfo = await AppleEmbeddings.getInfo(language: string)
 
 // Prepare language assets
-await NativeAppleEmbeddings.prepare(language: string): Promise<void>
+await AppleEmbeddings.prepare(language: string)
 
 // Generate embeddings
-const embeddings = await NativeAppleEmbeddings.generateEmbeddings(
+const embeddings = await AppleEmbeddings.generateEmbeddings(
   values: string[], 
   language: string
 ): Promise<number[][]>
