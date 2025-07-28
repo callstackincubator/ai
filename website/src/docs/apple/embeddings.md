@@ -55,7 +55,6 @@ console.log(embeddings)
 The embeddings model supports multiple languages. You can specify the language using [ISO 639-1 codes](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) or full names:
 
 ```tsx
-// ISO codes
 await embed({
   model: apple.textEmbeddingModel(), 
   value: 'Bonjour',
@@ -75,13 +74,7 @@ Apple's NLContextualEmbedding requires downloading language-specific assets to t
 ```tsx
 import { NativeAppleEmbeddings } from '@react-native-ai/apple'
 
-// Pre-download assets for a language
-try {
-  await NativeAppleEmbeddings.prepare('en')
-  console.log('English assets ready')
-} catch (error) {
-  console.log('Assets not available:', error)
-}
+await NativeAppleEmbeddings.prepare('en')
 ```
 
 The asset management system is designed to be efficient and user-friendly. When you call `prepare()` for a language, the system first checks if the required assets are already present on the device. If they are, the method resolves immediately without any network activity, making subsequent embedding operations instant.
