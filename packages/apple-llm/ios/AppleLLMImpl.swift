@@ -32,7 +32,7 @@ public class AppleLLMImpl: NSObject {
     return false
 #endif
   }
-  
+
   @objc
   public func generateText(
     _ messages: [[String: Any]],

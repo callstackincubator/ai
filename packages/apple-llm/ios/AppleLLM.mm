@@ -39,7 +39,7 @@ using namespace JS::NativeAppleLLM;
 }
 
 + (NSString *)moduleName {
-  return @"AppleLLM";
+  return @"NativeAppleLLM";
 }
 
 - (void)callToolWithId:(NSString *)toolId
@@ -173,5 +173,6 @@ using namespace JS::NativeAppleLLM;
 - (nonnull NSNumber *)isAvailable {
   return @([_llm isAvailable]);
 }
+
 
 @end
