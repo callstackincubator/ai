@@ -82,8 +82,5 @@ export const searchRelevantChunks = async (query: string, topK: number = 3) => {
     similarity: cosineSimilarity(queryEmbedding, doc.embedding),
   }))
 
-  return similarities
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, topK)
-    .filter((chunk) => chunk.similarity > 0.3)
+  return similarities.sort((a, b) => b.similarity - a.similarity).slice(0, topK)
 }
