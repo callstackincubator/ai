@@ -125,47 +125,6 @@ export async function basicArrayDemo() {
   return response.object
 }
 
-export async function basicEmbeddingDemo() {
-  const response = await embedMany({
-    model: apple.textEmbeddingModel(),
-    values: [
-      'React Native allows developers to build mobile apps using JavaScript and React.',
-      'MiniLM is a small, efficient transformer model used for sentence embeddings and semantic search.',
-      'NLContextualEmbedding is a lightweight Apple API that provides on-device contextual word embeddings.',
-      'Swift is a general-purpose programming language developed by Apple for iOS, macOS, and beyond.',
-      'Vector similarity search helps retrieve semantically relevant documents based on embeddings.',
-      'Expo simplifies React Native development by offering tooling and services for building and deploying apps.',
-      'CoreML lets you integrate machine learning models into your iOS app for fast on-device inference.',
-      'On-device AI enables privacy-preserving applications without relying on cloud servers.',
-      'Sentence transformers generate fixed-length embeddings for variable-length input text.',
-      'FAISS is a library developed by Facebook for efficient similarity search and clustering of dense vectors.',
-    ],
-  })
-
-  const question = await embed({
-    model: apple.textEmbeddingModel(),
-    value:
-      'How do I run machine learning models directly on iOS without cloud?',
-  })
-
-  let bestScore = -Infinity
-  let bestIndex = -1
-
-  for (let i = 0; i < response.embeddings.length; i++) {
-    const score = cosineSimilarity(question.embedding, response.embeddings[i])
-    if (score > bestScore) {
-      bestScore = score
-      bestIndex = i
-    }
-  }
-
-  console.log('Best match index:', bestIndex)
-  console.log('Best similarity score:', bestScore)
-  console.log('Best match:', response.values[bestIndex])
-
-  return response.values[bestIndex]
-}
-
 export const schemaDemos = {
   basicString: { name: 'String', func: basicStringDemo },
   basicStringStreaming: {
@@ -177,7 +136,6 @@ export const schemaDemos = {
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
   basicObject: { name: 'Object', func: basicObjectDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
-  basicEmbedding: { name: 'Embedding', func: basicEmbeddingDemo },
 }
 
 export type DemoKey = keyof typeof schemaDemos
