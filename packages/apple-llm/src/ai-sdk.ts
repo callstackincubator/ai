@@ -27,11 +27,6 @@ export function createAppleProvider({
 }: {
   availableTools?: ToolSet
 } = {}) {
-  if (typeof structuredClone === 'undefined') {
-    throw new Error(
-      'structuredClone is not available in this environment. Please load a polyfill, such as @ungap/structured-clone.'
-    )
-  }
   const createLanguageModel = () => {
     return new AppleLLMChatLanguageModel(availableTools)
   }

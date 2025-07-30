@@ -22,10 +22,10 @@
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "^0.80.0"
+    "react-native": "^0.76.0"
   },
   "devDependencies": {
-    "react-native": "0.80.0"
+    "react-native": "0.79.5"
   },
   "react-native-builder-bob": {
     "source": "src",

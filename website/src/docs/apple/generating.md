@@ -61,7 +61,7 @@ const result = await generateObject({
 });
 
 console.log(result.object);
-// Result is properly typed: { name: string, age: number, email: string, occupation: string }
+// { name: string, age: number, email: string, occupation: string }
 ```
 
 ## Tool Calling
