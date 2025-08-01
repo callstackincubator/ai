@@ -33,7 +33,7 @@ This is a monorepo with the following packages:
 
 3. **Test your changes:**
    ```bash
-   # Run React Native example (MLC)
+   # Run React Native Community CLI example (MLC)
    cd apps/example
    bun run start
    bun run android  # or ios
