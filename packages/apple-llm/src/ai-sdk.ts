@@ -7,6 +7,8 @@ import type {
   LanguageModelV2Prompt,
   LanguageModelV2ProviderDefinedTool,
   LanguageModelV2StreamPart,
+  TranscriptionModelV2,
+  TranscriptionModelV2CallOptions,
 } from '@ai-sdk/provider'
 import {
   generateId,
@@ -44,10 +46,36 @@ export function createAppleProvider({
   provider.imageModel = () => {
     throw new Error('Image generation models are not supported by Apple LLM')
   }
+  provider.transcriptionModel = () => {
+    return new AppleTranscriptionModel()
+  }
   return provider
 }
 
 export const apple = createAppleProvider()
+
+class AppleTranscriptionModel implements TranscriptionModelV2 {
+  readonly specificationVersion = 'v2'
+  readonly provider = 'apple'
+
+  readonly modelId = 'SpeechTranscriber'
+
+  async doGenerate(options: TranscriptionModelV2CallOptions) {
+    // const transcription = await NativeAppleLLM.transcribe(options.audio)
+    // TODO: implement actual transcription
+    return {
+      text: '',
+      segments: [],
+      language: 'en',
+      durationInSeconds: 0,
+      warnings: [],
+      response: {
+        timestamp: new Date(),
+        modelId: this.modelId,
+      },
+    }
+  }
+}
 
 class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
   readonly specificationVersion = 'v2'
