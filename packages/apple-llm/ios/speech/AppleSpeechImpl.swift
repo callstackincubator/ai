@@ -12,6 +12,18 @@ import UniformTypeIdentifiers
 
 @objc
 public class AppleSpeechImpl: NSObject {
+  
+  @available(iOS 26, *)
+  private func createTranscriber(for locale: Locale) -> SpeechTranscriber {
+    let preset = SpeechTranscriber.Preset.timeIndexedTranscriptionWithAlternatives
+    
+    return SpeechTranscriber(
+      locale: locale,
+      transcriptionOptions: preset.transcriptionOptions,
+      reportingOptions: preset.reportingOptions.subtracting([.alternativeTranscriptions]),
+      attributeOptions: preset.attributeOptions
+    )
+  }
   @objc
   public func isAvailable(_ language: String) -> Bool {
     if #available(iOS 26, *) {
@@ -24,7 +36,38 @@ public class AppleSpeechImpl: NSObject {
   @objc
   public func prepare(_ language: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
     if #available(iOS 26, *) {
-      resolve("")
+      Task {
+        do {
+          let locale = Locale(identifier: language)
+          
+          guard let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
+            reject("AppleSpeech", "Locale not supported: \(language)", nil)
+            return
+          }
+          
+          let transcriber = createTranscriber(for: supportedLocale)
+          
+          let status = await AssetInventory.status(forModules: [transcriber])
+          
+          switch status {
+          case .installed:
+            resolve(nil)
+          case .supported, .downloading:
+            if let request = try? await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+              try await request.downloadAndInstall()
+              resolve(nil)
+            } else {
+              resolve(nil)
+            }
+          case .unsupported:
+            reject("AppleSpeech", "Assets not supported for locale: \(supportedLocale.identifier)", nil)
+          @unknown default:
+            reject ("AppleSpeech", "Unknown asset inventory status", nil)
+          }
+        } catch {
+          reject("AppleSpeech", "Failed to prepare assets: \(error.localizedDescription)", error)
+        }
+      }
     } else {
       reject("AppleSpeech", "Not available on this platform", nil)
     }
@@ -47,16 +90,7 @@ public class AppleSpeechImpl: NSObject {
         
         Task {
           do {
-            let locale = Locale(identifier: language)
-            
-            let preset = SpeechTranscriber.Preset.timeIndexedTranscriptionWithAlternatives
-            
-            let transcriber = SpeechTranscriber(
-              locale: Locale.current,
-              transcriptionOptions: preset.transcriptionOptions,
-              reportingOptions: preset.reportingOptions.subtracting([.alternativeTranscriptions]),
-              attributeOptions: preset.attributeOptions
-            )
+            let transcriber = createTranscriber(for: Locale(identifier: language))
             
             let analyzer = SpeechAnalyzer(modules: [transcriber])
             

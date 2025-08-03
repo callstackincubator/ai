@@ -30,7 +30,7 @@ using namespace facebook;
 }
 
 - (NSString *)getCurrentLocale {
-  return [NSLocale currentLocale].languageCode;
+  return [NSLocale currentLocale].localeIdentifier;
 }
 
 @end
