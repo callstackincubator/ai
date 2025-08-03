@@ -44,7 +44,8 @@
       "modulesProvider": {
         "NativeAppleLLM": "AppleLLM",
         "NativeAppleEmbeddings": "AppleEmbeddings",
-        "NativeAppleSpeech": "AppleSpeech"
+        "NativeAppleSpeech": "AppleSpeech",
+        "NativeAppleUtils": "AppleUtils"
       }
     }
   },

@@ -1,14 +1,5 @@
 import { createAppleProvider } from '@react-native-ai/apple'
-import NativeAppleEmbeddings from '@react-native-ai/apple/src/NativeAppleEmbeddings'
-import {
-  cosineSimilarity,
-  embed,
-  embedMany,
-  generateObject,
-  generateText,
-  streamText,
-  tool,
-} from 'ai'
+import { experimental_transcribe, generateObject, streamText, tool } from 'ai'
 import { z } from 'zod'
 
 const getWeather = tool({
@@ -125,6 +116,18 @@ export async function basicArrayDemo() {
   return response.object
 }
 
+export async function basicTranscribeDemo() {
+  const response = await experimental_transcribe({
+    model: apple.transcriptionModel(),
+    audio: await (
+      await fetch(
+        'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
+      )
+    ).arrayBuffer(),
+  })
+  return response.text
+}
+
 export const schemaDemos = {
   basicString: { name: 'String', func: basicStringDemo },
   basicStringStreaming: {
@@ -136,6 +139,7 @@ export const schemaDemos = {
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
   basicObject: { name: 'Object', func: basicObjectDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
+  basicTranscribe: { name: 'Transcribe', func: basicTranscribeDemo },
 }
 
 export type DemoKey = keyof typeof schemaDemos

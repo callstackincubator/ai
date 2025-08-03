@@ -20,6 +20,8 @@ import {
 
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
+import NativeAppleSpeech from './NativeAppleSpeech'
+import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
 type ToolSet = Record<string, ToolDefinition>
@@ -46,7 +48,10 @@ export function createAppleProvider({
   provider.imageModel = () => {
     throw new Error('Image generation models are not supported by Apple LLM')
   }
-  provider.transcriptionModel = () => {
+  provider.transcriptionModel = (modelId: string = 'SpeechTranscriber') => {
+    if (modelId !== 'SpeechTranscriber') {
+      throw new Error('Only the default model is supported')
+    }
     return new AppleTranscriptionModel()
   }
   return provider
@@ -61,19 +66,48 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
   readonly modelId = 'SpeechTranscriber'
 
   async doGenerate(options: TranscriptionModelV2CallOptions) {
-    // const transcription = await NativeAppleLLM.transcribe(options.audio)
-    // TODO: implement actual transcription
-    return {
-      text: '',
-      segments: [],
-      language: 'en',
-      durationInSeconds: 0,
-      warnings: [],
-      response: {
-        timestamp: new Date(),
-        modelId: this.modelId,
-      },
+    try {
+      let audio = options.audio
+      if (typeof audio === 'string') {
+        audio = this.base64ToArrayBuffer(audio)
+      }
+
+      const language = String(
+        options.providerOptions?.language ?? NativeAppleUtils.getCurrentLocale()
+      )
+
+      await NativeAppleSpeech.prepare(language)
+
+      const transcriptionText = await NativeAppleSpeech.transcribe(
+        audio.buffer,
+        language
+      )
+
+      return {
+        text: transcriptionText,
+        segments: [],
+        language,
+        durationInSeconds: 0,
+        warnings: [],
+        response: {
+          timestamp: new Date(),
+          modelId: this.modelId,
+        },
+      }
+    } catch (error) {
+      throw new Error(
+        `Apple transcription failed: ${error instanceof Error ? error.message : String(error)}`
+      )
     }
+  }
+
+  private base64ToArrayBuffer(base64: string) {
+    let binaryString = atob(base64)
+    let bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    return bytes
   }
 }
 
@@ -89,7 +123,9 @@ class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
     values: string[]
     providerOptions?: Record<string, JSONValue>
   }) {
-    const language = String(options.providerOptions?.language ?? 'en')
+    const language = String(
+      options.providerOptions?.language ?? NativeAppleUtils.getCurrentLocale()
+    )
     await NativeAppleEmbeddings.prepare(language)
     const embeddings = await NativeAppleEmbeddings.generateEmbeddings(
       options.values,

@@ -4,7 +4,21 @@ import { TurboModuleRegistry } from 'react-native'
 export interface Spec extends TurboModule {
   isAvailable(language: string): boolean
   prepare(language: string): Promise<void>
-  transcribe(audio: string, language: string): Promise<string>
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleSpeech')
+declare global {
+  function __apple__llm__transcribe__(
+    data: ArrayBufferLike,
+    language: string
+  ): Promise<string>
+}
+
+const NativeAppleSpeech =
+  TurboModuleRegistry.getEnforcing<Spec>('NativeAppleSpeech')
+
+export default {
+  transcribe: (data: ArrayBufferLike, language: string) =>
+    globalThis.__apple__llm__transcribe__(data, language),
+  prepare: NativeAppleSpeech.prepare,
+  isAvailable: NativeAppleSpeech.isAvailable,
+}
