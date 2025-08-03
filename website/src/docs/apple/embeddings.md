@@ -4,7 +4,7 @@ Generate text embeddings using Apple's on-device NLContextualEmbedding model wit
 
 ## Overview
 
-The Apple Embeddings provider uses Apple's [`NLContextualEmbedding`](https://developer.apple.com/documentation/naturallanguage/nlcontextualembedding) to generate contextual text embeddings entirely on-device. This is Apple's implementation of a BERT-like transformer model integrated into iOS 17+, providing privacy-preserving text understanding capabilities.
+This provider uses Apple's [`NLContextualEmbedding`](https://developer.apple.com/documentation/naturallanguage/nlcontextualembedding) to generate contextual text embeddings entirely on-device. This is Apple's implementation of a BERT-like transformer model integrated into iOS 17+, providing privacy-preserving text understanding capabilities.
 
 ## Model Architecture
 
@@ -58,14 +58,18 @@ The embeddings model supports multiple languages. You can specify the language u
 await embed({
   model: apple.textEmbeddingModel(), 
   value: 'Bonjour',
-  language: 'fr' 
+  providerOptions: {
+    apple: {
+      language: 'fr',
+    }
+  }
 })
 ```
 
 For list of all supported languages, [check Apple documentation](https://developer.apple.com/documentation/naturallanguage/nlcontextualembedding#overview).
 
 > [!NOTE]
-> The default language is english.
+> By default, the embeddings model will use device language.
 
 ## Asset Management
 
@@ -77,7 +81,7 @@ import { NativeAppleEmbeddings } from '@react-native-ai/apple'
 await NativeAppleEmbeddings.prepare('en')
 ```
 
-The asset management system is designed to be efficient and user-friendly. When you call `prepare()` for a language, the system first checks if the required assets are already present on the device. If they are, the method resolves immediately without any network activity, making subsequent embedding operations instant.
+When you call `prepare()` for a language, the system first checks if the required assets are already present on the device. If they are, the method resolves immediately without any network activity, making subsequent embedding operations instant.
 
 > [!NOTE]
 > All language models and assets are stored in Apple's system-wide assets catalog, separate from your app bundle. This means zero impact on your app's size. Assets may already be available if the user has previously used other apps, or if system features have requested them.

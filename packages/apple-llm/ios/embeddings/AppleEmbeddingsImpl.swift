@@ -75,126 +75,128 @@ public class AppleEmbeddingsImpl: NSObject {
     case unsupportedLanguage(String)
   }
   
+  @available(iOS 16, *)
   private func convertToNLLanguage(_ languageString: String) throws -> NLLanguage {
-    switch languageString.lowercased() {
-    case "english", "en":
+    let locale = Locale(identifier: languageString)
+    guard let languageCode = locale.language.languageCode else {
+      throw LanguageConversionError.unsupportedLanguage("Cannot extract language code from locale: \(locale)")
+    }
+    
+    switch languageCode {
+    case "en":
       return .english
-    case "french", "fr":
+    case "fr":
       return .french
-    case "spanish", "es":
+    case "es":
       return .spanish
-    case "german", "de":
+    case "de":
       return .german
-    case "italian", "it":
+    case "it":
       return .italian
-    case "portuguese", "pt":
+    case "pt":
       return .portuguese
-    case "russian", "ru":
+    case "ru":
       return .russian
-    case "turkish", "tr":
+    case "tr":
       return .turkish
-    case "chinese", "zh":
+    case "zh":
       return .simplifiedChinese
-    case "arabic", "ar":
+    case "ar":
       return .arabic
-    case "czech", "cs":
+    case "cs":
       return .czech
-    case "dutch", "nl":
+    case "nl":
       return .dutch
-    case "finnish", "fi":
+    case "fi":
       return .finnish
-    case "hebrew", "he":
+    case "he":
       return .hebrew
-    case "hindi", "hi":
+    case "hi":
       return .hindi
-    case "hungarian", "hu":
+    case "hu":
       return .hungarian
-    case "icelandic", "is":
+    case "is":
       return .icelandic
-    case "indonesian", "id":
+    case "id":
       return .indonesian
-    case "japanese", "ja":
+    case "ja":
       return .japanese
-    case "korean", "ko":
+    case "ko":
       return .korean
-    case "malay", "ms":
+    case "ms":
       return .malay
-    case "norwegian", "no":
+    case "no":
       return .norwegian
-    case "polish", "pl":
+    case "pl":
       return .polish
-    case "romanian", "ro":
+    case "ro":
       return .romanian
-    case "slovak", "sk":
+    case "sk":
       return .slovak
-    case "swedish", "sv":
+    case "sv":
       return .swedish
-    case "thai", "th":
+    case "th":
       return .thai
-    case "ukrainian", "uk":
+    case "uk":
       return .ukrainian
-    case "amharic", "am":
+    case "am":
       return .amharic
-    case "armenian", "hy":
+    case "hy":
       return .armenian
-    case "bengali", "bn":
+    case "bn":
       return .bengali
-    case "bulgarian", "bg":
+    case "bg":
       return .bulgarian
-    case "burmese", "my":
+    case "my":
       return .burmese
-    case "catalan", "ca":
+    case "ca":
       return .catalan
-    case "cherokee", "chr":
+    case "chr":
       return .cherokee
-    case "croatian", "hr":
+    case "hr":
       return .croatian
-    case "danish", "da":
+    case "da":
       return .danish
-    case "georgian", "ka":
+    case "ka":
       return .georgian
-    case "greek", "el":
+    case "el":
       return .greek
-    case "gujarati", "gu":
+    case "gu":
       return .gujarati
-    case "kannada", "kn":
+    case "kn":
       return .kannada
-    case "khmer", "km":
+    case "km":
       return .khmer
-    case "lao", "lo":
+    case "lo":
       return .lao
-    case "malayalam", "ml":
+    case "ml":
       return .malayalam
-    case "marathi", "mr":
+    case "mr":
       return .marathi
-    case "mongolian", "mn":
+    case "mn":
       return .mongolian
-    case "oriya", "or":
+    case "or":
       return .oriya
-    case "persian", "fa":
+    case "fa":
       return .persian
-    case "punjabi", "pa":
+    case "pa":
       return .punjabi
-    case "sinhalese", "si":
+    case "si":
       return .sinhalese
-    case "tamil", "ta":
+    case "ta":
       return .tamil
-    case "telugu", "te":
+    case "te":
       return .telugu
-    case "tibetan", "bo":
+    case "bo":
       return .tibetan
-    case "urdu", "ur":
+    case "ur":
       return .urdu
-    case "vietnamese", "vi":
+    case "vi":
       return .vietnamese
-    case "kazakh", "kk":
-      if #available(iOS 16.0, *) {
-        return .kazakh
-      } else {
-        throw LanguageConversionError.unsupportedLanguage("\(languageString) (requires iOS 16+)")
-      }
+    case "kk":
+      return .kazakh
     default:
-      throw LanguageConversionError.unsupportedLanguage(languageString)
+      throw LanguageConversionError.unsupportedLanguage("\(languageCode)")
     }
   }
   
