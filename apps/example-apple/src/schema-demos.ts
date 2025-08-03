@@ -117,13 +117,13 @@ export async function basicArrayDemo() {
 }
 
 export async function basicTranscribeDemo() {
+  const file = await fetch(
+    'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
+  )
+  const audio = await file.arrayBuffer()
   const response = await experimental_transcribe({
     model: apple.transcriptionModel(),
-    audio: await (
-      await fetch(
-        'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
-      )
-    ).arrayBuffer(),
+    audio,
   })
   return response.text
 }

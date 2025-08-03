@@ -1,6 +1,5 @@
 import type {
   EmbeddingModelV2,
-  JSONValue,
   LanguageModelV2,
   LanguageModelV2CallOptions,
   LanguageModelV2FunctionTool,
@@ -73,7 +72,8 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
       }
 
       const language = String(
-        options.providerOptions?.language ?? NativeAppleUtils.getCurrentLocale()
+        options.providerOptions?.apple?.language ??
+          NativeAppleUtils.getCurrentLocale()
       )
 
       await NativeAppleSpeech.prepare(language)
@@ -93,6 +93,9 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
           timestamp: new Date(),
           modelId: this.modelId,
         },
+        // providerMetadata: {
+        //   apple: {},
+        // },
       }
     } catch (error) {
       throw new Error(
@@ -121,10 +124,15 @@ class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
 
   async doEmbed(options: {
     values: string[]
-    providerOptions?: Record<string, JSONValue>
+    providerOptions?: {
+      apple?: {
+        language?: string
+      }
+    }
   }) {
     const language = String(
-      options.providerOptions?.language ?? NativeAppleUtils.getCurrentLocale()
+      options.providerOptions?.apple?.language ??
+        NativeAppleUtils.getCurrentLocale()
     )
     await NativeAppleEmbeddings.prepare(language)
     const embeddings = await NativeAppleEmbeddings.generateEmbeddings(
