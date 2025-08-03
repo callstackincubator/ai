@@ -81,9 +81,9 @@ using namespace JS::NativeAppleLLM;
               
               [speechModule transcribe:audioData
                               language:language
-                               resolve:^(NSString* result) {
+                               resolve:^(id result) {
                                  runOnJS([resolve, result, &rt]() {
-                                   auto jsResult = jsi::String::createFromUtf8(rt, [result UTF8String]);
+                                   auto jsResult = react::TurboModuleConvertUtils::convertObjCObjectToJSIValue(rt, result);
                                    resolve->call(rt, jsResult);
                                  });
                               } reject:^(NSString *code, NSString *message, NSError *error) {

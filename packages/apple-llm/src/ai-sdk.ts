@@ -78,24 +78,25 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
 
       await NativeAppleSpeech.prepare(language)
 
-      const transcriptionText = await NativeAppleSpeech.transcribe(
+      const transcriptionResult = await NativeAppleSpeech.transcribe(
         audio.buffer,
         language
       )
 
+      const transcriptionText = transcriptionResult.segments
+        .map((segment) => segment.text)
+        .join(' ')
+
       return {
         text: transcriptionText,
-        segments: [],
+        segments: transcriptionResult.segments,
         language,
-        durationInSeconds: 0,
+        durationInSeconds: transcriptionResult.duration,
         warnings: [],
         response: {
           timestamp: new Date(),
           modelId: this.modelId,
         },
-        // providerMetadata: {
-        //   apple: {},
-        // },
       }
     } catch (error) {
       throw new Error(

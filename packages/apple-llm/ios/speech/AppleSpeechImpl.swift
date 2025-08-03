@@ -31,7 +31,7 @@ public class AppleSpeechImpl: NSObject {
   }
 
   @objc
-  public func transcribe(_ audioData: Data, language: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
+  public func transcribe(_ audioData: Data, language: String, resolve: @escaping ([String: Any]) -> Void, reject: @escaping (String, String, Error?) -> Void) {
     if #available(iOS 26, *) {
       let tempDirectory = FileManager.default.temporaryDirectory
       let fileName = UUID().uuidString
@@ -48,19 +48,33 @@ public class AppleSpeechImpl: NSObject {
         Task {
           do {
             let locale = Locale(identifier: language)
-            let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
+            
+            let preset = SpeechTranscriber.Preset.timeIndexedTranscriptionWithAlternatives
+            
+            let transcriber = SpeechTranscriber(
+              locale: Locale.current,
+              transcriptionOptions: preset.transcriptionOptions,
+              reportingOptions: preset.reportingOptions.subtracting([.alternativeTranscriptions]),
+              attributeOptions: preset.attributeOptions
+            )
+            
             let analyzer = SpeechAnalyzer(modules: [transcriber])
             
             defer {
               try? FileManager.default.removeItem(at: fileURL)
             }
             
-            var finalTranscription = ""
+            var segments: [[String: Any]] = []
             
             Task {
               for try await result in transcriber.results {
                 if result.isFinal {
-                  finalTranscription += String(result.text.characters)
+                  let segment: [String: Any] = [
+                    "text": String(result.text.characters),
+                    "startSecond": CMTimeGetSeconds(result.range.start),
+                    "endSecond": CMTimeGetSeconds(CMTimeRangeGetEnd(result.range))
+                  ]
+                  segments.append(segment)
                 }
               }
             }
@@ -73,7 +87,14 @@ public class AppleSpeechImpl: NSObject {
               await analyzer.cancelAndFinishNow()
             }
             
-            resolve(finalTranscription)
+            let totalDuration = if let lastSampleTime { CMTimeGetSeconds(lastSampleTime) } else { 0.0 }
+            
+            let result: [String: Any] = [
+              "segments": segments,
+              "duration": totalDuration
+            ]
+            
+            resolve(result)
           } catch {
             reject("AppleSpeech", "Transcription failed: \(error.localizedDescription)", error)
           }

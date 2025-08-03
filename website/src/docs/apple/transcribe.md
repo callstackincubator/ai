@@ -18,12 +18,14 @@ This provider uses Apple's [`SpeechAnalyzer`](https://developer.apple.com/docume
 const file = await fetch('https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav')
 const audio = await file.arrayBuffer()
 
-const { text } = await experimental_transcribe({
+const response = await experimental_transcribe({
   model: apple.transcriptionModel(),
   audio,
 })
 
-console.log(text)
+console.log(response.text)
+console.log(response.segments)
+console.log(response.durationInSeconds)
 ```
 
 The `audio` parameter accepts either an `ArrayBuffer` or a base64-encoded string.
@@ -80,8 +82,8 @@ const isAvailable: boolean = await AppleSpeech.isAvailable(language: string)
 // Prepare language assets
 await AppleSpeech.prepare(language: string)
 
-// Transcribe audio directly
-const transcription: string = await AppleSpeech.transcribe(
+// Transcribe audio with timing information
+const { segments, duration } = await AppleSpeech.transcribe(
   arrayBuffer,
   language: string
 )
