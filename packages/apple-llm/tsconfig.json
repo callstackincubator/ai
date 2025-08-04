@@ -1,7 +1,4 @@
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "types": ["web-streams-polyfill"]
-  },
+  "extends": "../../tsconfig.base.json",
   "include": ["src/**/*"]
 }
