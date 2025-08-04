@@ -194,7 +194,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
               text: modelInput,
               schema,
             })
-            return toolDefinition.execute(toolCallArguments, opts)
+            return toolDefinition.execute?.(toolCallArguments, opts)
           },
         }
       }
@@ -223,7 +223,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     })
 
     for (const tool of tools) {
-      globalThis.__APPLE_LLM_TOOLS__[tool.id] = undefined
+      delete globalThis.__APPLE_LLM_TOOLS__[tool.id]
     }
 
     return {
@@ -290,7 +290,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
       listeners = []
 
       for (const tool of tools) {
-        globalThis.__APPLE_LLM_TOOLS__[tool.id] = undefined
+        delete globalThis.__APPLE_LLM_TOOLS__[tool.id]
       }
     }
 

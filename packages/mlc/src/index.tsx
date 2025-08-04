@@ -15,6 +15,11 @@ import {
   ReadableStreamDefaultController,
 } from 'web-streams-polyfill'
 
+declare global {
+  // A react-native internal from TurboModuleRegistry.js
+  var __turboModuleProxy: unknown | undefined
+}
+
 const LINKING_ERROR =
   `The package 'react-native-ai' doesn't seem to be linked. Make sure: \n\n` +
   Platform.select({ ios: "- You have run 'pod install'\n", default: '' }) +
