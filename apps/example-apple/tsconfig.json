@@ -3,7 +3,7 @@
   "compilerOptions": {
     "strictNullChecks": true,
     "paths": {
-      "@react-native-ai/apple": ["../../packages/apple-llm"]
+      "@react-native-ai/apple": ["../../packages/apple-llm/src"]
     }
   },
   "include": ["src/**/*"]
