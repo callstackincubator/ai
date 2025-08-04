@@ -1,0 +1,5 @@
+[install]
+
+linker = "hoisted"
+peer = false
+frozen-lockfile = true
