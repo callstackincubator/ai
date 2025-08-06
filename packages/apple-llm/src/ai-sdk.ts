@@ -6,6 +6,8 @@ import type {
   LanguageModelV2Prompt,
   LanguageModelV2ProviderDefinedTool,
   LanguageModelV2StreamPart,
+  SpeechModelV2,
+  SpeechModelV2CallOptions,
   TranscriptionModelV2,
   TranscriptionModelV2CallOptions,
 } from '@ai-sdk/provider'
@@ -20,6 +22,7 @@ import {
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
+import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
@@ -53,6 +56,12 @@ export function createAppleProvider({
     }
     return new AppleTranscriptionModel()
   }
+  provider.speechModel = (modelId: string = 'AVSpeechSynthesizer') => {
+    if (modelId !== 'AVSpeechSynthesizer') {
+      throw new Error('Only the default model is supported')
+    }
+    return new AppleSpeechModel()
+  }
   return provider
 }
 
@@ -76,9 +85,9 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
           NativeAppleUtils.getCurrentLocale()
       )
 
-      await NativeAppleSpeech.prepare(language)
+      await NativeAppleTranscription.prepare(language)
 
-      const transcriptionResult = await NativeAppleSpeech.transcribe(
+      const transcriptionResult = await NativeAppleTranscription.transcribe(
         audio.buffer,
         language
       )
@@ -112,6 +121,37 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
       bytes[i] = binaryString.charCodeAt(i)
     }
     return bytes
+  }
+}
+
+class AppleSpeechModel implements SpeechModelV2 {
+  readonly specificationVersion = 'v2'
+  readonly provider = 'apple'
+
+  readonly modelId = 'AVSpeechSynthesizer'
+
+  async doGenerate(options: SpeechModelV2CallOptions) {
+    const language = String(
+      options.language ?? NativeAppleUtils.getCurrentLocale()
+    )
+
+    const speechOptions = {
+      language,
+      voice: options.voice,
+    }
+
+    await NativeAppleSpeech.generate(options.text, speechOptions)
+
+    // For now, return empty audio data since we're just stubbing the implementation
+    // In the future, this should return the actual audio data from the speech synthesis
+    return {
+      audio: new Uint8Array(0), // Empty audio data for now
+      warnings: [],
+      response: {
+        timestamp: new Date(),
+        modelId: this.modelId,
+      },
+    }
   }
 }
 

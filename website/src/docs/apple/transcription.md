@@ -1,4 +1,4 @@
-# Apple Speech Transcription
+# Transcription
 
 Convert speech to text using Apple's on-device `SpeechAnalyzer` and `SpeechTranscriber`.
 
@@ -57,9 +57,9 @@ await experimental_transcribe({
 Apple's SpeechAnalyzer requires downloading language-specific assets to the device. The provider automatically requests assets when needed, but you can also prepare them manually:
 
 ```tsx
-import { NativeAppleSpeech } from '@react-native-ai/apple'
+import { NativeAppletranscription } from '@react-native-ai/apple'
 
-await NativeAppleSpeech.prepare('en')
+await NativeAppletranscription.prepare('en')
 ```
 
 When you call `prepare()` for a language, the system first checks if the required assets are already present on the device. If they are, the method resolves immediately without any network activity, making subsequent embedding operations instant.
@@ -71,19 +71,19 @@ When you call `prepare()` for a language, the system first checks if the require
 
 For advanced use cases, you can access the speech transcription API directly:
 
-### AppleSpeech
+### AppleTranscription
 
 ```tsx
-import { AppleSpeech } from '@react-native-ai/apple'
+import { AppleTranscription } from '@react-native-ai/apple'
 
 // Check availability for a language
-const isAvailable: boolean = await AppleSpeech.isAvailable(language: string)
+const isAvailable: boolean = await AppleTranscription.isAvailable(language: string)
 
 // Prepare language assets
-await AppleSpeech.prepare(language: string)
+await AppleTranscription.prepare(language: string)
 
 // Transcribe audio with timing information
-const { segments, duration } = await AppleSpeech.transcribe(
+const { segments, duration } = await AppleTranscription.transcribe(
   arrayBuffer,
   language: string
 )
