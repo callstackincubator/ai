@@ -1,4 +1,4 @@
-# Apple Embeddings
+# Embeddings
 
 Generate text embeddings using Apple's on-device NLContextualEmbedding model with the AI SDK.
 
