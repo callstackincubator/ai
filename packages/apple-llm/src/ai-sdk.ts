@@ -140,17 +140,24 @@ class AppleSpeechModel implements SpeechModelV2 {
       voice: options.voice,
     }
 
-    await NativeAppleSpeech.generate(options.text, speechOptions)
+    try {
+      const audio = await NativeAppleSpeech.generate(
+        options.text,
+        speechOptions
+      )
 
-    // For now, return empty audio data since we're just stubbing the implementation
-    // In the future, this should return the actual audio data from the speech synthesis
-    return {
-      audio: new Uint8Array(0), // Empty audio data for now
-      warnings: [],
-      response: {
-        timestamp: new Date(),
-        modelId: this.modelId,
-      },
+      return {
+        audio: new Uint8Array(audio),
+        warnings: [],
+        response: {
+          timestamp: new Date(),
+          modelId: this.modelId,
+        },
+      }
+    } catch (error) {
+      throw new Error(
+        `Apple speech synthesis failed: ${error instanceof Error ? error.message : String(error)}`
+      )
     }
   }
 }
