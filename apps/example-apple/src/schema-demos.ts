@@ -1,5 +1,11 @@
 import { createAppleProvider } from '@react-native-ai/apple'
-import { experimental_transcribe, generateObject, streamText, tool } from 'ai'
+import {
+  experimental_generateSpeech,
+  experimental_transcribe,
+  generateObject,
+  streamText,
+  tool,
+} from 'ai'
 import { z } from 'zod'
 
 const getWeather = tool({
@@ -128,6 +134,15 @@ export async function basicTranscribeDemo() {
   return response.text
 }
 
+export async function basicSpeechDemo() {
+  const response = await experimental_generateSpeech({
+    model: apple.speechModel(),
+    text: 'What is the weather in Wroclaw?',
+  })
+  console.log(typeof response.audio)
+  return 'ok'
+}
+
 export const schemaDemos = {
   basicString: { name: 'String', func: basicStringDemo },
   basicStringStreaming: {
@@ -140,6 +155,7 @@ export const schemaDemos = {
   basicObject: { name: 'Object', func: basicObjectDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
   basicTranscribe: { name: 'Transcribe', func: basicTranscribeDemo },
+  basicSpeech: { name: 'Speech', func: basicSpeechDemo },
 }
 
 export type DemoKey = keyof typeof schemaDemos
