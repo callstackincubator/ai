@@ -58,7 +58,6 @@ public class AppleLLMImpl: NSObject {
           
           let session = LanguageModelSession.init(
             model: SystemLanguageModel.default,
-            guardrails: LanguageModelSession.Guardrails.default,
             tools: tools,
             transcript: transcript
           )
@@ -112,7 +111,6 @@ public class AppleLLMImpl: NSObject {
           
           let session = LanguageModelSession.init(
             model: SystemLanguageModel.default,
-            guardrails: LanguageModelSession.Guardrails.default,
             tools: tools,
             transcript: transcript
           )
@@ -128,12 +126,12 @@ public class AppleLLMImpl: NSObject {
               options: generationOptions
             )
             for try await chunk in responseStream {
-              onUpdate(streamId, String(describing: chunk.generatedContent))
+              onUpdate(streamId, String(describing: chunk.content))
             }
           } else {
             let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
             for try await chunk in responseStream {
-              onUpdate(streamId, chunk)
+              onUpdate(streamId, chunk.content)
             }
           }
           
