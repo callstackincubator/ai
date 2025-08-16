@@ -8,28 +8,9 @@
 import Foundation
 import AVFoundation
 
-extension AVSpeechSynthesisVoice {
-  func toDictionary() -> [String: Any] {
-    var data = [
-      "identifier": self.identifier,
-      "name": self.name,
-      "language": self.language,
-      "quality": quality,
-      "isPersonalVoice": false,
-      "isNoveltyVoice": false
-    ] as [String : Any]
-    
-    if #available(iOS 17.0, *) {
-      data["isPersonalVoice"] = self.voiceTraits.contains(.isPersonalVoice)
-      data["isNoveltyVoice"] = self.voiceTraits.contains(.isNoveltyVoice)
-    }
-    
-    return data
-  }
-}
-
 @objc
 public class AppleSpeechImpl: NSObject {
+  private let speechSynthesizer = AVSpeechSynthesizer()
   
   @objc
   public func getVoices(_ resolve: @escaping ([Any]) -> Void, reject: @escaping (String, String, Error?) -> Void) {
@@ -60,42 +41,117 @@ public class AppleSpeechImpl: NSObject {
       nil
     }
     
-    let synthesizer = AVSpeechSynthesizer()
+    var collectedBuffers: [AVAudioPCMBuffer] = []
     
-    class SpeechDelegate: NSObject, AVSpeechSynthesizerDelegate {
-      let resolve: (Data) -> Void
-      let reject: (String, String, Error?) -> Void
-      var audioData = Data()
+    speechSynthesizer.write(utterance) { buffer in
+      guard let pcm = buffer as? AVAudioPCMBuffer else { return }
       
-      init(resolve: @escaping (Data) -> Void, reject: @escaping (String, String, Error?) -> Void) {
-        self.resolve = resolve
-        self.reject = reject
-      }
-      
-      func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        resolve(audioData)
-      }
-      
-      func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        reject("AppleSpeech", "Speech synthesis was cancelled", nil)
-      }
-    }
-    
-    let delegate = SpeechDelegate(resolve: resolve, reject: reject)
-    synthesizer.delegate = delegate
-    
-    synthesizer.write(utterance) { [weak delegate] buffer in
-      guard let delegate = delegate else { return }
-      
-      let audioBuffer = buffer.audioBufferList.pointee.mBuffers
-      
-      guard let data = audioBuffer.mData else {
-        print("AppleSpeech: Received null audio buffer data (size: \(audioBuffer.mDataByteSize))")
+      // End of stream signaled by empty buffer. Finalize and resolve.
+      if pcm.frameLength == 0 {
+        do {
+          let data = try AppleSpeechImpl.wavData(from: collectedBuffers)
+          resolve(data)
+        } catch {
+          reject("AppleSpeech", "Error generating WAV data", error)
+        }
         return
       }
       
-      let bufferData = Data(bytes: data, count: Int(audioBuffer.mDataByteSize))
-      delegate.audioData.append(bufferData)
+      // Collect non-empty buffers for later concatenation
+      collectedBuffers.append(pcm)
     }
+  }
+}
+
+extension AppleSpeechImpl {
+  /// Build a single WAV file by generating the header using the first buffer's
+  /// format and then concatenating the raw PCM payloads of all subsequent buffers.
+  /// Assumes all buffers share the same format and are WAV-compatible.
+  static func wavData(from buffers: [AVAudioPCMBuffer]) throws -> Data {
+    guard let first = buffers.first else {
+      throw NSError(domain: "WAV", code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "No audio buffers collected"])
+    }
+    
+    let channels = Int(first.format.channelCount)
+    let sampleRate = Int(first.format.sampleRate)
+    let isFloat32 = (first.format.commonFormat == .pcmFormatFloat32)
+    let bitsPerSample = isFloat32 ? 32 : 16
+    let byteRate = sampleRate * channels * bitsPerSample / 8
+    let blockAlign = channels * bitsPerSample / 8
+    
+    // Helper: little-endian encoders
+    func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xff), UInt8((v >> 8) & 0xff)] }
+    func le32(_ v: Int) -> [UInt8] {
+      [UInt8(v & 0xff), UInt8((v >> 8) & 0xff),
+       UInt8((v >> 16) & 0xff), UInt8((v >> 24) & 0xff)]
+    }
+    
+    // Estimate capacity from actual valid bytes in each buffer
+    let estimatedCapacity = buffers.reduce(0) { acc, buf in
+      let audioBuffer = buf.audioBufferList.pointee.mBuffers
+      return acc + Int(audioBuffer.mDataByteSize)
+    }
+    
+    var payload = Data()
+    payload.reserveCapacity(estimatedCapacity)
+    
+    // Concatenate payloads using mDataByteSize, which is kept in sync with frameLength
+    for buf in buffers {
+      let m = buf.audioBufferList.pointee.mBuffers
+      let byteCount = Int(m.mDataByteSize)
+      if let p = m.mData {
+        payload.append(contentsOf: UnsafeRawBufferPointer(start: p, count: byteCount))
+      }
+    }
+    
+    let dataChunkSize = payload.count
+    let fmtChunkSize = 16
+    let riffChunkSize = 4 + (8 + fmtChunkSize) + (8 + dataChunkSize)
+    
+    var header = Data()
+    header.append(contentsOf: Array("RIFF".utf8))
+    header.append(contentsOf: le32(riffChunkSize))
+    header.append(contentsOf: Array("WAVE".utf8))
+    
+    // fmt chunk
+    header.append(contentsOf: Array("fmt ".utf8))
+    header.append(contentsOf: le32(fmtChunkSize))
+    header.append(contentsOf: le16(isFloat32 ? 3 : 1)) // 3 = IEEE float, 1 = PCM
+    header.append(contentsOf: le16(channels))
+    header.append(contentsOf: le32(sampleRate))
+    header.append(contentsOf: le32(byteRate))
+    header.append(contentsOf: le16(blockAlign))
+    header.append(contentsOf: le16(bitsPerSample))
+    
+    // data chunk
+    header.append(contentsOf: Array("data".utf8))
+    header.append(contentsOf: le32(dataChunkSize))
+    
+    var out = Data(capacity: header.count + payload.count)
+    out.append(header)
+    out.append(payload)
+    
+    return out
+  }
+}
+
+extension AVSpeechSynthesisVoice {
+  func toDictionary() -> [String: Any] {
+    var data = [
+      "identifier": self.identifier,
+      "name": self.name,
+      "language": self.language,
+      "quality": quality,
+      "isPersonalVoice": false,
+      "isNoveltyVoice": false
+    ] as [String : Any]
+    
+    if #available(iOS 17.0, *) {
+      data["isPersonalVoice"] = self.voiceTraits.contains(.isPersonalVoice)
+      data["isNoveltyVoice"] = self.voiceTraits.contains(.isNoveltyVoice)
+    }
+    
+    return data
   }
 }

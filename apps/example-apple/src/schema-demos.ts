@@ -6,6 +6,7 @@ import {
   streamText,
   tool,
 } from 'ai'
+import * as Clipboard from 'expo-clipboard'
 import { z } from 'zod'
 
 const getWeather = tool({
@@ -139,8 +140,8 @@ export async function basicSpeechDemo() {
     model: apple.speechModel(),
     text: 'What is the weather in Wroclaw?',
   })
-  console.log(typeof response.audio)
-  return 'ok'
+  await Clipboard.setStringAsync(response.audio.base64)
+  return 'Speech copied to clipboard. Go to https://base64.guru/converter/decode/audio to play.'
 }
 
 export const schemaDemos = {
