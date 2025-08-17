@@ -1,5 +1,12 @@
 import { createAppleProvider } from '@react-native-ai/apple'
-import { experimental_transcribe, generateObject, streamText, tool } from 'ai'
+import {
+  experimental_generateSpeech,
+  experimental_transcribe,
+  generateObject,
+  streamText,
+  tool,
+} from 'ai'
+import * as Clipboard from 'expo-clipboard'
 import { z } from 'zod'
 
 const getWeather = tool({
@@ -128,6 +135,15 @@ export async function basicTranscribeDemo() {
   return response.text
 }
 
+export async function basicSpeechDemo() {
+  const response = await experimental_generateSpeech({
+    model: apple.speechModel(),
+    text: 'What is the weather in Wroclaw?',
+  })
+  await Clipboard.setStringAsync(response.audio.base64)
+  return 'Speech copied to clipboard. Go to https://base64.guru/converter/decode/audio to play.'
+}
+
 export const schemaDemos = {
   basicString: { name: 'String', func: basicStringDemo },
   basicStringStreaming: {
@@ -140,6 +156,7 @@ export const schemaDemos = {
   basicObject: { name: 'Object', func: basicObjectDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
   basicTranscribe: { name: 'Transcribe', func: basicTranscribeDemo },
+  basicSpeech: { name: 'Speech', func: basicSpeechDemo },
 }
 
 export type DemoKey = keyof typeof schemaDemos
