@@ -43,21 +43,27 @@ public class AppleSpeechImpl: NSObject {
     
     var collectedBuffers: [AVAudioPCMBuffer] = []
     
+    var resolveCallback: ((Data) -> Void)? = resolve
+    var rejectCallback: ((String, String, Error?) -> Void)? = reject
+    
     speechSynthesizer.write(utterance) { buffer in
       guard let pcm = buffer as? AVAudioPCMBuffer else { return }
       
-      // End of stream signaled by empty buffer. Finalize and resolve.
       if pcm.frameLength == 0 {
+        guard let resolve = resolveCallback, let reject = rejectCallback else { return }
+        
         do {
           let data = try AppleSpeechImpl.wavData(from: collectedBuffers)
           resolve(data)
         } catch {
           reject("AppleSpeech", "Error generating WAV data", error)
         }
+        
+        resolveCallback = nil
+        rejectCallback = nil
         return
       }
       
-      // Collect non-empty buffers for later concatenation
       collectedBuffers.append(pcm)
     }
   }
