@@ -16,6 +16,7 @@
 #import <ReactCommon/RCTTurboModule.h>
 
 #import <jsi/jsi.h>
+#import <react/bridging/Function.h>
 
 #import <NativeAppleLLM/NativeAppleLLM.h>
 
@@ -46,11 +47,7 @@ using namespace react;
 - (void)installGenerateFunc:(std::shared_ptr<facebook::react::CallInvoker>)jsInvoker {
   AppleSpeechImpl *speechModule = _speech;
   
-  auto runOnJS = [jsInvoker](std::function<void()>&& f) {
-    jsInvoker->invokeAsync(std::move(f));
-  };
-  
-  jsInvoker->invokeAsync([speechModule, runOnJS](jsi::Runtime& rt) {
+  jsInvoker->invokeAsync([speechModule, jsInvoker](jsi::Runtime& rt) {
     @try {
       auto global = rt.global();
       
@@ -58,7 +55,7 @@ using namespace react;
         rt,
         jsi::PropNameID::forAscii(rt, "generateAudio"),
         2,
-        [speechModule, runOnJS](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+        [speechModule, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
           if (count < 1 || !args[0].isString()) {
             throw jsi::JSError(rt, "First argument must be a string (text)");
           }
@@ -93,12 +90,15 @@ using namespace react;
             rt,
             jsi::PropNameID::forAscii(rt, "executor"),
             2,
-            [speechModule, text, options, runOnJS](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
-              auto resolve = std::make_shared<jsi::Function>(args[0].asObject(rt).asFunction(rt));
-              auto reject = std::make_shared<jsi::Function>(args[1].asObject(rt).asFunction(rt));
+            [speechModule, text, options, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+              using ResolveCallback = facebook::react::AsyncCallback<NSData*>;
+              using RejectCallback = facebook::react::AsyncCallback<NSString*, NSString*, NSError*>;
+              
+              auto resolve = ResolveCallback(rt, args[0].asObject(rt).asFunction(rt), jsInvoker);
+              auto reject = RejectCallback(rt, args[1].asObject(rt).asFunction(rt), jsInvoker);
               
               [speechModule generateAudio:text options:options resolve:^(NSData *audioData) {
-                runOnJS([resolve, audioData, &rt]() {
+                resolve.call([audioData](jsi::Runtime& rt, jsi::Function& resolveFunc) {
                   class NSDataMutableBuffer : public facebook::jsi::MutableBuffer {
                   public:
                     NSDataMutableBuffer(uint8_t* data, size_t size) : _data(data), _size(size) {}
@@ -115,12 +115,12 @@ using namespace react;
                   auto mutableBuffer = std::make_shared<NSDataMutableBuffer>(data, size);
                   auto arrayBuffer = jsi::ArrayBuffer(rt, mutableBuffer);
 
-                  resolve->call(rt, std::move(arrayBuffer));
+                  resolveFunc.call(rt, std::move(arrayBuffer));
                 });
               } reject:^(NSString *code, NSString *message, NSError *error) {
-                runOnJS([reject, message, &rt]() {
+                reject.call([message](jsi::Runtime& rt, jsi::Function& rejectFunc) {
                   auto jsError = jsi::String::createFromUtf8(rt, [message UTF8String]);
-                  reject->call(rt, jsError);
+                  rejectFunc.call(rt, jsError);
                 });
               }];
               

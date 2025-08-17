@@ -16,6 +16,7 @@
 #import <ReactCommon/RCTTurboModule.h>
 
 #import <jsi/jsi.h>
+#import <react/bridging/Function.h>
 
 #import <NativeAppleLLM/NativeAppleLLM.h>
 
@@ -25,6 +26,7 @@
 
 using namespace facebook;
 using namespace JS::NativeAppleLLM;
+using namespace react;
 
 @implementation AppleTranscription
 
@@ -45,11 +47,7 @@ using namespace JS::NativeAppleLLM;
 - (void)installTranscribeFunc:(std::shared_ptr<facebook::react::CallInvoker>)jsInvoker {
   AppleTranscriptionImpl *transcriptionModule = _transcription;
   
-  auto runOnJS = [jsInvoker](std::function<void()>&& f) {
-    jsInvoker->invokeAsync(std::move(f));
-  };
-  
-  jsInvoker->invokeAsync([transcriptionModule, runOnJS](jsi::Runtime& rt) {
+  jsInvoker->invokeAsync([transcriptionModule, jsInvoker](jsi::Runtime& rt) {
     @try {
       auto global = rt.global();
       
@@ -57,7 +55,7 @@ using namespace JS::NativeAppleLLM;
         rt,
         jsi::PropNameID::forAscii(rt, "transcribe"),
         2,
-        [transcriptionModule, runOnJS](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+        [transcriptionModule, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
           auto arrayBuffer = args[0].asObject(rt);
           if (!arrayBuffer.isArrayBuffer(rt)) {
             throw jsi::JSError(rt, "First argument must be an ArrayBuffer");
@@ -75,23 +73,24 @@ using namespace JS::NativeAppleLLM;
             rt,
             jsi::PropNameID::forAscii(rt, "executor"),
             2,
-            [transcriptionModule, audioData, language, runOnJS](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
-              auto resolve = std::make_shared<jsi::Function>(args[0].asObject(rt).asFunction(rt));
-              auto reject = std::make_shared<jsi::Function>(args[1].asObject(rt).asFunction(rt));
+            [transcriptionModule, audioData, language, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+              using ResolveCallback = facebook::react::AsyncCallback<>;
+              using RejectCallback = facebook::react::AsyncCallback<NSString*, NSString*, NSError*>;
               
-              [transcriptionModule transcribe:audioData
-                                     language:language
-                                      resolve:^(id result) {
-                                        runOnJS([resolve, result, &rt]() {
-                                          auto jsResult = react::TurboModuleConvertUtils::convertObjCObjectToJSIValue(rt, result);
-                                          resolve->call(rt, jsResult);
-                                        });
-                                      } reject:^(NSString *code, NSString *message, NSError *error) {
-                                        runOnJS([reject, message, &rt]() {
-                                          auto jsError = jsi::String::createFromUtf8(rt, [message UTF8String]);
-                                          reject->call(rt, jsError);
-                                        });
-                                      }];
+              auto resolve = ResolveCallback(rt, args[0].asObject(rt).asFunction(rt), jsInvoker);
+              auto reject = RejectCallback(rt, args[1].asObject(rt).asFunction(rt), jsInvoker);
+              
+              [transcriptionModule transcribe:audioData language:language resolve:^(id result) {
+                resolve.call([result](jsi::Runtime& rt, jsi::Function& resolveFunc) {
+                  auto jsResult = react::TurboModuleConvertUtils::convertObjCObjectToJSIValue(rt, result);
+                  resolveFunc.call(rt, jsResult);
+                });
+              } reject:^(NSString *code, NSString *message, NSError *error) {
+                reject.call([message](jsi::Runtime& rt, jsi::Function& rejectFunc) {
+                  auto jsError = jsi::String::createFromUtf8(rt, [message UTF8String]);
+                  rejectFunc.call(rt, jsError);
+                });
+              }];
               
               return jsi::Value::undefined();
             }
