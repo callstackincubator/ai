@@ -20,8 +20,10 @@
     "expo-clipboard": "~7.1.5",
     "expo-document-picker": "~13.1.6",
     "expo-status-bar": "2.2.3",
+    "nativewind": "^4.1.23",
     "react": "19.0.0",
     "react-native": "0.79.5",
+    "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "web-streams-polyfill": "^4.1.0",
@@ -29,7 +31,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "@types/react": "~19.0.10"
+    "@types/react": "~19.0.10",
+    "prettier-plugin-tailwindcss": "^0.5.11",
+    "tailwindcss": "^3.4.17"
   },
   "private": true
 }
