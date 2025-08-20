@@ -5,8 +5,8 @@ import { NavigationContainer } from '@react-navigation/native'
 import { StatusBar } from 'expo-status-bar'
 import React from 'react'
 
-import EmbeddingsScreen from './screens/EmbeddingsScreen'
 import LLMScreen from './screens/LLMScreen'
+import PlaygroundScreen from './screens/PlaygroundScreen'
 import SpeechScreen from './screens/SpeechScreen'
 import TranscribeScreen from './screens/TranscribeScreen'
 
@@ -17,7 +17,7 @@ export default function App() {
     <NavigationContainer>
       <Tab.Navigator>
         <Tab.Screen name="LLM" component={LLMScreen} />
-        <Tab.Screen name="Embeddings" component={EmbeddingsScreen} />
+        <Tab.Screen name="Playground" component={PlaygroundScreen} />
         <Tab.Screen name="Transcribe" component={TranscribeScreen} />
         <Tab.Screen name="Speech" component={SpeechScreen} />
       </Tab.Navigator>

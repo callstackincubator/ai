@@ -1,8 +1,8 @@
-import { apple, AppleUtils } from '@react-native-ai/apple'
+import { apple, AppleTranscription, AppleUtils } from '@react-native-ai/apple'
 import { Picker } from '@react-native-picker/picker'
 import { experimental_transcribe } from 'ai'
 import * as DocumentPicker from 'expo-document-picker'
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -17,12 +17,19 @@ const DEMO_FILE =
 
 export default function TranscribeScreen() {
   const [isTranscribing, setIsTranscribing] = useState(false)
-  const [transcription, setTranscription] = useState('')
+  const [transcription, setTranscription] = useState<{
+    text: string
+    time: number
+  } | null>(null)
   const [selectedFile, setSelectedFile] = useState<{
     name: string
     uri: string
   } | null>(null)
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
+  const [isPreparing, setIsPreparing] = useState(false)
+
+  const currentLanguage = selectedLanguage || AppleUtils.getCurrentLocale()
+  const isAvailable = AppleTranscription.isAvailable(currentLanguage)
 
   const pickAudioFile = async () => {
     try {
@@ -43,9 +50,28 @@ export default function TranscribeScreen() {
     }
   }
 
+  const prepareAssets = async () => {
+    if (isPreparing) return
+
+    setIsPreparing(true)
+    try {
+      await AppleTranscription.prepare(currentLanguage)
+      Alert.alert('Success', `Assets prepared for ${currentLanguage}`)
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to prepare assets'
+      )
+    } finally {
+      setIsPreparing(false)
+    }
+  }
+
   const transcribe = async (fileUri: string) => {
     setIsTranscribing(true)
-    setTranscription('')
+    setTranscription(null)
+
+    const startTime = Date.now()
 
     try {
       const response = await fetch(fileUri)
@@ -61,7 +87,13 @@ export default function TranscribeScreen() {
         },
       })
 
-      setTranscription(result.text)
+      const endTime = Date.now()
+      const duration = endTime - startTime
+
+      setTranscription({
+        text: result.text,
+        time: duration,
+      })
     } catch (error) {
       Alert.alert(
         'Transcription Error',
@@ -74,13 +106,35 @@ export default function TranscribeScreen() {
 
   return (
     <View className="flex-1 p-4">
-      <Text className="text-2xl font-bold text-center mb-2">Transcribe</Text>
-      <Text className="text-base text-center mb-6">
-        Speech to text transcription
-      </Text>
+      <Text className="text-center mb-2">Transcribe</Text>
+      <Text className="text-center mb-6">Speech to text transcription</Text>
 
       <View className="border border-gray-300 p-4 mb-4">
-        <Text className="text-lg font-medium mb-3">Language</Text>
+        <Text className="mb-3">Status</Text>
+        <Text className="text-center mb-2">
+          Transcription for {currentLanguage}:
+          {isAvailable ? 'Available' : 'Not Available'}
+        </Text>
+        {!isAvailable && (
+          <TouchableOpacity
+            className="border border-gray-600 p-3"
+            onPress={prepareAssets}
+            disabled={isPreparing}
+          >
+            {isPreparing ? (
+              <View className="flex-row justify-center items-center">
+                <ActivityIndicator className="mr-2" size="small" />
+                <Text>Preparing Assets...</Text>
+              </View>
+            ) : (
+              <Text className="text-center">Prepare Assets</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View className="border border-gray-300 p-4 mb-4">
+        <Text className="mb-3">Language</Text>
         <View className="border border-gray-300 mb-4">
           <Picker
             selectedValue={selectedLanguage}
@@ -103,7 +157,7 @@ export default function TranscribeScreen() {
       </View>
 
       <View className="border border-gray-300 p-4 mb-4">
-        <Text className="text-lg font-medium mb-3">Select Audio File</Text>
+        <Text className="mb-3">Select Audio File</Text>
 
         <TouchableOpacity
           className="border border-gray-400 p-3 mb-3"
@@ -114,13 +168,13 @@ export default function TranscribeScreen() {
         </TouchableOpacity>
 
         {selectedFile && (
-          <Text className="text-sm text-center mb-2">
+          <Text className="text-center mb-2">
             Selected: {selectedFile.name}
           </Text>
         )}
 
         <View className="border-t border-gray-300 pt-3">
-          <Text className="text-sm mb-2">Or use demo file:</Text>
+          <Text className="mb-2">Or use demo file:</Text>
           <TouchableOpacity
             className="border border-gray-400 p-3 mb-2"
             onPress={() => transcribe(DEMO_FILE)}
@@ -128,7 +182,7 @@ export default function TranscribeScreen() {
           >
             <Text className="text-center">Use Demo File</Text>
           </TouchableOpacity>
-          <Text className="text-xs text-center">
+          <Text className="text-center">
             Demo contains a Harvard sentence for testing
           </Text>
         </View>
@@ -155,10 +209,11 @@ export default function TranscribeScreen() {
 
       {transcription && (
         <View className="flex-1 border border-gray-300 p-4">
-          <Text className="text-lg font-medium mb-3">Transcription</Text>
+          <Text className="mb-3">Transcription</Text>
+          <Text className="mb-3">Completed in {transcription.time}ms</Text>
 
           <ScrollView className="flex-1 border border-gray-200 p-3">
-            <Text className="text-base">{transcription}</Text>
+            <Text>{transcription.text}</Text>
           </ScrollView>
         </View>
       )}
