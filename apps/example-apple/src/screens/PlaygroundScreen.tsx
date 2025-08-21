@@ -1,48 +1,25 @@
-import { createAppleProvider } from '@react-native-ai/apple'
+import { apple } from '@react-native-ai/apple'
+import { generateObject, generateText, streamText, tool } from 'ai'
+import React, { useState } from 'react'
 import {
-  experimental_generateSpeech,
-  experimental_transcribe,
-  generateObject,
-  streamText,
-  tool,
-} from 'ai'
-import * as Clipboard from 'expo-clipboard'
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { z } from 'zod'
 
-const getWeather = tool({
-  description: 'Retrieve the weather for a given city',
-  inputSchema: z.object({
-    city: z.string().describe('The city to get the weather for'),
-  }),
-  execute: async ({ city }) => {
-    console.log('Executing tool for city:', city)
-    const temperature = Math.floor(Math.random() * 20) + 10
-    return `Weather forecast for ${city}: ${temperature}°C`
-  },
-})
-
-export const apple = createAppleProvider({
-  availableTools: {
-    getWeather,
-  },
-})
-
-export async function basicStringDemo() {
-  const response = streamText({
+async function basicStringDemo() {
+  const response = await generateText({
     model: apple(),
-    system: `Help the person with getting weather information. Use tools to get the weather.`,
-    prompt: 'What is the weather in Wroclaw?',
-    tools: {
-      getWeather,
-    },
+    prompt: 'Who founded Apple?',
   })
-  for await (const chunk of response.textStream) {
-    console.log(chunk)
-  }
   return response.text
 }
 
-export async function basicStringStreamingDemo() {
+async function basicStringStreamingDemo() {
   const response = streamText({
     model: apple(),
     prompt: 'Write me short essay on the meaning of life',
@@ -53,7 +30,7 @@ export async function basicStringStreamingDemo() {
   return response.text
 }
 
-export async function colorEnumDemo() {
+async function colorEnumDemo() {
   const response = await generateObject({
     model: apple(),
     prompt: 'What color is the grass?',
@@ -66,7 +43,7 @@ export async function colorEnumDemo() {
   return response.object
 }
 
-export async function basicNumberDemo() {
+async function basicNumberDemo() {
   const response = await generateObject({
     model: apple(),
     system: 'There are 3 people in the room.',
@@ -80,7 +57,7 @@ export async function basicNumberDemo() {
   return response.object
 }
 
-export async function basicBooleanDemo() {
+async function basicBooleanDemo() {
   const response = await generateObject({
     model: apple(),
     prompt: 'Is the sky blue?',
@@ -93,7 +70,7 @@ export async function basicBooleanDemo() {
   return response.object
 }
 
-export async function basicObjectDemo() {
+async function basicObjectDemo() {
   const response = await generateObject({
     model: apple(),
     prompt: 'Create a simple person',
@@ -108,7 +85,7 @@ export async function basicObjectDemo() {
   return response.object
 }
 
-export async function basicArrayDemo() {
+async function basicArrayDemo() {
   const response = await generateObject({
     model: apple(),
     prompt: 'Random list of fruits',
@@ -123,28 +100,7 @@ export async function basicArrayDemo() {
   return response.object
 }
 
-export async function basicTranscribeDemo() {
-  const file = await fetch(
-    'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
-  )
-  const audio = await file.arrayBuffer()
-  const response = await experimental_transcribe({
-    model: apple.transcriptionModel(),
-    audio,
-  })
-  return response.text
-}
-
-export async function basicSpeechDemo() {
-  const response = await experimental_generateSpeech({
-    model: apple.speechModel(),
-    text: 'What is the weather in Wroclaw?',
-  })
-  await Clipboard.setStringAsync(response.audio.base64)
-  return 'Speech copied to clipboard. Go to https://base64.guru/converter/decode/audio to play.'
-}
-
-export const schemaDemos = {
+const playgroundDemos = {
   basicString: { name: 'String', func: basicStringDemo },
   basicStringStreaming: {
     name: 'String Streaming',
@@ -155,8 +111,57 @@ export const schemaDemos = {
   basicBoolean: { name: 'Boolean', func: basicBooleanDemo },
   basicObject: { name: 'Object', func: basicObjectDemo },
   basicArray: { name: 'Array', func: basicArrayDemo },
-  basicTranscribe: { name: 'Transcribe', func: basicTranscribeDemo },
-  basicSpeech: { name: 'Speech', func: basicSpeechDemo },
 }
 
-export type DemoKey = keyof typeof schemaDemos
+export default function PlaygroundScreen() {
+  const [loading, setLoading] = useState<string | null>(null)
+  const isAvailable = apple.isAvailable()
+
+  const runDemo = async (key: string) => {
+    if (loading) return
+
+    setLoading(key)
+
+    try {
+      const result = await playgroundDemos[key].func()
+      Alert.alert('Success', JSON.stringify(result, null, 2))
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : String(error)
+      )
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  return (
+    <View className="flex-1 p-4">
+      <Text className="text-center mb-2">Playground</Text>
+      <Text className="text-center mb-2">Test Apple Intelligence features</Text>
+      <Text className="text-center mb-6">
+        Apple Intelligence: {isAvailable ? 'Available' : 'Not Available'}
+      </Text>
+
+      <ScrollView className="flex-1">
+        {Object.entries(playgroundDemos).map(([key, demo]) => (
+          <TouchableOpacity
+            key={key}
+            className={`border p-4 mb-3 ${
+              loading === key ? 'border-gray-400' : 'border-gray-300'
+            }`}
+            onPress={() => runDemo(key)}
+            disabled={loading !== null}
+          >
+            <View className="flex-row items-center justify-center">
+              {loading === key && (
+                <ActivityIndicator size="small" className="mr-2" />
+              )}
+              <Text className="text-center">{demo.name}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  )
+}
