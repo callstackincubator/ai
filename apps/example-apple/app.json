@@ -33,6 +33,15 @@
         {
           "calendarPermission": "The app needs to access your calendar."
         }
+      ],
+      "react-native-bottom-tabs",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
       ]
     ]
   }
