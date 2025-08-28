@@ -136,32 +136,35 @@ export default function PlaygroundScreen() {
   }
 
   return (
-    <View className="flex-1 p-4">
-      <Text className="text-center mb-2">Playground</Text>
-      <Text className="text-center mb-2">Test Apple Intelligence features</Text>
-      <Text className="text-center mb-6">
-        Apple Intelligence: {isAvailable ? 'Available' : 'Not Available'}
-      </Text>
+    <ScrollView contentInsetAdjustmentBehavior="automatic">
+      <View className="flex-1 p-4">
+        <Text className="text-center mb-2">
+          Test Apple Intelligence features
+        </Text>
+        <Text className="text-center mb-6">
+          Apple Intelligence: {isAvailable ? 'Available' : 'Not Available'}
+        </Text>
 
-      <ScrollView className="flex-1">
-        {Object.entries(playgroundDemos).map(([key, demo]) => (
-          <TouchableOpacity
-            key={key}
-            className={`border p-4 mb-3 ${
-              loading === key ? 'border-gray-400' : 'border-gray-300'
-            }`}
-            onPress={() => runDemo(key)}
-            disabled={loading !== null}
-          >
-            <View className="flex-row items-center justify-center">
-              {loading === key && (
-                <ActivityIndicator size="small" className="mr-2" />
-              )}
-              <Text className="text-center">{demo.name}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
+        <View className="flex-1">
+          {Object.entries(playgroundDemos).map(([key, demo]) => (
+            <TouchableOpacity
+              key={key}
+              className={`border p-4 mb-3 ${
+                loading === key ? 'border-gray-400' : 'border-gray-300'
+              }`}
+              onPress={() => runDemo(key)}
+              disabled={loading !== null}
+            >
+              <View className="flex-row items-center justify-center">
+                {loading === key && (
+                  <ActivityIndicator size="small" className="mr-2" />
+                )}
+                <Text className="text-center">{demo.name}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </ScrollView>
   )
 }

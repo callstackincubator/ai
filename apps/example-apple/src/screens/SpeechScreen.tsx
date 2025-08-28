@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -56,47 +57,46 @@ export default function SpeechScreen() {
   }
 
   return (
-    <View className="flex-1 p-4">
-      <Text className="text-center mb-2">Speech</Text>
-      <Text className="text-center mb-6">Text to speech synthesis</Text>
+    <ScrollView contentInsetAdjustmentBehavior="automatic">
+      <View className="flex-1 p-4">
+        <View className="border border-gray-300 p-4 mb-4">
+          <Text className="mb-3">Text Input</Text>
+          <TextInput
+            className="border border-gray-300 p-3 mb-4"
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Enter text to convert to speech"
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
 
-      <View className="border border-gray-300 p-4 mb-4">
-        <Text className="mb-3">Text Input</Text>
-        <TextInput
-          className="border border-gray-300 p-3 mb-4"
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Enter text to convert to speech"
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-
-        <TouchableOpacity onPress={generateSpeech} disabled={isGenerating}>
-          {isGenerating ? (
-            <View className="flex-row justify-center items-center">
-              <ActivityIndicator className="mr-2" />
-              <Text>Generating Speech...</Text>
-            </View>
-          ) : (
-            <Text className="text-center">Generate Speech</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {generatedSpeech && (
-        <View className="border border-gray-300 p-4">
-          <Text className="mb-3">Generated Speech</Text>
-          <Text className="mb-3">Completed in {generatedSpeech.time}ms</Text>
-
-          <TouchableOpacity
-            className="border border-gray-600 p-3"
-            onPress={() => play(generatedSpeech.arrayBuffer)}
-          >
-            <Text className="text-center">Play</Text>
+          <TouchableOpacity onPress={generateSpeech} disabled={isGenerating}>
+            {isGenerating ? (
+              <View className="flex-row justify-center items-center">
+                <ActivityIndicator className="mr-2" />
+                <Text>Generating Speech...</Text>
+              </View>
+            ) : (
+              <Text className="text-center">Generate Speech</Text>
+            )}
           </TouchableOpacity>
         </View>
-      )}
-    </View>
+
+        {generatedSpeech && (
+          <View className="border border-gray-300 p-4">
+            <Text className="mb-3">Generated Speech</Text>
+            <Text className="mb-3">Completed in {generatedSpeech.time}ms</Text>
+
+            <TouchableOpacity
+              className="border border-gray-600 p-3"
+              onPress={() => play(generatedSpeech.arrayBuffer)}
+            >
+              <Text className="text-center">Play</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </ScrollView>
   )
 }

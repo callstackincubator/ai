@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { z } from 'zod'
 
 interface Message {
@@ -148,12 +149,8 @@ export default function LLMScreen() {
   }
 
   return (
-    <View className="flex-1">
-      <View className="p-4 border-b border-gray-300">
-        <Text className="text-center">LLM Chat</Text>
-      </View>
-
-      <ScrollView className="flex-1 p-4">
+    <ScrollView contentInsetAdjustmentBehavior="automatic">
+      <View className="flex-1 p-4">
         {messages.length === 0 ? (
           <View className="flex-1 justify-center items-center">
             <Text className="text-center">
@@ -186,7 +183,7 @@ export default function LLMScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
+      </View>
 
       <View className="border-t border-gray-300 p-4">
         <View className="flex-row items-end">
@@ -213,6 +210,6 @@ export default function LLMScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </ScrollView>
   )
 }
