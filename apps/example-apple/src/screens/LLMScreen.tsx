@@ -1,7 +1,5 @@
 import { createAppleProvider } from '@react-native-ai/apple'
-import { generateText, tool } from 'ai'
-import * as Battery from 'expo-battery'
-import * as Calendar from 'expo-calendar'
+import { generateText } from 'ai'
 import React, { useState } from 'react'
 import {
   ActivityIndicator,
@@ -12,7 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { z } from 'zod'
+
+import {
+  checkBattery,
+  checkCalendarEvents,
+  createCalendarEvent,
+} from '../tools'
 
 interface Message {
   id: string
@@ -20,78 +23,11 @@ interface Message {
   content: string
 }
 
-const checkBattery = tool({
-  description: 'Check device battery level and charging status',
-  inputSchema: z.object({}),
-  execute: async () => {
-    const level = await Battery.getBatteryLevelAsync()
-    const state = await Battery.getBatteryStateAsync()
-
-    return {
-      level: Math.round(level * 100),
-      isCharging: state === Battery.BatteryState.CHARGING,
-    }
-  },
-})
-
-const createCalendarEvent = tool({
-  description: 'Create a new calendar event',
-  inputSchema: z.object({
-    title: z.string().describe('Event title'),
-    date: z.string().describe('Event date (YYYY-MM-DD)'),
-    time: z.string().optional().describe('Event time (HH:MM)'),
-    duration: z.number().optional().describe('Duration in minutes'),
-  }),
-  execute: async ({ title, date, time, duration = 60 }) => {
-    await Calendar.requestCalendarPermissionsAsync()
-
-    const calendars = await Calendar.getCalendarsAsync(
-      Calendar.EntityTypes.EVENT
-    )
-
-    const eventDate = new Date(date)
-    if (time) {
-      const [hours, minutes] = time.split(':').map(Number)
-      eventDate.setHours(hours, minutes)
-    }
-
-    await Calendar.createEventAsync(calendars[0].id, {
-      title,
-      startDate: eventDate,
-      endDate: new Date(eventDate.getTime() + duration * 60 * 1000),
-    })
-
-    return { message: `Created "${title}"` }
-  },
-})
-
-const checkCalendarEvents = tool({
-  description: 'Check upcoming calendar events',
-  inputSchema: z.object({
-    days: z.number().optional().describe('Number of days to look ahead'),
-  }),
-  execute: async ({ days = 7 }) => {
-    await Calendar.requestCalendarPermissionsAsync()
-
-    const calendars = await Calendar.getCalendarsAsync(
-      Calendar.EntityTypes.EVENT
-    )
-
-    const startDate = new Date()
-    const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000)
-
-    const events = await Calendar.getEventsAsync(
-      calendars.map((cal) => cal.id),
-      startDate,
-      endDate
-    )
-
-    return events.map((event) => ({
-      title: event.title,
-      date: event.startDate,
-    }))
-  },
-})
+const EXAMPLE_MESSAGES = [
+  'What is on my agenda this week?',
+  'How much battery I have left?',
+  'Who founded Apple?',
+]
 
 const apple = createAppleProvider({
   availableTools: {
@@ -106,13 +42,13 @@ export default function LLMScreen() {
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || isGenerating) return
+  const sendMessage = async (messageText: string) => {
+    if (!messageText.trim() || isGenerating) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputText.trim(),
+      content: messageText.trim(),
     }
 
     setMessages((prev) => [...prev, userMessage])
@@ -122,7 +58,7 @@ export default function LLMScreen() {
     try {
       const result = await generateText({
         model: apple(),
-        messages: [...messages, { role: 'user', content: userMessage.content }],
+        messages: [...messages, { role: 'user', content: messageText.trim() }],
         tools: {
           checkBattery,
           createCalendarEvent,
@@ -148,35 +84,27 @@ export default function LLMScreen() {
   }
 
   return (
-    <View className="flex-1">
-      <View className="p-4 border-b border-gray-300">
-        <Text className="text-center">LLM Chat</Text>
-      </View>
-
-      <ScrollView className="flex-1 p-4">
-        {messages.length === 0 ? (
-          <View className="flex-1 justify-center items-center">
-            <Text className="text-center">
-              Start a conversation with Apple Intelligence
+    <ScrollView contentInsetAdjustmentBehavior="automatic">
+      <Text className="text-center mb-6">
+        Start a conversation with Apple Intelligence
+      </Text>
+      <View className="flex-1 p-4">
+        {messages.map((message) => (
+          <View
+            key={message.id}
+            className={`mb-4 p-3 border ${
+              message.role === 'user'
+                ? 'border-gray-400 self-end max-w-[80%]'
+                : 'border-gray-300 self-start max-w-[80%]'
+            }`}
+          >
+            <Text className="mb-1">
+              {message.role === 'user' ? 'You' : 'Assistant'}
             </Text>
+            <Text>{message.content}</Text>
           </View>
-        ) : (
-          messages.map((message) => (
-            <View
-              key={message.id}
-              className={`mb-4 p-3 border ${
-                message.role === 'user'
-                  ? 'border-gray-400 self-end max-w-[80%]'
-                  : 'border-gray-300 self-start max-w-[80%]'
-              }`}
-            >
-              <Text className="mb-1">
-                {message.role === 'user' ? 'You' : 'Assistant'}
-              </Text>
-              <Text>{message.content}</Text>
-            </View>
-          ))
-        )}
+        ))}
+
         {isGenerating && (
           <View className="mb-4 p-3 border border-gray-300 self-start max-w-[80%]">
             <Text className="mb-1">Assistant</Text>
@@ -186,7 +114,7 @@ export default function LLMScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
+      </View>
 
       <View className="border-t border-gray-300 p-4">
         <View className="flex-row items-end">
@@ -197,7 +125,7 @@ export default function LLMScreen() {
             placeholder="Type your message..."
             multiline
             maxLength={500}
-            onSubmitEditing={sendMessage}
+            onSubmitEditing={() => sendMessage(inputText)}
             editable={!isGenerating}
           />
           <TouchableOpacity
@@ -206,13 +134,29 @@ export default function LLMScreen() {
                 ? 'border-gray-600'
                 : 'border-gray-300'
             }`}
-            onPress={sendMessage}
+            onPress={() => sendMessage(inputText)}
             disabled={!inputText.trim() || isGenerating}
           >
             <Text className="text-center">Send</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+
+      {messages.length === 0 && (
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-lg font-semibold mb-4">Try the following</Text>
+          {EXAMPLE_MESSAGES.map((message, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => sendMessage(message)}
+              className="mb-3 p-3 border border-gray-300"
+              disabled={isGenerating}
+            >
+              <Text>{message}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </ScrollView>
   )
 }
