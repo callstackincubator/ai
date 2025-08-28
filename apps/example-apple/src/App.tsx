@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import React from 'react'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import LLMScreen from './screens/LLMScreen'
 import PlaygroundScreen from './screens/PlaygroundScreen'
@@ -13,6 +14,7 @@ import TranscribeScreen from './screens/TranscribeScreen'
 
 const Tab = createNativeBottomTabNavigator()
 
+const RootStack = createNativeStackNavigator()
 const LLMStack = createNativeStackNavigator()
 const PlaygroundStack = createNativeStackNavigator()
 const TranscribeStack = createNativeStackNavigator()
@@ -71,40 +73,54 @@ function SpeechStackScreen() {
   )
 }
 
+function Tabs() {
+  return (
+    <Tab.Navigator sidebarAdaptable>
+      <Tab.Screen
+        name="LLM"
+        component={LLMStackScreen}
+        options={{
+          tabBarIcon: () => ({ sfSymbol: 'brain.head.profile' }),
+        }}
+      />
+      <Tab.Screen
+        name="Playground"
+        component={PlaygroundStackScreen}
+        options={{
+          tabBarIcon: () => ({ sfSymbol: 'play.circle' }),
+        }}
+      />
+      <Tab.Screen
+        name="Transcribe"
+        component={TranscribeStackScreen}
+        options={{
+          tabBarIcon: () => ({ sfSymbol: 'text.quote' }),
+        }}
+      />
+      <Tab.Screen
+        name="Speech"
+        component={SpeechStackScreen}
+        options={{
+          tabBarIcon: () => ({ sfSymbol: 'speaker.wave.3' }),
+        }}
+      />
+    </Tab.Navigator>
+  )
+}
+
 export default function App() {
   return (
-    <NavigationContainer>
-      <Tab.Navigator sidebarAdaptable>
-        <Tab.Screen
-          name="LLM"
-          component={LLMStackScreen}
-          options={{
-            tabBarIcon: () => ({ sfSymbol: 'brain.head.profile' }),
-          }}
-        />
-        <Tab.Screen
-          name="Playground"
-          component={PlaygroundStackScreen}
-          options={{
-            tabBarIcon: () => ({ sfSymbol: 'play.circle' }),
-          }}
-        />
-        <Tab.Screen
-          name="Transcribe"
-          component={TranscribeStackScreen}
-          options={{
-            tabBarIcon: () => ({ sfSymbol: 'text.quote' }),
-          }}
-        />
-        <Tab.Screen
-          name="Speech"
-          component={SpeechStackScreen}
-          options={{
-            tabBarIcon: () => ({ sfSymbol: 'speaker.wave.3' }),
-          }}
-        />
-      </Tab.Navigator>
-      <StatusBar style="auto" />
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <RootStack.Navigator>
+          <RootStack.Screen
+            name="Home"
+            component={Tabs}
+            options={{ headerShown: false }}
+          />
+        </RootStack.Navigator>
+        <StatusBar style="auto" />
+      </NavigationContainer>
+    </SafeAreaProvider>
   )
 }
