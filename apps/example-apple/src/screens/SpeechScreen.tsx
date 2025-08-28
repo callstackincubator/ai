@@ -10,9 +10,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { AudioContext } from 'react-native-audio-api'
 
-const play = (arrayBuffer: ArrayBufferLike) => {
-  // todo: implement this later
+const play = async (arrayBuffer: ArrayBufferLike) => {
+  const context = new AudioContext()
+
+  const source = context.createBufferSource()
+  source.buffer = await context.decodeAudioData(arrayBuffer as ArrayBuffer)
+  source.connect(context.destination)
+
+  source.start()
 }
 
 export default function SpeechScreen() {
