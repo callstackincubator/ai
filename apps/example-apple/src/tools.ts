@@ -3,7 +3,9 @@ import * as Battery from 'expo-battery'
 import * as Calendar from 'expo-calendar'
 import { z } from 'zod'
 
-// Retrieves the current battery level and charging status of the device
+/**
+ * Retrieves the current battery level and charging status of the device
+ */
 export const checkBattery = tool({
   description: 'Check device battery level and charging status',
   inputSchema: z.object({}),
@@ -18,7 +20,9 @@ export const checkBattery = tool({
   },
 })
 
-// Creates a new calendar event with specified title, date, time and duration
+/**
+ * Creates a new calendar event with specified title, date, time and duration
+ */
 export const createCalendarEvent = tool({
   description: 'Create a new calendar event',
   inputSchema: z.object({
@@ -50,7 +54,9 @@ export const createCalendarEvent = tool({
   },
 })
 
-// Retrieves upcoming calendar events for a specified number of days
+/**
+ * Retrieves upcoming calendar events for a specified number of days
+ */
 export const checkCalendarEvents = tool({
   description: 'Check upcoming calendar events',
   inputSchema: z.object({
