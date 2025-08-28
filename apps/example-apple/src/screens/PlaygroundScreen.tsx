@@ -1,5 +1,5 @@
 import { apple } from '@react-native-ai/apple'
-import { generateObject, generateText, streamText, tool } from 'ai'
+import { generateObject, generateText, streamText } from 'ai'
 import React, { useState } from 'react'
 import {
   ActivityIndicator,
