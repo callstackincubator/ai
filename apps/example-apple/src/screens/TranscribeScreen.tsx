@@ -1,19 +1,33 @@
 import { apple, AppleTranscription, AppleUtils } from '@react-native-ai/apple'
 import { Picker } from '@react-native-picker/picker'
 import { experimental_transcribe } from 'ai'
-import * as DocumentPicker from 'expo-document-picker'
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Button,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import {
+  AudioBuffer,
+  AudioContext,
+  AudioManager,
+  AudioRecorder,
+  RecorderAdapterNode,
+} from 'react-native-audio-api'
+
+import {
+  float32ArrayToWAV,
+  mergeBuffersToFloat32Array,
+} from '../utils/audioUtils'
 
 const DEMO_FILE =
   'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
+
+const SAMPLE_RATE = 16000
 
 export default function TranscribeScreen() {
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -21,34 +35,32 @@ export default function TranscribeScreen() {
     text: string
     time: number
   } | null>(null)
-  const [selectedFile, setSelectedFile] = useState<{
-    name: string
-    uri: string
-  } | null>(null)
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
   const [isPreparing, setIsPreparing] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+
+  const recorderRef = useRef<AudioRecorder | null>(null)
+  const aCtxRef = useRef<AudioContext | null>(null)
+  const recorderAdapterRef = useRef<RecorderAdapterNode | null>(null)
+  const audioBuffersRef = useRef<AudioBuffer[]>([])
 
   const currentLanguage = selectedLanguage || AppleUtils.getCurrentLocale()
   const isAvailable = AppleTranscription.isAvailable(currentLanguage)
 
-  const pickAudioFile = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['audio/*'],
-        copyToCacheDirectory: true,
-      })
+  useEffect(() => {
+    AudioManager.setAudioSessionOptions({
+      iosCategory: 'playAndRecord',
+      iosMode: 'spokenAudio',
+      iosOptions: ['defaultToSpeaker', 'allowBluetoothA2DP'],
+    })
 
-      if (result.assets && result.assets.length > 0) {
-        const file = result.assets[0]
-        setSelectedFile({ name: file.name, uri: file.uri })
-      }
-    } catch (error) {
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to pick file'
-      )
-    }
-  }
+    AudioManager.requestRecordingPermissions()
+
+    recorderRef.current = new AudioRecorder({
+      sampleRate: SAMPLE_RATE,
+      bufferLengthInSamples: SAMPLE_RATE,
+    })
+  }, [])
 
   const prepareAssets = async () => {
     if (isPreparing) return
@@ -104,9 +116,104 @@ export default function TranscribeScreen() {
     }
   }
 
+  const startRecording = () => {
+    if (!recorderRef.current) {
+      console.error('AudioRecorder is not initialized')
+      return
+    }
+
+    audioBuffersRef.current = []
+
+    recorderRef.current.onAudioReady((event) => {
+      const { buffer, numFrames, when } = event
+      console.log(
+        'Audio recorder buffer ready:',
+        buffer.duration,
+        numFrames,
+        when
+      )
+      audioBuffersRef.current.push(buffer)
+    })
+
+    aCtxRef.current = new AudioContext({ sampleRate: SAMPLE_RATE })
+    recorderAdapterRef.current = aCtxRef.current.createRecorderAdapter()
+    recorderAdapterRef.current.connect(aCtxRef.current.destination)
+    recorderRef.current.connect(recorderAdapterRef.current)
+
+    recorderRef.current.start()
+    setIsRecording(true)
+    console.log('Recording started')
+
+    if (aCtxRef.current.state === 'suspended') {
+      aCtxRef.current.resume()
+    }
+  }
+
+  const stopRecording = async () => {
+    if (!recorderRef.current) {
+      console.error('AudioRecorder is not initialized')
+      return
+    }
+
+    recorderRef.current.stop()
+    setIsRecording(false)
+
+    // Merge all recorded PCM data
+    const mergedPCM = mergeBuffersToFloat32Array(audioBuffersRef.current)
+    if (mergedPCM.length > 0) {
+      const duration = mergedPCM.length / SAMPLE_RATE
+      console.log(
+        `Merged ${audioBuffersRef.current.length} buffers: ${duration.toFixed(1)}s, ${mergedPCM.length} samples`
+      )
+
+      // Convert to WAV and transcribe
+      const wavBuffer = float32ArrayToWAV(mergedPCM, SAMPLE_RATE)
+      await transcribe(
+        'data:audio/wav;base64,' +
+          btoa(String.fromCharCode(...new Uint8Array(wavBuffer)))
+      )
+    }
+
+    aCtxRef.current = null
+    recorderAdapterRef.current = null
+    console.log('Recording stopped')
+  }
+
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic">
       <View className="flex-1 p-4">
+        <View className="border border-gray-300 p-4 mb-4">
+          <Text className="mb-3">Audio Recording</Text>
+          <Text className="text-center mb-2">Sample rate: {SAMPLE_RATE}</Text>
+
+          <TouchableOpacity
+            className={`border p-3 mb-3 ${
+              !isRecording ? 'border-gray-600' : 'border-gray-300'
+            }`}
+            onPress={startRecording}
+            disabled={isRecording}
+          >
+            <Text className="text-center">
+              {isRecording ? 'Recording...' : 'Start Recording'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className={`border p-3 ${
+              isRecording ? 'border-gray-600' : 'border-gray-300'
+            }`}
+            onPress={stopRecording}
+            disabled={!isRecording}
+          >
+            <Text className="text-center">Stop Recording</Text>
+          </TouchableOpacity>
+
+          {audioBuffersRef.current.length > 0 && (
+            <Text className="text-center mt-2">
+              Recorded {audioBuffersRef.current.length} audio buffers
+            </Text>
+          )}
+        </View>
         <Text className="text-center mb-6">Speech to text transcription</Text>
 
         <View className="border border-gray-300 p-4 mb-4">
@@ -157,55 +264,20 @@ export default function TranscribeScreen() {
         </View>
 
         <View className="border border-gray-300 p-4 mb-4">
-          <Text className="mb-3">Select Audio File</Text>
-
+          <Text className="mb-3">Demo File</Text>
           <TouchableOpacity
-            className="border border-gray-400 p-3 mb-3"
-            onPress={pickAudioFile}
+            className="border border-gray-400 p-3 mb-2"
+            onPress={() => transcribe(DEMO_FILE)}
             disabled={isTranscribing}
           >
-            <Text className="text-center">Pick Audio File</Text>
-          </TouchableOpacity>
-
-          {selectedFile && (
-            <Text className="text-center mb-2">
-              Selected: {selectedFile.name}
-            </Text>
-          )}
-
-          <View className="border-t border-gray-300 pt-3">
-            <Text className="mb-2">Or use demo file:</Text>
-            <TouchableOpacity
-              className="border border-gray-400 p-3 mb-2"
-              onPress={() => transcribe(DEMO_FILE)}
-              disabled={isTranscribing}
-            >
-              <Text className="text-center">Use Demo File</Text>
-            </TouchableOpacity>
             <Text className="text-center">
-              Demo contains a Harvard sentence for testing
+              {isTranscribing ? 'Transcribing...' : 'Transcribe Demo File'}
             </Text>
-          </View>
+          </TouchableOpacity>
+          <Text className="text-center">
+            Demo contains a Harvard sentence for testing
+          </Text>
         </View>
-
-        <TouchableOpacity
-          className={`border p-4 mb-4 ${
-            selectedFile && !isTranscribing
-              ? 'border-gray-600'
-              : 'border-gray-300'
-          }`}
-          onPress={() => selectedFile && transcribe(selectedFile.uri)}
-          disabled={!selectedFile || isTranscribing}
-        >
-          {isTranscribing ? (
-            <View className="flex-row justify-center items-center">
-              <ActivityIndicator className="mr-2" />
-              <Text>Transcribing...</Text>
-            </View>
-          ) : (
-            <Text className="text-center">Transcribe Selected File</Text>
-          )}
-        </TouchableOpacity>
 
         {transcription && (
           <View className="flex-1 border border-gray-300 p-4">
