@@ -5,7 +5,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Button,
   ScrollView,
   Text,
   TouchableOpacity,
