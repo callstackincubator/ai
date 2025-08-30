@@ -91,14 +91,14 @@ using namespace react;
             jsi::PropNameID::forAscii(rt, "executor"),
             2,
             [speechModule, text, options, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
-              using ResolveCallback = facebook::react::AsyncCallback<NSData*>;
+              using ResolveCallback = facebook::react::AsyncCallback<NSDictionary*>;
               using RejectCallback = facebook::react::AsyncCallback<NSString*, NSString*, NSError*>;
               
               auto resolve = ResolveCallback(rt, args[0].asObject(rt).asFunction(rt), jsInvoker);
               auto reject = RejectCallback(rt, args[1].asObject(rt).asFunction(rt), jsInvoker);
               
-              [speechModule generateAudio:text options:options resolve:^(NSData *audioData) {
-                resolve.call([audioData](jsi::Runtime& rt, jsi::Function& resolveFunc) {
+              [speechModule generateAudio:text options:options resolve:^(NSDictionary *result) {
+                resolve.call([result](jsi::Runtime& rt, jsi::Function& resolveFunc) {
                   class NSDataMutableBuffer : public facebook::jsi::MutableBuffer {
                   public:
                     NSDataMutableBuffer(uint8_t* data, size_t size) : _data(data), _size(size) {}
@@ -109,13 +109,23 @@ using namespace react;
                     size_t _size;
                   };
 
+                  // Extract PCM data
+                  NSData *audioData = result[@"data"];
                   uint8_t* data = (uint8_t*)[audioData bytes];
                   size_t size = [audioData length];
                   
                   auto mutableBuffer = std::make_shared<NSDataMutableBuffer>(data, size);
                   auto arrayBuffer = jsi::ArrayBuffer(rt, mutableBuffer);
 
-                  resolveFunc.call(rt, std::move(arrayBuffer));
+                  // Create result object with format information
+                  auto resultObj = jsi::Object(rt);
+                  resultObj.setProperty(rt, "data", std::move(arrayBuffer));
+                  resultObj.setProperty(rt, "sampleRate", jsi::Value(rt, [result[@"sampleRate"] intValue]));
+                  resultObj.setProperty(rt, "channels", jsi::Value(rt, [result[@"channels"] intValue]));
+                  resultObj.setProperty(rt, "bitsPerSample", jsi::Value(rt, [result[@"bitsPerSample"] intValue]));
+                  resultObj.setProperty(rt, "formatType", jsi::Value(rt, [result[@"formatType"] intValue]));
+
+                  resolveFunc.call(rt, std::move(resultObj));
                 });
               } reject:^(NSString *code, NSString *message, NSError *error) {
                 reject.call([message](jsi::Runtime& rt, jsi::Function& rejectFunc) {
