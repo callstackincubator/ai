@@ -37,6 +37,8 @@ export default function TranscribeScreen() {
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
   const [isPreparing, setIsPreparing] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [wavBuffer, setWavBuffer] = useState<ArrayBuffer | null>(null)
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false)
 
   const recorderRef = useRef<AudioRecorder | null>(null)
   const aCtxRef = useRef<AudioContext | null>(null)
@@ -78,16 +80,13 @@ export default function TranscribeScreen() {
     }
   }
 
-  const transcribe = async (fileUri: string) => {
+  const transcribe = async (audioBuffer: ArrayBuffer) => {
     setIsTranscribing(true)
     setTranscription(null)
 
     const startTime = Date.now()
 
     try {
-      const response = await fetch(fileUri)
-      const audioBuffer = await response.arrayBuffer()
-
       const result = await experimental_transcribe({
         model: apple.transcriptionModel(),
         audio: audioBuffer,
@@ -112,6 +111,22 @@ export default function TranscribeScreen() {
       )
     } finally {
       setIsTranscribing(false)
+    }
+  }
+
+  const loadDemoFile = async () => {
+    setIsLoadingDemo(true)
+    try {
+      const response = await fetch(DEMO_FILE)
+      const audioBuffer = await response.arrayBuffer()
+      setWavBuffer(audioBuffer)
+    } catch (error) {
+      Alert.alert(
+        'Load Error',
+        error instanceof Error ? error.message : 'Failed to load demo file'
+      )
+    } finally {
+      setIsLoadingDemo(false)
     }
   }
 
@@ -165,12 +180,9 @@ export default function TranscribeScreen() {
         `Merged ${audioBuffersRef.current.length} buffers: ${duration.toFixed(1)}s, ${mergedPCM.length} samples`
       )
 
-      // Convert to WAV and transcribe
-      const wavBuffer = float32ArrayToWAV(mergedPCM, SAMPLE_RATE)
-      await transcribe(
-        'data:audio/wav;base64,' +
-          btoa(String.fromCharCode(...new Uint8Array(wavBuffer)))
-      )
+      // Convert to WAV and store in state
+      const recordedWavBuffer = float32ArrayToWAV(mergedPCM, SAMPLE_RATE)
+      setWavBuffer(recordedWavBuffer)
     }
 
     aCtxRef.current = null
@@ -266,17 +278,32 @@ export default function TranscribeScreen() {
           <Text className="mb-3">Demo File</Text>
           <TouchableOpacity
             className="border border-gray-400 p-3 mb-2"
-            onPress={() => transcribe(DEMO_FILE)}
-            disabled={isTranscribing}
+            onPress={loadDemoFile}
+            disabled={isLoadingDemo}
           >
             <Text className="text-center">
-              {isTranscribing ? 'Transcribing...' : 'Transcribe Demo File'}
+              {isLoadingDemo ? 'Loading...' : 'Load Demo File'}
             </Text>
           </TouchableOpacity>
           <Text className="text-center">
             Demo contains a Harvard sentence for testing
           </Text>
         </View>
+
+        {wavBuffer && (
+          <View className="border border-gray-300 p-4 mb-4">
+            <Text className="mb-3">Loaded Audio</Text>
+            <TouchableOpacity
+              className="border border-gray-600 p-3"
+              onPress={() => transcribe(wavBuffer)}
+              disabled={isTranscribing}
+            >
+              <Text className="text-center">
+                {isTranscribing ? 'Transcribing...' : 'Transcribe Loaded Audio'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {transcription && (
           <View className="flex-1 border border-gray-300 p-4">
