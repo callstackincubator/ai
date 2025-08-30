@@ -78,15 +78,15 @@ extension AppleSpeechImpl {
     let (formatType, bitsPerSample): (Int, Int) = {
       switch first.format.commonFormat {
       case .pcmFormatFloat32:
-        return (1, 32) // Float format, 32-bit
+        return (1, 32)
       case .pcmFormatFloat64:
-        return (1, 64) // Float format, 64-bit
+        return (1, 64)
       case .pcmFormatInt16:
-        return (0, 16) // Integer format, 16-bit
+        return (0, 16)
       case .pcmFormatInt32:
-        return (0, 32) // Integer format, 32-bit
+        return (0, 32)
       default:
-        return (1, 32) // Default to Float32 for unknown formats
+        return (1, 32)
       }
     }()
     

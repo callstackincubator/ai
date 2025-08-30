@@ -2,10 +2,10 @@ import { addWAVHeader, AudioFormatType } from '@react-native-ai/apple'
 
 /**
  * Merges multiple AudioBuffer objects into a single continuous Float32Array
- * 
+ *
  * The Web Audio API recording typically provides audio data as a series of AudioBuffer chunks.
  * Each buffer contains PCM data that can be accessed via getChannelData().
- * 
+ *
  * In the future, we should support multiple channels too.
  */
 export const mergeBuffersToFloat32Array = (
@@ -30,7 +30,7 @@ export const mergeBuffersToFloat32Array = (
 
 /**
  * Converts Float32Array PCM data to WAV file format
- * 
+ *
  * Uses the addWAVHeader utility from @react-native-ai/apple library with appropriate format settings.
  * This ensures consistent WAV file generation across the application.
  */
@@ -42,6 +42,6 @@ export const float32ArrayToWAV = (
     sampleRate,
     channels: 1,
     bitsPerSample: 32,
-    formatType: AudioFormatType.FLOAT
+    formatType: AudioFormatType.FLOAT,
   })
 }
