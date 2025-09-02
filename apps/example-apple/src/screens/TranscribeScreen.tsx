@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -27,6 +28,153 @@ const DEMO_FILE =
   'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
 
 const SAMPLE_RATE = 16000
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+  },
+  title: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  sampleRateText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  button: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButton: {
+    backgroundColor: '#3b82f6',
+    shadowColor: '#3b82f6',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  secondaryButton: {
+    backgroundColor: '#f3f4f6',
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+  },
+  disabledButton: {
+    backgroundColor: '#9ca3af',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  secondaryButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  availableStatus: {
+    color: '#10b981',
+    fontWeight: '600',
+  },
+  unavailableStatus: {
+    color: '#ef4444',
+    fontWeight: '600',
+  },
+  pickerContainer: {
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: '#f9fafb',
+  },
+  demoDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  transcriptionText: {
+    fontSize: 16,
+    color: '#111827',
+    lineHeight: 24,
+  },
+  transcriptionScrollView: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 12,
+    backgroundColor: '#f9fafb',
+    maxHeight: 200,
+  },
+  timeText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  bufferInfo: {
+    fontSize: 14,
+    color: '#10b981',
+    textAlign: 'center',
+    marginTop: 12,
+    fontWeight: '500',
+  },
+})
 
 export default function TranscribeScreen() {
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -51,8 +199,8 @@ export default function TranscribeScreen() {
   useEffect(() => {
     AudioManager.setAudioSessionOptions({
       iosCategory: 'playAndRecord',
-      iosMode: 'spokenAudio',
-      iosOptions: ['defaultToSpeaker', 'allowBluetoothA2DP'],
+      iosMode: 'voiceChat',
+      iosOptions: ['defaultToSpeaker', 'allowBluetooth'],
     })
 
     AudioManager.requestRecordingPermissions()
@@ -191,69 +339,89 @@ export default function TranscribeScreen() {
   }
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic">
-      <View className="flex-1 p-4">
-        <View className="border border-gray-300 p-4 mb-4">
-          <Text className="mb-3">Audio Recording</Text>
-          <Text className="text-center mb-2">Sample rate: {SAMPLE_RATE}</Text>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      style={styles.container}
+    >
+      <View style={styles.scrollView}>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Audio Recording</Text>
+          <Text style={styles.sampleRateText}>Sample rate: {SAMPLE_RATE}</Text>
 
           <TouchableOpacity
-            className={`border p-3 mb-3 ${
-              !isRecording ? 'border-gray-600' : 'border-gray-300'
-            }`}
+            style={[
+              styles.button,
+              isRecording ? styles.disabledButton : styles.primaryButton,
+            ]}
             onPress={startRecording}
             disabled={isRecording}
           >
-            <Text className="text-center">
+            <Text style={styles.buttonText}>
               {isRecording ? 'Recording...' : 'Start Recording'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            className={`border p-3 ${
-              isRecording ? 'border-gray-600' : 'border-gray-300'
-            }`}
+            style={[
+              styles.button,
+              !isRecording ? styles.disabledButton : styles.primaryButton,
+            ]}
             onPress={stopRecording}
             disabled={!isRecording}
           >
-            <Text className="text-center">Stop Recording</Text>
+            <Text style={styles.buttonText}>Stop Recording</Text>
           </TouchableOpacity>
 
           {audioBuffersRef.current.length > 0 && (
-            <Text className="text-center mt-2">
+            <Text style={styles.bufferInfo}>
               Recorded {audioBuffersRef.current.length} audio buffers
             </Text>
           )}
         </View>
-        <Text className="text-center mb-6">Speech to text transcription</Text>
 
-        <View className="border border-gray-300 p-4 mb-4">
-          <Text className="mb-3">Status</Text>
-          <Text className="text-center mb-2">
-            Transcription for {currentLanguage}:
-            {isAvailable ? 'Available' : 'Not Available'}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Status</Text>
+          <Text style={styles.statusText}>
+            Transcription for {currentLanguage}:{' '}
+            <Text
+              style={
+                isAvailable ? styles.availableStatus : styles.unavailableStatus
+              }
+            >
+              {isAvailable ? 'Available' : 'Not Available'}
+            </Text>
           </Text>
           {!isAvailable && (
             <TouchableOpacity
-              className="border border-gray-600 p-3"
+              style={[
+                styles.button,
+                styles.secondaryButton,
+                isPreparing && styles.disabledButton,
+              ]}
               onPress={prepareAssets}
               disabled={isPreparing}
             >
               {isPreparing ? (
-                <View className="flex-row justify-center items-center">
-                  <ActivityIndicator className="mr-2" size="small" />
-                  <Text>Preparing Assets...</Text>
+                <View style={styles.buttonContent}>
+                  <ActivityIndicator
+                    style={{ marginRight: 8 }}
+                    size="small"
+                    color="#374151"
+                  />
+                  <Text style={styles.secondaryButtonText}>
+                    Preparing Assets...
+                  </Text>
                 </View>
               ) : (
-                <Text className="text-center">Prepare Assets</Text>
+                <Text style={styles.secondaryButtonText}>Prepare Assets</Text>
               )}
             </TouchableOpacity>
           )}
         </View>
 
-        <View className="border border-gray-300 p-4 mb-4">
-          <Text className="mb-3">Language</Text>
-          <View className="border border-gray-300 mb-4">
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Language</Text>
+          <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedLanguage}
               onValueChange={(value) => setSelectedLanguage(value)}
@@ -274,31 +442,39 @@ export default function TranscribeScreen() {
           </View>
         </View>
 
-        <View className="border border-gray-300 p-4 mb-4">
-          <Text className="mb-3">Demo File</Text>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Demo File</Text>
           <TouchableOpacity
-            className="border border-gray-400 p-3 mb-2"
+            style={[
+              styles.button,
+              styles.secondaryButton,
+              isLoadingDemo && styles.disabledButton,
+            ]}
             onPress={loadDemoFile}
             disabled={isLoadingDemo}
           >
-            <Text className="text-center">
+            <Text style={styles.secondaryButtonText}>
               {isLoadingDemo ? 'Loading...' : 'Load Demo File'}
             </Text>
           </TouchableOpacity>
-          <Text className="text-center">
+          <Text style={styles.demoDescription}>
             Demo contains a Harvard sentence for testing
           </Text>
         </View>
 
         {wavBuffer && (
-          <View className="border border-gray-300 p-4 mb-4">
-            <Text className="mb-3">Loaded Audio</Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Loaded Audio</Text>
             <TouchableOpacity
-              className="border border-gray-600 p-3"
+              style={[
+                styles.button,
+                styles.primaryButton,
+                isTranscribing && styles.disabledButton,
+              ]}
               onPress={() => transcribe(wavBuffer)}
               disabled={isTranscribing}
             >
-              <Text className="text-center">
+              <Text style={styles.buttonText}>
                 {isTranscribing ? 'Transcribing...' : 'Transcribe Loaded Audio'}
               </Text>
             </TouchableOpacity>
@@ -306,12 +482,14 @@ export default function TranscribeScreen() {
         )}
 
         {transcription && (
-          <View className="flex-1 border border-gray-300 p-4">
-            <Text className="mb-3">Transcription</Text>
-            <Text className="mb-3">Completed in {transcription.time}ms</Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Transcription</Text>
+            <Text style={styles.timeText}>
+              Completed in {transcription.time}ms
+            </Text>
 
-            <ScrollView className="flex-1 border border-gray-200 p-3">
-              <Text>{transcription.text}</Text>
+            <ScrollView style={styles.transcriptionScrollView}>
+              <Text style={styles.transcriptionText}>{transcription.text}</Text>
             </ScrollView>
           </View>
         )}

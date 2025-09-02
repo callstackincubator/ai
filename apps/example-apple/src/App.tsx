@@ -23,7 +23,13 @@ const SpeechStack = createNativeStackNavigator()
 function LLMStackScreen() {
   return (
     <LLMStack.Navigator>
-      <LLMStack.Screen name="LLMScreen" component={LLMScreen} />
+      <LLMStack.Screen
+        name="LLMScreen"
+        component={LLMScreen}
+        options={{
+          title: 'react-native-ai',
+        }}
+      />
     </LLMStack.Navigator>
   )
 }
@@ -34,6 +40,9 @@ function PlaygroundStackScreen() {
       <PlaygroundStack.Screen
         name="PlaygroundScreen"
         component={PlaygroundScreen}
+        options={{
+          title: 'Playground',
+        }}
       />
     </PlaygroundStack.Navigator>
   )
@@ -45,6 +54,9 @@ function TranscribeStackScreen() {
       <TranscribeStack.Screen
         name="TranscribeScreen"
         component={TranscribeScreen}
+        options={{
+          title: 'Speech to Text',
+        }}
       />
     </TranscribeStack.Navigator>
   )
@@ -53,7 +65,13 @@ function TranscribeStackScreen() {
 function SpeechStackScreen() {
   return (
     <SpeechStack.Navigator>
-      <SpeechStack.Screen name="SpeechScreen" component={SpeechScreen} />
+      <SpeechStack.Screen
+        name="SpeechScreen"
+        component={SpeechScreen}
+        options={{
+          title: 'Text to Speech',
+        }}
+      />
     </SpeechStack.Navigator>
   )
 }
