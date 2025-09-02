@@ -182,7 +182,6 @@ export default function TranscribeScreen() {
     text: string
     time: number
   } | null>(null)
-  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
   const [isPreparing, setIsPreparing] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [wavBuffer, setWavBuffer] = useState<ArrayBuffer | null>(null)
@@ -193,7 +192,7 @@ export default function TranscribeScreen() {
   const recorderAdapterRef = useRef<RecorderAdapterNode | null>(null)
   const audioBuffersRef = useRef<AudioBuffer[]>([])
 
-  const currentLanguage = selectedLanguage || AppleUtils.getCurrentLocale()
+  const currentLanguage = 'en-US'
   const isAvailable = AppleTranscription.isAvailable(currentLanguage)
 
   useEffect(() => {
@@ -240,7 +239,7 @@ export default function TranscribeScreen() {
         audio: audioBuffer,
         providerOptions: {
           apple: {
-            language: selectedLanguage,
+            language: currentLanguage,
           },
         },
       })
@@ -346,7 +345,7 @@ export default function TranscribeScreen() {
       <View style={styles.scrollView}>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Audio Recording</Text>
-          <Text style={styles.sampleRateText}>Sample rate: {SAMPLE_RATE}</Text>
+          {/* <Text style={styles.sampleRateText}>Sample rate: {SAMPLE_RATE}</Text> */}
 
           <TouchableOpacity
             style={[
@@ -379,7 +378,7 @@ export default function TranscribeScreen() {
           )}
         </View>
 
-        <View style={styles.card}>
+        {/* <View style={styles.card}>
           <Text style={styles.sectionTitle}>Status</Text>
           <Text style={styles.statusText}>
             Transcription for {currentLanguage}:{' '}
@@ -420,29 +419,6 @@ export default function TranscribeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Language</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedLanguage}
-              onValueChange={(value) => setSelectedLanguage(value)}
-            >
-              <Picker.Item
-                label={`Default (${AppleUtils.getCurrentLocale()})`}
-                value={undefined}
-              />
-              <Picker.Item label="English" value="en-US" />
-              <Picker.Item label="Spanish" value="es-ES" />
-              <Picker.Item label="French" value="fr-FR" />
-              <Picker.Item label="German" value="de-DE" />
-              <Picker.Item label="Italian" value="it-IT" />
-              <Picker.Item label="Japanese" value="ja-JP" />
-              <Picker.Item label="Korean" value="ko-KR" />
-              <Picker.Item label="Chinese" value="zh-CN" />
-            </Picker>
-          </View>
-        </View>
-
-        <View style={styles.card}>
           <Text style={styles.sectionTitle}>Demo File</Text>
           <TouchableOpacity
             style={[
@@ -460,7 +436,7 @@ export default function TranscribeScreen() {
           <Text style={styles.demoDescription}>
             Demo contains a Harvard sentence for testing
           </Text>
-        </View>
+        </View> */}
 
         {wavBuffer && (
           <View style={styles.card}>

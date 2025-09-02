@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import React from 'react'
+import { Image } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import LLMScreen from './screens/LLMScreen'
@@ -27,7 +28,13 @@ function LLMStackScreen() {
         name="LLMScreen"
         component={LLMScreen}
         options={{
-          title: 'react-native-ai',
+          headerTitle: () => (
+            <Image
+              source={require('../assets/ck.png')}
+              style={{ width: 36, height: 36, marginTop: 10 }}
+              resizeMode="contain"
+            />
+          ),
         }}
       />
     </LLMStack.Navigator>

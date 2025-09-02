@@ -1,3 +1,6 @@
+import 'react-native-get-random-values'
+
+import { createAppleProvider } from '@react-native-ai/apple'
 import { streamText } from 'ai'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
@@ -8,10 +11,7 @@ import {
   View,
 } from 'react-native'
 import { GiftedChat, type IMessage } from 'react-native-gifted-chat'
-import 'react-native-get-random-values'
 import { v4 as uuid } from 'uuid'
-
-import { createAppleProvider } from '@react-native-ai/apple'
 
 import {
   checkBattery,
