@@ -35,7 +35,7 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/*",
+    "apps/example-apple",
     "website"
   ],
   "packageManager": "bun@1.2.19",
