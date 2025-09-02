@@ -51,8 +51,8 @@ export default function TranscribeScreen() {
   useEffect(() => {
     AudioManager.setAudioSessionOptions({
       iosCategory: 'playAndRecord',
-      iosMode: 'spokenAudio',
-      iosOptions: ['defaultToSpeaker', 'allowBluetoothA2DP'],
+      iosMode: 'voiceChat',
+      iosOptions: ['defaultToSpeaker', 'allowBluetooth'],
     })
 
     AudioManager.requestRecordingPermissions()
