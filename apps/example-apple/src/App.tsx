@@ -20,19 +20,10 @@ const PlaygroundStack = createNativeStackNavigator()
 const TranscribeStack = createNativeStackNavigator()
 const SpeechStack = createNativeStackNavigator()
 
-const headerOptions = {
-  headerShown: true,
-  headerLargeTitle: true,
-}
-
 function LLMStackScreen() {
   return (
     <LLMStack.Navigator>
-      <LLMStack.Screen
-        name="LLMScreen"
-        component={LLMScreen}
-        options={headerOptions}
-      />
+      <LLMStack.Screen name="LLMScreen" component={LLMScreen} />
     </LLMStack.Navigator>
   )
 }
@@ -43,7 +34,6 @@ function PlaygroundStackScreen() {
       <PlaygroundStack.Screen
         name="PlaygroundScreen"
         component={PlaygroundScreen}
-        options={headerOptions}
       />
     </PlaygroundStack.Navigator>
   )
@@ -55,7 +45,6 @@ function TranscribeStackScreen() {
       <TranscribeStack.Screen
         name="TranscribeScreen"
         component={TranscribeScreen}
-        options={headerOptions}
       />
     </TranscribeStack.Navigator>
   )
@@ -64,11 +53,7 @@ function TranscribeStackScreen() {
 function SpeechStackScreen() {
   return (
     <SpeechStack.Navigator>
-      <SpeechStack.Screen
-        name="SpeechScreen"
-        component={SpeechScreen}
-        options={headerOptions}
-      />
+      <SpeechStack.Screen name="SpeechScreen" component={SpeechScreen} />
     </SpeechStack.Navigator>
   )
 }

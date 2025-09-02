@@ -30,7 +30,7 @@ public class AppleSpeechImpl: NSObject {
   }
   
   @objc
-  public func generateAudio(_ text: String, options: [String: Any], resolve: @escaping (Data) -> Void, reject: @escaping (String, String, Error?) -> Void) {
+  public func generateAudio(_ text: String, options: [String: Any], resolve: @escaping ([String: Any]) -> Void, reject: @escaping (String, String, Error?) -> Void) {
     let utterance = AVSpeechUtterance(string: text)
     
     utterance.voice = if let voiceId = options["voice"] as? String {
@@ -47,12 +47,8 @@ public class AppleSpeechImpl: NSObject {
       guard let pcm = buffer as? AVAudioPCMBuffer else { return }
       
       if pcm.frameLength == 0 {
-        do {
-          let data = try AppleSpeechImpl.wavData(from: collectedBuffers)
-          resolve(data)
-        } catch {
-          reject("AppleSpeech", "Error generating WAV data", error)
-        }
+        let result = AppleSpeechImpl.concatenatePCMDataWithFormat(from: collectedBuffers)
+        resolve(result)
         return
       }
       
@@ -62,28 +58,37 @@ public class AppleSpeechImpl: NSObject {
 }
 
 extension AppleSpeechImpl {
-  /// Build a single WAV file by generating the header using the first buffer's
-  /// format and then concatenating the raw PCM payloads of all subsequent buffers.
-  /// Assumes all buffers share the same format and are WAV-compatible.
-  static func wavData(from buffers: [AVAudioPCMBuffer]) throws -> Data {
+  /// Concatenate raw PCM data from AVAudioPCMBuffer array and return format information
+  /// JavaScript will handle WAV header generation
+  static func concatenatePCMDataWithFormat(from buffers: [AVAudioPCMBuffer]) -> [String: Any] {
     guard let first = buffers.first else {
-      throw NSError(domain: "WAV", code: -2,
-                    userInfo: [NSLocalizedDescriptionKey: "No audio buffers collected"])
+      return [
+        "data": Data(),
+        "sampleRate": 22050,
+        "channels": 1,
+        "bitsPerSample": 32,
+        "formatType": 1
+      ]
     }
     
     let channels = Int(first.format.channelCount)
     let sampleRate = Int(first.format.sampleRate)
-    let isFloat32 = (first.format.commonFormat == .pcmFormatFloat32)
-    let bitsPerSample = isFloat32 ? 32 : 16
-    let byteRate = sampleRate * channels * bitsPerSample / 8
-    let blockAlign = channels * bitsPerSample / 8
     
-    // Helper: little-endian encoders
-    func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xff), UInt8((v >> 8) & 0xff)] }
-    func le32(_ v: Int) -> [UInt8] {
-      [UInt8(v & 0xff), UInt8((v >> 8) & 0xff),
-       UInt8((v >> 16) & 0xff), UInt8((v >> 24) & 0xff)]
-    }
+    // Determine format type and bits per sample based on AVAudioCommonFormat
+    let (formatType, bitsPerSample): (Int, Int) = {
+      switch first.format.commonFormat {
+      case .pcmFormatFloat32:
+        return (1, 32)
+      case .pcmFormatFloat64:
+        return (1, 64)
+      case .pcmFormatInt16:
+        return (0, 16)
+      case .pcmFormatInt32:
+        return (0, 32)
+      default:
+        return (1, 32)
+      }
+    }()
     
     // Estimate capacity from actual valid bytes in each buffer
     let estimatedCapacity = buffers.reduce(0) { acc, buf in
@@ -94,7 +99,7 @@ extension AppleSpeechImpl {
     var payload = Data()
     payload.reserveCapacity(estimatedCapacity)
     
-    // Concatenate payloads using mDataByteSize, which is kept in sync with frameLength
+    // Concatenate raw PCM payloads using mDataByteSize
     for buf in buffers {
       let m = buf.audioBufferList.pointee.mBuffers
       let byteCount = Int(m.mDataByteSize)
@@ -103,34 +108,13 @@ extension AppleSpeechImpl {
       }
     }
     
-    let dataChunkSize = payload.count
-    let fmtChunkSize = 16
-    let riffChunkSize = 4 + (8 + fmtChunkSize) + (8 + dataChunkSize)
-    
-    var header = Data()
-    header.append(contentsOf: Array("RIFF".utf8))
-    header.append(contentsOf: le32(riffChunkSize))
-    header.append(contentsOf: Array("WAVE".utf8))
-    
-    // fmt chunk
-    header.append(contentsOf: Array("fmt ".utf8))
-    header.append(contentsOf: le32(fmtChunkSize))
-    header.append(contentsOf: le16(isFloat32 ? 3 : 1)) // 3 = IEEE float, 1 = PCM
-    header.append(contentsOf: le16(channels))
-    header.append(contentsOf: le32(sampleRate))
-    header.append(contentsOf: le32(byteRate))
-    header.append(contentsOf: le16(blockAlign))
-    header.append(contentsOf: le16(bitsPerSample))
-    
-    // data chunk
-    header.append(contentsOf: Array("data".utf8))
-    header.append(contentsOf: le32(dataChunkSize))
-    
-    var out = Data(capacity: header.count + payload.count)
-    out.append(header)
-    out.append(payload)
-    
-    return out
+    return [
+      "data": payload,
+      "sampleRate": sampleRate,
+      "channels": channels,
+      "bitsPerSample": bitsPerSample,
+      "formatType": formatType
+    ]
   }
 }
 
