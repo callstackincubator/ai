@@ -124,7 +124,7 @@ extension AVSpeechSynthesisVoice {
       "identifier": self.identifier,
       "name": self.name,
       "language": self.language,
-      "quality": quality,
+      "quality": self.quality,
       "isPersonalVoice": false,
       "isNoveltyVoice": false
     ] as [String : Any]

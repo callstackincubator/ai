@@ -1,7 +1,7 @@
 export { apple, createAppleProvider } from './ai-sdk'
 export { default as AppleEmbeddings } from './NativeAppleEmbeddings'
 export { default as AppleFoundationModels } from './NativeAppleLLM'
-export { default as AppleSpeech } from './NativeAppleSpeech'
+export { default as AppleSpeech, VoiceInfo } from './NativeAppleSpeech'
 export { default as AppleTranscription } from './NativeAppleTranscription'
 export { default as AppleUtils } from './NativeAppleUtils'
 export { addWAVHeader, AudioFormatType } from './utils'

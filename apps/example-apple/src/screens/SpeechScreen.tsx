@@ -1,6 +1,7 @@
-import { apple } from '@react-native-ai/apple'
+import { apple, AppleSpeech, VoiceInfo } from '@react-native-ai/apple'
+import { Picker } from '@react-native-picker/picker'
 import { experimental_generateSpeech } from 'ai'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +32,21 @@ export default function SpeechScreen() {
     arrayBuffer: ArrayBufferLike
     time: number
   } | null>(null)
+  const [voices, setVoices] = useState<VoiceInfo[]>([])
+  const [selectedVoice, setSelectedVoice] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadVoices = async () => {
+      try {
+        const voiceList = await AppleSpeech.getVoices()
+        setVoices(voiceList)
+      } catch (error) {
+        console.error('Failed to load voices:', error)
+      }
+    }
+
+    loadVoices()
+  }, [])
 
   const generateSpeech = async () => {
     if (!inputText.trim() || isGenerating) return
@@ -44,6 +60,7 @@ export default function SpeechScreen() {
       const result = await experimental_generateSpeech({
         model: apple.speechModel(),
         text: inputText,
+        voice: selectedVoice ?? undefined,
       })
 
       const endTime = Date.now()
@@ -89,6 +106,27 @@ export default function SpeechScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {voices.length > 0 && (
+          <View className="border border-gray-300 p-4 mb-4">
+            <Text className="mb-3">Voice Selection</Text>
+            <View className="border border-gray-300">
+              <Picker
+                selectedValue={selectedVoice}
+                onValueChange={setSelectedVoice}
+              >
+                <Picker.Item label="System Default Voice" value={null} />
+                {voices.map((voice) => (
+                  <Picker.Item
+                    key={voice.identifier}
+                    label={`${voice.name} (${voice.language})`}
+                    value={voice.identifier}
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        )}
 
         {generatedSpeech && (
           <View className="border border-gray-300 p-4">
