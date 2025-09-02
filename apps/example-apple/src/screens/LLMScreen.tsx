@@ -1,10 +1,7 @@
-import { createAppleProvider } from '@react-native-ai/apple'
 import { generateText } from 'ai'
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
+  Keyboard,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,17 +11,13 @@ import { GiftedChat, type IMessage } from 'react-native-gifted-chat'
 import 'react-native-get-random-values'
 import { v4 as uuid } from 'uuid'
 
+import { createAppleProvider } from '@react-native-ai/apple'
+
 import {
   checkBattery,
   checkCalendarEvents,
   createCalendarEvent,
 } from '../tools'
-
-const EXAMPLE_MESSAGES = [
-  'What was on my agenda today?',
-  'How much battery I have left?',
-  'Who founded Apple?',
-]
 
 const apple = createAppleProvider({
   availableTools: {
@@ -43,6 +36,27 @@ const aiBot = {
 export default function LLMScreen() {
   const [displayedMessages, setDisplayedMessages] = useState<IMessage[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
+
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      'keyboardWillShow',
+      () => {
+        setIsKeyboardVisible(true)
+      }
+    )
+    const keyboardWillHideListener = Keyboard.addListener(
+      'keyboardWillHide',
+      () => {
+        setIsKeyboardVisible(false)
+      }
+    )
+
+    return () => {
+      keyboardWillShowListener.remove()
+      keyboardWillHideListener.remove()
+    }
+  }, [])
 
   const addAiBotMessage = useCallback((text: string) => {
     setDisplayedMessages((previousMessages) =>
@@ -116,72 +130,72 @@ export default function LLMScreen() {
   )
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView style={styles.keyboardAvoidingView}>
-        <GiftedChat
-          messages={displayedMessages}
-          onSend={onSend}
-          renderAvatar={() => null}
-          user={{ _id: 1 }}
-          keyboardShouldPersistTaps="handled"
-          renderBubble={(props) => (
-            <View
+    <View
+      style={[styles.container, !isKeyboardVisible && { paddingBottom: 100 }]}
+    >
+      <GiftedChat
+        messages={displayedMessages}
+        onSend={onSend}
+        renderAvatar={() => null}
+        user={{ _id: 1 }}
+        keyboardShouldPersistTaps="handled"
+        renderBubble={(props) => (
+          <View
+            style={[
+              styles.bubble,
+              props.currentMessage?.user._id === 1
+                ? styles.userBubble
+                : styles.botBubble,
+            ]}
+          >
+            <Text
               style={[
-                styles.bubble,
+                styles.bubbleText,
                 props.currentMessage?.user._id === 1
-                  ? styles.userBubble
-                  : styles.botBubble,
+                  ? styles.userBubbleText
+                  : styles.botBubbleText,
               ]}
             >
-              <Text
-                style={[
-                  styles.bubbleText,
-                  props.currentMessage?.user._id === 1
-                    ? styles.userBubbleText
-                    : styles.botBubbleText,
-                ]}
-              >
-                {props.currentMessage?.text}
-              </Text>
-            </View>
-          )}
-          renderSend={(props) => (
-            <TouchableOpacity
+              {props.currentMessage?.text}
+            </Text>
+          </View>
+        )}
+        renderSend={(props) => (
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              props.text?.trim() && !isGenerating
+                ? styles.sendButtonActive
+                : styles.sendButtonInactive,
+            ]}
+            onPress={() => {
+              if (props.text && props.onSend) {
+                props.onSend({ text: props.text.trim() }, true)
+              }
+            }}
+            disabled={!props.text?.trim() || isGenerating}
+          >
+            <Text
               style={[
-                styles.sendButton,
+                styles.sendButtonText,
                 props.text?.trim() && !isGenerating
-                  ? styles.sendButtonActive
-                  : styles.sendButtonInactive,
+                  ? styles.sendButtonTextActive
+                  : styles.sendButtonTextInactive,
               ]}
-              onPress={() => {
-                if (props.text && props.onSend) {
-                  props.onSend({ text: props.text.trim() }, true)
-                }
-              }}
-              disabled={!props.text?.trim() || isGenerating}
             >
-              <Text
-                style={[
-                  styles.sendButtonText,
-                  props.text?.trim() && !isGenerating
-                    ? styles.sendButtonTextActive
-                    : styles.sendButtonTextInactive,
-                ]}
-              >
-                ↑
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+              ↑
+            </Text>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#fff',
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -294,8 +308,10 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   sendButton: {
-    width: 44,
-    height: 44,
+    width: 33,
+    height: 33,
+    marginBottom: 5,
+    marginRight: 5,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
