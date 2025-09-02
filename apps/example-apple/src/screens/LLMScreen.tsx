@@ -1,4 +1,4 @@
-import { generateText } from 'ai'
+import { streamText } from 'ai'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Keyboard,
@@ -37,6 +37,9 @@ export default function LLMScreen() {
   const [displayedMessages, setDisplayedMessages] = useState<IMessage[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
+  const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<
+    string | null
+  >(null)
 
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
@@ -58,23 +61,44 @@ export default function LLMScreen() {
     }
   }, [])
 
-  const addAiBotMessage = useCallback((text: string) => {
+  const createInitialBotMessage = useCallback(() => {
+    const messageId = uuid()
+    setCurrentStreamingMessageId(messageId)
+
+    const newMessage: IMessage = {
+      _id: messageId,
+      text: '...',
+      createdAt: new Date(),
+      user: aiBot,
+    }
+
     setDisplayedMessages((previousMessages) =>
-      GiftedChat.append(previousMessages, {
-        // @ts-ignore
-        _id: uuid(),
-        text,
-        createdAt: new Date(),
-        user: aiBot,
-      })
+      GiftedChat.append(previousMessages, [newMessage])
     )
+
+    return messageId
   }, [])
+
+  const updateStreamingMessage = useCallback(
+    (messageId: string, text: string) => {
+      setDisplayedMessages((previousMessages) =>
+        previousMessages.map((message) =>
+          message._id === messageId ? { ...message, text } : message
+        )
+      )
+    },
+    []
+  )
 
   const sendMessageToAI = useCallback(
     async (userMessage: IMessage) => {
       if (isGenerating) return
 
       setIsGenerating(true)
+
+      // Create initial bot message with loading indicator
+      const messageId = createInitialBotMessage()
+      let accumulatedText = ''
 
       try {
         // Convert GiftedChat messages to AI SDK format
@@ -95,7 +119,7 @@ export default function LLMScreen() {
           content: userMessage.text,
         })
 
-        const result = await generateText({
+        const result = streamText({
           model: apple(),
           messages: aiMessages,
           tools: {
@@ -105,16 +129,24 @@ export default function LLMScreen() {
           },
         })
 
-        addAiBotMessage(result.text)
+        for await (const chunk of result.textStream) {
+          accumulatedText += chunk
+          updateStreamingMessage(messageId, accumulatedText)
+        }
       } catch (error) {
-        addAiBotMessage(
-          `Error: ${error instanceof Error ? error.message : 'Failed to generate response'}`
-        )
+        const errorMessage = `Error: ${error instanceof Error ? error.message : 'Failed to generate response'}`
+        updateStreamingMessage(messageId, errorMessage)
       } finally {
         setIsGenerating(false)
+        setCurrentStreamingMessageId(null)
       }
     },
-    [displayedMessages, isGenerating, addAiBotMessage]
+    [
+      displayedMessages,
+      isGenerating,
+      createInitialBotMessage,
+      updateStreamingMessage,
+    ]
   )
 
   const onSend = useCallback(
