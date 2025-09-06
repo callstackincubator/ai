@@ -21,8 +21,8 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "react": ">=18.2.0",
-    "react-native": ">=0.76.0"
+    "react": "19.0.0",
+    "react-native": "0.79.5"
   },
   "devDependencies": {
     "react-native": "0.79.5"

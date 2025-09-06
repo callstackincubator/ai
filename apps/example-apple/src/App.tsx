@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import React from 'react'
+import { Image } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import LLMScreen from './screens/LLMScreen'
@@ -23,7 +24,19 @@ const SpeechStack = createNativeStackNavigator()
 function LLMStackScreen() {
   return (
     <LLMStack.Navigator>
-      <LLMStack.Screen name="LLMScreen" component={LLMScreen} />
+      <LLMStack.Screen
+        name="LLMScreen"
+        component={LLMScreen}
+        options={{
+          headerTitle: () => (
+            <Image
+              source={require('../assets/ck.png')}
+              style={{ width: 36, height: 36, marginTop: 10 }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
     </LLMStack.Navigator>
   )
 }
@@ -34,6 +47,9 @@ function PlaygroundStackScreen() {
       <PlaygroundStack.Screen
         name="PlaygroundScreen"
         component={PlaygroundScreen}
+        options={{
+          title: 'Playground',
+        }}
       />
     </PlaygroundStack.Navigator>
   )
@@ -45,6 +61,9 @@ function TranscribeStackScreen() {
       <TranscribeStack.Screen
         name="TranscribeScreen"
         component={TranscribeScreen}
+        options={{
+          title: 'Speech to Text',
+        }}
       />
     </TranscribeStack.Navigator>
   )
@@ -53,7 +72,13 @@ function TranscribeStackScreen() {
 function SpeechStackScreen() {
   return (
     <SpeechStack.Navigator>
-      <SpeechStack.Screen name="SpeechScreen" component={SpeechScreen} />
+      <SpeechStack.Screen
+        name="SpeechScreen"
+        component={SpeechScreen}
+        options={{
+          title: 'Text to Speech',
+        }}
+      />
     </SpeechStack.Navigator>
   )
 }
