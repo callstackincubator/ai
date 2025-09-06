@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -23,150 +22,6 @@ const play = async (arrayBuffer: ArrayBufferLike) => {
 
   source.start()
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  sectionTitleNoMargin: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  textInput: {
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#f9fafb',
-    marginBottom: 24,
-    minHeight: 120,
-    textAlignVertical: 'top',
-  },
-  generateButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    shadowColor: '#3b82f6',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  generateButtonActive: {
-    backgroundColor: '#3b82f6',
-  },
-  generateButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  playButton: {
-    backgroundColor: '#10b981',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    shadowColor: '#10b981',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statusBadge: {
-    backgroundColor: '#dcfce7',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  statusText: {
-    color: '#166534',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  timeBox: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  timeLabel: {
-    color: '#1e40af',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  timeValue: {
-    color: '#1e40af',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  bottomSpacing: {
-    height: 32,
-  },
-})
 
 export default function SpeechScreen() {
   const [inputText, setInputText] = useState(
@@ -228,13 +83,13 @@ export default function SpeechScreen() {
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
-      style={styles.container}
+      className="flex-1 bg-gray-50"
     >
-      <View style={styles.scrollView}>
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Enter Your Text</Text>
+      <View className="p-4">
+        <View className="bg-white rounded-xl p-4">
+          <Text className="text-lg font-semibold mb-4">Enter Your Text</Text>
           <TextInput
-            style={styles.textInput}
+            className="border border-gray-200 rounded-lg p-3 text-gray-900 bg-gray-50 mb-4 min-h-[100px]"
             value={inputText}
             onChangeText={setInputText}
             placeholder="Type something to convert to speech..."
@@ -245,33 +100,31 @@ export default function SpeechScreen() {
           />
 
           <TouchableOpacity
-            style={[
-              styles.generateButton,
-              isGenerating
-                ? styles.generateButtonDisabled
-                : styles.generateButtonActive,
-            ]}
+            className={`rounded-lg py-3 ${
+              isGenerating ? 'bg-gray-400' : 'bg-blue-500'
+            }`}
             onPress={generateSpeech}
             disabled={isGenerating}
           >
             {isGenerating ? (
-              <View style={styles.buttonContent}>
-                <ActivityIndicator
-                  style={{ marginRight: 12 }}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.buttonText}>Generating Speech...</Text>
+              <View className="flex-row justify-center items-center">
+                <ActivityIndicator color="#FFFFFF" />
+                <Text className="text-white font-semibold ml-2">
+                  Generating...
+                </Text>
               </View>
             ) : (
-              <Text style={styles.buttonText}>Generate Speech</Text>
+              <Text className="text-white font-semibold text-center">
+                Generate Speech
+              </Text>
             )}
           </TouchableOpacity>
         </View>
 
         {voices.length > 0 && (
-          <View className="border border-gray-300 p-4 mb-4">
-            <Text className="mb-3">Voice Selection</Text>
-            <View className="border border-gray-300">
+          <View className="bg-white rounded-xl p-4 mt-4">
+            <Text className="text-lg font-semibold mb-3">Voice Selection</Text>
+            <View className="border border-gray-200 rounded-lg bg-gray-50">
               <Picker
                 selectedValue={selectedVoice}
                 onValueChange={setSelectedVoice}
@@ -290,32 +143,26 @@ export default function SpeechScreen() {
         )}
 
         {generatedSpeech && (
-          <View style={styles.card}>
-            <View style={styles.statusRow}>
-              <Text style={styles.sectionTitleNoMargin}>Generated Speech</Text>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>Ready</Text>
-              </View>
+          <View className="bg-white rounded-xl p-4 mt-4">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-lg font-semibold">Generated Speech</Text>
+              <Text className="text-green-600 text-sm">Ready</Text>
             </View>
 
-            <View style={styles.timeBox}>
-              <Text style={styles.timeLabel}>Generation Time</Text>
-              <Text style={styles.timeValue}>{generatedSpeech.time}ms</Text>
-            </View>
+            <Text className="text-gray-500 text-sm mb-3">
+              Generated in {generatedSpeech.time}ms
+            </Text>
 
             <TouchableOpacity
-              style={styles.playButton}
+              className="bg-green-500 rounded-lg py-3"
               onPress={() => play(generatedSpeech.arrayBuffer)}
             >
-              <View style={styles.buttonContent}>
-                <Text style={styles.buttonText}>▶️ Play Audio</Text>
-              </View>
+              <Text className="text-white font-semibold text-center">
+                ▶️ Play Audio
+              </Text>
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Bottom spacing */}
-        <View style={styles.bottomSpacing} />
       </View>
     </ScrollView>
   )
