@@ -35,8 +35,7 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/example-apple",
-    "website"
+    "apps/example-apple"
   ],
   "packageManager": "bun@1.2.19",
   "commitlint": {
