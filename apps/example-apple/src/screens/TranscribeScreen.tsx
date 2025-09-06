@@ -10,10 +10,7 @@ import {
   RecorderAdapterNode,
 } from 'react-native-audio-api'
 
-import {
-  float32ArrayToWAV,
-  mergeBuffersToFloat32Array,
-} from '../utils/audioUtils'
+import { float32ArrayToWAV, mergeBuffersToFloat32Array } from '../utils/audio'
 
 const SAMPLE_RATE = 16000
 

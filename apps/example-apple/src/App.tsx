@@ -1,139 +1,78 @@
 import './global.css'
 
-import { createNativeBottomTabNavigator } from '@bottom-tabs/react-navigation'
-import { NavigationContainer } from '@react-navigation/native'
+import { Ionicons } from '@react-native-vector-icons/ionicons'
+import { createDrawerNavigator } from '@react-navigation/drawer'
+import {
+  NavigationContainer,
+  NavigatorScreenParams,
+} from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
+import { Provider as JotaiProvider } from 'jotai'
 import React from 'react'
-import { Image } from 'react-native'
+import { TouchableNativeFeedback } from 'react-native'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import ChatDrawer from './components/ChatDrawer'
 import LLMScreen from './screens/LLMScreen'
-import PlaygroundScreen from './screens/PlaygroundScreen'
-import SpeechScreen from './screens/SpeechScreen'
-import TranscribeScreen from './screens/TranscribeScreen'
 
-const Tab = createNativeBottomTabNavigator()
-
-const RootStack = createNativeStackNavigator()
-const LLMStack = createNativeStackNavigator()
-const PlaygroundStack = createNativeStackNavigator()
-const TranscribeStack = createNativeStackNavigator()
-const SpeechStack = createNativeStackNavigator()
-
-function LLMStackScreen() {
-  return (
-    <LLMStack.Navigator>
-      <LLMStack.Screen
-        name="LLMScreen"
-        component={LLMScreen}
-        options={{
-          headerTitle: () => (
-            <Image
-              source={require('../assets/ck.png')}
-              style={{ width: 36, height: 36, marginTop: 10 }}
-              resizeMode="contain"
-            />
-          ),
-        }}
-      />
-    </LLMStack.Navigator>
-  )
+export type ChatStackParamList = {
+  Chat: { conversationId?: string }
 }
 
-function PlaygroundStackScreen() {
-  return (
-    <PlaygroundStack.Navigator>
-      <PlaygroundStack.Screen
-        name="PlaygroundScreen"
-        component={PlaygroundScreen}
-        options={{
-          title: 'Playground',
-        }}
-      />
-    </PlaygroundStack.Navigator>
-  )
+export type DrawerParamList = {
+  ChatStack: NavigatorScreenParams<ChatStackParamList>
 }
 
-function TranscribeStackScreen() {
-  return (
-    <TranscribeStack.Navigator>
-      <TranscribeStack.Screen
-        name="TranscribeScreen"
-        component={TranscribeScreen}
-        options={{
-          title: 'Speech to Text',
-        }}
-      />
-    </TranscribeStack.Navigator>
-  )
-}
+const Drawer = createDrawerNavigator()
+const Stack = createNativeStackNavigator()
 
-function SpeechStackScreen() {
+function ChatStack() {
   return (
-    <SpeechStack.Navigator>
-      <SpeechStack.Screen
-        name="SpeechScreen"
-        component={SpeechScreen}
-        options={{
-          title: 'Text to Speech',
-        }}
-      />
-    </SpeechStack.Navigator>
-  )
-}
-
-function Tabs() {
-  return (
-    <Tab.Navigator sidebarAdaptable>
-      <Tab.Screen
-        name="LLM"
-        component={LLMStackScreen}
-        options={{
-          tabBarIcon: () => ({ sfSymbol: 'brain.head.profile' }),
-        }}
-      />
-      <Tab.Screen
-        name="Playground"
-        component={PlaygroundStackScreen}
-        options={{
-          tabBarIcon: () => ({ sfSymbol: 'play.circle' }),
-        }}
-      />
-      <Tab.Screen
-        name="Transcribe"
-        component={TranscribeStackScreen}
-        options={{
-          tabBarIcon: () => ({ sfSymbol: 'text.quote' }),
-        }}
-      />
-      <Tab.Screen
-        name="Speech"
-        component={SpeechStackScreen}
-        options={{
-          tabBarIcon: () => ({ sfSymbol: 'speaker.wave.3' }),
-        }}
-      />
-    </Tab.Navigator>
+    <Stack.Navigator
+      screenOptions={({ navigation }) => ({
+        headerLeft: () => {
+          return (
+            <TouchableNativeFeedback
+              onPress={() =>
+                // @ts-expect-error
+                navigation.toggleDrawer()
+              }
+            >
+              <Ionicons name="menu" size={24} color="black" />
+            </TouchableNativeFeedback>
+          )
+        },
+      })}
+    >
+      <Stack.Screen name="Chat" component={LLMScreen} />
+    </Stack.Navigator>
   )
 }
 
 export default function App() {
   return (
-    <KeyboardProvider>
-      <SafeAreaProvider>
-        <NavigationContainer>
-          <RootStack.Navigator>
-            <RootStack.Screen
-              name="Home"
-              component={Tabs}
-              options={{ headerShown: false }}
-            />
-          </RootStack.Navigator>
-          <StatusBar style="auto" />
-        </NavigationContainer>
-      </SafeAreaProvider>
-    </KeyboardProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <JotaiProvider>
+        <KeyboardProvider>
+          <SafeAreaProvider>
+            <NavigationContainer>
+              <Drawer.Navigator
+                drawerContent={(props) => <ChatDrawer {...props} />}
+              >
+                <Drawer.Screen
+                  name="ChatStack"
+                  component={ChatStack}
+                  options={{ headerShown: false }}
+                />
+              </Drawer.Navigator>
+              <StatusBar style="auto" />
+            </NavigationContainer>
+          </SafeAreaProvider>
+        </KeyboardProvider>
+      </JotaiProvider>
+    </GestureHandlerRootView>
   )
 }
