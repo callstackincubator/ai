@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import React from 'react'
 import { Image } from 'react-native'
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import LLMScreen from './screens/LLMScreen'
@@ -120,17 +121,19 @@ function Tabs() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <RootStack.Navigator>
-          <RootStack.Screen
-            name="Home"
-            component={Tabs}
-            options={{ headerShown: false }}
-          />
-        </RootStack.Navigator>
-        <StatusBar style="auto" />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <KeyboardProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <RootStack.Navigator>
+            <RootStack.Screen
+              name="Home"
+              component={Tabs}
+              options={{ headerShown: false }}
+            />
+          </RootStack.Navigator>
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </KeyboardProvider>
   )
 }
