@@ -1,24 +1,6 @@
 import { tool } from 'ai'
-import * as Battery from 'expo-battery'
 import * as Calendar from 'expo-calendar'
 import { z } from 'zod'
-
-/**
- * Retrieves the current battery level and charging status of the device
- */
-export const checkBattery = tool({
-  description: 'Check device battery level and charging status',
-  inputSchema: z.object({}),
-  execute: async () => {
-    const level = await Battery.getBatteryLevelAsync()
-    const state = await Battery.getBatteryStateAsync()
-
-    return {
-      level: Math.round(level * 100),
-      isCharging: state === Battery.BatteryState.CHARGING,
-    }
-  },
-})
 
 /**
  * Creates a new calendar event with specified title, date, time and duration
@@ -82,5 +64,16 @@ export const checkCalendarEvents = tool({
       title: event.title,
       date: event.startDate,
     }))
+  },
+})
+
+/**
+ * Get current time
+ */
+export const getCurrentTime = tool({
+  description: 'Get current time and date',
+  inputSchema: z.object({}),
+  execute: async () => {
+    return `Current time is: ${new Date().toUTCString()}`
   },
 })

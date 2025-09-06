@@ -14,14 +14,14 @@ import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller
 import Animated, { useDerivedValue } from 'react-native-reanimated'
 
 import {
-  checkBattery,
   checkCalendarEvents,
   createCalendarEvent,
+  getCurrentTime,
 } from '../tools'
 
 const apple = createAppleProvider({
   availableTools: {
-    checkBattery,
+    getCurrentTime,
     createCalendarEvent,
     checkCalendarEvents,
   },
@@ -75,7 +75,7 @@ export default function LLMScreen() {
         model: apple(),
         messages: updatedMessages,
         tools: {
-          checkBattery,
+          getCurrentTime,
           createCalendarEvent,
           checkCalendarEvents,
         },
