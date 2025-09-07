@@ -13,7 +13,6 @@
   "devDependencies": {
     "@babel/plugin-transform-strict-mode": "^7.27.1",
     "@commitlint/config-conventional": "^17.0.2",
-    "@evilmartians/lefthook": "^1.5.0",
     "@react-native/babel-preset": "^0.80.1",
     "@react-native/typescript-config": "^0.80.1",
     "@release-it-plugins/workspaces": "^4.2.0",
@@ -38,11 +37,6 @@
     "apps/example-apple"
   ],
   "packageManager": "bun@1.2.19",
-  "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ]
-  },
   "release-it": {
     "git": {
       "commitMessage": "chore: release ${version}",
