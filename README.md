@@ -1,33 +1,120 @@
 [![image](https://github.com/user-attachments/assets/027ccbc1-c6c4-46a0-aa62-7b89d4e62f24)](https://www.callstack.com/open-source?utm_campaign=generic&utm_source=github&utm_medium=referral&utm_content=react-native-ai)
-<div align="center">
 
-Bring on-device AI to React Native apps. Use instantly available built-in models (Apple Intelligence, Gemini Nano) for immediate AI capabilities, or download and run any model locally with popular runtimes such as MLC Engine. Compatible with Vercel AI SDK interface.
+# React Native AI
 
-</div>
+A collection of on-device AI primitives for React Native with first-class Vercel AI SDK support. Run AI models directly on users' devices for privacy-preserving, low-latency inference without server costs.
 
-<div align="center">
+## Features
 
-[![mit licence](https://img.shields.io/dub/l/vibe-d.svg?style=for-the-badge)](https://github.com/callstackincubator/ai/blob/main/LICENSE)
-[![npm version](https://img.shields.io/npm/v/react-native-ai?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
-[![npm downloads](https://img.shields.io/npm/dt/react-native-ai.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
-[![npm downloads](https://img.shields.io/npm/dm/react-native-ai.svg?style=for-the-badge)](https://www.npmjs.org/package/react-native-ai)
-</div>
+- 🚀 **Instant AI** - Use built-in system models immediately without downloads
+- 🔒 **Privacy-first** - All processing happens on-device, data stays local
+- 🎯 **Vercel AI SDK compatible** - Drop-in replacement with familiar APIs
+- 🎨 **Complete toolkit** - Text generation, embeddings, transcription, speech synthesis
 
-## Why choose `react-native-ai`?
+## Available Providers
 
-- **Complete AI toolkit** - Build apps with text generation, voice transcription, speech synthesis, and embeddings
-- **Instant AI** - Built-in models work immediately, no downloads or setup required  
-- **Run anything** - Download and use any LLM locally when you need specific models
-- **Drop-in replacement** - Uses familiar Vercel AI SDK functions
-- **Privacy-first** - All processing happens on-device, your data stays local
+### Apple
 
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/443a6925-1e50-4eab-87a3-4f9c34e2de14" />
-</div>
+Native integration with Apple's on-device AI capabilities:
 
-## Read more 
+- **Text Generation** - Apple Foundation Models for chat and completion
+- **Embeddings** - NLContextualEmbedding for 512-dimensional semantic vectors
+- **Transcription** - SpeechAnalyzer for fast, accurate speech-to-text
+- **Speech Synthesis** - AVSpeechSynthesizer for natural text-to-speech with system voices
 
-For installation instructions and comprehensive documentation, visit [react-native-ai.dev](https://react-native-ai.dev).
+#### Installation
+
+```bash
+npm install @react-native-ai/apple
+```
+
+No additional linking needed, works immediately on iOS devices (autolinked).
+
+#### Usage
+
+```typescript
+import { apple } from '@react-native-ai/apple'
+import { 
+  generateText,
+  embed, 
+  experimental_transcribe as transcribe, 
+  experimental_generateSpeech as speech 
+} from 'ai'
+
+// Text generation with Apple Intelligence
+const { text } = await generateText({
+  model: apple(),
+  prompt: 'Explain quantum computing'
+})
+
+// Generate embeddings
+const { embedding } = await embed({
+  model: apple.textEmbeddingModel(),
+  value: 'Hello world'
+})
+
+// Transcribe audio
+const { text } = await transcribe({
+  model: apple.transcriptionModel(),
+  audio: audioBuffer
+})
+
+// Text-to-speech
+const { audio } = await speech({
+  model: apple.speechModel(),
+  text: 'Hello from Apple!'
+})
+```
+
+#### Availability
+
+| Feature | iOS Version | Additional Requirements |
+|---------|-------------|------------------------|
+| Text Generation | iOS 26+ | Apple Intelligence device |
+| Embeddings | iOS 17+ | - |
+| Transcription | iOS 26+ | - |
+| Speech Synthesis | iOS 13+ | iOS 17+ for Personal Voice |
+
+See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
+
+### MLC Engine (Work in Progress)
+
+Run any open-source LLM locally using MLC's optimized runtime. Currently in development and not recommended for production use.
+
+#### Installation
+
+```bash
+npm install @react-native-ai/mlc
+```
+
+Requires manual setup including installing the MLC CLI. See the [setup guide](https://react-native-ai.dev/docs/mlc/overview#3-install-mlc_llm-cli).
+
+#### Usage
+
+```typescript
+import { getModel, prepareModel } from '@react-native-ai/mlc'
+import { generateText } from 'ai'
+
+// Download and prepare model
+await prepareModel('Llama-3.2-3B-Instruct')
+
+// Generate response with Llama via MLC engine
+const { text } = await generateText({
+  model: getModel('Llama-3.2-3B-Instruct'),
+  prompt: 'Explain quantum computing'
+})
+```
+
+> [!NOTE]
+> MLC support is experimental. Follow the [setup guide](https://react-native-ai.dev/docs/mlc/overview) for detailed installation instructions.
+
+### Google (Coming Soon)
+
+Support for Google's on-device models is planned for future releases.
+
+## Documentation
+
+Comprehensive guides and API references are available at [react-native-ai.dev](https://react-native-ai.dev).
 
 ## Contributing
 
@@ -35,7 +122,7 @@ Read the [contribution guidelines](/CONTRIBUTING.md) before contributing.
 
 ## Made with ❤️ at Callstack
 
-<b>react-native-ai</b> is an open source project and will always remain free to use. If you think it's cool, please star it 🌟. 
+**react-native-ai** is an open source project and will always remain free to use. If you think it's cool, please star it 🌟. 
 
 [Callstack][callstack-readme-with-love] is a group of React and React Native geeks, contact us at [hello@callstack.com](mailto:hello@callstack.com) if you need any help with these or just want to say hi!
 

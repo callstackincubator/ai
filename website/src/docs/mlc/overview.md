@@ -5,7 +5,7 @@
 #### 1. Install the package
 
 ```
-npm install react-native-ai
+npm install @react-native-ai/mlc
 ```
 
 #### 2. Clone MLC LLM Engine repository and set environment variable.
@@ -79,7 +79,7 @@ This command prepares the necessary binaries and static libraries for your React
 - Handling environment variables and platform-specific requirements
 
 ```
-npx react-native-ai mlc-prepare
+npx @react-native-ai/mlc mlc-prepare
 ```
 
 #### 7. Add missing polyfills
@@ -121,7 +121,7 @@ This library provides first-class compatibility with the [Vercel AI SDK](https:/
     Retrieves a list of available models configured in your `mlc-config.json`.
 
     ```typescript
-    import { getModels } from 'react-native-ai';
+    import { getModels } from '@react-native-ai/mlc';
 
     async function listModels() {
       const models = await getModels();
@@ -133,7 +133,7 @@ This library provides first-class compatibility with the [Vercel AI SDK](https:/
     Downloads the specified model files. It accepts optional callbacks to track the download progress.
 
     ```typescript
-    import { downloadModel, type DownloadProgress } from 'react-native-ai';
+    import { downloadModel, type DownloadProgress } from '@react-native-ai/mlc';
 
     await downloadModel('Mistral-7B-Instruct-v0.2-q3f16_1', {
       onStart: () => console.log('Download started...'),
@@ -149,7 +149,7 @@ This library provides first-class compatibility with the [Vercel AI SDK](https:/
     Prepares the downloaded model for use by loading it into memory, if the model is not on the device it'll fetch it. However we recommend using `downloadModel` before calling `prepareModel`.
 
     ```typescript
-    import { prepareModel } from 'react-native-ai';
+    import { prepareModel } from '@react-native-ai/mlc';
 
     await prepareModel('Mistral-7B-Instruct-v0.2-q3f16_1');
     console.log('Model is ready!');
@@ -163,7 +163,7 @@ This library provides first-class compatibility with the [Vercel AI SDK](https:/
 Once a model is downloaded and prepared, you can use it with the Vercel AI SDK functions.
 
 ```typescript
-import { getModel, prepareModel } from 'react-native-ai';
+import { getModel, prepareModel } from '@react-native-ai/mlc';
 import { streamText, type CoreMessage } from 'ai';
 
 async function runInference(modelId: string, messages: CoreMessage[]) {
