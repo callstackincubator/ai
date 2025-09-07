@@ -22,6 +22,16 @@ Native integration with Apple's on-device AI capabilities:
 - **Transcription** - SpeechAnalyzer for fast, accurate speech-to-text
 - **Speech Synthesis** - AVSpeechSynthesizer for natural text-to-speech with system voices
 
+#### Installation
+
+```bash
+npm install @react-native-ai/apple
+```
+
+No additional linking needed, works immediately on iOS devices (autolinked).
+
+#### Usage
+
 ```typescript
 import { apple } from '@react-native-ai/apple'
 import { 
@@ -71,9 +81,19 @@ See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-sta
 
 Run any open-source LLM locally using MLC's optimized runtime. Currently in development and not recommended for production use.
 
+#### Installation
+
+```bash
+npm install @react-native-ai/mlc
+```
+
+Requires manual setup including installing the MLC CLI. See the [setup guide](https://react-native-ai.dev/docs/mlc/overview#3-install-mlc_llm-cli).
+
+#### Usage
+
 ```typescript
-import { getModel, prepareModel } from 'react-native-ai'
-import { streamText } from 'ai'
+import { getModel, prepareModel } from '@react-native-ai/mlc'
+import { generateText } from 'ai'
 
 // Download and prepare model
 await prepareModel('Llama-3.2-3B-Instruct')
