@@ -14,13 +14,14 @@
 #import <React/RCTCallInvokerModule.h>
 #import <React/RCTCallInvoker.h>
 #import <ReactCommon/RCTTurboModule.h>
+#import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
 
 #import <jsi/jsi.h>
 #import <react/bridging/Function.h>
 
 #import <NativeAppleLLM/NativeAppleLLM.h>
 
-@interface AppleSpeech : NativeAppleSpeechSpecBase <NativeAppleSpeechSpec, RCTCallInvokerModule>
+@interface AppleSpeech : NativeAppleSpeechSpecBase <NativeAppleSpeechSpec, RCTCallInvokerModule, RCTTurboModuleWithJSIBindings>
 @property (strong, nonatomic) AppleSpeechImpl *speech;
 @end
 
@@ -44,111 +45,108 @@ using namespace react;
   return @"NativeAppleSpeech";
 }
 
-- (void)installGenerateFunc:(std::shared_ptr<facebook::react::CallInvoker>)jsInvoker {
+- (void)installJSIBindingsWithRuntime:(facebook::jsi::Runtime &)rt callInvoker:(const std::shared_ptr<facebook::react::CallInvoker> &)jsInvoker {
   AppleSpeechImpl *speechModule = _speech;
   
-  jsInvoker->invokeAsync([speechModule, jsInvoker](jsi::Runtime& rt) {
-    @try {
-      auto global = rt.global();
-      
-      auto generateAudioFunc = jsi::Function::createFromHostFunction(
-        rt,
-        jsi::PropNameID::forAscii(rt, "generateAudio"),
-        2,
-        [speechModule, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
-          if (count < 1 || !args[0].isString()) {
-            throw jsi::JSError(rt, "First argument must be a string (text)");
-          }
-          
-          auto textStr = args[0].asString(rt).utf8(rt);
-          NSString *text = [NSString stringWithUTF8String:textStr.c_str()];
-          
-          auto *options = [NSMutableDictionary new];
-          if (count > 1 && args[1].isObject()) {
-            auto opts = args[1].asObject(rt);
-            
-            if (opts.hasProperty(rt, "language")) {
-              auto langProp = opts.getProperty(rt, "language");
-              if (langProp.isString()) {
-                auto langStr = langProp.asString(rt).utf8(rt);
-                options[@"language"] = [NSString stringWithUTF8String:langStr.c_str()];
-              }
-            }
-            
-            if (opts.hasProperty(rt, "voice")) {
-              auto voiceProp = opts.getProperty(rt, "voice");
-              if (voiceProp.isString()) {
-                auto voiceStr = voiceProp.asString(rt).utf8(rt);
-                options[@"voice"] = [NSString stringWithUTF8String:voiceStr.c_str()];
-              }
-            }
-          }
-          
-          auto Promise = rt.global().getPropertyAsFunction(rt, "Promise");
-          
-          return Promise.callAsConstructor(rt, jsi::Function::createFromHostFunction(
-            rt,
-            jsi::PropNameID::forAscii(rt, "executor"),
-            2,
-            [speechModule, text, options, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
-              using ResolveCallback = facebook::react::AsyncCallback<NSDictionary*>;
-              using RejectCallback = facebook::react::AsyncCallback<NSString*, NSString*, NSError*>;
-              
-              auto resolve = ResolveCallback(rt, args[0].asObject(rt).asFunction(rt), jsInvoker);
-              auto reject = RejectCallback(rt, args[1].asObject(rt).asFunction(rt), jsInvoker);
-              
-              [speechModule generateAudio:text options:options resolve:^(NSDictionary *result) {
-                resolve.call([result](jsi::Runtime& rt, jsi::Function& resolveFunc) {
-                  class NSDataMutableBuffer : public facebook::jsi::MutableBuffer {
-                  public:
-                    NSDataMutableBuffer(uint8_t* data, size_t size) : _data(data), _size(size) {}
-                    uint8_t* data() override { return _data; }
-                    size_t size() const override { return _size; }
-                  private:
-                    uint8_t* _data;
-                    size_t _size;
-                  };
-
-                  // Extract PCM data
-                  NSData *audioData = result[@"data"];
-                  uint8_t* data = (uint8_t*)[audioData bytes];
-                  size_t size = [audioData length];
-                  
-                  auto mutableBuffer = std::make_shared<NSDataMutableBuffer>(data, size);
-                  auto arrayBuffer = jsi::ArrayBuffer(rt, mutableBuffer);
-
-                  // Create result object with format information
-                  auto resultObj = jsi::Object(rt);
-                  resultObj.setProperty(rt, "data", std::move(arrayBuffer));
-                  resultObj.setProperty(rt, "sampleRate", jsi::Value(rt, [result[@"sampleRate"] intValue]));
-                  resultObj.setProperty(rt, "channels", jsi::Value(rt, [result[@"channels"] intValue]));
-                  resultObj.setProperty(rt, "bitsPerSample", jsi::Value(rt, [result[@"bitsPerSample"] intValue]));
-                  resultObj.setProperty(rt, "formatType", jsi::Value(rt, [result[@"formatType"] intValue]));
-
-                  resolveFunc.call(rt, std::move(resultObj));
-                });
-              } reject:^(NSString *code, NSString *message, NSError *error) {
-                reject.call([message](jsi::Runtime& rt, jsi::Function& rejectFunc) {
-                  auto jsError = jsi::String::createFromUtf8(rt, [message UTF8String]);
-                  rejectFunc.call(rt, jsError);
-                });
-              }];
-              
-              return jsi::Value::undefined();
-            }
-          ));
+  @try {
+    auto global = rt.global();
+    
+    auto generateAudioFunc = jsi::Function::createFromHostFunction(
+      rt,
+      jsi::PropNameID::forAscii(rt, "generateAudio"),
+      2,
+      [speechModule, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+        if (count < 1 || !args[0].isString()) {
+          throw jsi::JSError(rt, "First argument must be a string (text)");
         }
-      );
-      
-      global.setProperty(rt, "__apple__llm__generate_audio__", generateAudioFunc);
-    } @catch (NSException *exception) {
-      throw jsi::JSError(rt, [[NSString stringWithFormat:@"Failed to install generateAudio handler: %@", exception.reason] UTF8String]);
-    }
-  });
+        
+        auto textStr = args[0].asString(rt).utf8(rt);
+        NSString *text = [NSString stringWithUTF8String:textStr.c_str()];
+        
+        auto *options = [NSMutableDictionary new];
+        if (count > 1 && args[1].isObject()) {
+          auto opts = args[1].asObject(rt);
+          
+          if (opts.hasProperty(rt, "language")) {
+            auto langProp = opts.getProperty(rt, "language");
+            if (langProp.isString()) {
+              auto langStr = langProp.asString(rt).utf8(rt);
+              options[@"language"] = [NSString stringWithUTF8String:langStr.c_str()];
+            }
+          }
+          
+          if (opts.hasProperty(rt, "voice")) {
+            auto voiceProp = opts.getProperty(rt, "voice");
+            if (voiceProp.isString()) {
+              auto voiceStr = voiceProp.asString(rt).utf8(rt);
+              options[@"voice"] = [NSString stringWithUTF8String:voiceStr.c_str()];
+            }
+          }
+        }
+        
+        auto Promise = rt.global().getPropertyAsFunction(rt, "Promise");
+        
+        return Promise.callAsConstructor(rt, jsi::Function::createFromHostFunction(
+          rt,
+          jsi::PropNameID::forAscii(rt, "executor"),
+          2,
+          [speechModule, text, options, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+            using ResolveCallback = facebook::react::AsyncCallback<NSDictionary*>;
+            using RejectCallback = facebook::react::AsyncCallback<NSString*, NSString*, NSError*>;
+            
+            auto resolve = ResolveCallback(rt, args[0].asObject(rt).asFunction(rt), jsInvoker);
+            auto reject = RejectCallback(rt, args[1].asObject(rt).asFunction(rt), jsInvoker);
+            
+            [speechModule generateAudio:text options:options resolve:^(NSDictionary *result) {
+              resolve.call([result](jsi::Runtime& rt, jsi::Function& resolveFunc) {
+                class NSDataMutableBuffer : public facebook::jsi::MutableBuffer {
+                public:
+                  NSDataMutableBuffer(uint8_t* data, size_t size) : _data(data), _size(size) {}
+                  uint8_t* data() override { return _data; }
+                  size_t size() const override { return _size; }
+                private:
+                  uint8_t* _data;
+                  size_t _size;
+                };
+
+                // Extract PCM data
+                NSData *audioData = result[@"data"];
+                uint8_t* data = (uint8_t*)[audioData bytes];
+                size_t size = [audioData length];
+                
+                auto mutableBuffer = std::make_shared<NSDataMutableBuffer>(data, size);
+                auto arrayBuffer = jsi::ArrayBuffer(rt, mutableBuffer);
+
+                // Create result object with format information
+                auto resultObj = jsi::Object(rt);
+                resultObj.setProperty(rt, "data", std::move(arrayBuffer));
+                resultObj.setProperty(rt, "sampleRate", jsi::Value(rt, [result[@"sampleRate"] intValue]));
+                resultObj.setProperty(rt, "channels", jsi::Value(rt, [result[@"channels"] intValue]));
+                resultObj.setProperty(rt, "bitsPerSample", jsi::Value(rt, [result[@"bitsPerSample"] intValue]));
+                resultObj.setProperty(rt, "formatType", jsi::Value(rt, [result[@"formatType"] intValue]));
+
+                resolveFunc.call(rt, std::move(resultObj));
+              });
+            } reject:^(NSString *code, NSString *message, NSError *error) {
+              reject.call([message](jsi::Runtime& rt, jsi::Function& rejectFunc) {
+                auto jsError = jsi::String::createFromUtf8(rt, [message UTF8String]);
+                rejectFunc.call(rt, jsError);
+              });
+            }];
+            
+            return jsi::Value::undefined();
+          }
+        ));
+      }
+    );
+    
+    global.setProperty(rt, "__apple__llm__generate_audio__", generateAudioFunc);
+  } @catch (NSException *exception) {
+    throw jsi::JSError(rt, [[NSString stringWithFormat:@"Failed to install generateAudio handler: %@", exception.reason] UTF8String]);
+  }
 }
 
 - (std::shared_ptr<react::TurboModule>)getTurboModule:(const react::ObjCTurboModule::InitParams &)params {
-  [self installGenerateFunc:params.jsInvoker];
   return std::make_shared<react::NativeAppleSpeechSpecJSI>(params);
 }
 
