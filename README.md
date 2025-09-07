@@ -65,6 +65,8 @@ const { audio } = await speech({
 | Transcription | iOS 26+ | - |
 | Speech Synthesis | iOS 13+ | iOS 17+ for Personal Voice |
 
+See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
+
 ### MLC Engine (Work in Progress)
 
 Run any open-source LLM locally using MLC's optimized runtime. Currently in development and not recommended for production use.
@@ -76,14 +78,15 @@ import { streamText } from 'ai'
 // Download and prepare model
 await prepareModel('Llama-3.2-3B-Instruct')
 
-// Stream responses
-const { textStream } = await streamText({
+// Generate response with Llama via MLC engine
+const { text } = await generateText({
   model: getModel('Llama-3.2-3B-Instruct'),
-  messages: [{ role: 'user', content: 'Hello!' }]
+  prompt: 'Explain quantum computing'
 })
 ```
 
-> **Note:** MLC support is experimental. Follow the [setup guide](https://react-native-ai.dev/docs/mlc/overview) for detailed installation instructions.
+> [!NOTE]
+> MLC support is experimental. Follow the [setup guide](https://react-native-ai.dev/docs/mlc/overview) for detailed installation instructions.
 
 ### Google (Coming Soon)
 
