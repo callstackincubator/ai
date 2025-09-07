@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "typecheck": "bun run --filter='*' typecheck",
-    "lint": "eslint \"**/*.{js,ts,tsx}\""
+    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "release": "release-it"
   },
   "repository": {
     "type": "git",
