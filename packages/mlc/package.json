@@ -1,7 +1,7 @@
 {
   "name": "@react-native-ai/mlc",
   "version": "0.6.0",
-  "description": "React Native AI",
+  "description": "MLC LLM provider for Vercel AI SDK",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
   "types": "lib/typescript/index.d.ts",
@@ -28,14 +28,18 @@
   ],
   "scripts": {
     "clean": "del-cli lib",
-    "prepare": "bunx bob build",
+    "typecheck": "tsc --noEmit",
+    "prepare": "bob build",
     "build:runtime:ios": "./scripts/build-runtime.sh --platform ios",
     "build:runtime:android": "./scripts/build-runtime.sh --platform android"
   },
   "keywords": [
     "react-native",
-    "ios",
-    "android"
+    "mlc",
+    "llm",
+    "ai",
+    "sdk",
+    "vercel"
   ],
   "repository": {
     "type": "git",
@@ -54,23 +58,11 @@
     "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.5",
-    "@types/react": "~19.0.10",
-    "jest": "^29.7.0",
-    "react": "19.0.0",
-    "react-native": "0.79.5",
-    "react-native-builder-bob": "^0.23.2"
+    "react-native": "0.79.5"
   },
   "peerDependencies": {
-    "react": ">=18.2.0",
-    "react-native": ">=0.76.0"
-  },
-  "jest": {
-    "preset": "react-native",
-    "modulePathIgnorePatterns": [
-      "<rootDir>/example/node_modules",
-      "<rootDir>/lib/"
-    ]
+    "react": "19.0.0",
+    "react-native": "0.79.5"
   },
   "react-native-builder-bob": {
     "source": "src",
@@ -92,7 +84,8 @@
     "jsSrcsDir": "src"
   },
   "dependencies": {
-    "@ai-sdk/provider": "^1.0.7",
-    "web-streams-polyfill": "3.3.3"
+    "@ai-sdk/provider": "^2.0.0-beta.1",
+    "@ai-sdk/provider-utils": "^3.0.0-beta.5",
+    "zod": "^4.0.0"
   }
 }

@@ -1,5 +1,3 @@
-import './polyfills'
-
 import {
   type LanguageModelV1,
   type LanguageModelV1CallOptions,
@@ -15,36 +13,7 @@ import {
   ReadableStreamDefaultController,
 } from 'web-streams-polyfill'
 
-declare global {
-  // A react-native internal from TurboModuleRegistry.js
-  var __turboModuleProxy: unknown | undefined
-}
-
-const LINKING_ERROR =
-  `The package 'react-native-ai' doesn't seem to be linked. Make sure: \n\n` +
-  Platform.select({ ios: "- You have run 'pod install'\n", default: '' }) +
-  '- You rebuilt the app after installing the package\n' +
-  '- You are not using Expo Go\n'
-
-const isTurboModuleEnabled = global.__turboModuleProxy != null
-
-const AiModule = isTurboModuleEnabled
-  ? // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('./NativeAi').default
-  : NativeModules.Ai
-
-const Ai = AiModule
-  ? AiModule
-  : new Proxy(
-      {},
-      {
-        get() {
-          throw new Error(LINKING_ERROR)
-        },
-      }
-    )
-
-export default Ai
+import MlcEngine from './NativeAi'
 
 export interface AiModelSettings extends Record<string, unknown> {
   model_id?: string
@@ -60,30 +29,24 @@ export interface Message {
   content: string
 }
 
-export interface DownloadProgress {
-  percentage: number
-}
+LogBox.ignoreLogs(['new NativeEventEmitter', 'Avatar:'])
 
-LogBox.ignoreLogs(['new NativeEventEmitter', 'Avatar:']) // Ignore log notification by message
-
-class AiModel implements LanguageModelV1 {
+export class MlcProvider implements LanguageModelV1 {
   readonly specificationVersion = 'v1'
   readonly defaultObjectGenerationMode = 'json'
-  readonly provider = 'gemini-nano'
+  readonly provider = 'mlc'
   public modelId: string
   private options: AiModelSettings
 
-  constructor(modelId: string, options: AiModelSettings = {}) {
-    this.modelId = modelId
+  constructor(modelId?: string, options: AiModelSettings = {}) {
+    this.modelId = modelId || 'Llama-3.2-3B-Instruct'
     this.options = options
-
-    console.debug('init:', this.modelId)
   }
 
   private model!: Model
   async getModel() {
-    this.model = await Ai.getModel(this.modelId)
-
+    // @ts-ignore
+    this.model = await MlcEngine.getModel(this.modelId)
     return this.model
   }
 
@@ -113,6 +76,8 @@ class AiModel implements LanguageModelV1 {
               : messageContent
           )
           .join('')
+      } else {
+        content = typeof message.content === 'string' ? message.content : ''
       }
 
       return {
@@ -124,7 +89,7 @@ class AiModel implements LanguageModelV1 {
     let text = ''
 
     if (messages.length > 0) {
-      text = await Ai.doGenerate(model.modelId, extractedMessages)
+      text = await MlcEngine.doGenerate(model.modelId, extractedMessages)
     }
 
     return {
@@ -172,6 +137,8 @@ class AiModel implements LanguageModelV1 {
               : messageContent
           )
           .join('')
+      } else {
+        content = typeof message.content === 'string' ? message.content : ''
       }
 
       return {
@@ -207,7 +174,7 @@ class AiModel implements LanguageModelV1 {
                 this.controller.close()
               }
             } catch (error) {
-              console.error('🔴 [Stream] Error in complete handler:', error)
+              console.error('Error in complete handler:', error)
             }
           }
         )
@@ -215,10 +182,6 @@ class AiModel implements LanguageModelV1 {
         this.chatErrorListener = eventEmitter.addListener(
           'onChatUpdate',
           (data) => {
-            console.log(
-              '🟢 [Stream] Update data:',
-              JSON.stringify(data, null, 2)
-            )
             try {
               if (!this.isStreamClosed && this.controller) {
                 if (data.error) {
@@ -231,46 +194,30 @@ class AiModel implements LanguageModelV1 {
                     textDelta: data.content || '',
                   })
                 }
-              } else {
-                console.log(
-                  '🟡 [Stream] Cannot update - stream closed or no controller'
-                )
               }
             } catch (error) {
-              console.error('🔴 [Stream] Error in update handler:', error)
+              console.error('Error in update handler:', error)
             }
           }
         )
 
         if (!model) {
-          console.error('🔴 [Stream] Model not initialized')
           throw new Error('Model not initialized')
         }
 
-        console.log(
-          '🔵 [Stream] Starting native stream with model:',
-          model.modelId
-        )
-        Ai.doStream(model.modelId, extractedMessages)
+        MlcEngine.doStream(model.modelId, extractedMessages)
       },
       cancel: () => {
-        console.log('🟡 [Stream] Stream cancelled, cleaning up')
         this.isStreamClosed = true
         if (this.chatUpdateListener) {
-          console.log('🟡 [Stream] Removing chat update listener')
           this.chatUpdateListener.remove()
         }
         if (this.chatCompleteListener) {
-          console.log('🟡 [Stream] Removing chat complete listener')
           this.chatCompleteListener.remove()
         }
         if (this.chatErrorListener) {
-          console.log('🟡 [Stream] Removing chat error listener')
           this.chatErrorListener.remove()
         }
-      },
-      pull: () => {
-        console.log('🔵 [Stream] Pull called')
       },
     })
 
@@ -279,92 +226,4 @@ class AiModel implements LanguageModelV1 {
       rawCall: { rawPrompt: options.prompt, rawSettings: this.options },
     }
   }
-
-  // Add other methods here as needed
 }
-
-type ModelOptions = Record<string, unknown>
-
-export function getModel(modelId: string, options: ModelOptions = {}): AiModel {
-  return new AiModel(modelId, options)
-}
-
-export async function getModels(): Promise<AiModelSettings[]> {
-  return Ai.getModels()
-}
-
-export async function downloadModel(
-  modelId: string,
-  callbacks?: {
-    onStart?: () => void
-    onProgress?: (progress: DownloadProgress) => void
-    onComplete?: () => void
-    onError?: (error: Error) => void
-  }
-): Promise<void> {
-  const eventEmitter = new NativeEventEmitter(NativeModules.Ai)
-
-  const downloadStartListener = eventEmitter.addListener(
-    'onDownloadStart',
-    () => {
-      console.log('🔵 [Download] Started downloading model:', modelId)
-      callbacks?.onStart?.()
-    }
-  )
-
-  const downloadProgressListener = eventEmitter.addListener(
-    'onDownloadProgress',
-    (progress: DownloadProgress) => {
-      console.log(
-        '🟢 [Download] Progress:',
-        progress.percentage.toFixed(2) + '%'
-      )
-      callbacks?.onProgress?.(progress)
-    }
-  )
-
-  const downloadCompleteListener = eventEmitter.addListener(
-    'onDownloadComplete',
-    () => {
-      console.log('✅ [Download] Completed downloading model:', modelId)
-      callbacks?.onComplete?.()
-      // Cleanup listeners
-      downloadStartListener.remove()
-      downloadProgressListener.remove()
-      downloadCompleteListener.remove()
-      downloadErrorListener.remove()
-    }
-  )
-
-  const downloadErrorListener = eventEmitter.addListener(
-    'onDownloadError',
-    (error) => {
-      console.error('🔴 [Download] Error downloading model:', error)
-      callbacks?.onError?.(new Error(error.message || 'Unknown download error'))
-      // Cleanup listeners
-      downloadStartListener.remove()
-      downloadProgressListener.remove()
-      downloadCompleteListener.remove()
-      downloadErrorListener.remove()
-    }
-  )
-
-  try {
-    await Ai.downloadModel(modelId)
-  } catch (error) {
-    // Cleanup listeners in case of error
-    downloadStartListener.remove()
-    downloadProgressListener.remove()
-    downloadCompleteListener.remove()
-    downloadErrorListener.remove()
-    throw error
-  }
-}
-
-export async function prepareModel(modelId: string) {
-  return Ai.prepareModel(modelId)
-}
-
-const { doGenerate, doStream } = Ai
-
-export { doGenerate, doStream }
