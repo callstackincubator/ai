@@ -7,17 +7,14 @@
   "types": "lib/typescript/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
-  "bin": {
-    "mlc-prepare": "scripts/mlc-prepare.js"
-  },
   "files": [
     "src",
     "lib",
     "android",
     "ios",
     "cpp",
+    "prebuilt",
     "*.podspec",
-    "./scripts/mlc-prepare.js",
     "!ios/build",
     "!android/build",
     "!android/gradle",
@@ -30,13 +27,10 @@
     "!**/.*"
   ],
   "scripts": {
-    "test": "jest",
-    "typecheck": "tsc --noEmit",
     "clean": "del-cli lib",
     "prepare": "bunx bob build",
-    "format:ios": "./scripts/format-ios.sh",
-    "format:android": "./scripts/format-android.sh",
-    "prestart": "node scripts/mlc-prepare.js"
+    "build:runtime:ios": "./scripts/build-runtime.sh --platform ios",
+    "build:runtime:android": "./scripts/build-runtime.sh --platform android"
   },
   "keywords": [
     "react-native",
@@ -48,6 +42,9 @@
     "url": "git+https://github.com/callstackincubator/ai.git"
   },
   "author": "Szymon Rybczak <szymon.rybczak@gmail.com> (https://github.com/szymonrybczak)",
+  "contributors": [
+    "Mike Grabowski <grabbou@gmail.com> (https://github.com/grabbou)"
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/callstackincubator/ai/issues"

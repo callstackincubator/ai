@@ -1,5 +1,4 @@
 buildscript {
-  // Buildscript is evaluated before everything else so we can't use getExtOrDefault
   def kotlin_version = rootProject.ext.has("kotlinVersion") ? rootProject.ext.get("kotlinVersion") : project.properties["Ai_kotlinVersion"]
 
   repositories {
@@ -9,7 +8,6 @@ buildscript {
 
   dependencies {
     classpath "com.android.tools.build:gradle:7.2.1"
-    // noinspection DifferentKotlinGradleVersion
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
   }
 }
@@ -42,15 +40,14 @@ def supportsNamespace() {
   def parsed = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')
   def major = parsed[0].toInteger()
   def minor = parsed[1].toInteger()
-
-  // Namespace support was added in 7.3.0
   return (major == 7 && minor >= 3) || major >= 8
 }
+
 
 android {
   if (supportsNamespace()) {
     namespace "com.ai"
-
+    
     sourceSets {
       main {
         manifest.srcFile "src/main/AndroidManifestNew.xml"
@@ -64,7 +61,6 @@ android {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
     buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
-
   }
 
   buildFeatures {
@@ -91,12 +87,17 @@ android {
       if (isNewArchitectureEnabled()) {
         java.srcDirs += [
           "src/newarch",
-          // This is needed to build Kotlin project with NewArch enabled
           "${project.buildDir}/generated/source/codegen/java"
         ]
       } else {
         java.srcDirs += ["src/oldarch"]
       }
+      
+      // Include prebuilt native libraries
+      jniLibs.srcDirs += ["${projectDir}/../prebuilt/android/jniLibs"]
+      
+      // Include prebuilt model assets
+      assets.srcDirs += ["${projectDir}/../prebuilt/android/models"]
     }
   }
 }
@@ -109,13 +110,14 @@ repositories {
 def kotlin_version = getExtOrDefault("kotlinVersion")
 
 dependencies {
-  // For < 0.71, this will be from the local maven repo
-  // For > 0.71, this will be replaced by `com.facebook.react:react-android:$version` by react gradle plugin
-  //noinspection GradleDynamicVersion
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   implementation 'com.google.code.gson:gson:2.10.1'
-  implementation project(":mlc4j")
+  
+  // Use prebuilt MLC runtime AAR (no more mlc4j project dependency!)
+  implementation files("${projectDir}/../prebuilt/android/mlc-runtime.aar")
+  
+  // UI dependencies
   implementation 'androidx.core:core-ktx:1.10.1'
   implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
   implementation 'com.github.jeziellago:compose-markdown:0.5.2'
@@ -126,8 +128,8 @@ dependencies {
   implementation 'androidx.compose.material:material-icons-extended'
   implementation 'androidx.appcompat:appcompat:1.6.1'
   implementation 'androidx.navigation:navigation-compose:2.5.3'
-  implementation 'com.google.code.gson:gson:2.10.1'
-  implementation fileTree(dir: 'src/main/libs', include: ['*.aar', '*.jar'], exclude: [])
+  
+  // Testing
   testImplementation 'junit:junit:4.13.2'
   androidTestImplementation 'androidx.test.ext:junit:1.1.5'
   androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
