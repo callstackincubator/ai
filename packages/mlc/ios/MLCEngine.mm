@@ -1,75 +1,728 @@
-//
-//  MLCEngine.mm
-//  Pods
-//
-//  Created by Szymon Rybczak on 19/07/2024.
-//
+#import <React/RCTEventEmitter.h>
+#import <ReactCommon/RCTTurboModule.h>
 
-#import "MLCEngine.h"
-#import "BackgroundWorker.h"
-#import "EngineState.h"
 #import "LLMEngine.h"
 
-// Private class extension for MLCEngine
-@interface MLCEngine ()
-@property(nonatomic, strong) EngineState* state;
-@property(nonatomic, strong) JSONFFIEngine* jsonFFIEngine;
-@property(nonatomic, strong) NSMutableArray<NSThread*>* threads;
+#import <jsi/jsi.h>
+#import <NativeMLCEngine/NativeMLCEngine.h>
+
+@interface MLCEngine : NativeMLCEngineSpecBase <NativeMLCEngineSpec, RCTBridgeModule>
+
+@property(nonatomic, strong) LLMEngine* engine;
+@property(nonatomic, strong) NSURL* bundleURL;
+@property(nonatomic, strong) NSString* modelPath;
+@property(nonatomic, strong) NSString* modelLib;
+@property(nonatomic, strong) NSString* displayText;
+
 @end
 
+using namespace facebook;
+
 @implementation MLCEngine
+
++ (NSString *)moduleName {
+  return @"MLCEngine";
+}
 
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _state = [[EngineState alloc] init];
-    _jsonFFIEngine = [[JSONFFIEngine alloc] init];
-    _threads = [NSMutableArray array];
+    _engine = [[LLMEngine alloc] init];
 
-    [_jsonFFIEngine initBackgroundEngine:^(NSString* _Nullable result) {
-      [self.state streamCallbackWithResult:result];
-    }];
+    // Get the Documents directory path
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString* documentsDirectory = [paths firstObject];
+    _bundleURL = [NSURL fileURLWithPath:[documentsDirectory stringByAppendingPathComponent:@"bundle"]];
 
-    BackgroundWorker* backgroundWorker = [[BackgroundWorker alloc] initWithTask:^{
-      [NSThread setThreadPriority:1.0];
-      [self.jsonFFIEngine runBackgroundLoop];
-    }];
+    // Create bundle directory if it doesn't exist
+    NSError* dirError;
+    [[NSFileManager defaultManager] createDirectoryAtPath:[_bundleURL path] withIntermediateDirectories:YES attributes:nil error:&dirError];
+    if (dirError) {
+      NSLog(@"Error creating bundle directory: %@", dirError);
+    }
 
-    BackgroundWorker* backgroundStreamBackWorker = [[BackgroundWorker alloc] initWithTask:^{
-      [self.jsonFFIEngine runBackgroundStreamBackLoop];
-    }];
+    // Copy the config file from the app bundle to Documents if it doesn't exist yet
+    NSURL* bundleConfigURL = [[[NSBundle mainBundle] bundleURL] URLByAppendingPathComponent:@"bundle/mlc-app-config.json"];
+    NSURL* configURL = [_bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
 
-    backgroundWorker.qualityOfService = NSQualityOfServiceUserInteractive;
-    [_threads addObject:backgroundWorker];
-    [_threads addObject:backgroundStreamBackWorker];
-    [backgroundWorker start];
-    [backgroundStreamBackWorker start];
+    NSError* copyError;
+    [[NSFileManager defaultManager] removeItemAtURL:configURL error:nil]; // Remove existing file if it exists
+    [[NSFileManager defaultManager] copyItemAtURL:bundleConfigURL toURL:configURL error:&copyError];
+    if (copyError) {
+      NSLog(@"Error copying config file: %@", copyError);
+    }
+
+    // Read and parse JSON
+    NSData* jsonData = [NSData dataWithContentsOfURL:configURL];
+    if (jsonData) {
+      NSError* error;
+      NSDictionary* jsonDict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+      if (!error && [jsonDict isKindOfClass:[NSDictionary class]]) {
+        NSArray* modelList = jsonDict[@"model_list"];
+        if ([modelList isKindOfClass:[NSArray class]] && modelList.count > 0) {
+          NSDictionary* firstModel = modelList[0];
+          _modelPath = firstModel[@"model_path"];
+          _modelLib = firstModel[@"model_lib"];
+        }
+      }
+    }
   }
   return self;
 }
 
-- (void)dealloc {
-  [self.jsonFFIEngine exitBackgroundLoop];
+- (std::shared_ptr<react::TurboModule>)getTurboModule:(const react::ObjCTurboModule::InitParams &)params {
+  return std::make_shared<react::NativeMLCEngineSpecJSI>(params);
 }
 
-- (void)reloadWithModelPath:(NSString*)modelPath modelLib:(NSString*)modelLib {
-  NSString* engineConfig =
-      [NSString stringWithFormat:@"{\"model\": \"%@\", \"model_lib\": \"system://%@\", \"mode\": \"interactive\"}", modelPath, modelLib];
-  [self.jsonFFIEngine reload:engineConfig];
+- (NSDictionary*)parseResponseString:(NSString*)responseString {
+  NSData* jsonData = [responseString dataUsingEncoding:NSUTF8StringEncoding];
+  NSError* error;
+  NSArray* jsonArray = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+  if (error) {
+    NSLog(@"Error parsing JSON: %@", error);
+    return nil;
+  }
+
+  if (jsonArray.count > 0) {
+    NSDictionary* responseDict = jsonArray[0];
+    NSArray* choices = responseDict[@"choices"];
+    if (choices.count > 0) {
+      NSDictionary* choice = choices[0];
+      NSDictionary* delta = choice[@"delta"];
+      NSString* content = delta[@"content"];
+      NSString* finishReason = choice[@"finish_reason"];
+
+      BOOL isFinished = (finishReason != nil && ![finishReason isEqual:[NSNull null]]);
+
+      return @{@"content" : content ?: @"", @"isFinished" : @(isFinished)};
+    }
+  }
+
+  return nil;
 }
 
-- (void)reset {
-  [self.jsonFFIEngine reset];
+- (void)generateText:(NSString*)modelId 
+            messages:(NSArray<NSDictionary*>*)messages 
+             resolve:(RCTPromiseResolveBlock)resolve 
+              reject:(RCTPromiseRejectBlock)reject {
+  NSLog(@"Generating for model ID: %@, with messages: %@", modelId, messages);
+  _displayText = @"";
+  __block BOOL hasResolved = NO;
+
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
+    NSString* modelLocalPath = [modelLocalURL path];
+
+    [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
+
+    [self.engine chatCompletionWithMessages:messages
+                                 completion:^(id response) {
+                                   if ([response isKindOfClass:[NSString class]]) {
+                                     NSDictionary* parsedResponse = [self parseResponseString:response];
+                                     if (parsedResponse) {
+                                       NSString* content = parsedResponse[@"content"];
+                                       BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
+
+                                       if (content) {
+                                         self.displayText = [self.displayText stringByAppendingString:content];
+                                       }
+
+                                       if (isFinished && !hasResolved) {
+                                         hasResolved = YES;
+                                         resolve(self.displayText);
+                                       }
+
+                                     } else {
+                                       if (!hasResolved) {
+                                         hasResolved = YES;
+                                         reject(@"PARSE_ERROR", @"Failed to parse response", nil);
+                                       }
+                                     }
+                                   } else {
+                                     if (!hasResolved) {
+                                       hasResolved = YES;
+                                       reject(@"INVALID_RESPONSE", @"Received an invalid response type", nil);
+                                     }
+                                   }
+                                 }];
+  });
 }
 
-- (void)unload {
-  [self.jsonFFIEngine unload];
+- (void)streamText:(NSString*)modelId 
+          messages:(NSArray<NSDictionary*>*)messages 
+           resolve:(RCTPromiseResolveBlock)resolve 
+            reject:(RCTPromiseRejectBlock)reject {
+
+  NSLog(@"Streaming for model ID: %@, with messages: %@", modelId, messages);
+
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    __block BOOL hasResolved = NO;
+
+    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
+    NSString* modelLocalPath = [modelLocalURL path];
+
+    [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
+
+    [self.engine chatCompletionWithMessages:messages
+                                 completion:^(id response) {
+                                   if ([response isKindOfClass:[NSString class]]) {
+                                     NSDictionary* parsedResponse = [self parseResponseString:response];
+                                     if (parsedResponse) {
+                                       NSString* content = parsedResponse[@"content"];
+                                       BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
+
+                                       if (content) {
+                                         self.displayText = [self.displayText stringByAppendingString:content];
+                                         [self emitOnChatUpdate:@{@"content" : content}];
+                                       }
+
+                                       if (isFinished && !hasResolved) {
+                                         hasResolved = YES;
+                                         [self emitOnChatComplete:@{}];
+                                         resolve(@"");
+                                         return;
+                                       }
+                                     } else {
+                                       if (!hasResolved) {
+                                         hasResolved = YES;
+                                         reject(@"PARSE_ERROR", @"Failed to parse response", nil);
+                                       }
+                                     }
+                                   } else {
+                                     if (!hasResolved) {
+                                       hasResolved = YES;
+                                       reject(@"INVALID_RESPONSE", @"Received an invalid response type", nil);
+                                     }
+                                   }
+                                 }];
+  });
 }
 
-- (void)chatCompletionWithMessages:(NSArray*)messages completion:(void (^)(NSString* response))completion {
-  NSDictionary* request = @{@"messages" : messages, @"temperature" : @0.6};
+- (void)getModel:(NSString*)name 
+         resolve:(RCTPromiseResolveBlock)resolve 
+          reject:(RCTPromiseRejectBlock)reject {
+  // Read app config from Documents directory
+  NSURL* configURL = [self.bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
+  NSData* jsonData = [NSData dataWithContentsOfURL:configURL];
 
-  [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine request:request completion:completion];
+  if (!jsonData) {
+    reject(@"Model not found", @"Failed to read app config", nil);
+    return;
+  }
+
+  NSError* error;
+  NSDictionary* appConfig = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+  if (error) {
+    reject(@"Model not found", @"Failed to parse app config", error);
+    return;
+  }
+
+  // Find model record
+  NSArray* modelList = appConfig[@"model_list"];
+  NSDictionary* modelConfig = nil;
+
+  for (NSDictionary* model in modelList) {
+    if ([model[@"model_id"] isEqualToString:name]) {
+      modelConfig = model;
+      break;
+    }
+  }
+
+  if (!modelConfig) {
+    reject(@"Model not found", @"Didn't find the model", nil);
+    return;
+  }
+
+  // Return a JSON object with details
+  NSDictionary* modelInfo = @{@"modelId" : modelConfig[@"model_id"], @"modelLib" : modelConfig[@"model_lib"]};
+
+  resolve(modelInfo);
+}
+
+- (void)getModels:(RCTPromiseResolveBlock)resolve 
+           reject:(RCTPromiseRejectBlock)reject {
+  NSURL* configURL = [_bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
+
+  // Read and parse JSON
+  NSData* jsonData = [NSData dataWithContentsOfURL:configURL];
+  if (!jsonData) {
+    reject(@"error", @"Failed to read JSON data", nil);
+    return;
+  }
+
+  NSError* error;
+  NSDictionary* jsonDict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+  if (error || ![jsonDict isKindOfClass:[NSDictionary class]]) {
+    reject(@"error", @"Failed to parse JSON", error);
+    return;
+  }
+
+  NSArray* modelList = jsonDict[@"model_list"];
+  if (![modelList isKindOfClass:[NSArray class]]) {
+    reject(@"error", @"model_list is missing or invalid", nil);
+    return;
+  }
+  NSLog(@"models: %@", modelList);
+  resolve(modelList);
+}
+
+- (void)prepareModel:(NSString*)modelId 
+             resolve:(RCTPromiseResolveBlock)resolve 
+              reject:(RCTPromiseRejectBlock)reject {
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    @try {
+      // Read app config
+      NSURL* configURL = [self.bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
+      NSData* jsonData = [NSData dataWithContentsOfURL:configURL];
+
+      if (!jsonData) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to read app config", nil);
+        });
+        return;
+      }
+
+      NSError* error;
+      NSDictionary* appConfig = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+      if (error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to parse app config", error);
+        });
+        return;
+      }
+
+      // Find model record
+      NSArray* modelList = appConfig[@"model_list"];
+      NSDictionary* modelRecord = nil;
+
+      for (NSDictionary* model in modelList) {
+        if ([model[@"model_id"] isEqualToString:modelId]) {
+          modelRecord = model;
+          break;
+        }
+      }
+
+      if (!modelRecord) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"There's no record for requested model", nil);
+        });
+        return;
+      }
+
+      // Get model config
+      NSError* configError;
+      NSDictionary* modelConfig = [self getModelConfig:modelRecord error:&configError];
+
+      if (configError || !modelConfig) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to get model config", configError);
+        });
+        return;
+      }
+
+      // Update model properties - with null checks
+      NSString* modelLib = modelRecord[@"model_lib"];
+
+      if (!modelLib) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Invalid model config - missing required fields", nil);
+        });
+        return;
+      }
+
+      // Set model path to just use Documents directory and modelId
+      self.modelPath = modelId;
+      self.modelLib = modelLib;
+
+      // Initialize engine with model
+      NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
+
+      if (!modelLocalURL) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to construct model path", nil);
+        });
+        return;
+      }
+      NSString* modelLocalPath = [modelLocalURL path];
+
+      [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
+
+      dispatch_async(dispatch_get_main_queue(), ^{
+        resolve([NSString stringWithFormat:@"Model prepared: %@", modelId]);
+      });
+
+    } @catch (NSException* exception) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        reject(@"MODEL_ERROR", exception.reason, nil);
+      });
+    }
+  });
+}
+
+- (NSDictionary*)getModelConfig:(NSDictionary*)modelRecord error:(NSError**)error {
+  [self downloadModelConfig:modelRecord error:error];
+  if (*error != nil) {
+    return nil;
+  }
+
+  NSString* modelId = modelRecord[@"model_id"];
+
+  // Use the same path construction as downloadModelConfig
+  NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
+  NSURL* modelConfigURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
+
+  NSData* jsonData = [NSData dataWithContentsOfURL:modelConfigURL];
+  if (!jsonData) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine" code:1 userInfo:@{NSLocalizedDescriptionKey : @"Requested model config not found"}];
+    }
+    return nil;
+  }
+
+  return [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:error];
+}
+
+- (void)downloadModelConfig:(NSDictionary*)modelRecord error:(NSError**)error {
+  NSString* modelId = modelRecord[@"model_id"];
+  NSString* modelUrl = modelRecord[@"model_url"];
+
+  if (!modelId || !modelUrl) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine" code:3 userInfo:@{NSLocalizedDescriptionKey : @"Missing required model record fields"}];
+    }
+    return;
+  }
+
+  // Check if config already exists
+  NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
+  NSURL* modelConfigURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
+  NSURL* ndarrayCacheURL = [modelDirURL URLByAppendingPathComponent:@"ndarray-cache.json"];
+
+  if (!modelDirURL || !modelConfigURL) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine" code:4 userInfo:@{NSLocalizedDescriptionKey : @"Failed to construct config URLs"}];
+    }
+    return;
+  }
+
+  // Create model directory if it doesn't exist
+  NSError* dirError;
+  [[NSFileManager defaultManager] createDirectoryAtPath:[modelDirURL path] withIntermediateDirectories:YES attributes:nil error:&dirError];
+  if (dirError) {
+    *error = dirError;
+    return;
+  }
+
+  // Download and save model config if it doesn't exist
+  if (![[NSFileManager defaultManager] fileExistsAtPath:[modelConfigURL path]]) {
+    [self downloadAndSaveConfig:modelUrl configName:@"mlc-chat-config.json" toURL:modelConfigURL error:error];
+    if (*error != nil)
+      return;
+  }
+
+  // Download and save ndarray-cache if it doesn't exist
+  if (![[NSFileManager defaultManager] fileExistsAtPath:[ndarrayCacheURL path]]) {
+    [self downloadAndSaveConfig:modelUrl configName:@"ndarray-cache.json" toURL:ndarrayCacheURL error:error];
+    if (*error != nil)
+      return;
+  }
+
+  // Read and parse ndarray cache
+  NSData* ndarrayCacheData = [NSData dataWithContentsOfURL:ndarrayCacheURL];
+  if (!ndarrayCacheData) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine" code:2 userInfo:@{NSLocalizedDescriptionKey : @"Failed to read ndarray cache"}];
+    }
+    return;
+  }
+
+  NSError* ndarrayCacheJsonError;
+  NSDictionary* ndarrayCache = [NSJSONSerialization JSONObjectWithData:ndarrayCacheData options:0 error:&ndarrayCacheJsonError];
+  if (ndarrayCacheJsonError) {
+    *error = ndarrayCacheJsonError;
+    return;
+  }
+
+  // Download parameter files from ndarray cache
+  NSArray* records = ndarrayCache[@"records"];
+  if ([records isKindOfClass:[NSArray class]]) {
+    for (NSDictionary* record in records) {
+      NSString* dataPath = record[@"dataPath"];
+      if (dataPath) {
+        NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:dataPath];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+          [self downloadModelFile:modelUrl filename:dataPath toURL:fileURL error:error];
+          if (*error != nil)
+            return;
+        }
+      }
+    }
+  }
+
+  // Read and parse model config
+  NSData* modelConfigData = [NSData dataWithContentsOfURL:modelConfigURL];
+  if (!modelConfigData) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine" code:2 userInfo:@{NSLocalizedDescriptionKey : @"Failed to read model config"}];
+    }
+    return;
+  }
+
+  NSError* modelConfigJsonError;
+  NSDictionary* modelConfig = [NSJSONSerialization JSONObjectWithData:modelConfigData options:0 error:&modelConfigJsonError];
+  if (modelConfigJsonError) {
+    *error = modelConfigJsonError;
+    return;
+  }
+
+  // Download tokenizer files
+  NSArray* tokenizerFiles = modelConfig[@"tokenizer_files"];
+  for (NSString* filename in tokenizerFiles) {
+    NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:filename];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+      [self downloadModelFile:modelUrl filename:filename toURL:fileURL error:error];
+      if (*error != nil)
+        return;
+    }
+  }
+
+  // Download model file
+  NSString* modelPath = modelConfig[@"model_path"];
+  if (modelPath) {
+    NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:modelPath];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+      [self downloadModelFile:modelUrl filename:modelPath toURL:fileURL error:error];
+      if (*error != nil)
+        return;
+    }
+  }
+}
+
+- (void)downloadAndSaveConfig:(NSString*)modelUrl configName:(NSString*)configName toURL:(NSURL*)destURL error:(NSError**)error {
+  NSString* urlString = [NSString stringWithFormat:@"%@/resolve/main/%@", modelUrl, configName];
+  NSURL* url = [NSURL URLWithString:urlString];
+
+  NSData* configData = [NSData dataWithContentsOfURL:url];
+  if (!configData) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine"
+                                   code:2
+                               userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to download %@", configName]}];
+    }
+    return;
+  }
+
+  if (![configData writeToURL:destURL atomically:YES]) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine"
+                                   code:6
+                               userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to write %@", configName]}];
+    }
+    return;
+  }
+}
+
+- (void)downloadModelFile:(NSString*)modelUrl filename:(NSString*)filename toURL:(NSURL*)destURL error:(NSError**)error {
+  NSString* urlString = [NSString stringWithFormat:@"%@/resolve/main/%@", modelUrl, filename];
+  NSURL* url = [NSURL URLWithString:urlString];
+
+  NSData* fileData = [NSData dataWithContentsOfURL:url];
+  if (!fileData) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine"
+                                   code:2
+                               userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to download %@", filename]}];
+    }
+    return;
+  }
+
+  if (![fileData writeToURL:destURL atomically:YES]) {
+    if (error) {
+      *error = [NSError errorWithDomain:@"MLCEngine"
+                                   code:6
+                               userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to write %@", filename]}];
+    }
+    return;
+  }
+}
+
+- (void)downloadModel:(NSString*)modelId 
+              resolve:(RCTPromiseResolveBlock)resolve 
+               reject:(RCTPromiseRejectBlock)reject {
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    @try {
+      // Read app config
+      NSURL* configURL = [self.bundleURL URLByAppendingPathComponent:@"mlc-app-config.json"];
+      NSData* jsonData = [NSData dataWithContentsOfURL:configURL];
+
+      if (!jsonData) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to read app config", nil);
+        });
+        return;
+      }
+
+      NSError* error;
+      NSDictionary* appConfig = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+      if (error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to parse app config", error);
+        });
+        return;
+      }
+
+      // Find model record
+      NSArray* modelList = appConfig[@"model_list"];
+      NSDictionary* modelRecord = nil;
+
+      for (NSDictionary* model in modelList) {
+        if ([model[@"model_id"] isEqualToString:modelId]) {
+          modelRecord = model;
+          break;
+        }
+      }
+
+      if (!modelRecord) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"There's no record for requested model", nil);
+        });
+        return;
+      }
+
+      // Get model config and download files
+      NSError* configError;
+      NSDictionary* modelConfig = [self getModelConfig:modelRecord error:&configError];
+
+      if (configError || !modelConfig) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to get model config", configError);
+        });
+        return;
+      }
+
+      // Calculate total files to download
+      NSInteger totalFiles = 0;
+      __block NSInteger downloadedFiles = 0;
+
+      // Count files from ndarray cache
+      NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelRecord[@"model_id"]];
+      NSURL* ndarrayCacheURL = [modelDirURL URLByAppendingPathComponent:@"ndarray-cache.json"];
+      NSData* ndarrayCacheData = [NSData dataWithContentsOfURL:ndarrayCacheURL];
+      if (ndarrayCacheData) {
+        NSDictionary* ndarrayCache = [NSJSONSerialization JSONObjectWithData:ndarrayCacheData options:0 error:nil];
+        NSArray* records = ndarrayCache[@"records"];
+        if ([records isKindOfClass:[NSArray class]]) {
+          totalFiles += records.count;
+        }
+      }
+
+      // Count tokenizer files
+      NSArray* tokenizerFiles = modelConfig[@"tokenizer_files"];
+      if ([tokenizerFiles isKindOfClass:[NSArray class]]) {
+        totalFiles += tokenizerFiles.count;
+      }
+
+      // Add model file
+      if (modelConfig[@"model_path"]) {
+        totalFiles += 1;
+      }
+
+      // Add config files
+      totalFiles += 2; // mlc-chat-config.json and ndarray-cache.json
+
+      // Send progress updates during download
+      void (^updateProgress)(void) = ^{
+        downloadedFiles++;
+        if (true) {
+          double percentage = (double)downloadedFiles / totalFiles * 100.0;
+          [self emitOnDownloadProgress:@{@"percentage" : @(percentage)}];
+        }
+      };
+
+      // Download config files
+      [self downloadAndSaveConfig:modelRecord[@"model_url"]
+                       configName:@"mlc-chat-config.json"
+                            toURL:[modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"]
+                            error:&error];
+      if (error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to download config files", error);
+        });
+        return;
+      }
+      updateProgress();
+
+      [self downloadAndSaveConfig:modelRecord[@"model_url"] configName:@"ndarray-cache.json" toURL:ndarrayCacheURL error:&error];
+      if (error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          reject(@"MODEL_ERROR", @"Failed to download config files", error);
+        });
+        return;
+      }
+      updateProgress();
+
+      // Download parameter files
+      NSDictionary* ndarrayCache = [NSJSONSerialization JSONObjectWithData:ndarrayCacheData options:0 error:nil];
+      NSArray* records = ndarrayCache[@"records"];
+      if ([records isKindOfClass:[NSArray class]]) {
+        for (NSDictionary* record in records) {
+          NSString* dataPath = record[@"dataPath"];
+          if (dataPath) {
+            NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:dataPath];
+            [self downloadModelFile:modelRecord[@"model_url"] filename:dataPath toURL:fileURL error:&error];
+            if (error) {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                reject(@"MODEL_ERROR", @"Failed to download parameter files", error);
+              });
+              return;
+            }
+            updateProgress();
+          }
+        }
+      }
+
+      // Download tokenizer files
+      for (NSString* filename in tokenizerFiles) {
+        NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:filename];
+        [self downloadModelFile:modelRecord[@"model_url"] filename:filename toURL:fileURL error:&error];
+        if (error) {
+          dispatch_async(dispatch_get_main_queue(), ^{
+            reject(@"MODEL_ERROR", @"Failed to download tokenizer files", error);
+          });
+          return;
+        }
+        updateProgress();
+      }
+
+      // Download model file
+      NSString* modelPath = modelConfig[@"model_path"];
+      if (modelPath) {
+        NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:modelPath];
+        [self downloadModelFile:modelRecord[@"model_url"] filename:modelPath toURL:fileURL error:&error];
+        if (error) {
+          dispatch_async(dispatch_get_main_queue(), ^{
+            reject(@"MODEL_ERROR", @"Failed to download model file", error);
+          });
+          return;
+        }
+        updateProgress();
+      }
+
+      dispatch_async(dispatch_get_main_queue(), ^{
+        resolve([NSString stringWithFormat:@"Model downloaded: %@", modelId]);
+      });
+    } @catch (NSException* exception) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        reject(@"MODEL_ERROR", exception.reason, nil);
+      });
+    }
+  });
 }
 
 @end

@@ -29,7 +29,7 @@ console.log(result.text);
 Stream responses for real-time output:
 
 ```typescript
-import { getModel, prepareModel } from '@react-native-ai/mlc';
+import { MLCEngine, mlc } from '@react-native-ai/mlc';
 import { streamText } from 'ai';
 
 await MLCEngine.prepareModel('Llama-3.2-3B-Instruct');

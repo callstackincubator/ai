@@ -2,12 +2,17 @@
 //  EngineState.mm
 //  Pods
 //
-//  Created by Szymon Rybczak on 19/07/2024.
-//
 
 #import "EngineState.h"
-#import "LLMEngine.h"
+#import "JSONFFIEngine.h"
 
+/**
+ * EngineState manages the request lifecycle and callback routing for chat completions.
+ * It maintains a mapping between request IDs and their corresponding completion handlers,
+ * ensuring that streaming responses are properly routed back to the correct caller.
+ * This class handles JSON serialization/deserialization and coordinates between
+ * the high-level API and the low-level JSON FFI engine.
+ */
 @implementation EngineState
 
 - (instancetype)init {

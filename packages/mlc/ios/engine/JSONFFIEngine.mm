@@ -2,6 +2,7 @@
 //  LLMEngine.mm
 //  LLMEngine
 //
+
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #include <os/proc.h>
@@ -24,6 +25,14 @@ using tvm::ffi::Optional;
 using tvm::ffi::String;
 using tvm::ffi::TypedFunction;
 
+/**
+ * JSONFFIEngine is the core bridge between Objective-C and the MLC LLM C++ engine.
+ * This class wraps the TVM-based JSON FFI interface, providing methods to initialize,
+ * reload, and interact with language models. It handles the low-level communication
+ * with the compiled model runtime, manages background processing threads, and
+ * provides streaming capabilities for real-time text generation. This is the foundation
+ * layer that directly interfaces with the TVM runtime and MLC compiled models.
+ */
 @implementation JSONFFIEngine {
   // Internal c++ classes
   // internal module backed by JSON FFI

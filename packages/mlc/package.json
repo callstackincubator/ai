@@ -79,9 +79,14 @@
     ]
   },
   "codegenConfig": {
-    "name": "RNAiSpec",
+    "name": "NativeMLCEngine",
     "type": "modules",
-    "jsSrcsDir": "src"
+    "jsSrcsDir": "src",
+    "ios": {
+      "modulesProvider": {
+        "NativeMLCEngine": "MLCEngine"
+      }
+    }
   },
   "dependencies": {
     "@ai-sdk/provider": "^2.0.0-beta.1",
