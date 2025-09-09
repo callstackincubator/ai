@@ -7,7 +7,7 @@
 #import <UIKit/UIKit.h>
 #include <os/proc.h>
 
-#include "LLMEngine.h"
+#include "JSONFFIEngine.h"
 
 #define TVM_USE_LIBBACKTRACE 0
 #define DMLC_USE_LOGGING_LIBRARY <tvm/runtime/logging.h>
