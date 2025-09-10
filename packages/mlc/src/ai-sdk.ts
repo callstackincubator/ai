@@ -5,7 +5,10 @@ import type {
   LanguageModelV2StreamPart,
 } from '@ai-sdk/provider'
 
-import NativeMLCEngine, { downloadModel, type Message } from './NativeMLCEngine'
+import NativeMLCEngine, {
+  DownloadProgress,
+  type Message,
+} from './NativeMLCEngine'
 
 export const mlc = {
   languageModel: (modelId: string = 'Llama-3.2-3B-Instruct') => {
@@ -28,8 +31,20 @@ class MlcChatLanguageModel implements LanguageModelV2 {
     return NativeMLCEngine.prepareModel(this.modelId)
   }
 
-  public download() {
-    return downloadModel(this.modelId)
+  public async download(progressCallback?: (event: DownloadProgress) => void) {
+    const removeListener = NativeMLCEngine.onDownloadProgress((event) => {
+      progressCallback?.(event)
+    })
+    await NativeMLCEngine.downloadModel(this.modelId)
+    removeListener.remove()
+  }
+
+  public unload() {
+    return NativeMLCEngine.unloadModel()
+  }
+
+  public remove() {
+    return NativeMLCEngine.removeModel(this.modelId)
   }
 
   private prepareMessages(messages: LanguageModelV2Prompt): Message[] {

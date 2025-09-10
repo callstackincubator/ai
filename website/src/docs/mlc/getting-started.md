@@ -1,71 +1,62 @@
 # Getting Started
 
+The MLC provider enables you to run large language models directly on-device in React Native applications. This includes popular models like Llama, Phi-3, Mistral, and Qwen that run entirely on-device for privacy, performance, and offline capabilities.
+
 > [!NOTE]
-> MLC support is experimental and not recommended for production use yet.
+> MLC currently does not support Android.
 
 ## Installation
+
+Install the MLC provider:
 
 ```bash
 npm install @react-native-ai/mlc
 cd ios && pod install
 ```
 
-## iOS Setup
+While you can use the MLC provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](https://v5.ai-sdk.dev/docs/getting-started/expo#polyfills):
+
+```bash
+npm install ai@beta
+```
+
+## Requirements
+
+- **React Native New Architecture** - Required for native module functionality
+- **Increased Memory Limit capability** - Required for large model loading
+
+## Configuration
+
+### iOS
 
 Add the "Increased Memory Limit" capability in Xcode:
+
 1. Open your iOS project in Xcode
 2. Go to Signing & Capabilities tab
 3. Add "Increased Memory Limit" capability
 
 ![Image](https://github.com/user-attachments/assets/0f8eec76-2900-48d9-91b8-ad7b3adce235)
 
-## Available Models
+## Basic Usage
 
-The package includes a prebuilt runtime optimized for the following models:
-- **Llama 3.2 3B** - General purpose chat, balanced performance
-- **Phi-3 Mini 4K** - Coding assistance, technical tasks  
-- **Mistral 7B** - Advanced reasoning (requires 8GB+ RAM)
-- **Qwen 2.5 1.5B** - Fast responses, mobile-optimized
-
-### Listing Models
-
-Get the list of available models included in the runtime:
+Import the MLC provider and use it with the AI SDK:
 
 ```typescript
-import { getModels } from '@react-native-ai/mlc';
+import { mlc } from '@react-native-ai/mlc';
+import { generateText } from 'ai';
 
-const models = await getModels();
-console.log('Available models:', models);
-```
+const model = mlc.languageModel("Llama-3.2-3B-Instruct");
 
-### Downloading Models
+await model.download();
+await model.prepare();
 
-Models need to be downloaded to the device before use. You can track download progress:
-
-```typescript
-import { downloadModel } from '@react-native-ai/mlc';
-
-await downloadModel('Llama-3.2-3B-Instruct', {
-  onStart: () => console.log('Download started...'),
-  onProgress: (progress) => {
-    console.log(`Progress: ${progress.percentage.toFixed(2)}%`);
-  },
-  onComplete: () => console.log('Download complete!'),
-  onError: (error) => console.error('Download failed:', error),
+const result = await generateText({
+  model,
+  prompt: 'Explain quantum computing in simple terms'
 });
 ```
 
-### Preparing Models
+## Next Steps
 
-After downloading, prepare the model for inference:
-
-```typescript
-import { prepareModel } from '@react-native-ai/mlc';
-
-await prepareModel('Llama-3.2-3B-Instruct');
-console.log('Model ready for inference!');
-```
-
-## Custom Models
-
-If you need models beyond the prebuilt ones, you'll need to build your own runtime. See the [build script](https://github.com/callstackincubator/ai/blob/main/packages/mlc/scripts/build-runtime.sh) for implementation details. Full documentation for custom builds is coming soon.
+- **[Model Management](./model-management.md)** - Complete guide to model lifecycle, available models, and API reference
+- **[Generating](./generating.md)** - Learn how to generate text and stream responses

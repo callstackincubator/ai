@@ -32,12 +32,9 @@ export default function MLCScreen() {
       setStatusText('Starting download...')
       const model = mlc.languageModel(modelId)
 
-      const progressListener = MLCEngine.onDownloadProgress((event) => {
+      await model.download((event) => {
         setStatusText(`Download: ${event.status}`)
       })
-
-      await model.download()
-      progressListener.remove()
 
       setStatusText('Download complete')
 
