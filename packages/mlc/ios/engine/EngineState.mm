@@ -25,7 +25,7 @@
 
 - (void)chatCompletionWithJSONFFIEngine:(JSONFFIEngine*)jsonFFIEngine
                                 request:(NSDictionary*)request
-                             completion:(void (^)(NSString* response))completion {
+                             completion:(void (^)(id response))completion {
   NSError* error;
   NSData* jsonData = [NSJSONSerialization dataWithJSONObject:request options:0 error:&error];
   if (error) {

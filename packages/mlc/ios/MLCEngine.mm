@@ -10,9 +10,6 @@
 
 @property(nonatomic, strong) LLMEngine* engine;
 @property(nonatomic, strong) NSURL* bundleURL;
-@property(nonatomic, strong) NSString* modelPath;
-@property(nonatomic, strong) NSString* modelLib;
-@property(nonatomic, strong) NSString* displayText;
 @property(nonatomic, strong) NSDictionary* cachedAppConfig;
 @property(nonatomic, strong) NSArray* cachedModelList;
 
@@ -145,16 +142,10 @@ using namespace facebook;
             messages:(NSArray<NSDictionary*>*)messages 
              resolve:(RCTPromiseResolveBlock)resolve 
               reject:(RCTPromiseRejectBlock)reject {
-  NSLog(@"Generating for model ID: %@, with messages: %@", modelId, messages);
-  _displayText = @"";
+  __block NSMutableString* displayText = [NSMutableString string];
   __block BOOL hasResolved = NO;
 
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
-    NSString* modelLocalPath = [modelLocalURL path];
-
-    [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
-
     [self.engine chatCompletionWithMessages:messages
                                  completion:^(id response) {
                                    if ([response isKindOfClass:[NSString class]]) {
@@ -164,12 +155,12 @@ using namespace facebook;
                                        BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
 
                                        if (content) {
-                                         self.displayText = [self.displayText stringByAppendingString:content];
+                                         [displayText appendString:content];
                                        }
 
                                        if (isFinished && !hasResolved) {
                                          hasResolved = YES;
-                                         resolve(self.displayText);
+                                         resolve([displayText copy]);
                                        }
 
                                      } else {
@@ -192,17 +183,8 @@ using namespace facebook;
           messages:(NSArray<NSDictionary*>*)messages 
            resolve:(RCTPromiseResolveBlock)resolve 
             reject:(RCTPromiseRejectBlock)reject {
-
-  NSLog(@"Streaming for model ID: %@, with messages: %@", modelId, messages);
-
+  __block BOOL hasResolved = NO;
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    __block BOOL hasResolved = NO;
-
-    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
-    NSString* modelLocalPath = [modelLocalURL path];
-
-    [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
-
     [self.engine chatCompletionWithMessages:messages
                                  completion:^(id response) {
                                    if ([response isKindOfClass:[NSString class]]) {
@@ -212,7 +194,6 @@ using namespace facebook;
                                        BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
 
                                        if (content) {
-                                         self.displayText = [self.displayText stringByAppendingString:content];
                                          [self emitOnChatUpdate:@{@"content" : content}];
                                        }
 
@@ -242,14 +223,11 @@ using namespace facebook;
          resolve:(RCTPromiseResolveBlock)resolve 
           reject:(RCTPromiseRejectBlock)reject {
   NSDictionary* modelConfig = [self findModelById:name];
-  
   if (!modelConfig) {
     reject(@"Model not found", @"Didn't find the model", nil);
     return;
   }
-
   NSDictionary* modelInfo = @{@"modelId" : modelConfig[@"model_id"], @"modelLib" : modelConfig[@"model_lib"]};
-
   resolve(modelInfo);
 }
 
@@ -276,21 +254,8 @@ using namespace facebook;
       NSDictionary* modelConfig = [self readModelConfig:modelId error:&configError];
 
       if (configError || !modelConfig) {
-        // Try downloading the model first
-        NSError* downloadError = nil;
-        [self downloadModelFiles:modelRecord status:nil error:&downloadError];
-        
-        if (downloadError) {
-          reject(@"MODEL_ERROR", @"Failed to download model", downloadError);
-          return;
-        }
-        
-        // Try reading again after download
-        modelConfig = [self readModelConfig:modelId error:&configError];
-        if (configError || !modelConfig) {
-          reject(@"MODEL_ERROR", @"Failed to read model after download", configError);
-          return;
-        }
+        reject(@"MODEL_ERROR", @"Model not found locally. Please download it first", configError);
+        return;
       }
 
       // Update model properties - with null checks
@@ -301,20 +266,23 @@ using namespace facebook;
         return;
       }
 
-      // Set model path to just use Documents directory and modelId
-      self.modelPath = modelId;
-      self.modelLib = modelLib;
-
-      // Initialize engine with model
-      NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:self.modelPath];
+      // Build the correct model path
+      NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:modelId];
 
       if (!modelLocalURL) {
         reject(@"MODEL_ERROR", @"Failed to construct model path", nil);
         return;
       }
       NSString* modelLocalPath = [modelLocalURL path];
+      
+      // Check if the model directory exists
+      BOOL isDirectory;
+      if (![[NSFileManager defaultManager] fileExistsAtPath:modelLocalPath isDirectory:&isDirectory] || !isDirectory) {
+        reject(@"MODEL_ERROR", [NSString stringWithFormat:@"Model directory not found at path: %@", modelLocalPath], nil);
+        return;
+      }
 
-      [self.engine reloadWithModelPath:modelLocalPath modelLib:self.modelLib];
+      [self.engine reloadWithModelPath:modelLocalPath modelLib:modelLib];
 
       resolve([NSString stringWithFormat:@"Model prepared: %@", modelId]);
 
@@ -436,12 +404,12 @@ using namespace facebook;
   // Download parameter files from ndarray cache
   NSArray* records = ndarrayCache[@"records"];
   if ([records isKindOfClass:[NSArray class]] && records.count > 0) {
-    if (statusCallback) statusCallback(@"Downloading model parameters...");
     for (NSDictionary* record in records) {
       NSString* dataPath = record[@"dataPath"];
       if (dataPath) {
         NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:dataPath];
         if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+          if (statusCallback) statusCallback(@"Downloading model parameters..."); //add record id or sometihng from this
           if (![self downloadFile:modelUrl filename:dataPath toURL:fileURL error:error]) {
             return;
           }
@@ -479,18 +447,6 @@ using namespace facebook;
       }
     }
   }
-
-  // Download model file
-  NSString* modelPath = modelConfig[@"model_path"];
-  if (modelPath) {
-    NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:modelPath];
-    if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
-      if (statusCallback) statusCallback(@"Downloading model weights...");
-      if (![self downloadFile:modelUrl filename:modelPath toURL:fileURL error:error]) {
-        return;
-      }
-    }
-  }
   
   if (statusCallback) statusCallback(@"Download complete");
 }
@@ -522,6 +478,69 @@ using namespace facebook;
       resolve([NSString stringWithFormat:@"Model downloaded: %@", modelId]);
     } @catch (NSException* exception) {
       reject(@"MODEL_ERROR", exception.reason, nil);
+    }
+  });
+}
+
+- (void)cleanDownloadedModel:(NSString*)modelId 
+                     resolve:(RCTPromiseResolveBlock)resolve 
+                      reject:(RCTPromiseRejectBlock)reject {
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    @try {
+      // Build path to model directory
+      NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
+      NSString* modelDirPath = [modelDirURL path];
+      
+      NSLog(@"Cleaning downloaded model at path: %@", modelDirPath);
+      
+      // Check if directory exists
+      BOOL isDirectory;
+      if ([[NSFileManager defaultManager] fileExistsAtPath:modelDirPath isDirectory:&isDirectory]) {
+        if (isDirectory) {
+          // Remove the entire model directory
+          NSError* removeError;
+          BOOL removed = [[NSFileManager defaultManager] removeItemAtPath:modelDirPath error:&removeError];
+          
+          if (removed) {
+            NSLog(@"Successfully cleaned model directory: %@", modelId);
+            resolve([NSString stringWithFormat:@"Model cleaned: %@", modelId]);
+          } else {
+            NSLog(@"Failed to clean model directory: %@", removeError);
+            reject(@"CLEAN_ERROR", [NSString stringWithFormat:@"Failed to clean model: %@", removeError.localizedDescription], removeError);
+          }
+        } else {
+          reject(@"CLEAN_ERROR", @"Path exists but is not a directory", nil);
+        }
+      } else {
+        NSLog(@"Model directory does not exist, nothing to clean");
+        resolve(@"Model directory does not exist");
+      }
+    } @catch (NSException* exception) {
+      reject(@"CLEAN_ERROR", exception.reason, nil);
+    }
+  });
+}
+
+- (void)unloadModel:(RCTPromiseResolveBlock)resolve 
+             reject:(RCTPromiseRejectBlock)reject {
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    @try {
+      NSLog(@"Unloading current model from engine");
+      
+      // Use the proper unload method from the engine
+      if (self.engine) {
+        // First try to unload the model
+        [self.engine unload];
+        NSLog(@"Model unloaded from engine");
+        
+        // Then reset the engine state to clear any remaining data
+        [self.engine reset];
+        NSLog(@"Engine state reset");
+      }
+      
+      resolve(@"Model unloaded successfully");
+    } @catch (NSException* exception) {
+      reject(@"UNLOAD_ERROR", exception.reason, nil);
     }
   });
 }

@@ -35,6 +35,21 @@ export default function MLCScreen() {
       console.log('Selected model:', modelId)
       setStatusText(`Selected model: ${modelId}`)
 
+      // Step 2.5: Clean up any existing model files and unload
+      try {
+        setStatusText('Cleaning up old model files...')
+        await MLCEngine.unloadModel()
+        console.log('Model unloaded')
+
+        // await MLCEngine.cleanDownloadedModel(modelId)
+        console.log('Old model files cleaned')
+      } catch (cleanError) {
+        console.log(
+          'Clean up error (may be normal if no model exists):',
+          cleanError
+        )
+      }
+
       // Step 3: Download the model with progress tracking
       setStatusText('Starting download...')
 
@@ -86,6 +101,34 @@ export default function MLCScreen() {
     }
   }
 
+  const cleanResources = async () => {
+    try {
+      setIsLoading(true)
+      setStatusText('Cleaning resources...')
+      setResponse('')
+
+      // Get first model to know what to clean
+      const models = await MLCEngine.getModels()
+      const modelId = models[0]?.model_id || 'Llama-3.2-3B-Instruct'
+
+      // Unload the model from memory
+      await MLCEngine.unloadModel()
+      console.log('Model unloaded from memory')
+      setStatusText('Model unloaded')
+
+      // Clean downloaded files
+      await MLCEngine.cleanDownloadedModel(modelId)
+      console.log('Model files cleaned')
+      setStatusText('All resources cleaned!')
+    } catch (error) {
+      console.error('Clean error:', error)
+      Alert.alert('Error', `Failed to clean: ${error}`)
+      setStatusText(`Error: ${error}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <ScrollView className="flex-1 bg-gray-50">
       <View className="p-5">
@@ -106,6 +149,21 @@ export default function MLCScreen() {
             </Text>
             <Text className="text-white text-xs text-center mt-1">
               Get models → Download → Prepare → Generate
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className={`bg-red-500 px-6 py-4 rounded-lg ${
+              isLoading ? 'opacity-50' : ''
+            }`}
+            onPress={cleanResources}
+            disabled={isLoading}
+          >
+            <Text className="text-white font-semibold text-center">
+              Clean Resources
+            </Text>
+            <Text className="text-white text-xs text-center mt-1">
+              Unload model & delete files
             </Text>
           </TouchableOpacity>
         </View>

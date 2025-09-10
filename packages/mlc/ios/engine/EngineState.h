@@ -15,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)chatCompletionWithJSONFFIEngine:(JSONFFIEngine *)jsonFFIEngine
                                 request:(NSDictionary *)request
-                             completion:(void (^)(NSString *response))completion;
+                             completion:(void (^)(id response))completion;
 - (void)streamCallbackWithResult:(NSString *)result;
 @end
 NS_ASSUME_NONNULL_END

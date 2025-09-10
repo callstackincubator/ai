@@ -33,6 +33,8 @@ export interface Spec extends TurboModule {
   streamText(modelId: string, messages: Message[]): Promise<string>
   downloadModel(modelId: string): Promise<string>
   prepareModel(modelId: string): Promise<string>
+  cleanDownloadedModel(modelId: string): Promise<string>
+  unloadModel(): Promise<string>
 
   onChatUpdate: EventEmitter<ChatUpdateEvent>
   onChatComplete: EventEmitter<ChatCompleteEvent>
