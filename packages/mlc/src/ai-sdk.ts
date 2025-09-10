@@ -4,28 +4,14 @@ import type {
   LanguageModelV2Prompt,
   LanguageModelV2StreamPart,
 } from '@ai-sdk/provider'
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native'
 
 import NativeMLCEngine, { downloadModel, type Message } from './NativeMLCEngine'
 
-export function createMlcProvider(modelId: string = 'Llama-3.2-3B-Instruct') {
-  const createLanguageModel = () => {
+export const mlc = {
+  languageModel: (modelId: string = 'Llama-3.2-3B-Instruct') => {
     return new MlcChatLanguageModel(modelId)
-  }
-  const provider = function () {
-    return createLanguageModel()
-  }
-  provider.languageModel = createLanguageModel
-  provider.prepare = () => {
-    return NativeMLCEngine.prepareModel(modelId)
-  }
-  provider.download = () => {
-    return downloadModel(modelId)
-  }
-  return provider
+  },
 }
-
-export const mlc = (modelId?: string) => createMlcProvider(modelId)()
 
 class MlcChatLanguageModel implements LanguageModelV2 {
   readonly specificationVersion = 'v2'
@@ -36,6 +22,14 @@ class MlcChatLanguageModel implements LanguageModelV2 {
 
   constructor(modelId: string) {
     this.modelId = modelId
+  }
+
+  public prepare() {
+    return NativeMLCEngine.prepareModel(this.modelId)
+  }
+
+  public download() {
+    return downloadModel(this.modelId)
   }
 
   private prepareMessages(messages: LanguageModelV2Prompt): Message[] {
@@ -60,15 +54,12 @@ class MlcChatLanguageModel implements LanguageModelV2 {
   async doGenerate(options: LanguageModelV2CallOptions) {
     const messages = this.prepareMessages(options.prompt)
 
-    // Ensure model is ready
-    const model = await NativeMLCEngine.getModel(this.modelId)
-
-    // Generate text
-    const text = await NativeMLCEngine.generateText(model.modelId, messages)
+    const text = await NativeMLCEngine.generateText(messages)
 
     return {
       content: [{ type: 'text' as const, text }],
       finishReason: 'stop' as const,
+      // tbd: expose usage
       usage: {
         inputTokens: 0,
         outputTokens: 0,
@@ -87,9 +78,6 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       )
     }
 
-    // Ensure model is ready
-    const model = await NativeMLCEngine.getModel(this.modelId)
-
     let streamId: string | null = null
     let listeners: { remove(): void }[] = []
 
@@ -101,52 +89,44 @@ class MlcChatLanguageModel implements LanguageModelV2 {
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
         try {
-          // Start streaming
-          streamId = await NativeMLCEngine.streamText(model.modelId, messages)
-
-          const eventEmitter =
-            Platform.OS === 'android'
-              ? new NativeEventEmitter()
-              : new NativeEventEmitter(NativeModules.MLCEngine)
+          streamId = await NativeMLCEngine.streamText(messages)
 
           controller.enqueue({
             type: 'text-start',
             id: streamId,
           })
 
-          const updateListener = eventEmitter.addListener(
-            'onChatUpdate',
-            (data) => {
-              if (data.content) {
-                controller.enqueue({
-                  type: 'text-delta',
-                  delta: data.content,
-                  id: streamId!,
-                })
-              }
-            }
-          )
+          let previousContent = ''
 
-          const completeListener = eventEmitter.addListener(
-            'onChatComplete',
-            () => {
+          const updateListener = NativeMLCEngine.onChatUpdate((data) => {
+            if (data.content) {
+              const delta = data.content.slice(previousContent.length)
               controller.enqueue({
-                type: 'text-end',
+                type: 'text-delta',
+                delta,
                 id: streamId!,
               })
-              controller.enqueue({
-                type: 'finish',
-                finishReason: 'stop',
-                usage: {
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  totalTokens: 0,
-                },
-              })
-              cleanup()
-              controller.close()
+              previousContent = data.content
             }
-          )
+          })
+
+          const completeListener = NativeMLCEngine.onChatComplete(() => {
+            controller.enqueue({
+              type: 'text-end',
+              id: streamId!,
+            })
+            controller.enqueue({
+              type: 'finish',
+              finishReason: 'stop',
+              usage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+              },
+            })
+            cleanup()
+            controller.close()
+          })
 
           listeners = [updateListener, completeListener]
         } catch (error) {

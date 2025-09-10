@@ -1,8 +1,8 @@
 import { mlc, MLCEngine } from '@react-native-ai/mlc'
+import { generateText } from 'ai'
 import React, { useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -20,109 +20,43 @@ export default function MLCScreen() {
       setStatusText('Getting available models...')
       setResponse('')
 
-      // Step 1: Get all models
+      // Step 1: Choose the model
       const models = await MLCEngine.getModels()
-      console.log('Available models:', models)
 
-      if (!models || models.length === 0) {
-        Alert.alert('Error', 'No models available')
-        return
-      }
+      // Step 2: Choose the model
+      const modelId = models[0]!.model_id!
 
-      // Step 2: Pick the first model
-      const firstModel = models[0]
-      const modelId = firstModel.model_id!
-      console.log('Selected model:', modelId)
       setStatusText(`Selected model: ${modelId}`)
 
-      // Step 2.5: Clean up any existing model files and unload
-      try {
-        setStatusText('Cleaning up old model files...')
-        // await MLCEngine.unloadModel()
-        console.log('Model unloaded')
-
-        // await MLCEngine.cleanDownloadedModel(modelId)
-        console.log('Old model files cleaned')
-      } catch (cleanError) {
-        console.log(
-          'Clean up error (may be normal if no model exists):',
-          cleanError
-        )
-      }
-
-      // Step 3: Download the model with progress tracking
+      // Step 3: Create MLC provider and download the model
       setStatusText('Starting download...')
+      const model = mlc.languageModel(modelId)
 
-      const downloadPromise = MLCEngine.downloadModel(modelId)
-
-      // Listen for download progress
       const progressListener = MLCEngine.onDownloadProgress((event) => {
-        console.log('Download progress:', event)
-        // Check if event has status (text-based) or percentage
-        if ('status' in event) {
-          setStatusText(`Download: ${event.status}`)
-        } else if ('percentage' in event) {
-          setStatusText(`Download: ${event.percentage.toFixed(1)}%`)
-        }
+        setStatusText(`Download: ${event.status}`)
       })
 
-      await downloadPromise
+      await model.download()
       progressListener.remove()
 
-      console.log('Download complete')
       setStatusText('Download complete')
 
       // Step 4: Prepare the model
       setStatusText('Preparing model...')
-      await MLCEngine.prepareModel(modelId)
-      console.log('Model prepared')
+      await model.prepare()
       setStatusText('Model ready')
 
-      // Step 5: Generate text using the simple API
+      // Step 5: Generate text using AI SDK
       setStatusText('Generating response...')
-      const messages = [
-        {
-          role: 'user' as const,
-          content: 'Hello! Who are you? Please introduce yourself briefly.',
-        },
-      ]
 
-      const generatedText = await MLCEngine.generateText(modelId, messages)
-      console.log('Generated text:', generatedText)
+      const result = await generateText({
+        model,
+        prompt: 'Hello! Who are you? Please introduce yourself briefly.',
+      })
 
-      setResponse(generatedText)
+      setResponse(result.text)
       setStatusText('Complete!')
     } catch (error) {
-      console.error('Workflow error:', error)
-      Alert.alert('Error', `Failed: ${error}`)
-      setStatusText(`Error: ${error}`)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const cleanResources = async () => {
-    try {
-      setIsLoading(true)
-      setStatusText('Cleaning resources...')
-      setResponse('')
-
-      // Get first model to know what to clean
-      const models = await MLCEngine.getModels()
-      const modelId = models[0]?.model_id || 'Llama-3.2-3B-Instruct'
-
-      // Unload the model from memory
-      await MLCEngine.unloadModel()
-      console.log('Model unloaded from memory')
-      setStatusText('Model unloaded')
-
-      // Clean downloaded files
-      await MLCEngine.cleanDownloadedModel(modelId)
-      console.log('Model files cleaned')
-      setStatusText('All resources cleaned!')
-    } catch (error) {
-      console.error('Clean error:', error)
-      Alert.alert('Error', `Failed to clean: ${error}`)
       setStatusText(`Error: ${error}`)
     } finally {
       setIsLoading(false)
@@ -149,21 +83,6 @@ export default function MLCScreen() {
             </Text>
             <Text className="text-white text-xs text-center mt-1">
               Get models → Download → Prepare → Generate
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className={`bg-red-500 px-6 py-4 rounded-lg ${
-              isLoading ? 'opacity-50' : ''
-            }`}
-            onPress={cleanResources}
-            disabled={isLoading}
-          >
-            <Text className="text-white font-semibold text-center">
-              Clean Resources
-            </Text>
-            <Text className="text-white text-xs text-center mt-1">
-              Unload model & delete files
             </Text>
           </TouchableOpacity>
         </View>

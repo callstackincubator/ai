@@ -2,12 +2,7 @@ import type { EventSubscription, TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
 import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes'
 
-export interface Model {
-  modelId: string
-  modelLib: string
-}
-
-export interface AiModelSettings {
+export interface ModelConfig {
   model_id?: string
 }
 
@@ -17,7 +12,7 @@ export interface Message {
 }
 
 export interface DownloadProgress {
-  percentage: number
+  status: string
 }
 
 export interface ChatUpdateEvent {
@@ -27,13 +22,16 @@ export interface ChatUpdateEvent {
 export interface ChatCompleteEvent {}
 
 export interface Spec extends TurboModule {
-  getModel(name: string): Promise<Model>
-  getModels(): Promise<AiModelSettings[]>
-  generateText(modelId: string, messages: Message[]): Promise<string>
-  streamText(modelId: string, messages: Message[]): Promise<string>
+  getModel(name: string): Promise<ModelConfig>
+  getModels(): Promise<ModelConfig[]>
+
+  generateText(messages: Message[]): Promise<string>
+  streamText(messages: Message[]): Promise<string>
+
   downloadModel(modelId: string): Promise<string>
+  removeModel(modelId: string): Promise<string>
+
   prepareModel(modelId: string): Promise<string>
-  cleanDownloadedModel(modelId: string): Promise<string>
   unloadModel(): Promise<string>
 
   onChatUpdate: EventEmitter<ChatUpdateEvent>
@@ -41,22 +39,4 @@ export interface Spec extends TurboModule {
   onDownloadProgress: EventEmitter<DownloadProgress>
 }
 
-const NativeMLCEngine = TurboModuleRegistry.getEnforcing<Spec>('MLCEngine')
-
-export async function downloadModel(
-  modelId: string,
-  onProgress?: (progress: DownloadProgress) => void
-): Promise<void> {
-  const listeners: EventSubscription[] = [
-    NativeMLCEngine.onDownloadProgress((event) => {
-      onProgress?.(event)
-    }),
-  ]
-  try {
-    await NativeMLCEngine.downloadModel(modelId)
-  } finally {
-    listeners.forEach((listener) => listener.remove())
-  }
-}
-
-export default NativeMLCEngine
+export default TurboModuleRegistry.getEnforcing<Spec>('MLCEngine')

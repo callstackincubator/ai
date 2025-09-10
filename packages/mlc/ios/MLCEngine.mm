@@ -140,8 +140,7 @@ using namespace facebook;
   return nil;
 }
 
-- (void)generateText:(NSString*)modelId
-            messages:(NSArray<NSDictionary*>*)messages
+- (void)generateText:(NSArray<NSDictionary*>*)messages
              resolve:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject {
   __block NSMutableString* displayText = [NSMutableString string];
@@ -169,8 +168,7 @@ using namespace facebook;
   }];
 }
 
-- (void)streamText:(NSString*)modelId
-          messages:(NSArray<NSDictionary*>*)messages
+- (void)streamText:(NSArray<NSDictionary*>*)messages
            resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject {
   __block BOOL hasResolved = NO;
@@ -205,8 +203,7 @@ using namespace facebook;
     reject(@"MLCEngine", @"Didn't find the model", nil);
     return;
   }
-  NSDictionary* modelInfo = @{@"modelId" : modelConfig[@"model_id"], @"modelLib" : modelConfig[@"model_lib"]};
-  resolve(modelInfo);
+  resolve(modelConfig);
 }
 
 - (void)getModels:(RCTPromiseResolveBlock)resolve
@@ -447,9 +444,9 @@ using namespace facebook;
   });
 }
 
-- (void)cleanDownloadedModel:(NSString*)modelId
-                     resolve:(RCTPromiseResolveBlock)resolve
-                      reject:(RCTPromiseRejectBlock)reject {
+- (void)removeModel:(NSString*)modelId
+            resolve:(RCTPromiseResolveBlock)resolve
+             reject:(RCTPromiseRejectBlock)reject {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     @try {
       // Build path to model directory
