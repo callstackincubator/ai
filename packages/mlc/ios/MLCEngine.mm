@@ -1,12 +1,12 @@
 #import <React/RCTEventEmitter.h>
 #import <ReactCommon/RCTTurboModule.h>
 
-#import "LLMEngine.h"
-
 #import <jsi/jsi.h>
 #import <NativeMLCEngine/NativeMLCEngine.h>
 
-@interface MLCEngine : NativeMLCEngineSpecBase <NativeMLCEngineSpec, RCTBridgeModule>
+#import "LLMEngine.h"
+
+@interface MLCEngine : NativeMLCEngineSpecBase <NativeMLCEngineSpec>
 
 @property(nonatomic, strong) LLMEngine* engine;
 @property(nonatomic, strong) NSURL* bundleURL;
@@ -27,12 +27,12 @@ using namespace facebook;
   self = [super init];
   if (self) {
     _engine = [[LLMEngine alloc] init];
-
+    
     // Get the Documents directory path for downloaded models
     NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString* documentsDirectory = [paths firstObject];
     _bundleURL = [NSURL fileURLWithPath:[documentsDirectory stringByAppendingPathComponent:@"bundle"]];
-
+    
     // Create bundle directory if it doesn't exist (for downloaded models)
     NSError* dirError;
     [[NSFileManager defaultManager] createDirectoryAtPath:[_bundleURL path] withIntermediateDirectories:YES attributes:nil error:&dirError];
@@ -114,12 +114,12 @@ using namespace facebook;
   NSData* jsonData = [responseString dataUsingEncoding:NSUTF8StringEncoding];
   NSError* error;
   NSArray* jsonArray = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
-
+  
   if (error) {
     NSLog(@"Error parsing JSON: %@", error);
     return nil;
   }
-
+  
   if (jsonArray.count > 0) {
     NSDictionary* responseDict = jsonArray[0];
     NSArray* choices = responseDict[@"choices"];
@@ -128,175 +128,134 @@ using namespace facebook;
       NSDictionary* delta = choice[@"delta"];
       NSString* content = delta[@"content"];
       NSString* finishReason = choice[@"finish_reason"];
-
+      
       BOOL isFinished = (finishReason != nil && ![finishReason isEqual:[NSNull null]]);
-
+      if (isFinished) {
+        
+      }
       return @{@"content" : content ?: @"", @"isFinished" : @(isFinished)};
     }
   }
-
+  
   return nil;
 }
 
-- (void)generateText:(NSString*)modelId 
-            messages:(NSArray<NSDictionary*>*)messages 
-             resolve:(RCTPromiseResolveBlock)resolve 
+- (void)generateText:(NSString*)modelId
+            messages:(NSArray<NSDictionary*>*)messages
+             resolve:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject {
   __block NSMutableString* displayText = [NSMutableString string];
   __block BOOL hasResolved = NO;
-
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    [self.engine chatCompletionWithMessages:messages
-                                 completion:^(id response) {
-                                   if ([response isKindOfClass:[NSString class]]) {
-                                     NSDictionary* parsedResponse = [self parseResponseString:response];
-                                     if (parsedResponse) {
-                                       NSString* content = parsedResponse[@"content"];
-                                       BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
-
-                                       if (content) {
-                                         [displayText appendString:content];
-                                       }
-
-                                       if (isFinished && !hasResolved) {
-                                         hasResolved = YES;
-                                         resolve([displayText copy]);
-                                       }
-
-                                     } else {
-                                       if (!hasResolved) {
-                                         hasResolved = YES;
-                                         reject(@"PARSE_ERROR", @"Failed to parse response", nil);
-                                       }
-                                     }
-                                   } else {
-                                     if (!hasResolved) {
-                                       hasResolved = YES;
-                                       reject(@"INVALID_RESPONSE", @"Received an invalid response type", nil);
-                                     }
-                                   }
-                                 }];
-  });
+  
+  [self.engine chatCompletionWithMessages:messages
+                               completion:^(NSString* response) {
+    NSDictionary* parsedResponse = [self parseResponseString:response];
+    if (parsedResponse) {
+      NSString* content = parsedResponse[@"content"];
+      BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
+      if (content) {
+        [displayText appendString:content];
+      }
+      if (isFinished && !hasResolved) {
+        hasResolved = YES;
+        resolve([displayText copy]);
+      }
+    } else {
+      if (!hasResolved) {
+        hasResolved = YES;
+        reject(@"MLCEngine", @"Failed to parse response", nil);
+      }
+    }
+  }];
 }
 
-- (void)streamText:(NSString*)modelId 
-          messages:(NSArray<NSDictionary*>*)messages 
-           resolve:(RCTPromiseResolveBlock)resolve 
+- (void)streamText:(NSString*)modelId
+          messages:(NSArray<NSDictionary*>*)messages
+           resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject {
   __block BOOL hasResolved = NO;
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    [self.engine chatCompletionWithMessages:messages
-                                 completion:^(id response) {
-                                   if ([response isKindOfClass:[NSString class]]) {
-                                     NSDictionary* parsedResponse = [self parseResponseString:response];
-                                     if (parsedResponse) {
-                                       NSString* content = parsedResponse[@"content"];
-                                       BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
-
-                                       if (content) {
-                                         [self emitOnChatUpdate:@{@"content" : content}];
-                                       }
-
-                                       if (isFinished && !hasResolved) {
-                                         hasResolved = YES;
-                                         [self emitOnChatComplete:@{}];
-                                         resolve(@"");
-                                         return;
-                                       }
-                                     } else {
-                                       if (!hasResolved) {
-                                         hasResolved = YES;
-                                         reject(@"PARSE_ERROR", @"Failed to parse response", nil);
-                                       }
-                                     }
-                                   } else {
-                                     if (!hasResolved) {
-                                       hasResolved = YES;
-                                       reject(@"INVALID_RESPONSE", @"Received an invalid response type", nil);
-                                     }
-                                   }
-                                 }];
-  });
+ [self.engine chatCompletionWithMessages:messages
+                               completion:^(NSString* response) {
+    NSDictionary* parsedResponse = [self parseResponseString:response];
+    if (parsedResponse) {
+      NSString* content = parsedResponse[@"content"];
+      BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
+      if (content) {
+        [self emitOnChatUpdate:@{@"content" : content}];
+      }
+      if (isFinished && !hasResolved) {
+        hasResolved = YES;
+        [self emitOnChatComplete:@{}];
+        resolve(@"");
+      }
+    } else {
+      if (!hasResolved) {
+        hasResolved = YES;
+        reject(@"MLCEngine", @"Failed to parse response", nil);
+      }
+    }
+  }];
 }
 
-- (void)getModel:(NSString*)name 
-         resolve:(RCTPromiseResolveBlock)resolve 
+- (void)getModel:(NSString*)name
+         resolve:(RCTPromiseResolveBlock)resolve
           reject:(RCTPromiseRejectBlock)reject {
   NSDictionary* modelConfig = [self findModelById:name];
   if (!modelConfig) {
-    reject(@"Model not found", @"Didn't find the model", nil);
+    reject(@"MLCEngine", @"Didn't find the model", nil);
     return;
   }
   NSDictionary* modelInfo = @{@"modelId" : modelConfig[@"model_id"], @"modelLib" : modelConfig[@"model_lib"]};
   resolve(modelInfo);
 }
 
-- (void)getModels:(RCTPromiseResolveBlock)resolve 
+- (void)getModels:(RCTPromiseResolveBlock)resolve
            reject:(RCTPromiseRejectBlock)reject {
   resolve([self getModelList]);
 }
 
-- (void)prepareModel:(NSString*)modelId 
-             resolve:(RCTPromiseResolveBlock)resolve 
+- (void)prepareModel:(NSString*)modelId
+             resolve:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject {
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    @try {
-      // Find model record
-      NSDictionary* modelRecord = [self findModelById:modelId];
-      
-      if (!modelRecord) {
-        reject(@"MODEL_ERROR", @"There's no record for requested model", nil);
-        return;
-      }
-
-      // Check if model exists locally  
-      NSError* configError;
-      NSDictionary* modelConfig = [self readModelConfig:modelId error:&configError];
-
-      if (configError || !modelConfig) {
-        reject(@"MODEL_ERROR", @"Model not found locally. Please download it first", configError);
-        return;
-      }
-
-      // Update model properties - with null checks
-      NSString* modelLib = modelRecord[@"model_lib"];
-
-      if (!modelLib) {
-        reject(@"MODEL_ERROR", @"Invalid model config - missing required fields", nil);
-        return;
-      }
-
-      // Build the correct model path
-      NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:modelId];
-
-      if (!modelLocalURL) {
-        reject(@"MODEL_ERROR", @"Failed to construct model path", nil);
-        return;
-      }
-      NSString* modelLocalPath = [modelLocalURL path];
-      
-      // Check if the model directory exists
-      BOOL isDirectory;
-      if (![[NSFileManager defaultManager] fileExistsAtPath:modelLocalPath isDirectory:&isDirectory] || !isDirectory) {
-        reject(@"MODEL_ERROR", [NSString stringWithFormat:@"Model directory not found at path: %@", modelLocalPath], nil);
-        return;
-      }
-
-      [self.engine reloadWithModelPath:modelLocalPath modelLib:modelLib];
-
-      resolve([NSString stringWithFormat:@"Model prepared: %@", modelId]);
-
-    } @catch (NSException* exception) {
-      reject(@"MODEL_ERROR", exception.reason, nil);
+  @try {
+    NSDictionary* modelRecord = [self findModelById:modelId];
+    if (!modelRecord) {
+      reject(@"MLCEngine", @"There's no record for requested model", nil);
+      return;
     }
-  });
+    
+    NSString* modelLib = modelRecord[@"model_lib"];
+    if (!modelLib) {
+      reject(@"MLCEngine", @"Invalid model config - missing required fields", nil);
+      return;
+    }
+    
+    NSURL* modelLocalURL = [self.bundleURL URLByAppendingPathComponent:modelId];
+    if (!modelLocalURL) {
+      reject(@"MLCEngine", @"Failed to construct model path", nil);
+      return;
+    }
+    
+    NSString* modelLocalPath = [modelLocalURL path];
+    
+    BOOL isDirectory;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:modelLocalPath isDirectory:&isDirectory] || !isDirectory) {
+      reject(@"MLCEngine", [NSString stringWithFormat:@"Model directory not found at path: %@", modelLocalPath], nil);
+      return;
+    }
+    
+    [self.engine reloadWithModelPath:modelLocalPath modelLib:modelLib];
+    
+    resolve([NSString stringWithFormat:@"Model prepared: %@", modelId]);
+  } @catch (NSException* exception) {
+    reject(@"MLCEngine", exception.reason, nil);
+  }
 }
 
-// Read model config without downloading - assumes files already exist
 - (NSDictionary*)readModelConfig:(NSString*)modelId error:(NSError**)error {
   NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
   NSURL* modelConfigURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
-
+  
   NSData* jsonData = [NSData dataWithContentsOfURL:modelConfigURL];
   if (!jsonData) {
     if (error) {
@@ -304,15 +263,14 @@ using namespace facebook;
     }
     return nil;
   }
-
+  
   return [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:error];
 }
 
-// Helper to download a single file
 - (BOOL)downloadFile:(NSString*)modelUrl filename:(NSString*)filename toURL:(NSURL*)destURL error:(NSError**)error {
   NSString* urlString = [NSString stringWithFormat:@"%@/resolve/main/%@", modelUrl, filename];
   NSURL* url = [NSURL URLWithString:urlString];
-
+  
   NSData* fileData = [NSData dataWithContentsOfURL:url];
   if (!fileData) {
     if (error) {
@@ -322,7 +280,7 @@ using namespace facebook;
     }
     return NO;
   }
-
+  
   if (![fileData writeToURL:destURL atomically:YES]) {
     if (error) {
       *error = [NSError errorWithDomain:@"MLCEngine"
@@ -336,31 +294,31 @@ using namespace facebook;
 }
 
 // Download all model files with status updates
-- (void)downloadModelFiles:(NSDictionary*)modelRecord 
+- (void)downloadModelFiles:(NSDictionary*)modelRecord
                     status:(void (^)(NSString* status))statusCallback
                      error:(NSError**)error {
   NSString* modelId = modelRecord[@"model_id"];
   NSString* modelUrl = modelRecord[@"model_url"];
-
+  
   if (!modelId || !modelUrl) {
     if (error) {
       *error = [NSError errorWithDomain:@"MLCEngine" code:3 userInfo:@{NSLocalizedDescriptionKey : @"Missing required model record fields"}];
     }
     return;
   }
-
+  
   // Check if config already exists
   NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
   NSURL* modelConfigURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
   NSURL* ndarrayCacheURL = [modelDirURL URLByAppendingPathComponent:@"ndarray-cache.json"];
-
+  
   if (!modelDirURL || !modelConfigURL) {
     if (error) {
       *error = [NSError errorWithDomain:@"MLCEngine" code:4 userInfo:@{NSLocalizedDescriptionKey : @"Failed to construct config URLs"}];
     }
     return;
   }
-
+  
   // Create model directory if it doesn't exist
   NSError* dirError;
   [[NSFileManager defaultManager] createDirectoryAtPath:[modelDirURL path] withIntermediateDirectories:YES attributes:nil error:&dirError];
@@ -368,7 +326,7 @@ using namespace facebook;
     *error = dirError;
     return;
   }
-
+  
   // Download and save model config if it doesn't exist
   if (![[NSFileManager defaultManager] fileExistsAtPath:[modelConfigURL path]]) {
     if (statusCallback) statusCallback(@"Downloading model configuration...");
@@ -376,7 +334,7 @@ using namespace facebook;
       return;
     }
   }
-
+  
   // Download and save ndarray-cache if it doesn't exist
   if (![[NSFileManager defaultManager] fileExistsAtPath:[ndarrayCacheURL path]]) {
     if (statusCallback) statusCallback(@"Downloading cache configuration...");
@@ -384,7 +342,7 @@ using namespace facebook;
       return;
     }
   }
-
+  
   // Read and parse ndarray cache
   NSData* ndarrayCacheData = [NSData dataWithContentsOfURL:ndarrayCacheURL];
   if (!ndarrayCacheData) {
@@ -393,14 +351,14 @@ using namespace facebook;
     }
     return;
   }
-
+  
   NSError* ndarrayCacheJsonError;
   NSDictionary* ndarrayCache = [NSJSONSerialization JSONObjectWithData:ndarrayCacheData options:0 error:&ndarrayCacheJsonError];
   if (ndarrayCacheJsonError) {
     *error = ndarrayCacheJsonError;
     return;
   }
-
+  
   // Download parameter files from ndarray cache
   NSArray* records = ndarrayCache[@"records"];
   if ([records isKindOfClass:[NSArray class]] && records.count > 0) {
@@ -424,7 +382,7 @@ using namespace facebook;
       }
     }
   }
-
+  
   // Read and parse model config
   NSData* modelConfigData = [NSData dataWithContentsOfURL:modelConfigURL];
   if (!modelConfigData) {
@@ -433,14 +391,14 @@ using namespace facebook;
     }
     return;
   }
-
+  
   NSError* modelConfigJsonError;
   NSDictionary* modelConfig = [NSJSONSerialization JSONObjectWithData:modelConfigData options:0 error:&modelConfigJsonError];
   if (modelConfigJsonError) {
     *error = modelConfigJsonError;
     return;
   }
-
+  
   // Download tokenizer files
   NSArray* tokenizerFiles = modelConfig[@"tokenizer_files"];
   if ([tokenizerFiles isKindOfClass:[NSArray class]] && tokenizerFiles.count > 0) {
@@ -458,39 +416,39 @@ using namespace facebook;
   if (statusCallback) statusCallback(@"Download complete");
 }
 
-- (void)downloadModel:(NSString*)modelId 
-              resolve:(RCTPromiseResolveBlock)resolve 
+- (void)downloadModel:(NSString*)modelId
+              resolve:(RCTPromiseResolveBlock)resolve
                reject:(RCTPromiseRejectBlock)reject {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     @try {
       NSDictionary* modelRecord = [self findModelById:modelId];
       
       if (!modelRecord) {
-        reject(@"MODEL_ERROR", @"There's no record for requested model", nil);
+        reject(@"MLCEngine", @"There's no record for requested model", nil);
         return;
       }
-
+      
       NSError* downloadError = nil;
-      [self downloadModelFiles:modelRecord 
+      [self downloadModelFiles:modelRecord
                         status:^(NSString* status) {
-                          [self emitOnDownloadProgress:@{@"status" : status}];
-                        }
+        [self emitOnDownloadProgress:@{@"status" : status}];
+      }
                          error:&downloadError];
       
       if (downloadError) {
-        reject(@"MODEL_ERROR", @"Failed to download model", downloadError);
+        reject(@"MLCEngine", @"Failed to download model", downloadError);
         return;
       }
-
+      
       resolve([NSString stringWithFormat:@"Model downloaded: %@", modelId]);
     } @catch (NSException* exception) {
-      reject(@"MODEL_ERROR", exception.reason, nil);
+      reject(@"MLCEngine", exception.reason, nil);
     }
   });
 }
 
-- (void)cleanDownloadedModel:(NSString*)modelId 
-                     resolve:(RCTPromiseResolveBlock)resolve 
+- (void)cleanDownloadedModel:(NSString*)modelId
+                     resolve:(RCTPromiseResolveBlock)resolve
                       reject:(RCTPromiseRejectBlock)reject {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     @try {
@@ -513,43 +471,25 @@ using namespace facebook;
             resolve([NSString stringWithFormat:@"Model cleaned: %@", modelId]);
           } else {
             NSLog(@"Failed to clean model directory: %@", removeError);
-            reject(@"CLEAN_ERROR", [NSString stringWithFormat:@"Failed to clean model: %@", removeError.localizedDescription], removeError);
+            reject(@"MLCEngine", [NSString stringWithFormat:@"Failed to clean model: %@", removeError.localizedDescription], removeError);
           }
         } else {
-          reject(@"CLEAN_ERROR", @"Path exists but is not a directory", nil);
+          reject(@"MLCEngine", @"Path exists but is not a directory", nil);
         }
       } else {
         NSLog(@"Model directory does not exist, nothing to clean");
         resolve(@"Model directory does not exist");
       }
     } @catch (NSException* exception) {
-      reject(@"CLEAN_ERROR", exception.reason, nil);
+      reject(@"MLCEngine", exception.reason, nil);
     }
   });
 }
 
-- (void)unloadModel:(RCTPromiseResolveBlock)resolve 
+- (void)unloadModel:(RCTPromiseResolveBlock)resolve
              reject:(RCTPromiseRejectBlock)reject {
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    @try {
-      NSLog(@"Unloading current model from engine");
-      
-      // Use the proper unload method from the engine
-      if (self.engine) {
-        // First try to unload the model
-        [self.engine unload];
-        NSLog(@"Model unloaded from engine");
-        
-        // Then reset the engine state to clear any remaining data
-        [self.engine reset];
-        NSLog(@"Engine state reset");
-      }
-      
-      resolve(@"Model unloaded successfully");
-    } @catch (NSException* exception) {
-      reject(@"UNLOAD_ERROR", exception.reason, nil);
-    }
-  });
+  [self.engine unload];
+  resolve(@"Model unloaded successfully");
 }
 
 @end

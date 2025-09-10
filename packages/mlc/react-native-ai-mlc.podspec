@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "14.0" }
   s.source       = { :git => "https://github.com/callstackincubator/ai.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm}"
+  s.source_files = "ios/**/*.{h,m,mm,swift}"
   
   # Use prebuilt static libraries shipped with the package
   s.vendored_libraries = [
@@ -42,10 +42,10 @@ Pod::Spec.new do |s|
     'OTHER_LDFLAGS' => [
       '$(inherited)',
       '-ObjC',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libmodel_iphone.a"',
       '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libmlc_llm.a"',
       '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtvm_runtime.a"',
       '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtvm_ffi_static.a"',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libmodel_iphone.a"',
       '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libsentencepiece.a"',
       '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtokenizers_cpp.a"',
       '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtokenizers_c.a"'

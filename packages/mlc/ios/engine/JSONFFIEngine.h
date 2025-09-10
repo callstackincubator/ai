@@ -2,8 +2,6 @@
 //  LLMEngine.h
 //  Pods
 //
-//  Created by Szymon Rybczak on 19/07/2024.
-//
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
@@ -13,17 +11,17 @@
  */
 @interface JSONFFIEngine : NSObject
 
-- (void)initBackgroundEngine:(void (^)(NSString*))streamCallback;
+- (void)initBackgroundEngine:(void (^)(NSString *))streamCallback;
 
-- (void)reload:(NSString*)engineConfig;
+- (void)reload:(NSString *)engineConfig;
 
 - (void)unload;
 
 - (void)reset;
 
-- (void)chatCompletion:(NSString*)requestJSON requestID:(NSString*)requestID;
+- (void)chatCompletion:(NSString *)requestJSON requestID:(NSString *)requestID;
 
-- (void)abort:(NSString*)requestID;
+- (void)abort:(NSString *)requestID;
 
 - (void)runBackgroundLoop;
 

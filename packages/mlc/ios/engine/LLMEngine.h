@@ -2,8 +2,6 @@
 //  LLMEngine.h
 //  Pods
 //
-//  Created by Szymon Rybczak on 19/07/2024.
-//
 
 #import <Foundation/Foundation.h>
 

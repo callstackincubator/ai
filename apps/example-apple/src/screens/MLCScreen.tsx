@@ -31,14 +31,14 @@ export default function MLCScreen() {
 
       // Step 2: Pick the first model
       const firstModel = models[0]
-      const modelId = firstModel.model_id || 'Llama-3.2-3B-Instruct'
+      const modelId = firstModel.model_id!
       console.log('Selected model:', modelId)
       setStatusText(`Selected model: ${modelId}`)
 
       // Step 2.5: Clean up any existing model files and unload
       try {
         setStatusText('Cleaning up old model files...')
-        await MLCEngine.unloadModel()
+        // await MLCEngine.unloadModel()
         console.log('Model unloaded')
 
         // await MLCEngine.cleanDownloadedModel(modelId)

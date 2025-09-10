@@ -113,6 +113,7 @@ if [ -z "$MLC_LLM_SOURCE_DIR" ]; then
   echo "Please set the MLC LLM source directory:"
   echo "  1. Clone the repository: git clone https://github.com/mlc-ai/mlc-llm.git"
   echo "  2. Export the path: export MLC_LLM_SOURCE_DIR=/path/to/mlc-llm"
+  echo "  3. Make sure to checkout the correct version tag (per CLI) and not the main branch"
   exit 1
 fi
 
@@ -140,7 +141,7 @@ if ! python3 -m mlc_llm --help > /dev/null 2>&1; then
   echo -e "${RED}Error: mlc_llm not found${NC}"
   echo ""
   echo "Please install MLC:"
-  echo "  pip install --pre -U -f https://mlc.ai/wheels mlc-llm-nightly-cpu mlc-ai-nightly-cpu"
+  echo "  pip install --pre -U -f https://mlc.ai/wheels mlc-llm-cpu mlc-ai-cpu"
   exit 1
 fi
 
@@ -170,8 +171,8 @@ if [ "$PLATFORM" = "ios" ]; then
   fi
   
   # Copy dlpack headers (often needed with TVM)
-  if [ -d "$MLC_LLM_SOURCE_DIR/3rdparty/tvm/ffi/3rdparty/dlpack/include/dlpack" ]; then
-    cp -r "$MLC_LLM_SOURCE_DIR/3rdparty/tvm/ffi/3rdparty/dlpack/include/dlpack" "$INCLUDE_DIR/"
+  if [ -d "$MLC_LLM_SOURCE_DIR/3rdparty/tvm/3rdparty/dlpack/include/dlpack" ]; then
+    cp -r "$MLC_LLM_SOURCE_DIR/3rdparty/tvm/3rdparty/dlpack/include/dlpack" "$INCLUDE_DIR/"
   fi
   
   # Copy dmlc headers (logging and other utilities)

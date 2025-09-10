@@ -18,4 +18,5 @@ NS_ASSUME_NONNULL_BEGIN
                              completion:(void (^)(id response))completion;
 - (void)streamCallbackWithResult:(NSString *)result;
 @end
+
 NS_ASSUME_NONNULL_END
