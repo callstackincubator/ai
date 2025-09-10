@@ -77,9 +77,9 @@ const { audio } = await speech({
 
 See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
 
-### MLC Engine (Work in Progress)
+### MLC Engine (Experimental)
 
-Run any open-source LLM locally using MLC's optimized runtime. Currently in development and not recommended for production use.
+Run popular open-source LLMs directly on-device using MLC's optimized runtime.
 
 #### Installation
 
@@ -87,26 +87,39 @@ Run any open-source LLM locally using MLC's optimized runtime. Currently in deve
 npm install @react-native-ai/mlc
 ```
 
-Requires manual setup including installing the MLC CLI. See the [setup guide](https://react-native-ai.dev/docs/mlc/overview#3-install-mlc_llm-cli).
+Requires the "Increased Memory Limit" capability in Xcode. See the [getting started guide](https://react-native-ai.dev/docs/mlc/getting-started) for setup instructions.
 
 #### Usage
 
 ```typescript
-import { getModel, prepareModel } from '@react-native-ai/mlc'
+import { mlc } from '@react-native-ai/mlc'
 import { generateText } from 'ai'
 
-// Download and prepare model
-await prepareModel('Llama-3.2-3B-Instruct')
+// Create model instance
+const model = mlc.languageModel('Llama-3.2-3B-Instruct')
+
+// Download and prepare model (one-time setup)
+await model.download()
+await model.prepare()
 
 // Generate response with Llama via MLC engine
 const { text } = await generateText({
-  model: getModel('Llama-3.2-3B-Instruct'),
+  model,
   prompt: 'Explain quantum computing'
 })
 ```
 
+#### Available Models
+
+| Model | Size | Use Case |
+|-------|------|----------|
+| Llama 3.2 3B | ~2GB | General purpose chat |
+| Phi-3 Mini 4K | ~2.5GB | Coding assistance |
+| Mistral 7B | ~4.5GB | Advanced reasoning (8GB+ RAM) |
+| Qwen 2.5 1.5B | ~1GB | Fast responses, mobile-optimized |
+
 > [!NOTE]
-> MLC support is experimental. Follow the [setup guide](https://react-native-ai.dev/docs/mlc/overview) for detailed installation instructions.
+> MLC requires iOS devices with sufficient memory (1-8GB depending on model). The prebuilt runtime supports the models listed above. For other models or custom configurations, you'll need to recompile the MLC runtime from source.
 
 ### Google (Coming Soon)
 

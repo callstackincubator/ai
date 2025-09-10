@@ -2,9 +2,6 @@
 
 The MLC provider enables you to run large language models directly on-device in React Native applications. This includes popular models like Llama, Phi-3, Mistral, and Qwen that run entirely on-device for privacy, performance, and offline capabilities.
 
-> [!NOTE]
-> MLC currently does not support Android.
-
 ## Installation
 
 Install the MLC provider:
