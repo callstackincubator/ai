@@ -111,12 +111,12 @@ const { text } = await generateText({
 
 #### Available Models
 
-| Model | Size | Use Case |
-|-------|------|----------|
-| Llama 3.2 3B | ~2GB | General purpose chat |
-| Phi-3 Mini 4K | ~2.5GB | Coding assistance |
-| Mistral 7B | ~4.5GB | Advanced reasoning (8GB+ RAM) |
-| Qwen 2.5 1.5B | ~1GB | Fast responses, mobile-optimized |
+| Model ID | Size |
+|----------|------|
+| `Llama-3.2-3B-Instruct` | ~2GB |
+| `Phi-3-mini-4k-instruct` | ~2.5GB |
+| `Mistral-7B-Instruct` | ~4.5GB |
+| `Qwen2.5-1.5B-Instruct` | ~1GB |
 
 > [!NOTE]
 > MLC requires iOS devices with sufficient memory (1-8GB depending on model). The prebuilt runtime supports the models listed above. For other models or custom configurations, you'll need to recompile the MLC runtime from source.

@@ -6,12 +6,12 @@ This guide covers the complete lifecycle of MLC models - from discovery and down
 
 The package includes a prebuilt runtime optimized for the following models:
 
-| Model | Model ID | Size | Use Case |
-|-------|----------|------|----------|
-| **Llama 3.2 3B** | `Llama-3.2-3B-Instruct` | ~2GB | General purpose chat, balanced performance |
-| **Phi-3 Mini 4K** | `Phi-3-mini-4k-instruct` | ~2.5GB | Coding assistance, technical tasks |
-| **Mistral 7B** | `Mistral-7B-Instruct` | ~4.5GB | Advanced reasoning (requires 8GB+ RAM) |
-| **Qwen 2.5 1.5B** | `Qwen2.5-1.5B-Instruct` | ~1GB | Fast responses, mobile-optimized |
+| Model ID | Size |
+|----------|------|
+| `Llama-3.2-3B-Instruct` | ~2GB |
+| `Phi-3-mini-4k-instruct` | ~2.5GB |
+| `Mistral-7B-Instruct` | ~4.5GB (requires 8GB+ RAM) |
+| `Qwen2.5-1.5B-Instruct` | ~1GB |
 
 > **Note**: These are the only models supported for direct download. For other models, you'll need to build MLC from source (documentation coming soon).
 
