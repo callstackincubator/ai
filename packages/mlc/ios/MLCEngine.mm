@@ -404,12 +404,19 @@ using namespace facebook;
   // Download parameter files from ndarray cache
   NSArray* records = ndarrayCache[@"records"];
   if ([records isKindOfClass:[NSArray class]] && records.count > 0) {
+    int currentFile = 0;
+    int totalFiles = (int)records.count;
+    
     for (NSDictionary* record in records) {
       NSString* dataPath = record[@"dataPath"];
       if (dataPath) {
         NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:dataPath];
         if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
-          if (statusCallback) statusCallback(@"Downloading model parameters..."); //add record id or sometihng from this
+          currentFile++;
+          NSString* fileName = [dataPath lastPathComponent];
+          if (statusCallback) {
+            statusCallback([NSString stringWithFormat:@"Downloading %@ (%d/%d)...", fileName, currentFile, totalFiles]);
+          }
           if (![self downloadFile:modelUrl filename:dataPath toURL:fileURL error:error]) {
             return;
           }
