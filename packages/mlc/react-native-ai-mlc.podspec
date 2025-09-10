@@ -33,7 +33,23 @@ Pod::Spec.new do |s|
   # Compiler configuration
   s.pod_target_xcconfig = {
     'HEADER_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/ios" "$(PODS_TARGET_SRCROOT)/prebuilt/ios/include"',
-    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17'
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+    'LIBRARY_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/prebuilt/ios/lib"'
+  }
+  
+  # User target configuration to ensure static libraries are force loaded
+  s.user_target_xcconfig = {
+    'OTHER_LDFLAGS' => [
+      '$(inherited)',
+      '-ObjC',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libmlc_llm.a"',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtvm_runtime.a"',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtvm_ffi_static.a"',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libmodel_iphone.a"',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libsentencepiece.a"',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtokenizers_cpp.a"',
+      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtokenizers_c.a"'
+    ].join(' ')
   }
   
   # Framework dependencies

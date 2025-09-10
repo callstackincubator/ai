@@ -10,6 +10,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import LLMScreen from './screens/LLMScreen'
+import MLCScreen from './screens/MLCScreen'
 import PlaygroundScreen from './screens/PlaygroundScreen'
 import SpeechScreen from './screens/SpeechScreen'
 import TranscribeScreen from './screens/TranscribeScreen'
@@ -18,6 +19,7 @@ const Tab = createNativeBottomTabNavigator()
 
 const RootStack = createNativeStackNavigator()
 const LLMStack = createNativeStackNavigator()
+const MLCStack = createNativeStackNavigator()
 const PlaygroundStack = createNativeStackNavigator()
 const TranscribeStack = createNativeStackNavigator()
 const SpeechStack = createNativeStackNavigator()
@@ -39,6 +41,20 @@ function LLMStackScreen() {
         }}
       />
     </LLMStack.Navigator>
+  )
+}
+
+function MLCStackScreen() {
+  return (
+    <MLCStack.Navigator>
+      <MLCStack.Screen
+        name="MLCScreen"
+        component={MLCScreen}
+        options={{
+          title: 'MLC Engine',
+        }}
+      />
+    </MLCStack.Navigator>
   )
 }
 
@@ -92,6 +108,13 @@ function Tabs() {
         component={LLMStackScreen}
         options={{
           tabBarIcon: () => ({ sfSymbol: 'brain.head.profile' }),
+        }}
+      />
+      <Tab.Screen
+        name="MLC"
+        component={MLCStackScreen}
+        options={{
+          tabBarIcon: () => ({ sfSymbol: 'cpu' }),
         }}
       />
       <Tab.Screen
