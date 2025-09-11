@@ -2,6 +2,14 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 
+# Dynamically resolve the package path using Node.js
+resolved_path = `node -p "require.resolve('@react-native-ai/mlc/package.json')"`.chomp
+if $?.success?
+  package_path = File.dirname(resolved_path)
+else
+  raise "Failed to resolve package path for react-native-ai-mlc. Make sure Node.js is available and the package is installed."
+end
+
 Pod::Spec.new do |s|
   s.name         = "react-native-ai-mlc"
   
@@ -42,13 +50,13 @@ Pod::Spec.new do |s|
     'OTHER_LDFLAGS' => [
       '$(inherited)',
       '-ObjC',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libmodel_iphone.a"',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libmlc_llm.a"',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtvm_runtime.a"',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtvm_ffi_static.a"',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libsentencepiece.a"',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtokenizers_cpp.a"',
-      '-force_load "$(PODS_ROOT)/../../../../packages/mlc/prebuilt/ios/lib/libtokenizers_c.a"'
+      "-force_load \"#{package_path}/prebuilt/ios/lib/libmodel_iphone.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib/libmlc_llm.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib/libtvm_runtime.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib/libtvm_ffi_static.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib/libsentencepiece.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib/libtokenizers_cpp.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib/libtokenizers_c.a\""
     ].join(' ')
   }
   
