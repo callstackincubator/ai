@@ -64,8 +64,23 @@
   [self.jsonFFIEngine unload];
 }
 
-- (void)chatCompletionWithMessages:(NSArray*)messages completion:(void (^)(id response))completion {
-  NSDictionary* request = @{@"messages" : messages, @"temperature" : @0.6 };
+- (void)chatCompletionWithMessages:(NSArray*)messages options:(NSDictionary*)options completion:(void (^)(id response))completion {
+  NSMutableDictionary* request = [@{@"messages" : messages, @"stream": @YES} mutableCopy];
+  
+  // Add generation options if provided
+  if (options[@"temperature"] && ![options[@"temperature"] isEqual:[NSNull null]]) {
+    request[@"temperature"] = options[@"temperature"];
+  }
+  if (options[@"maxTokens"] && ![options[@"maxTokens"] isEqual:[NSNull null]]) {
+    request[@"max_tokens"] = options[@"maxTokens"];
+  }
+  if (options[@"topP"] && ![options[@"topP"] isEqual:[NSNull null]]) {
+    request[@"top_p"] = options[@"topP"];
+  }
+  if (options[@"topK"] && ![options[@"topK"] isEqual:[NSNull null]]) {
+    request[@"top_k"] = options[@"topK"];
+  }
+  
   [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine request:request completion:completion];
 }
 

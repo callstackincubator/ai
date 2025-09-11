@@ -1,4 +1,4 @@
-import type { EventSubscription, TurboModule } from 'react-native'
+import type { TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
 import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes'
 
@@ -9,6 +9,13 @@ export interface ModelConfig {
 export interface Message {
   role: 'assistant' | 'system' | 'tool' | 'user'
   content: string
+}
+
+export interface GenerationOptions {
+  temperature?: number
+  maxTokens?: number
+  topP?: number
+  topK?: number
 }
 
 export interface DownloadProgress {
@@ -25,8 +32,11 @@ export interface Spec extends TurboModule {
   getModel(name: string): Promise<ModelConfig>
   getModels(): Promise<ModelConfig[]>
 
-  generateText(messages: Message[]): Promise<string>
-  streamText(messages: Message[]): Promise<string>
+  generateText(
+    messages: Message[],
+    options?: GenerationOptions
+  ): Promise<string>
+  streamText(messages: Message[], options?: GenerationOptions): Promise<string>
 
   downloadModel(modelId: string): Promise<string>
   removeModel(modelId: string): Promise<string>
