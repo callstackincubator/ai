@@ -38,7 +38,7 @@ For Expo projects, add the MLC config plugin to automatically configure the incr
 }
 ```
 
-The plugin automatically adds the `com.apple.developer.kernel.increased-memory-limit` entitlement to your iOS app, which enables better performance for memory-intensive ML operations.
+The plugin automatically adds the `com.apple.developer.kernel.increased-memory-limit` entitlement to your iOS app, which is required to run large language models that exceed the default memory limits.
 
 After adding the plugin, run:
 
