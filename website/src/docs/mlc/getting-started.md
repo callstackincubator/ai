@@ -24,15 +24,35 @@ npm install ai@beta
 
 ## Configuration
 
-### iOS
+### Expo Config Plugin
 
-Add the "Increased Memory Limit" capability in Xcode:
+For Expo projects, add the MLC config plugin to automatically configure the increased memory limit capability:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      "@react-native-ai/mlc"
+    ]
+  }
+}
+```
+
+The plugin automatically adds the `com.apple.developer.kernel.increased-memory-limit` entitlement to your iOS app, which enables better performance for memory-intensive ML operations.
+
+After adding the plugin, run:
+
+```bash
+npx expo prebuild --clean
+```
+
+### Manual Installation
+
+If you're not using Expo or prefer manual configuration, add the "Increased Memory Limit" capability in Xcode:
 
 1. Open your iOS project in Xcode
-2. Go to Signing & Capabilities tab
-3. Add "Increased Memory Limit" capability
-
-![Image](https://github.com/user-attachments/assets/0f8eec76-2900-48d9-91b8-ad7b3adce235)
+2. Navigate to your target's **Signing & Capabilities** tab  
+3. Click **+ Capability** and add "Increased Memory Limit"
 
 ## Basic Usage
 
