@@ -15,6 +15,7 @@
     "cpp",
     "prebuilt",
     "*.podspec",
+    "app.plugin.js",
     "!ios/build",
     "!android/build",
     "!android/gradle",
@@ -39,7 +40,9 @@
     "llm",
     "ai",
     "sdk",
-    "vercel"
+    "vercel",
+    "expo",
+    "config-plugin"
   ],
   "repository": {
     "type": "git",
@@ -58,10 +61,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
-    "react-native": "0.79.5"
-  },
-  "peerDependencies": {
-    "react": "19.0.0",
     "react-native": "0.79.5"
   },
   "react-native-builder-bob": {
@@ -92,5 +91,15 @@
     "@ai-sdk/provider": "^2.0.0-beta.1",
     "@ai-sdk/provider-utils": "^3.0.0-beta.5",
     "zod": "^4.0.0"
+  },
+  "peerDependencies": {
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "expo": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
   }
 }

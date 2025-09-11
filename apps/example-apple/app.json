@@ -67,7 +67,8 @@
             "mediaPlayback"
           ]
         }
-      ]
+      ],
+      "@react-native-ai/mlc"
     ]
   }
 }
