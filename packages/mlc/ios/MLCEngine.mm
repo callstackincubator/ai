@@ -141,12 +141,16 @@ using namespace facebook;
 }
 
 - (void)generateText:(NSArray<NSDictionary*>*)messages
+             options:(NSDictionary *)options
              resolve:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject {
   __block NSMutableString* displayText = [NSMutableString string];
   __block BOOL hasResolved = NO;
   
+  NSDictionary *engineOptions = options ?: @{};
+  
   [self.engine chatCompletionWithMessages:messages
+                                  options:engineOptions
                                completion:^(NSString* response) {
     NSDictionary* parsedResponse = [self parseResponseString:response];
     if (parsedResponse) {
@@ -169,10 +173,15 @@ using namespace facebook;
 }
 
 - (void)streamText:(NSArray<NSDictionary*>*)messages
+           options:(NSDictionary *)options
            resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject {
   __block BOOL hasResolved = NO;
- [self.engine chatCompletionWithMessages:messages
+  
+  NSDictionary *engineOptions = options ?: @{};
+  
+  [self.engine chatCompletionWithMessages:messages
+                                  options:engineOptions
                                completion:^(NSString* response) {
     NSDictionary* parsedResponse = [self parseResponseString:response];
     if (parsedResponse) {

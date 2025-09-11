@@ -7,6 +7,7 @@ import type {
 
 import NativeMLCEngine, {
   DownloadProgress,
+  type GenerationOptions,
   type Message,
 } from './NativeMLCEngine'
 
@@ -69,7 +70,14 @@ class MlcChatLanguageModel implements LanguageModelV2 {
   async doGenerate(options: LanguageModelV2CallOptions) {
     const messages = this.prepareMessages(options.prompt)
 
-    const text = await NativeMLCEngine.generateText(messages)
+    const generationOptions: GenerationOptions = {
+      temperature: options.temperature,
+      maxTokens: options.maxOutputTokens,
+      topP: options.topP,
+      topK: options.topK,
+    }
+
+    const text = await NativeMLCEngine.generateText(messages, generationOptions)
 
     return {
       content: [{ type: 'text' as const, text }],
@@ -93,6 +101,13 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       )
     }
 
+    const generationOptions: GenerationOptions = {
+      temperature: options.temperature,
+      maxTokens: options.maxOutputTokens,
+      topP: options.topP,
+      topK: options.topK,
+    }
+
     let streamId: string | null = null
     let listeners: { remove(): void }[] = []
 
@@ -104,7 +119,10 @@ class MlcChatLanguageModel implements LanguageModelV2 {
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
         try {
-          streamId = await NativeMLCEngine.streamText(messages)
+          streamId = await NativeMLCEngine.streamText(
+            messages,
+            generationOptions
+          )
 
           controller.enqueue({
             type: 'text-start',
