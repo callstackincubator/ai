@@ -21,16 +21,11 @@ const identificationSchema = z.object({
 
 export default function MLCScreen() {
   const [isLoading, setIsLoading] = useState(false)
-  const [statusText, setStatusTextM] = useState('')
+  const [statusText, setStatusText] = useState('')
   const [response, setResponse] = useState('')
   const [structuredResponse, setStructuredResponse] = useState<z.infer<
     typeof identificationSchema
   > | null>(null)
-
-  const setStatusText = (text: string) => {
-    setStatusTextM(text)
-    console.log('statusText', text)
-  }
 
   const runFullWorkflow = async () => {
     try {
