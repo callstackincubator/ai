@@ -1,6 +1,6 @@
 {
   "name": "@react-native-ai/mlc",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "MLC LLM provider for Vercel AI SDK",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
