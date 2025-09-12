@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
       echo "  4. Set environment variable:"
       echo "     export MLC_LLM_SOURCE_DIR=/path/to/mlc-llm"
       echo "  5. Install MLC Python package:"
-      echo "     pip install --pre -U -f https://mlc.ai/wheels mlc-llm-nightly-cpu mlc-ai-nightly-cpu"
+      echo "     pip install --pre -U -f https://mlc.ai/wheels mlc-llm-cpu mlc-ai-cpu"
       exit 0
       ;;
     *)
