@@ -27,36 +27,30 @@ export default function MLCScreen() {
     typeof identificationSchema
   > | null>(null)
 
+  const setupModel = async () => {
+    // Step 1: Get available models
+    setStatusText('Getting available models...')
+    const models = await MLCEngine.getModels()
+    const modelId = models[0]!.model_id!
+    setStatusText(`Selected model: ${modelId}`)
+
+    // Step 2: Create and prepare model
+    const model = mlc.languageModel(modelId)
+    setStatusText('Preparing model...')
+    await model.prepare()
+    setStatusText('Model ready')
+
+    return model
+  }
+
   const runFullWorkflow = async () => {
     try {
       setIsLoading(true)
-      setStatusText('Getting available models...')
       setResponse('')
 
-      // Step 1: Choose the model
-      const models = await MLCEngine.getModels()
+      const model = await setupModel()
 
-      // Step 2: Choose the model
-      const modelId = models[0]!.model_id!
-
-      setStatusText(`Selected model: ${modelId}`)
-
-      // Step 3: Create MLC provider and download the model
-      setStatusText('Starting download...')
-      const model = mlc.languageModel(modelId)
-
-      await model.download((event) => {
-        setStatusText(`Download: ${event.status}`)
-      })
-
-      setStatusText('Download complete')
-
-      // Step 4: Prepare the model
-      setStatusText('Preparing model...')
-      await model.prepare()
-      setStatusText('Model ready')
-
-      // Step 5: Generate text using AI SDK
+      // Generate text using AI SDK
       setStatusText('Generating response...')
 
       const result = await generateText({
@@ -76,21 +70,11 @@ export default function MLCScreen() {
   const runStructuredOutput = async () => {
     try {
       setIsLoading(true)
-      setStatusText('Getting available models...')
       setStructuredResponse(null)
 
-      // Step 1: Get models and select one
-      const models = await MLCEngine.getModels()
-      const modelId = models[0]!.model_id!
-      setStatusText(`Selected model: ${modelId}`)
+      const model = await setupModel()
 
-      // Step 2: Create model and ensure it's ready
-      const model = mlc.languageModel(modelId)
-      setStatusText('Preparing model...')
-      await model.prepare()
-      setStatusText('Model ready')
-
-      // Step 3: Generate structured output
+      // Generate structured output
       setStatusText('Generating structured response...')
 
       const result = await generateObject({
