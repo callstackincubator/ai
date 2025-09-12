@@ -110,6 +110,37 @@ using namespace facebook;
   return std::make_shared<react::NativeMLCEngineSpecJSI>(params);
 }
 
+// Helper method to build complete request with messages and options
+- (NSDictionary*)buildRequestWithMessages:(NSArray*)messages options:(const JS::NativeMLCEngine::GenerationOptions &)options stream:(BOOL)stream {
+  NSMutableDictionary *request = [@{@"messages": messages, @"stream": @(stream)} mutableCopy];
+  
+  if (options.temperature().has_value()) {
+    request[@"temperature"] = @(options.temperature().value());
+  }
+  if (options.maxTokens().has_value()) {
+    request[@"max_tokens"] = @(options.maxTokens().value());
+  }
+  if (options.topP().has_value()) {
+    request[@"top_p"] = @(options.topP().value());
+  }
+  if (options.topK().has_value()) {
+    request[@"top_k"] = @(options.topK().value());
+  }
+  if (options.responseFormat().has_value()) {
+    auto responseFormat = options.responseFormat().value();
+    NSMutableDictionary *responseFormatDict = [NSMutableDictionary dictionary];
+    if (responseFormat.type()) {
+      responseFormatDict[@"type"] = responseFormat.type();
+    }
+    if (responseFormat.schema()) {
+      responseFormatDict[@"schema"] = responseFormat.schema();
+    }
+    request[@"response_format"] = responseFormatDict;
+  }
+  
+  return request;
+}
+
 - (NSDictionary*)parseResponseString:(NSString*)responseString {
   NSData* jsonData = [responseString dataUsingEncoding:NSUTF8StringEncoding];
   NSError* error;
@@ -141,16 +172,16 @@ using namespace facebook;
 }
 
 - (void)generateText:(NSArray<NSDictionary*>*)messages
-             options:(NSDictionary *)options
+             options:(JS::NativeMLCEngine::GenerationOptions &)options
              resolve:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject {
   __block NSMutableString* displayText = [NSMutableString string];
   __block BOOL hasResolved = NO;
   
-  NSDictionary *engineOptions = options ?: @{};
+  NSDictionary *request = [self buildRequestWithMessages:messages options:options stream:YES];
   
   [self.engine chatCompletionWithMessages:messages
-                                  options:engineOptions
+                                  options:request
                                completion:^(NSString* response) {
     NSDictionary* parsedResponse = [self parseResponseString:response];
     if (parsedResponse) {
@@ -173,15 +204,15 @@ using namespace facebook;
 }
 
 - (void)streamText:(NSArray<NSDictionary*>*)messages
-           options:(NSDictionary *)options
+           options:(JS::NativeMLCEngine::GenerationOptions &)options
            resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject {
   __block BOOL hasResolved = NO;
   
-  NSDictionary *engineOptions = options ?: @{};
+  NSDictionary *request = [self buildRequestWithMessages:messages options:options stream:YES];
   
   [self.engine chatCompletionWithMessages:messages
-                                  options:engineOptions
+                                  options:request
                                completion:^(NSString* response) {
     NSDictionary* parsedResponse = [self parseResponseString:response];
     if (parsedResponse) {

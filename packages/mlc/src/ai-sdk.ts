@@ -75,6 +75,13 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       maxTokens: options.maxOutputTokens,
       topP: options.topP,
       topK: options.topK,
+      responseFormat:
+        options.responseFormat?.type === 'json'
+          ? {
+              type: 'json_object',
+              schema: JSON.stringify(options.responseFormat.schema),
+            }
+          : undefined,
     }
 
     const text = await NativeMLCEngine.generateText(messages, generationOptions)
@@ -106,6 +113,13 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       maxTokens: options.maxOutputTokens,
       topP: options.topP,
       topK: options.topK,
+      responseFormat:
+        options.responseFormat?.type === 'json'
+          ? {
+              type: 'json_object',
+              schema: JSON.stringify(options.responseFormat.schema),
+            }
+          : undefined,
     }
 
     let streamId: string | null = null

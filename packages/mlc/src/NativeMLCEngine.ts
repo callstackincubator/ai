@@ -11,11 +11,17 @@ export interface Message {
   content: string
 }
 
+export interface ResponseFormat {
+  type: 'json_object' | 'text'
+  schema?: string
+}
+
 export interface GenerationOptions {
   temperature?: number
   maxTokens?: number
   topP?: number
   topK?: number
+  responseFormat?: ResponseFormat
 }
 
 export interface DownloadProgress {
