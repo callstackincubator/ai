@@ -184,7 +184,7 @@ using namespace facebook;
   __block NSMutableString* displayText = [NSMutableString string];
   __block BOOL hasResolved = NO;
   
-  NSDictionary *request = [self buildRequestWithMessages:messages options:options stream:NO];
+  NSDictionary *request = [self buildRequestWithMessages:messages options:options];
   
   [self.engine chatCompletionWithMessages:messages
                                   options:request
@@ -215,7 +215,7 @@ using namespace facebook;
             reject:(RCTPromiseRejectBlock)reject {
   __block BOOL hasResolved = NO;
   
-  NSDictionary *request = [self buildRequestWithMessages:messages options:options stream:YES];
+  NSDictionary *request = [self buildRequestWithMessages:messages options:options];
   
   [self.engine chatCompletionWithMessages:messages
                                   options:request
