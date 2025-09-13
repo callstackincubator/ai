@@ -16,10 +16,15 @@ export interface ResponseFormat {
   schema?: string
 }
 
-export interface ChatTool {
+export interface ChatFunctionTool {
   name: string
   description?: string
   parameters: Record<string, string>
+}
+
+export interface ChatTool {
+  type: 'function'
+  function: ChatFunctionTool
 }
 
 export interface GenerationOptions {
@@ -29,7 +34,7 @@ export interface GenerationOptions {
   topK?: number
   responseFormat?: ResponseFormat
   tools?: ChatTool[]
-  toolChoice?: 'none' | 'auto' | Record<string, any>
+  toolChoice?: 'none' | 'auto'
 }
 
 export interface DownloadProgress {

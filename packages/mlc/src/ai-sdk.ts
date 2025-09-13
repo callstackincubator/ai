@@ -5,6 +5,7 @@ import type {
   LanguageModelV2Prompt,
   LanguageModelV2ProviderDefinedTool,
   LanguageModelV2StreamPart,
+  LanguageModelV2ToolChoice,
 } from '@ai-sdk/provider'
 
 import NativeMLCEngine, {
@@ -35,11 +36,29 @@ const convertToolsToNativeFormat = (
         })
       }
       return {
-        name: tool.name,
-        description: tool.description,
-        parameters,
+        type: 'function' as const,
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters,
+        },
       }
     })
+}
+
+const convertToolChoice = (
+  toolChoice?: LanguageModelV2ToolChoice
+): 'none' | 'auto' | undefined => {
+  if (!toolChoice) {
+    return 'none'
+  }
+  if (toolChoice.type === 'none' || toolChoice.type === 'auto') {
+    return toolChoice.type
+  }
+  console.warn(
+    `Unsupported toolChoice value: ${JSON.stringify(toolChoice)}. Defaulting to 'none'.`
+  )
+  return undefined
 }
 
 class MlcChatLanguageModel implements LanguageModelV2 {
@@ -108,8 +127,10 @@ class MlcChatLanguageModel implements LanguageModelV2 {
             }
           : undefined,
       tools: convertToolsToNativeFormat(options.tools || []),
-      toolChoice: options.toolChoice,
+      toolChoice: convertToolChoice(options.toolChoice),
     }
+
+    console.log(generationOptions)
 
     const text = await NativeMLCEngine.generateText(messages, generationOptions)
 
@@ -148,7 +169,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
             }
           : undefined,
       tools: convertToolsToNativeFormat(options.tools || []),
-      toolChoice: options.toolChoice,
+      toolChoice: convertToolChoice(options.toolChoice),
     }
 
     let streamId: string | null = null
