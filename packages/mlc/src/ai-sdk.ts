@@ -164,7 +164,9 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       },
       providerMetadata: {
         mlc: {
-          extraUsage: response.usage.extra,
+          extraUsage: {
+            ...response.usage.extra,
+          },
         },
       },
       warnings: [],
@@ -242,7 +244,9 @@ class MlcChatLanguageModel implements LanguageModelV2 {
               },
               providerMetadata: {
                 mlc: {
-                  extraUsage: data.usage.extra,
+                  extraUsage: {
+                    ...data.usage.extra,
+                  },
                 },
               },
             })

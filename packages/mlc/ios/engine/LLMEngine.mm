@@ -68,4 +68,8 @@
   return [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine request:options completion:completion];
 }
 
+- (void)cancelRequest:(NSString *)requestId {
+  [self.state cancelRequest:requestId withJSONFFIEngine:self.jsonFFIEngine];
+}
+
 @end

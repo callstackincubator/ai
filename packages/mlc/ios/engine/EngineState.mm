@@ -65,4 +65,9 @@
   }
 }
 
+- (void)cancelRequest:(NSString *)requestId withJSONFFIEngine:(JSONFFIEngine *)jsonFFIEngine {
+  [self.requestStateMap removeObjectForKey:requestId];
+  [jsonFFIEngine abort:requestId];
+}
+
 @end

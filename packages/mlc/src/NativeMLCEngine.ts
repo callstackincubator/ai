@@ -11,7 +11,7 @@ export interface Message {
   content: string
 }
 
-export interface CompletionUsageExtra extends Record<string, number> {
+export interface CompletionUsageExtra {
   ttft_s: number
   prefill_tokens_per_s: number
   prompt_tokens: number
@@ -99,13 +99,13 @@ export interface Spec extends TurboModule {
   ): Promise<GeneratedMessage>
 
   streamText(messages: Message[], options?: GenerationOptions): Promise<string>
-  cancelStream(streamId: string): Promise<string>
+  cancelStream(streamId: string): Promise<void>
 
-  downloadModel(modelId: string): Promise<string>
-  removeModel(modelId: string): Promise<string>
+  downloadModel(modelId: string): Promise<void>
+  removeModel(modelId: string): Promise<void>
 
-  prepareModel(modelId: string): Promise<string>
-  unloadModel(): Promise<string>
+  prepareModel(modelId: string): Promise<void>
+  unloadModel(): Promise<void>
 
   onChatUpdate: EventEmitter<ChatUpdateEvent>
   onChatComplete: EventEmitter<ChatCompleteEvent>

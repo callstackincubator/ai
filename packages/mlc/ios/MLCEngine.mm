@@ -470,7 +470,7 @@ using namespace facebook;
         return;
       }
       
-      resolve([NSString stringWithFormat:@"Model downloaded: %@", modelId]);
+      resolve(nil);
     } @catch (NSException* exception) {
       reject(@"MLCEngine", exception.reason, nil);
     }
@@ -482,33 +482,25 @@ using namespace facebook;
              reject:(RCTPromiseRejectBlock)reject {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     @try {
-      // Build path to model directory
       NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
       NSString* modelDirPath = [modelDirURL path];
       
-      NSLog(@"Cleaning downloaded model at path: %@", modelDirPath);
-      
-      // Check if directory exists
       BOOL isDirectory;
       if ([[NSFileManager defaultManager] fileExistsAtPath:modelDirPath isDirectory:&isDirectory]) {
         if (isDirectory) {
-          // Remove the entire model directory
           NSError* removeError;
           BOOL removed = [[NSFileManager defaultManager] removeItemAtPath:modelDirPath error:&removeError];
           
           if (removed) {
-            NSLog(@"Successfully cleaned model directory: %@", modelId);
-            resolve([NSString stringWithFormat:@"Model cleaned: %@", modelId]);
+            resolve(nil);
           } else {
-            NSLog(@"Failed to clean model directory: %@", removeError);
             reject(@"MLCEngine", [NSString stringWithFormat:@"Failed to clean model: %@", removeError.localizedDescription], removeError);
           }
         } else {
           reject(@"MLCEngine", @"Path exists but is not a directory", nil);
         }
       } else {
-        NSLog(@"Model directory does not exist, nothing to clean");
-        resolve(@"Model directory does not exist");
+        resolve(nil);
       }
     } @catch (NSException* exception) {
       reject(@"MLCEngine", exception.reason, nil);
@@ -519,7 +511,13 @@ using namespace facebook;
 - (void)unloadModel:(RCTPromiseResolveBlock)resolve
              reject:(RCTPromiseRejectBlock)reject {
   [self.engine unload];
-  resolve(@"Model unloaded successfully");
+  resolve(nil);
 }
+
+- (void)cancelStream:(nonnull NSString *)streamId resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject { 
+  [self.engine cancelRequest:streamId];
+  resolve(nil);
+}
+
 
 @end

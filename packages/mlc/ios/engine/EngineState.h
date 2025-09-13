@@ -17,6 +17,8 @@ NS_ASSUME_NONNULL_BEGIN
                                 request:(NSDictionary *)request
                              completion:(void (^)(NSDictionary* response))completion;
 - (void)streamCallbackWithResult:(NSString *)result;
+- (void)cancelRequest:(NSString *)requestId
+    withJSONFFIEngine:(JSONFFIEngine *)jsonFFIEngine;
 @end
 
 NS_ASSUME_NONNULL_END
