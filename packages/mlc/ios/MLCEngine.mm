@@ -147,63 +147,46 @@ using namespace facebook;
   return request;
 }
 
-- (NSDictionary*)parseResponseString:(NSString*)responseString {
-  NSData* jsonData = [responseString dataUsingEncoding:NSUTF8StringEncoding];
-  NSError* error;
-  NSArray* jsonArray = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
-  
-  if (error) {
-    NSLog(@"Error parsing JSON: %@", error);
-    return nil;
-  }
-  
-  if (jsonArray.count > 0) {
-    NSDictionary* responseDict = jsonArray[0];
-    NSArray* choices = responseDict[@"choices"];
-    if (choices.count > 0) {
-      NSDictionary* choice = choices[0];
-      NSDictionary* delta = choice[@"delta"];
-      NSString* content = delta[@"content"];
-      NSString* finishReason = choice[@"finish_reason"];
-      
-      BOOL isFinished = (finishReason != nil && ![finishReason isEqual:[NSNull null]]);
-      if (isFinished) {
-        
-      }
-      return @{@"content" : content ?: @"", @"isFinished" : @(isFinished)};
-    }
-  }
-  
-  return nil;
-}
-
 - (void)generateText:(NSArray<NSDictionary*>*)messages
              options:(JS::NativeMLCEngine::GenerationOptions &)options
              resolve:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject {
-  __block NSMutableString* displayText = [NSMutableString string];
-  __block BOOL hasResolved = NO;
-  
   NSDictionary *request = [self buildRequestWithMessages:messages options:options];
+  
+  NSMutableString* accumulatedContent = [NSMutableString new];
+  NSMutableArray* accumulatedToolCalls = [NSMutableArray new];
+  
+  __block NSString* finalFinishReason = nil;
+  __block NSString* finalRole = nil;
   
   [self.engine chatCompletionWithMessages:messages
                                   options:request
-                               completion:^(NSString* response) {
-    NSDictionary* parsedResponse = [self parseResponseString:response];
-    if (parsedResponse) {
-      NSString* content = parsedResponse[@"content"];
-      BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
-      if (content) {
-        [displayText appendString:content];
+                               completion:^(NSDictionary* response) {
+    if (response[@"usage"]) {
+      resolve(@{
+        @"role": finalRole,
+        @"content": accumulatedContent,
+        @"tool_calls": accumulatedToolCalls,
+        @"finish_reason": finalFinishReason,
+        @"usage": response[@"usage"],
+      });
+      return;
+    }
+    
+    NSDictionary* choice = response[@"choices"][0];
+    if (choice) {
+      NSDictionary* delta = choice[@"delta"];
+      if (delta[@"content"]) {
+        [accumulatedContent appendString:delta[@"content"]];
       }
-      if (isFinished && !hasResolved) {
-        hasResolved = YES;
-        resolve([displayText copy]);
+      if (delta[@"role"]) {
+        finalRole = delta[@"role"];
       }
-    } else {
-      if (!hasResolved) {
-        hasResolved = YES;
-        reject(@"MLCEngine", @"Failed to parse response", nil);
+      if (delta[@"tool_calls"]) {
+        [accumulatedToolCalls addObjectsFromArray:delta[@"tool_calls"]];
+      }
+      if (choice[@"finish_reason"]) {
+        finalFinishReason = choice[@"finish_reason"];
       }
     }
   }];
@@ -213,32 +196,36 @@ using namespace facebook;
            options:(JS::NativeMLCEngine::GenerationOptions &)options
            resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject {
-  __block BOOL hasResolved = NO;
   
   NSDictionary *request = [self buildRequestWithMessages:messages options:options];
   
-  [self.engine chatCompletionWithMessages:messages
-                                  options:request
-                               completion:^(NSString* response) {
-    NSDictionary* parsedResponse = [self parseResponseString:response];
-    if (parsedResponse) {
-      NSString* content = parsedResponse[@"content"];
-      BOOL isFinished = [parsedResponse[@"isFinished"] boolValue];
-      if (content) {
-        [self emitOnChatUpdate:@{@"content" : content}];
+  __block NSString* finalFinishReason = nil;
+  
+  @try {
+    NSString *requestId = [self.engine chatCompletionWithMessages:messages
+                                                          options:request
+                                                       completion:^(NSDictionary* response) {
+      if (response[@"usage"]) {
+        [self emitOnChatComplete:@{
+          @"usage": response[@"usage"],
+          @"finish_reason": finalFinishReason
+        }];
+        return;
       }
-      if (isFinished && !hasResolved) {
-        hasResolved = YES;
-        [self emitOnChatComplete:@{}];
-        resolve(@"");
+      
+      NSDictionary* choice = response[@"choices"][0];
+      if (choice[@"finish_reason"]) {
+        finalFinishReason = choice[@"finish_reason"];
       }
-    } else {
-      if (!hasResolved) {
-        hasResolved = YES;
-        reject(@"MLCEngine", @"Failed to parse response", nil);
-      }
-    }
-  }];
+      
+      [self emitOnChatUpdate:choice];
+    }];
+    
+    resolve(requestId);
+  } @catch (NSException* exception) {
+    reject(@"MLCEngine", exception.reason, nil);
+    return;
+  }
 }
 
 - (void)getModel:(NSString*)name

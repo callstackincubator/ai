@@ -15,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)reset;
 - (void)unload;
 
-- (void)chatCompletionWithMessages:(NSArray *)messages options:(NSDictionary *)options completion:(void (^)(id response))completion;
+- (NSString*)chatCompletionWithMessages:(NSArray *)messages options:(NSDictionary *)options completion:(void (^)(NSDictionary* response))completion;
 @end
 
 NS_ASSUME_NONNULL_END
