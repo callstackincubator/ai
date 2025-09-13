@@ -16,12 +16,25 @@ export interface ResponseFormat {
   schema?: string
 }
 
+export interface ChatFunctionTool {
+  name: string
+  description?: string
+  parameters: Record<string, string>
+}
+
+export interface ChatTool {
+  type: 'function'
+  function: ChatFunctionTool
+}
+
 export interface GenerationOptions {
   temperature?: number
   maxTokens?: number
   topP?: number
   topK?: number
   responseFormat?: ResponseFormat
+  tools?: ChatTool[]
+  toolChoice?: 'none' | 'auto'
 }
 
 export interface DownloadProgress {

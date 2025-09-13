@@ -1,8 +1,11 @@
 import type {
   LanguageModelV2,
   LanguageModelV2CallOptions,
+  LanguageModelV2FunctionTool,
   LanguageModelV2Prompt,
+  LanguageModelV2ProviderDefinedTool,
   LanguageModelV2StreamPart,
+  LanguageModelV2ToolChoice,
 } from '@ai-sdk/provider'
 
 import NativeMLCEngine, {
@@ -15,6 +18,47 @@ export const mlc = {
   languageModel: (modelId: string = 'Llama-3.2-3B-Instruct') => {
     return new MlcChatLanguageModel(modelId)
   },
+}
+
+const convertToolsToNativeFormat = (
+  tools: (LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool)[]
+) => {
+  return tools
+    .filter((tool) => tool.type === 'function')
+    .map((tool) => {
+      const parameters: Record<string, string> = {}
+      if (tool.inputSchema.properties) {
+        Object.entries(tool.inputSchema.properties).forEach(([key, value]) => {
+          if (!value) {
+            return
+          }
+          parameters[key] = (value as any)?.description || ''
+        })
+      }
+      return {
+        type: 'function' as const,
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters,
+        },
+      }
+    })
+}
+
+const convertToolChoice = (
+  toolChoice?: LanguageModelV2ToolChoice
+): 'none' | 'auto' | undefined => {
+  if (!toolChoice) {
+    return 'none'
+  }
+  if (toolChoice.type === 'none' || toolChoice.type === 'auto') {
+    return toolChoice.type
+  }
+  console.warn(
+    `Unsupported toolChoice value: ${JSON.stringify(toolChoice)}. Defaulting to 'none'.`
+  )
+  return undefined
 }
 
 class MlcChatLanguageModel implements LanguageModelV2 {
@@ -82,6 +126,8 @@ class MlcChatLanguageModel implements LanguageModelV2 {
               schema: JSON.stringify(options.responseFormat.schema),
             }
           : undefined,
+      tools: convertToolsToNativeFormat(options.tools || []),
+      toolChoice: convertToolChoice(options.toolChoice),
     }
 
     const text = await NativeMLCEngine.generateText(messages, generationOptions)
@@ -120,6 +166,8 @@ class MlcChatLanguageModel implements LanguageModelV2 {
               schema: JSON.stringify(options.responseFormat.schema),
             }
           : undefined,
+      tools: convertToolsToNativeFormat(options.tools || []),
+      toolChoice: convertToolChoice(options.toolChoice),
     }
 
     let streamId: string | null = null

@@ -111,8 +111,8 @@ using namespace facebook;
 }
 
 // Helper method to build complete request with messages and options
-- (NSDictionary*)buildRequestWithMessages:(NSArray*)messages options:(const JS::NativeMLCEngine::GenerationOptions &)options stream:(BOOL)stream {
-  NSMutableDictionary *request = [@{@"messages": messages, @"stream": @(stream)} mutableCopy];
+- (NSDictionary*)buildRequestWithMessages:(NSArray*)messages options:(const JS::NativeMLCEngine::GenerationOptions &)options {
+  NSMutableDictionary *request = [@{@"messages": messages, @"stream": @(YES)} mutableCopy];
   
   if (options.temperature().has_value()) {
     request[@"temperature"] = @(options.temperature().value());
@@ -136,6 +136,12 @@ using namespace facebook;
       responseFormatDict[@"schema"] = responseFormat.schema();
     }
     request[@"response_format"] = responseFormatDict;
+  }
+  if (options.tools()) {
+    request[@"tools"] = options.tools();
+  }
+  if (options.toolChoice()) {
+    request[@"tool_choice"] = options.toolChoice();
   }
   
   return request;
@@ -178,7 +184,7 @@ using namespace facebook;
   __block NSMutableString* displayText = [NSMutableString string];
   __block BOOL hasResolved = NO;
   
-  NSDictionary *request = [self buildRequestWithMessages:messages options:options stream:YES];
+  NSDictionary *request = [self buildRequestWithMessages:messages options:options];
   
   [self.engine chatCompletionWithMessages:messages
                                   options:request
@@ -209,7 +215,7 @@ using namespace facebook;
             reject:(RCTPromiseRejectBlock)reject {
   __block BOOL hasResolved = NO;
   
-  NSDictionary *request = [self buildRequestWithMessages:messages options:options stream:YES];
+  NSDictionary *request = [self buildRequestWithMessages:messages options:options];
   
   [self.engine chatCompletionWithMessages:messages
                                   options:request

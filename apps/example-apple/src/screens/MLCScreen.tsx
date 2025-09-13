@@ -36,6 +36,9 @@ export default function MLCScreen() {
 
     // Step 2: Create and prepare model
     const model = mlc.languageModel(modelId)
+    await model.download((event) => {
+      setStatusText(`Downloading model: ${event.status}`)
+    })
     setStatusText('Preparing model...')
     await model.prepare()
     setStatusText('Model ready')
