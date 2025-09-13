@@ -10,8 +10,6 @@ import {
 } from 'react-native'
 import { z } from 'zod'
 
-import { getCurrentTime } from '../tools'
-
 const identificationSchema = z.object({
   name: z.string().describe('The name or identity of the AI assistant'),
   description: z
@@ -98,33 +96,6 @@ export default function MLCScreen() {
     }
   }
 
-  const runToolCalling = async () => {
-    try {
-      setIsLoading(true)
-      setResponse('')
-
-      const model = await setupModel()
-
-      // Generate text with tools
-      setStatusText('Generating response with tool calling...')
-
-      const result = await generateText({
-        model,
-        prompt: 'What tools are available?',
-        tools: {
-          getCurrentTime,
-        },
-      })
-
-      setResponse(result.text)
-      setStatusText('Tool calling complete!')
-    } catch (error) {
-      setStatusText(`Error: ${error}`)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   return (
     <ScrollView className="flex-1 bg-gray-50">
       <View className="p-5">
@@ -160,21 +131,6 @@ export default function MLCScreen() {
             </Text>
             <Text className="text-white text-xs text-center mt-1">
               AI identifies itself with name & description
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className={`bg-purple-500 px-6 py-4 rounded-lg mb-3 ${
-              isLoading ? 'opacity-50' : ''
-            }`}
-            onPress={runToolCalling}
-            disabled={isLoading}
-          >
-            <Text className="text-white font-semibold text-center">
-              Test Tool Calling
-            </Text>
-            <Text className="text-white text-xs text-center mt-1">
-              AI uses getCurrentTime tool to answer questions
             </Text>
           </TouchableOpacity>
         </View>

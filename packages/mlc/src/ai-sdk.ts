@@ -130,8 +130,6 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       toolChoice: convertToolChoice(options.toolChoice),
     }
 
-    console.log(generationOptions)
-
     const text = await NativeMLCEngine.generateText(messages, generationOptions)
 
     return {
