@@ -1,7 +1,9 @@
 import type {
   LanguageModelV2,
   LanguageModelV2CallOptions,
+  LanguageModelV2FunctionTool,
   LanguageModelV2Prompt,
+  LanguageModelV2ProviderDefinedTool,
   LanguageModelV2StreamPart,
 } from '@ai-sdk/provider'
 
@@ -15,6 +17,29 @@ export const mlc = {
   languageModel: (modelId: string = 'Llama-3.2-3B-Instruct') => {
     return new MlcChatLanguageModel(modelId)
   },
+}
+
+const convertToolsToNativeFormat = (
+  tools: (LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool)[]
+) => {
+  return tools
+    .filter((tool) => tool.type === 'function')
+    .map((tool) => {
+      const parameters: Record<string, string> = {}
+      if (tool.inputSchema.properties) {
+        Object.entries(tool.inputSchema.properties).forEach(([key, value]) => {
+          if (!value) {
+            return
+          }
+          parameters[key] = (value as any)?.description || ''
+        })
+      }
+      return {
+        name: tool.name,
+        description: tool.description,
+        parameters,
+      }
+    })
 }
 
 class MlcChatLanguageModel implements LanguageModelV2 {
@@ -82,6 +107,8 @@ class MlcChatLanguageModel implements LanguageModelV2 {
               schema: JSON.stringify(options.responseFormat.schema),
             }
           : undefined,
+      tools: convertToolsToNativeFormat(options.tools || []),
+      toolChoice: options.toolChoice,
     }
 
     const text = await NativeMLCEngine.generateText(messages, generationOptions)
@@ -120,6 +147,8 @@ class MlcChatLanguageModel implements LanguageModelV2 {
               schema: JSON.stringify(options.responseFormat.schema),
             }
           : undefined,
+      tools: convertToolsToNativeFormat(options.tools || []),
+      toolChoice: options.toolChoice,
     }
 
     let streamId: string | null = null

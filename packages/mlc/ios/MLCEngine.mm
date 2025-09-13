@@ -137,6 +137,31 @@ using namespace facebook;
     }
     request[@"response_format"] = responseFormatDict;
   }
+  if (options.tools().has_value()) {
+    auto tools = options.tools().value();
+    NSMutableArray *toolsArray = [NSMutableArray array];
+    for (const auto& tool : tools) {
+      NSMutableDictionary *toolDict = [NSMutableDictionary dictionary];
+      toolDict[@"type"] = @"function";
+      
+      NSMutableDictionary *functionDict = [NSMutableDictionary dictionary];
+      if (tool.name()) {
+        functionDict[@"name"] = tool.name();
+      }
+      if (tool.description()) {
+        functionDict[@"description"] = tool.description();
+      }
+      if (tool.parameters()) {
+        functionDict[@"parameters"] = tool.parameters();
+      }
+      toolDict[@"function"] = functionDict;
+      [toolsArray addObject:toolDict];
+    }
+    request[@"tools"] = toolsArray;
+  }
+  if (options.toolChoice().has_value()) {
+    request[@"tool_choice"] = options.toolChoice().value();
+  }
   
   return request;
 }
