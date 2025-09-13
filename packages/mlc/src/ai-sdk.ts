@@ -1,6 +1,7 @@
 import type {
   LanguageModelV2,
   LanguageModelV2CallOptions,
+  LanguageModelV2FinishReason,
   LanguageModelV2FunctionTool,
   LanguageModelV2Prompt,
   LanguageModelV2ProviderDefinedTool,
@@ -10,6 +11,7 @@ import type {
 
 import NativeMLCEngine, {
   DownloadProgress,
+  type GeneratedMessage,
   type GenerationOptions,
   type Message,
 } from './NativeMLCEngine'
@@ -59,6 +61,15 @@ const convertToolChoice = (
     `Unsupported toolChoice value: ${JSON.stringify(toolChoice)}. Defaulting to 'none'.`
   )
   return undefined
+}
+
+const convertFinishReason = (
+  finishReason: GeneratedMessage['finish_reason']
+): LanguageModelV2FinishReason => {
+  if (finishReason === 'tool_calls') {
+    return 'tool-calls'
+  }
+  return finishReason
 }
 
 class MlcChatLanguageModel implements LanguageModelV2 {
@@ -130,16 +141,33 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       toolChoice: convertToolChoice(options.toolChoice),
     }
 
-    const text = await NativeMLCEngine.generateText(messages, generationOptions)
+    const response = await NativeMLCEngine.generateText(
+      messages,
+      generationOptions
+    )
 
     return {
-      content: [{ type: 'text' as const, text }],
-      finishReason: 'stop' as const,
-      // tbd: expose usage
+      content: [
+        { type: 'text' as const, text: response.content },
+        ...response.tool_calls.map((toolCall) => ({
+          type: 'tool-call' as const,
+          toolCallId: toolCall.id,
+          toolName: toolCall.function.name,
+          input: JSON.stringify(toolCall.function.arguments || {}),
+        })),
+      ],
+      finishReason: convertFinishReason(response.finish_reason),
       usage: {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
+        inputTokens: response.usage.prompt_tokens,
+        outputTokens: response.usage.completion_tokens,
+        totalTokens: response.usage.total_tokens,
+      },
+      providerMetadata: {
+        mlc: {
+          extraUsage: {
+            ...response.usage.extra,
+          },
+        },
       },
       warnings: [],
     }
@@ -170,7 +198,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       toolChoice: convertToolChoice(options.toolChoice),
     }
 
-    let streamId: string | null = null
+    let streamId: string | undefined
     let listeners: { remove(): void }[] = []
 
     const cleanup = () => {
@@ -181,42 +209,45 @@ class MlcChatLanguageModel implements LanguageModelV2 {
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
         try {
-          streamId = await NativeMLCEngine.streamText(
+          const id = (streamId = await NativeMLCEngine.streamText(
             messages,
             generationOptions
-          )
+          ))
 
           controller.enqueue({
             type: 'text-start',
-            id: streamId,
+            id,
           })
-
-          let previousContent = ''
 
           const updateListener = NativeMLCEngine.onChatUpdate((data) => {
             if (data.content) {
-              const delta = data.content.slice(previousContent.length)
               controller.enqueue({
                 type: 'text-delta',
-                delta,
-                id: streamId!,
+                delta: data.content,
+                id,
               })
-              previousContent = data.content
             }
           })
 
-          const completeListener = NativeMLCEngine.onChatComplete(() => {
+          const completeListener = NativeMLCEngine.onChatComplete((data) => {
             controller.enqueue({
               type: 'text-end',
-              id: streamId!,
+              id,
             })
             controller.enqueue({
               type: 'finish',
-              finishReason: 'stop',
+              finishReason: convertFinishReason(data.finish_reason),
               usage: {
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
+                inputTokens: data.usage.prompt_tokens,
+                outputTokens: data.usage.completion_tokens,
+                totalTokens: data.usage.total_tokens,
+              },
+              providerMetadata: {
+                mlc: {
+                  extraUsage: {
+                    ...data.usage.extra,
+                  },
+                },
               },
             })
             cleanup()
@@ -231,6 +262,9 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       },
       cancel() {
         cleanup()
+        if (streamId) {
+          NativeMLCEngine.cancelStream(streamId)
+        }
       },
     })
 

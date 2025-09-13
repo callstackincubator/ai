@@ -64,8 +64,12 @@
   [self.jsonFFIEngine unload];
 }
 
-- (void)chatCompletionWithMessages:(NSArray*)messages options:(NSDictionary*)options completion:(void (^)(id response))completion {
-  [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine request:options completion:completion];
+- (NSString*)chatCompletionWithMessages:(NSArray*)messages options:(NSDictionary*)options completion:(void (^)(NSDictionary* response))completion {
+  return [self.state chatCompletionWithJSONFFIEngine:self.jsonFFIEngine request:options completion:completion];
+}
+
+- (void)cancelRequest:(NSString *)requestId {
+  [self.state cancelRequest:requestId withJSONFFIEngine:self.jsonFFIEngine];
 }
 
 @end

@@ -11,9 +11,48 @@ export interface Message {
   content: string
 }
 
+export interface CompletionUsageExtra {
+  ttft_s: number
+  prefill_tokens_per_s: number
+  prompt_tokens: number
+  jump_forward_tokens: number
+  completion_tokens: number
+  end_to_end_latency_s: number
+  prefill_tokens: number
+  inter_token_latency_s: number
+  decode_tokens_per_s: number
+  decode_tokens: number
+}
+
+export interface CompletionUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  extra: CompletionUsageExtra
+}
+
+export interface GeneratedMessage {
+  role: 'assistant' | 'system' | 'tool' | 'user'
+  content: string
+  tool_calls: ChatToolCall[]
+  finish_reason: 'stop' | 'length' | 'tool_calls'
+  usage: CompletionUsage
+}
+
 export interface ResponseFormat {
   type: 'json_object' | 'text'
   schema?: string
+}
+
+export interface ChatFunctionCall {
+  name: string
+  arguments?: Record<string, string>
+}
+
+export interface ChatToolCall {
+  id: string
+  type: string
+  function: ChatFunctionCall
 }
 
 export interface ChatFunctionTool {
@@ -45,7 +84,10 @@ export interface ChatUpdateEvent {
   content: string
 }
 
-export interface ChatCompleteEvent {}
+export interface ChatCompleteEvent {
+  usage: CompletionUsage
+  finish_reason: 'stop' | 'length' | 'tool_calls'
+}
 
 export interface Spec extends TurboModule {
   getModel(name: string): Promise<ModelConfig>
@@ -54,14 +96,16 @@ export interface Spec extends TurboModule {
   generateText(
     messages: Message[],
     options?: GenerationOptions
-  ): Promise<string>
+  ): Promise<GeneratedMessage>
+
   streamText(messages: Message[], options?: GenerationOptions): Promise<string>
+  cancelStream(streamId: string): Promise<void>
 
-  downloadModel(modelId: string): Promise<string>
-  removeModel(modelId: string): Promise<string>
+  downloadModel(modelId: string): Promise<void>
+  removeModel(modelId: string): Promise<void>
 
-  prepareModel(modelId: string): Promise<string>
-  unloadModel(): Promise<string>
+  prepareModel(modelId: string): Promise<void>
+  unloadModel(): Promise<void>
 
   onChatUpdate: EventEmitter<ChatUpdateEvent>
   onChatComplete: EventEmitter<ChatCompleteEvent>

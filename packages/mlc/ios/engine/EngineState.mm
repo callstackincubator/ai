@@ -23,23 +23,26 @@
   return self;
 }
 
-- (void)chatCompletionWithJSONFFIEngine:(JSONFFIEngine*)jsonFFIEngine
+- (NSString*)chatCompletionWithJSONFFIEngine:(JSONFFIEngine*)jsonFFIEngine
                                 request:(NSDictionary*)request
-                             completion:(void (^)(id response))completion {
+                             completion:(void (^)(NSDictionary* response))completion {
   NSError* error;
   NSData* jsonData = [NSJSONSerialization dataWithJSONObject:request options:0 error:&error];
   if (error) {
-    NSLog(@"Error encoding JSON: %@", error);
-    return;
+    @throw [NSException exceptionWithName:@"JSONSerializationException"
+                                   reason:[NSString stringWithFormat:@"Failed to serialize request: %@",
+                                           error.localizedDescription]
+                                 userInfo:nil];
   }
 
   NSString* jsonRequest = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
   NSString* requestID = [[NSUUID UUID] UUIDString];
 
-  // Store the completion handler in the requestStateMap
   self.requestStateMap[requestID] = completion;
 
   [jsonFFIEngine chatCompletion:jsonRequest requestID:requestID];
+  
+  return requestID;
 }
 
 - (void)streamCallbackWithResult:(NSString*)result {
@@ -52,14 +55,19 @@
 
   for (NSDictionary* res in responses) {
     NSString* requestID = res[@"id"];
-    void (^completion)(NSString*) = self.requestStateMap[requestID];
+    void (^completion)(NSDictionary*) = self.requestStateMap[requestID];
     if (completion) {
-      completion(result);
+      completion(res);
       if (res[@"usage"]) {
         [self.requestStateMap removeObjectForKey:requestID];
       }
     }
   }
+}
+
+- (void)cancelRequest:(NSString *)requestId withJSONFFIEngine:(JSONFFIEngine *)jsonFFIEngine {
+  [self.requestStateMap removeObjectForKey:requestId];
+  [jsonFFIEngine abort:requestId];
 }
 
 @end
