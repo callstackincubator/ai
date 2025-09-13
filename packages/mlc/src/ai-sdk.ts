@@ -220,10 +220,10 @@ class MlcChatLanguageModel implements LanguageModelV2 {
           })
 
           const updateListener = NativeMLCEngine.onChatUpdate((data) => {
-            if (data.content) {
+            if (data.delta) {
               controller.enqueue({
                 type: 'text-delta',
-                delta: data.content,
+                delta: data.delta.content,
                 id,
               })
             }

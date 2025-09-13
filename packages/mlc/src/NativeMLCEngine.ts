@@ -6,8 +6,10 @@ export interface ModelConfig {
   model_id?: string
 }
 
+type MessageRole = 'assistant' | 'system' | 'tool' | 'user'
+
 export interface Message {
-  role: 'assistant' | 'system' | 'tool' | 'user'
+  role: MessageRole
   content: string
 }
 
@@ -32,7 +34,7 @@ export interface CompletionUsage {
 }
 
 export interface GeneratedMessage {
-  role: 'assistant' | 'system' | 'tool' | 'user'
+  role: MessageRole
   content: string
   tool_calls: ChatToolCall[]
   finish_reason: 'stop' | 'length' | 'tool_calls'
@@ -81,7 +83,10 @@ export interface DownloadProgress {
 }
 
 export interface ChatUpdateEvent {
-  content: string
+  delta: {
+    content: string
+    role: MessageRole
+  }
 }
 
 export interface ChatCompleteEvent {

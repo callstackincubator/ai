@@ -1,5 +1,5 @@
 import { mlc, MLCEngine } from '@react-native-ai/mlc'
-import { generateObject, generateText } from 'ai'
+import { generateObject, generateText, streamText } from 'ai'
 import React, { useState } from 'react'
 import {
   ActivityIndicator,
@@ -46,7 +46,7 @@ export default function MLCScreen() {
     return model
   }
 
-  const runFullWorkflow = async () => {
+  const runGenerateText = async () => {
     try {
       setIsLoading(true)
       setResponse('')
@@ -63,6 +63,33 @@ export default function MLCScreen() {
 
       setResponse(result.text)
       setStatusText('Complete!')
+    } catch (error) {
+      setStatusText(`Error: ${error}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const runStreamText = async () => {
+    try {
+      setIsLoading(true)
+      setResponse('')
+
+      const model = await setupModel()
+
+      // Stream text using AI SDK
+      setStatusText('Streaming response...')
+
+      const result = await streamText({
+        model,
+        prompt: 'Hello! Who are you? Please introduce yourself.',
+      })
+
+      for await (const textPart of result.textStream) {
+        setResponse((prev) => prev + textPart)
+      }
+
+      setStatusText('Streaming complete!')
     } catch (error) {
       setStatusText(`Error: ${error}`)
     } finally {
@@ -108,14 +135,29 @@ export default function MLCScreen() {
             className={`bg-blue-500 px-6 py-4 rounded-lg mb-3 ${
               isLoading ? 'opacity-50' : ''
             }`}
-            onPress={runFullWorkflow}
+            onPress={runGenerateText}
             disabled={isLoading}
           >
             <Text className="text-white font-semibold text-center">
-              Run Full Workflow
+              Generate Text
             </Text>
             <Text className="text-white text-xs text-center mt-1">
               Get models → Download → Prepare → Generate
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className={`bg-purple-500 px-6 py-4 rounded-lg mb-3 ${
+              isLoading ? 'opacity-50' : ''
+            }`}
+            onPress={runStreamText}
+            disabled={isLoading}
+          >
+            <Text className="text-white font-semibold text-center">
+              Stream Text
+            </Text>
+            <Text className="text-white text-xs text-center mt-1">
+              Same as above, but streaming incrementally
             </Text>
           </TouchableOpacity>
 
@@ -150,7 +192,9 @@ export default function MLCScreen() {
 
         {response !== '' && (
           <View className="bg-white p-4 rounded-lg border border-gray-200 mb-4">
-            <Text className="text-sm font-semibold mb-2">Response:</Text>
+            <Text className="text-sm font-semibold mb-2">
+              Generated Response:
+            </Text>
             <Text className="text-sm text-gray-800">{response}</Text>
           </View>
         )}
