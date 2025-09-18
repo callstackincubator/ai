@@ -21,11 +21,11 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "react": "19.0.0",
-    "react-native": "0.79.5"
+    "react": "19.1.0",
+    "react-native": "0.81.4"
   },
   "devDependencies": {
-    "react-native": "0.79.5"
+    "react-native": "0.81.4"
   },
   "react-native-builder-bob": {
     "source": "src",
