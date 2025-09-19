@@ -68,7 +68,7 @@
     },
     "packages/apple-llm": {
       "name": "@react-native-ai/apple",
-      "version": "0.6.0",
+      "version": "0.9.0",
       "dependencies": {
         "@ai-sdk/provider": "^2.0.0-beta.1",
         "@ai-sdk/provider-utils": "^3.0.0-beta.5",
@@ -84,7 +84,7 @@
     },
     "packages/mlc": {
       "name": "@react-native-ai/mlc",
-      "version": "0.6.0",
+      "version": "0.9.0",
       "dependencies": {
         "@ai-sdk/provider": "^2.0.0-beta.1",
         "@ai-sdk/provider-utils": "^3.0.0-beta.5",
@@ -94,9 +94,13 @@
         "react-native": "0.79.5",
       },
       "peerDependencies": {
+        "expo": "*",
         "react": "19.0.0",
         "react-native": "0.79.5",
       },
+      "optionalPeers": [
+        "expo",
+      ],
     },
   },
   "packages": {
@@ -2796,7 +2800,7 @@
 
     "fast-glob/glob-parent": ["glob-parent@5.1.2", "", { "dependencies": { "is-glob": "^4.0.1" } }, "sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow=="],
 
-    "fdir/picomatch": ["picomatch@3.0.1", "", {}, "sha512-I3EurrIQMlRc9IaAZnqRR044Phh2DXY+55o7uJ0V+hYZAcQYSuFWsc9q5PvyDHUSCe1Qxn/iBz+78s86zWnGag=="],
+    "fdir/picomatch": ["picomatch@4.0.2", "", {}, "sha512-M7BAV6Rlcy5u+m6oPhAPFgJTzAioX/6B0DxyvDlo9l8+T3nLKbrczg2WLUyzd45L8RqfUMyGPzekbMvX2Ldkwg=="],
 
     "fetch-blob/web-streams-polyfill": ["web-streams-polyfill@3.3.3", "", {}, "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw=="],
 

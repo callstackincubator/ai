@@ -1,42 +1,29 @@
-import * as path from 'node:path'
+import path from 'node:path'
+import url from 'node:url'
+import { withCallstackPreset } from '@callstack/rspress-preset'
 
-import { pluginCallstackTheme } from '@callstack/rspress-theme/plugin'
-import { defineConfig } from 'rspress/config'
+const __filename = url.fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-export default defineConfig({
-  root: path.join(__dirname, 'src'),
-  title: 'React Native AI',
-  icon: '/rspress-icon.png',
-  logo: {
-    light: '/logo-light.png',
-    dark: '/logo-dark.png',
-  },
-  globalStyles: path.join(__dirname, 'theme/styles.css'),
-  route: {
-    cleanUrls: true,
-  },
-  themeConfig: {
-    editLink: {
-      docRepoBaseUrl: 'https://github.com/callstackincubator/ai/blob/main/docs',
-      text: 'Edit this page on GitHub',
+export default withCallstackPreset(
+  {
+    context: __dirname,
+    docs: {
+      title: 'React Native AI',
+      description:
+        'react-native-ai brings on-device LLMs capabilities to mobile React Native apps',
+      rootUrl: 'https://react-native-ai.dev',
+      icon: '/rspress-icon.png',
+      logoLight: '/logo-light.png',
+      logoDark: '/logo-dark.png',
+      editUrl: 'https://github.com/callstackincubator/ai/edit/main/website/src',
+      rootDir: 'src',
+      socials: {
+        discord: 'https://discord.com/invite/dmDkGFNj9k',
+        github: 'https://github.com/callstackincubator/ai',
+        x: 'https://x.com/callstackio',
+      },
     },
-    socialLinks: [
-      {
-        icon: 'github',
-        mode: 'link',
-        content: 'https://github.com/callstackincubator/ai',
-      },
-      {
-        icon: 'X',
-        mode: 'link',
-        content: 'https://x.com/callstackio',
-      },
-      {
-        icon: 'discord',
-        mode: 'link',
-        content: 'https://discord.com/invite/dmDkGFNj9k',
-      },
-    ],
   },
-  plugins: [pluginCallstackTheme()],
-})
+  { outDir: 'build' }
+)
