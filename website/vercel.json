@@ -5,6 +5,6 @@
   "framework": null,
   "installCommand": "bun install --frozen-lockfile",
   "rewrites": [{ "source": "/(.*)", "destination": "/404.html" }],
-  "outputDirectory": "doc_build",
+  "outputDirectory": "build",
   "trailingSlash": false
-} 
+}
