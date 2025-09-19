@@ -15,7 +15,9 @@ This provider uses Apple's [`SpeechAnalyzer`](https://developer.apple.com/docume
 ### Basic Transcription
 
 ```tsx
-const file = await fetch('https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav')
+const file = await fetch(
+  'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
+)
 const audio = await file.arrayBuffer()
 
 const response = await experimental_transcribe({
@@ -43,9 +45,9 @@ await experimental_transcribe({
   audio: audioArrayBuffer,
   providerOptions: {
     apple: {
-      language: 'fr'
-    }
-  }
+      language: 'fr',
+    },
+  },
 })
 ```
 
@@ -91,9 +93,9 @@ const { segments, duration } = await AppleTranscription.transcribe(
 
 ## Benchmarks
 
-Performance comparison showing transcription speed for a 34-minute audio file ([source]((https://www.macrumors.com/2025/06/18/apple-transcription-api-faster-than-whisper/))):
+Performance comparison showing transcription speed for a 34-minute audio file ([source](https://www.macrumors.com/2025/06/18/apple-transcription-api-faster-than-whisper/)):
 
-| System | Processing Time | Performance |
-|--------|----------------|-------------|
-| Apple SpeechAnalyzer | 45 seconds | Baseline |
+| System                    | Processing Time     | Performance |
+| ------------------------- | ------------------- | ----------- |
+| Apple SpeechAnalyzer      | 45 seconds          | Baseline    |
 | MacWhisper Large V3 Turbo | 1 minute 41 seconds | 2.2× slower |
