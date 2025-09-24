@@ -1,5 +1,8 @@
 import { tool } from 'ai'
+import * as Battery from 'expo-battery'
 import * as Calendar from 'expo-calendar'
+import * as Contacts from 'expo-contacts'
+import { Alert, Linking } from 'react-native'
 import { z } from 'zod'
 
 /**
@@ -74,6 +77,133 @@ export const getCurrentTime = tool({
   description: 'Get current time and date',
   inputSchema: z.object({}),
   execute: async () => {
-    return `Current time is: ${new Date().toUTCString()}`
+    const now = new Date()
+    const currentDay = now.toDateString()
+    const currentTime = now.toTimeString()
+
+    return `Current day: ${currentDay}\nCurrent time: ${currentTime}`
+  },
+})
+
+/**
+ * Get device battery level
+ */
+export const getBatteryLevel = tool({
+  description: 'Get current battery level of the device',
+  inputSchema: z.object({}),
+  execute: async () => {
+    const batteryLevel = await Battery.getBatteryLevelAsync()
+    const batteryState = await Battery.getBatteryStateAsync()
+
+    const percentage = Math.round(batteryLevel * 100)
+    const state = Battery.BatteryState[batteryState]
+
+    return {
+      level: percentage,
+      state,
+      message: `Battery level: ${percentage}% (${state})`,
+    }
+  },
+})
+
+/**
+ * List all contacts from the device
+ */
+export const listContacts = tool({
+  description: 'List all contacts from the device with their basic information',
+  inputSchema: z.object({
+    limit: z
+      .number()
+      .optional()
+      .describe('Maximum number of contacts to return'),
+    fields: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Specific fields to retrieve (firstName, lastName, emails, phoneNumbers, etc.)'
+      ),
+  }),
+  execute: async ({ limit, fields }) => {
+    // Request permissions first
+    const { status } = await Contacts.requestPermissionsAsync()
+
+    if (status !== 'granted') {
+      return {
+        error: 'Contacts permission not granted',
+        contacts: [],
+        message: 'Permission to access contacts was denied',
+      }
+    }
+
+    // Define which fields to retrieve
+    const contactFields: Contacts.FieldType[] = fields
+      ? fields.map((field) => {
+          // Map common field names to Contacts.Fields constants
+          const fieldMap: Record<string, Contacts.FieldType> = {
+            firstName: Contacts.Fields.FirstName,
+            lastName: Contacts.Fields.LastName,
+            emails: Contacts.Fields.Emails,
+            phoneNumbers: Contacts.Fields.PhoneNumbers,
+            company: Contacts.Fields.Company,
+            jobTitle: Contacts.Fields.JobTitle,
+            name: Contacts.Fields.Name,
+          }
+          return fieldMap[field] || (field as Contacts.FieldType)
+        })
+      : [
+          Contacts.Fields.FirstName,
+          Contacts.Fields.LastName,
+          Contacts.Fields.Emails,
+          Contacts.Fields.PhoneNumbers,
+          Contacts.Fields.Company,
+        ]
+
+    try {
+      const { data } = await Contacts.getContactsAsync({
+        fields: contactFields,
+        pageSize: limit || 100,
+        pageOffset: 0,
+      })
+
+      const processedContacts = data.map((contact) => ({
+        id: contact.id,
+        firstName: contact.firstName || '',
+        lastName: contact.lastName || '',
+        name:
+          contact.name ||
+          `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+        emails: contact.emails?.map((email) => email.email) || [],
+        phoneNumbers: contact.phoneNumbers?.map((phone) => phone.number) || [],
+        company: contact.company || '',
+        jobTitle: contact.jobTitle || '',
+      }))
+
+      return {
+        contacts: processedContacts,
+        count: processedContacts.length,
+        message: `Found ${processedContacts.length} contacts`,
+      }
+    } catch (error) {
+      return {
+        error: 'Failed to retrieve contacts',
+        contacts: [],
+        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      }
+    }
+  },
+})
+
+/**
+ * Open email app with pre-filled recipient
+ */
+export const openEmail = tool({
+  description: 'Open email app',
+  inputSchema: z.object({
+    email: z.string().describe('Email address to send to'),
+    subject: z.string().optional().describe('Email subject line'),
+  }),
+  execute: async ({ email, subject }) => {
+    Linking.openURL(`mailto:${email}?subject=${subject}`)
+    return { message: 'Email app opened' }
   },
 })

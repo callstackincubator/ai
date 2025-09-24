@@ -34,6 +34,12 @@
           "calendarPermission": "The app needs to access your calendar."
         }
       ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts."
+        }
+      ],
       "react-native-bottom-tabs",
       [
         "expo-build-properties",

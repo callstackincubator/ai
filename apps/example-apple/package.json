@@ -25,6 +25,7 @@
     "expo-build-properties": "~0.14.8",
     "expo-calendar": "~14.1.4",
     "expo-clipboard": "~7.1.5",
+    "expo-contacts": "~14.2.5",
     "expo-document-picker": "~13.1.6",
     "expo-status-bar": "2.2.3",
     "nativewind": "^4.1.23",

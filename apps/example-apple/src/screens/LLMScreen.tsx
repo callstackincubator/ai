@@ -16,7 +16,10 @@ import Animated, { useDerivedValue } from 'react-native-reanimated'
 import {
   checkCalendarEvents,
   createCalendarEvent,
+  getBatteryLevel,
   getCurrentTime,
+  listContacts,
+  openEmail,
 } from '../tools'
 
 const apple = createAppleProvider({
@@ -24,6 +27,9 @@ const apple = createAppleProvider({
     getCurrentTime,
     createCalendarEvent,
     checkCalendarEvents,
+    getBatteryLevel,
+    listContacts,
+    openEmail,
   },
 })
 
@@ -78,6 +84,9 @@ export default function LLMScreen() {
           getCurrentTime,
           createCalendarEvent,
           checkCalendarEvents,
+          getBatteryLevel,
+          listContacts,
+          openEmail,
         },
       })
 
