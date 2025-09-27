@@ -78,7 +78,7 @@
         "react-native": "0.81.4",
       },
       "peerDependencies": {
-        "react-native": "^0.79.5",
+        "react-native": ">=0.76.0",
       },
     },
     "packages/mlc": {
@@ -94,7 +94,7 @@
       },
       "peerDependencies": {
         "expo": "*",
-        "react-native": "^0.79.5",
+        "react-native": ">=0.76.0",
       },
       "optionalPeers": [
         "expo",

@@ -93,7 +93,7 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "react-native": "^0.79.5",
+    "react-native": ">=0.76.0",
     "expo": "*"
   },
   "peerDependenciesMeta": {
