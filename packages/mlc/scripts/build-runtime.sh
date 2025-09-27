@@ -33,14 +33,19 @@ while [[ $# -gt 0 ]]; do
       echo "     brew install git-lfs && git lfs install"
       echo "  2. For iOS builds - Install Metal toolchain:"
       echo "     xcodebuild -downloadComponent MetalToolchain"
-      echo "  3. Clone MLC LLM repository with submodules:"
+      echo "  3. For Android builds - Install additional dependencies:"
+      echo "     - Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+      echo "     - Android Studio with NDK 27.0.11718014"
+      echo "     - JDK >= 17 (preferably Android Studio's bundled JBR)"
+      echo "     - Set environment variables: ANDROID_NDK, TVM_NDK_CC, JAVA_HOME, TVM_SOURCE_DIR"
+      echo "  4. Clone MLC LLM repository with submodules:"
       echo "     # Fresh clone (recommended):"
       echo "     git clone --recursive https://github.com/mlc-ai/mlc-llm.git"
       echo "     # Or if already cloned without --recursive:"
       echo "     cd mlc-llm && git submodule update --init --recursive"
-      echo "  4. Set environment variable:"
+      echo "  5. Set environment variable:"
       echo "     export MLC_LLM_SOURCE_DIR=/path/to/mlc-llm"
-      echo "  5. Install MLC Python package:"
+      echo "  6. Install MLC Python package:"
       echo "     pip install --pre -U -f https://mlc.ai/wheels mlc-llm-cpu mlc-ai-cpu"
       exit 0
       ;;
@@ -67,6 +72,7 @@ fi
 # Get script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
+BUILD_DIR="$PACKAGE_DIR/build"
 CONFIG_FILE="$PACKAGE_DIR/mlc-package-config-$PLATFORM.json"
 OUTPUT_DIR="$PACKAGE_DIR/prebuilt/$PLATFORM"
 
@@ -122,6 +128,109 @@ if [ ! -d "$MLC_LLM_SOURCE_DIR" ]; then
   exit 1
 fi
 
+# Android-specific checks
+if [ "$PLATFORM" = "android" ]; then
+  echo "Checking Android prerequisites..."
+  
+  # Check for Rust
+  if ! command -v rustc > /dev/null 2>&1 || ! command -v cargo > /dev/null 2>&1 || ! command -v rustup > /dev/null 2>&1; then
+    echo -e "${RED}Error: Rust toolchain not found${NC}"
+    echo ""
+    echo "Rust is required to cross-compile HuggingFace tokenizers to Android."
+    echo "Please install Rust from https://rustup.rs/ and ensure rustc, cargo, and rustup are in \$PATH"
+    exit 1
+  fi
+  
+  # Check for ANDROID_NDK
+  if [ -z "$ANDROID_NDK" ]; then
+    echo -e "${RED}Error: ANDROID_NDK environment variable not set${NC}"
+    echo ""
+    echo "Please install Android Studio with NDK and set up environment variables:"
+    echo "  1. Install Android Studio from https://developer.android.com/studio"
+    echo "  2. Install NDK via SDK Manager → SDK Tools → NDK"
+    echo "  3. Set ANDROID_NDK environment variable:"
+    echo ""
+    echo "Example paths:"
+    echo "  macOS:   export ANDROID_NDK=\$HOME/Library/Android/sdk/ndk/27.0.11718014"
+    echo "  Linux:   export ANDROID_NDK=\$HOME/Android/Sdk/ndk/27.0.11718014"
+    echo "  Windows: export ANDROID_NDK=%HOME%/AppData/Local/Android/Sdk/ndk/27.0.11718014"
+    exit 1
+  fi
+  
+  if [ ! -d "$ANDROID_NDK" ]; then
+    echo -e "${RED}Error: ANDROID_NDK directory does not exist: $ANDROID_NDK${NC}"
+    exit 1
+  fi
+  
+  if [ ! -f "$ANDROID_NDK/build/cmake/android.toolchain.cmake" ]; then
+    echo -e "${RED}Error: Android NDK toolchain not found at: $ANDROID_NDK/build/cmake/android.toolchain.cmake${NC}"
+    echo "Please ensure you have installed the correct NDK version."
+    exit 1
+  fi
+  
+  # Check for TVM_NDK_CC
+  if [ -z "$TVM_NDK_CC" ]; then
+    echo -e "${RED}Error: TVM_NDK_CC environment variable not set${NC}"
+    echo ""
+    echo "Please set TVM_NDK_CC to point to NDK's clang compiler:"
+    echo ""
+    echo "Example paths:"
+    echo "  macOS:   export TVM_NDK_CC=\$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android24-clang"
+    echo "  Linux:   export TVM_NDK_CC=\$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+    echo "  Windows: export TVM_NDK_CC=\$ANDROID_NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android24-clang"
+    exit 1
+  fi
+  
+  if [ ! -f "$TVM_NDK_CC" ]; then
+    echo -e "${RED}Error: TVM_NDK_CC compiler not found: $TVM_NDK_CC${NC}"
+    exit 1
+  fi
+  
+  # Check for JAVA_HOME
+  if [ -z "$JAVA_HOME" ]; then
+    echo -e "${RED}Error: JAVA_HOME environment variable not set${NC}"
+    echo ""
+    echo "Please install JDK >= 17 and set JAVA_HOME:"
+    echo "We recommend using the JDK bundled with Android Studio:"
+    echo ""
+    echo "Example paths:"
+    echo "  macOS: export JAVA_HOME=/Applications/Android\\ Studio.app/Contents/jbr/Contents/Home"
+    echo "  Linux: export JAVA_HOME=/opt/android-studio/jbr"
+    echo ""
+    echo "Make sure \$JAVA_HOME/bin/java exists and JDK version matches Android Studio's JBR."
+    exit 1
+  fi
+  
+  if [ ! -f "$JAVA_HOME/bin/java" ]; then
+    echo -e "${RED}Error: Java binary not found: $JAVA_HOME/bin/java${NC}"
+    echo "Please verify your JAVA_HOME path is correct."
+    exit 1
+  fi
+  
+  # Check Java version (should be >= 17)
+  JAVA_VERSION=$("$JAVA_HOME/bin/java" -version 2>&1 | grep -oP 'version "([0-9]+)' | grep -oP '[0-9]+' | head -1)
+  if [ -n "$JAVA_VERSION" ] && [ "$JAVA_VERSION" -gt 0 ] 2>/dev/null && [ "$JAVA_VERSION" -lt 17 ]; then
+    echo -e "${YELLOW}Warning: Java version is $JAVA_VERSION, but >= 17 is recommended${NC}"
+  fi
+  
+  # Check for TVM_SOURCE_DIR
+  if [ -z "$TVM_SOURCE_DIR" ]; then
+    echo -e "${RED}Error: TVM_SOURCE_DIR environment variable not set${NC}"
+    echo ""
+    echo "Please set TVM_SOURCE_DIR to point to the TVM runtime:"
+    echo "  export TVM_SOURCE_DIR=$MLC_LLM_SOURCE_DIR/3rdparty/tvm"
+    exit 1
+  fi
+  
+  if [ ! -d "$TVM_SOURCE_DIR" ]; then
+    echo -e "${RED}Error: TVM_SOURCE_DIR directory does not exist: $TVM_SOURCE_DIR${NC}"
+    echo "Expected path: $MLC_LLM_SOURCE_DIR/3rdparty/tvm"
+    exit 1
+  fi
+  
+  echo -e "${GREEN}✅ Android prerequisites verified${NC}"
+fi
+
 # Check for submodules
 if [ ! -f "$MLC_LLM_SOURCE_DIR/3rdparty/tvm/CMakeLists.txt" ] || [ ! -f "$MLC_LLM_SOURCE_DIR/3rdparty/tokenizers-cpp/CMakeLists.txt" ]; then
   echo -e "${RED}Error: MLC LLM submodules not initialized${NC}"
@@ -143,6 +252,26 @@ if ! python3 -m mlc_llm --help > /dev/null 2>&1; then
   echo "Please install MLC:"
   echo "  pip install --pre -U -f https://mlc.ai/wheels mlc-llm-cpu mlc-ai-cpu"
   exit 1
+fi
+
+# Check for conflicting build artifacts from other platforms
+if [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
+  # Check if this is an Xcode/iOS build when building for Android
+  if [ "$PLATFORM" = "android" ] && grep -q "Xcode" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
+    echo -e "${YELLOW}Warning: Detected Xcode/iOS build artifacts in $BUILD_DIR${NC}"
+    echo "This can cause CMake cache conflicts for Android builds."
+    echo "Cleaning build directory..."
+    rm -rf "$BUILD_DIR"
+    echo -e "${GREEN}Build directory cleaned${NC}"
+  fi
+  # Check if this is an Android build when building for iOS
+  if [ "$PLATFORM" = "ios" ] && grep -q "Android" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
+    echo -e "${YELLOW}Warning: Detected Android build artifacts in $BUILD_DIR${NC}"
+    echo "This can cause CMake cache conflicts for iOS builds."
+    echo "Cleaning build directory..."
+    rm -rf "$BUILD_DIR"
+    echo -e "${GREEN}Build directory cleaned${NC}"
+  fi
 fi
 
 # Create output directory
