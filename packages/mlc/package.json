@@ -61,7 +61,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
-    "react-native": "0.79.5"
+    "react-native": "0.81.4"
   },
   "react-native-builder-bob": {
     "source": "src",
@@ -88,13 +88,12 @@
     }
   },
   "dependencies": {
-    "@ai-sdk/provider": "^2.0.0-beta.1",
-    "@ai-sdk/provider-utils": "^3.0.0-beta.5",
+    "@ai-sdk/provider": "^2.0.0",
+    "@ai-sdk/provider-utils": "^3.0.10",
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "react": "19.0.0",
-    "react-native": "0.79.5",
+    "react-native": ">=0.76.0",
     "expo": "*"
   },
   "peerDependenciesMeta": {

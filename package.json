@@ -14,8 +14,8 @@
   "devDependencies": {
     "@babel/plugin-transform-strict-mode": "^7.27.1",
     "@commitlint/config-conventional": "^17.0.2",
-    "@react-native/babel-preset": "^0.80.1",
-    "@react-native/typescript-config": "^0.80.1",
+    "@react-native/babel-preset": "^0.81.4",
+    "@react-native/typescript-config": "^0.81.4",
     "@release-it-plugins/workspaces": "^4.2.0",
     "@release-it/conventional-changelog": "^5.0.0",
     "@typescript-eslint/eslint-plugin": "^7.3.1",
