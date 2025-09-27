@@ -88,8 +88,8 @@
     }
   },
   "dependencies": {
-    "@ai-sdk/provider": "^2.0.0-beta.1",
-    "@ai-sdk/provider-utils": "^3.0.0-beta.5",
+    "@ai-sdk/provider": "^2.0.0",
+    "@ai-sdk/provider-utils": "^3.0.10",
     "zod": "^4.0.0"
   },
   "peerDependencies": {

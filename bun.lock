@@ -39,7 +39,7 @@
         "@react-navigation/native": "^7.1.16",
         "@react-navigation/native-stack": "^7.3.25",
         "@ungap/structured-clone": "^1.3.0",
-        "ai": "^5.0.0-beta.25",
+        "ai": "^5.0.56",
         "expo": "^54.0.8",
         "expo-battery": "~10.0.7",
         "expo-build-properties": "~1.0.8",
@@ -70,8 +70,8 @@
       "name": "@react-native-ai/apple",
       "version": "0.9.0",
       "dependencies": {
-        "@ai-sdk/provider": "^2.0.0-beta.1",
-        "@ai-sdk/provider-utils": "^3.0.0-beta.5",
+        "@ai-sdk/provider": "^2.0.0",
+        "@ai-sdk/provider-utils": "^3.0.10",
         "zod": "^4.0.0",
       },
       "devDependencies": {
@@ -85,8 +85,8 @@
       "name": "@react-native-ai/mlc",
       "version": "0.9.0",
       "dependencies": {
-        "@ai-sdk/provider": "^2.0.0-beta.1",
-        "@ai-sdk/provider-utils": "^3.0.0-beta.5",
+        "@ai-sdk/provider": "^2.0.0",
+        "@ai-sdk/provider-utils": "^3.0.10",
         "zod": "^4.0.0",
       },
       "devDependencies": {
