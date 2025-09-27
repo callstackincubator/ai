@@ -209,7 +209,7 @@ if [ "$PLATFORM" = "android" ]; then
   
   # Check Java version (should be >= 17)
   JAVA_VERSION=$("$JAVA_HOME/bin/java" -version 2>&1 | grep -oP 'version "([0-9]+)' | grep -oP '[0-9]+' | head -1)
-  if [ -n "$JAVA_VERSION" ] && [ "$JAVA_VERSION" -lt 17 ]; then
+  if [ -n "$JAVA_VERSION" ] && [ "$JAVA_VERSION" -gt 0 ] 2>/dev/null && [ "$JAVA_VERSION" -lt 17 ]; then
     echo -e "${YELLOW}Warning: Java version is $JAVA_VERSION, but >= 17 is recommended${NC}"
   fi
   
