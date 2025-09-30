@@ -1,5 +1,7 @@
+import com.android.Version
+
 buildscript {
-  def kotlin_version = rootProject.ext.has("kotlinVersion") ? rootProject.ext.get("kotlinVersion") : project.properties["Ai_kotlinVersion"]
+  def kotlin_version = rootProject.ext.has("kotlinVersion") ? rootProject.ext.get("kotlinVersion") : project.properties["MLC_kotlinVersion"]
 
   repositories {
     google()
@@ -12,45 +14,34 @@ buildscript {
   }
 }
 
-def reactNativeArchitectures() {
-  def value = rootProject.getProperties().get("reactNativeArchitectures")
-  return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
-}
-
-def isNewArchitectureEnabled() {
-  return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
-}
-
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
-
-if (isNewArchitectureEnabled()) {
-  apply plugin: "com.facebook.react"
-}
+apply plugin: "com.facebook.react"
 
 def getExtOrDefault(name) {
-  return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties["Ai_" + name]
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties["MLC_" + name]
 }
 
 def getExtOrIntegerDefault(name) {
-  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Ai_" + name]).toInteger()
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["MLC_" + name]).toInteger()
 }
 
-def supportsNamespace() {
-  def parsed = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')
+static def supportsNamespace() {
+  def parsed = Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')
   def major = parsed[0].toInteger()
   def minor = parsed[1].toInteger()
+
+  // Namespace support was added in 7.3.0
   return (major == 7 && minor >= 3) || major >= 8
 }
 
-
 android {
   if (supportsNamespace()) {
-    namespace "com.ai"
-    
+    namespace "com.reactnativeai"
+
     sourceSets {
       main {
-        manifest.srcFile "src/main/AndroidManifestNew.xml"
+        manifest.srcFile "src/main/AndroidManifest.xml"
       }
     }
   }
@@ -60,7 +51,6 @@ android {
   defaultConfig {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
-    buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
   }
 
   buildFeatures {
@@ -84,20 +74,13 @@ android {
 
   sourceSets {
     main {
-      if (isNewArchitectureEnabled()) {
-        java.srcDirs += [
-          "src/newarch",
-          "${project.buildDir}/generated/source/codegen/java"
-        ]
-      } else {
-        java.srcDirs += ["src/oldarch"]
-      }
-      
-      // Include prebuilt native libraries
-      jniLibs.srcDirs += ["${projectDir}/../prebuilt/android/jniLibs"]
-      
-      // Include prebuilt model assets
-      assets.srcDirs += ["${projectDir}/../prebuilt/android/models"]
+      java.srcDirs += [
+        "src",
+        "generated/java",
+        "generated/jni",
+        "../prebuilt/android/lib/mlc4j/src/main/java"
+      ]
+      jniLibs.srcDirs += ["../prebuilt/android/lib/mlc4j/output"]
     }
   }
 }
@@ -112,34 +95,16 @@ def kotlin_version = getExtOrDefault("kotlinVersion")
 dependencies {
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+
+  // Dependencies
   implementation 'com.google.code.gson:gson:2.10.1'
-  
-  // Use prebuilt MLC runtime AAR (no more mlc4j project dependency!)
-  implementation files("${projectDir}/../prebuilt/android/mlc-runtime.aar")
-  
-  // UI dependencies
-  implementation 'androidx.core:core-ktx:1.10.1'
-  implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
-  implementation 'com.github.jeziellago:compose-markdown:0.5.2'
-  implementation 'androidx.activity:activity-compose:1.7.1'
-  implementation platform('androidx.compose:compose-bom:2022.10.00')
-  implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1'
-  implementation 'androidx.compose.material3:material3:1.1.0'
-  implementation 'androidx.compose.material:material-icons-extended'
-  implementation 'androidx.appcompat:appcompat:1.6.1'
-  implementation 'androidx.navigation:navigation-compose:2.5.3'
-  
-  // Testing
-  testImplementation 'junit:junit:4.13.2'
-  androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-  androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-  androidTestImplementation platform('androidx.compose:compose-bom:2022.10.00')
+
+  // MLC4J dependency
+  implementation files('../prebuilt/android/lib/mlc4j/output/tvm4j_core.jar')
 }
 
-if (isNewArchitectureEnabled()) {
-  react {
-    jsRootDir = file("../src/")
-    libraryName = "Ai"
-    codegenJavaPackageName = "com.ai"
-  }
+react {
+  jsRootDir = file("../src/")
+  libraryName = "MLC"
+  codegenJavaPackageName = "com.reactnativeai"
 }

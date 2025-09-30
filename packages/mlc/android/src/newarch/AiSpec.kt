@@ -1,4 +1,4 @@
-package com.ai
+package com.reactnativeai
 
 import com.facebook.react.bridge.ReactApplicationContext
 

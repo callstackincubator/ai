@@ -85,6 +85,9 @@
       "modulesProvider": {
         "NativeMLCEngine": "MLCEngine"
       }
+    },
+    "android": {
+      "javaPackageName": "com.reactnativeai"
     }
   },
   "dependencies": {

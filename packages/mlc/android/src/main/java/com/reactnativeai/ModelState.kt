@@ -1,9 +1,8 @@
-package com.ai
+package com.reactnativeai
 
-import androidx.compose.runtime.mutableIntStateOf
-import com.ai.AiModule.Companion.MODEL_CONFIG_FILENAME
-import com.ai.AiModule.Companion.MODEL_URL_SUFFIX
-import com.ai.AiModule.Companion.PARAMS_CONFIG_FILENAME
+import com.reactnativeai.NativeMLCEngineModule.Companion.MODEL_CONFIG_FILENAME
+import com.reactnativeai.NativeMLCEngineModule.Companion.MODEL_URL_SUFFIX
+import com.reactnativeai.NativeMLCEngineModule.Companion.PARAMS_CONFIG_FILENAME
 import com.google.gson.Gson
 import java.io.File
 import java.io.FileOutputStream
@@ -17,7 +16,7 @@ import kotlinx.coroutines.withContext
 class ModelState(private val modelConfig: ModelConfig, private val modelDir: File) {
   private var paramsConfig = ParamsConfig(emptyList())
   val progress = MutableStateFlow(0)
-  val total = mutableIntStateOf(1)
+  val total = MutableStateFlow(1)
   val id: UUID = UUID.randomUUID()
   private val remainingTasks = emptySet<DownloadTask>().toMutableSet()
   private val downloadingTasks = emptySet<DownloadTask>().toMutableSet()
@@ -113,7 +112,7 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
 
   private fun indexModel() {
     progress.value = 0
-    total.intValue = modelConfig.tokenizerFiles.size + paramsConfig.paramsRecords.size
+    total.value = modelConfig.tokenizerFiles.size + paramsConfig.paramsRecords.size
 
     // Adding Tokenizer to download tasks
     for (tokenizerFilename in modelConfig.tokenizerFiles) {
