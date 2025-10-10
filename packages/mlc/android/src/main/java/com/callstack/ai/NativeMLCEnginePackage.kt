@@ -1,4 +1,4 @@
-package com.reactnativeai
+package com.callstack.ai
 
 import com.facebook.react.BaseReactPackage
 

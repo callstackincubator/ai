@@ -11,11 +11,13 @@ buildscript {
   dependencies {
     classpath "com.android.tools.build:gradle:7.2.1"
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    classpath "org.jetbrains.kotlin:kotlin-serialization:$kotlin_version"
   }
 }
 
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
+apply plugin: "kotlinx-serialization"
 apply plugin: "com.facebook.react"
 
 def getExtOrDefault(name) {
@@ -37,7 +39,7 @@ static def supportsNamespace() {
 
 android {
   if (supportsNamespace()) {
-    namespace "com.reactnativeai"
+    namespace "com.callstack.ai"
 
     sourceSets {
       main {
@@ -80,6 +82,7 @@ android {
         "generated/jni",
         "../prebuilt/android/lib/mlc4j/src/main/java"
       ]
+      assets.srcDirs += ["../prebuilt/android/lib/mlc4j/src/main/assets"]
       jniLibs.srcDirs += ["../prebuilt/android/lib/mlc4j/output"]
     }
   }
@@ -97,7 +100,7 @@ dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
   // Dependencies
-  implementation 'com.google.code.gson:gson:2.10.1'
+  implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
 
   // MLC4J dependency
   implementation files('../prebuilt/android/lib/mlc4j/output/tvm4j_core.jar')
@@ -106,5 +109,5 @@ dependencies {
 react {
   jsRootDir = file("../src/")
   libraryName = "MLC"
-  codegenJavaPackageName = "com.reactnativeai"
+  codegenJavaPackageName = "com.callstack.ai"
 }

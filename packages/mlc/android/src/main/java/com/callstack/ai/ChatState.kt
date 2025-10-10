@@ -1,4 +1,4 @@
-package com.reactnativeai
+package com.callstack.ai
 
 import ai.mlc.mlcllm.MLCEngine
 import ai.mlc.mlcllm.OpenAIProtocol
@@ -18,7 +18,7 @@ class Chat(modelConfig: ModelConfig, modelDir: File) {
 
   init {
     engine.unload()
-    engine.reload(modelDir.path, modelConfig.modelLib)
+    engine.reload(modelDir.path, modelConfig.model_lib)
   }
 
   fun generateResponse(

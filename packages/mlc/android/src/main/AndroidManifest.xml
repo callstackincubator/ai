@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="com.reactnativeai">
+          package="com.callstack.ai">
   <!-- <application>
     <uses-native-library
       android:name="libOpenCL.so"

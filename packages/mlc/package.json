@@ -87,7 +87,7 @@
       }
     },
     "android": {
-      "javaPackageName": "com.reactnativeai"
+      "javaPackageName": "com.callstack.ai"
     }
   },
   "dependencies": {

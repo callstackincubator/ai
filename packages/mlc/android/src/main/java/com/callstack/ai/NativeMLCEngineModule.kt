@@ -1,4 +1,4 @@
-package com.reactnativeai
+package com.callstack.ai
 
 import ai.mlc.mlcllm.OpenAIProtocol
 import ai.mlc.mlcllm.OpenAIProtocol.ChatCompletionMessage
@@ -6,8 +6,10 @@ import android.os.Environment
 import android.util.Log
 import com.facebook.react.bridge.*
 import com.facebook.react.bridge.ReactContext.RCTDeviceEventEmitter
-import com.google.gson.Gson
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
@@ -30,30 +32,18 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     const val MODEL_URL_SUFFIX = "/resolve/main/"
   }
 
-  private var appConfig = AppConfig(
-    emptyList<String>().toMutableList(),
-    emptyList<ModelRecord>().toMutableList()
-  )
-
-  private val gson = Gson()
+  private val json = Json { ignoreUnknownKeys = true }
   private lateinit var chat: Chat
 
-  private fun getAppConfig(): AppConfig {
-    val appConfigFile = File(reactApplicationContext.applicationContext.getExternalFilesDir(""), APP_CONFIG_FILENAME)
-
-    val jsonString: String = if (appConfigFile.exists()) {
-      appConfigFile.readText()
-    } else {
-      reactApplicationContext.applicationContext.assets.open(APP_CONFIG_FILENAME).bufferedReader().use { it.readText() }
-    }
-
-    return gson.fromJson(jsonString, AppConfig::class.java)
+  private val appConfig by lazy {
+    val jsonString = reactApplicationContext.applicationContext.assets.open(APP_CONFIG_FILENAME).bufferedReader().use { it.readText() }
+    json.decodeFromString<AppConfig>(jsonString)
   }
 
   private suspend fun getModelConfig(modelRecord: ModelRecord): ModelConfig {
     downloadModelConfig(modelRecord)
 
-    val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.modelId)
+    val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
     val modelConfigFile = File(modelDirFile, MODEL_CONFIG_FILENAME)
 
     val jsonString: String = if (modelConfigFile.exists()) {
@@ -62,21 +52,11 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
       throw Error("Requested model config not found")
     }
 
-    val modelConfig = gson.fromJson(jsonString, ModelConfig::class.java)
-
-    modelConfig.apply {
-      modelId = modelRecord.modelId
-      modelUrl = modelRecord.modelUrl
-      modelLib = modelRecord.modelLib
-    }
-
-    return modelConfig
+    return json.decodeFromString<ModelConfig>(jsonString)
   }
 
   override fun getModel(name: String, promise: Promise) {
-    appConfig = getAppConfig()
-
-    val modelConfig = appConfig.modelList.find { modelRecord -> modelRecord.modelId == name }
+    val modelConfig = appConfig.model_list.find { modelRecord -> modelRecord.model_id == name }
 
     if (modelConfig == null) {
       promise.reject("Model not found", "Didn't find the model")
@@ -84,27 +64,14 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     }
 
     val modelConfigInstance = Arguments.createMap().apply {
-      putString("model_id", modelConfig.modelId)
+      putString("model_id", modelConfig.model_id)
     }
 
     promise.resolve(modelConfigInstance)
   }
 
   override fun getModels(promise: Promise) {
-    try {
-      appConfig = getAppConfig()
-      appConfig.modelLibs = emptyList<String>().toMutableList()
-
-      val modelsArray = Arguments.createArray().apply {
-        for (modelRecord in appConfig.modelList) {
-          pushMap(Arguments.createMap().apply { putString("model_id", modelRecord.modelId) })
-        }
-      }
-
-      promise.resolve(modelsArray)
-    } catch (e: Exception) {
-      promise.reject("JSON_ERROR", "Error creating JSON array", e)
-    }
+    promise.resolve(Arguments.fromList(appConfig.model_list))
   }
 
   override fun generateText(
@@ -194,15 +161,14 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   override fun downloadModel(instanceId: String, promise: Promise) {
     CoroutineScope(Dispatchers.IO).launch {
       try {
-        val appConfig = getAppConfig()
-        val modelRecord = appConfig.modelList.find { modelRecord -> modelRecord.modelId == instanceId }
+        val modelRecord = appConfig.model_list.find { modelRecord -> modelRecord.model_id == instanceId }
         if (modelRecord == null) {
           throw Error("There's no record for requested model")
         }
 
         val modelConfig = getModelConfig(modelRecord)
 
-        val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
+        val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
 
         val modelState = ModelState(modelConfig, modelDir)
 
@@ -213,7 +179,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
         CoroutineScope(Dispatchers.IO).launch {
           modelState.progress.collect { newValue ->
             val event: WritableMap = Arguments.createMap().apply {
-              putDouble("percentage", (newValue.toDouble() / modelState.total.intValue) * 100)
+              putDouble("percentage", (newValue.toDouble() / modelState.total.value) * 100)
             }
             sendEvent("onDownloadProgress", event)
           }
@@ -235,6 +201,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     TODO("Not yet implemented")
   }
 
+  // tbd
   private fun sendEvent(eventName: String, data: Any?) {
     reactApplicationContext.getJSModule(RCTDeviceEventEmitter::class.java)?.emit(eventName, data)
   }
@@ -242,16 +209,14 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   override fun prepareModel(instanceId: String, promise: Promise) {
     CoroutineScope(Dispatchers.IO).launch {
       try {
-        val appConfig = getAppConfig()
-
-        val modelRecord = appConfig.modelList.find { modelRecord -> modelRecord.modelId == instanceId }
+        val modelRecord = appConfig.model_list.find { modelRecord -> modelRecord.model_id == instanceId }
 
         if (modelRecord == null) {
           throw Error("There's no record for requested model")
         }
         val modelConfig = getModelConfig(modelRecord)
 
-        val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
+        val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
 
         val modelState = ModelState(modelConfig, modelDir)
         modelState.initialize()
@@ -273,13 +238,13 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   private suspend fun downloadModelConfig(modelRecord: ModelRecord) {
     withContext(Dispatchers.IO) {
       // Don't download if config is downloaded already
-      val modelFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.modelId)
+      val modelFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
       if (modelFile.exists()) {
         return@withContext
       }
 
       // Prepare temp file for streaming
-      val url = URL("${modelRecord.modelUrl}${MODEL_URL_SUFFIX}$MODEL_CONFIG_FILENAME")
+      val url = URL("${modelRecord.model_url}${MODEL_URL_SUFFIX}$MODEL_CONFIG_FILENAME")
       val tempId = UUID.randomUUID().toString()
       val tempFile = File(
         reactApplicationContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
@@ -296,16 +261,8 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
       }
       require(tempFile.exists())
 
-      // Create object form config
-      val modelConfigString = tempFile.readText()
-      val modelConfig = gson.fromJson(modelConfigString, ModelConfig::class.java).apply {
-        modelId = modelRecord.modelId
-        modelLib = modelRecord.modelLib
-        estimatedVramBytes = modelRecord.estimatedVramBytes
-      }
-
       // Copy to config location and remove temp file
-      val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelConfig.modelId)
+      val modelDirFile = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
       val modelConfigFile = File(modelDirFile, MODEL_CONFIG_FILENAME)
       tempFile.copyTo(modelConfigFile, overwrite = true)
       tempFile.delete()
@@ -326,27 +283,28 @@ enum class ModelChatState {
 
 data class MessageData(val role: String, val text: String, val id: UUID = UUID.randomUUID())
 
+@Serializable
 data class ModelConfig(
-  @SerializedName("model_lib") var modelLib: String,
-  @SerializedName("model_id") var modelId: String,
-  @SerializedName("model_url") var modelUrl: String,
-  @SerializedName("estimated_vram_bytes") var estimatedVramBytes: Long?,
-  @SerializedName("tokenizer_files") val tokenizerFiles: List<String>,
-  @SerializedName("context_window_size") val contextWindowSize: Int,
-  @SerializedName("prefill_chunk_size") val prefillChunkSize: Int
+  val tokenizer_files: List<String>,
+  val context_window_size: Int,
+  val prefill_chunk_size: Int
 )
 
-data class AppConfig(@SerializedName("model_libs") var modelLibs: MutableList<String>, @SerializedName("model_list") val modelList: MutableList<ModelRecord>)
+@Serializable
+data class AppConfig(val model_list: List<ModelRecord>)
 
+@Serializable
 data class ModelRecord(
-  @SerializedName("model_url") val modelUrl: String,
-  @SerializedName("model_id") val modelId: String,
-  @SerializedName("estimated_vram_bytes") val estimatedVramBytes: Long?,
-  @SerializedName("model_lib") val modelLib: String
+  val model_url: String,
+  val model_id: String,
+  val estimated_vram_bytes: Long?,
+  val model_lib: String
 )
 
 data class DownloadTask(val url: URL, val file: File)
 
-data class ParamsConfig(@SerializedName("records") val paramsRecords: List<ParamsRecord>)
+@Serializable
+data class ParamsConfig(val records: List<ParamsRecord>)
 
-data class ParamsRecord(@SerializedName("dataPath") val dataPath: String)
+@Serializable
+data class ParamsRecord(val dataPath: String)

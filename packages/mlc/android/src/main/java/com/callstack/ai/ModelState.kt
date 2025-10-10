@@ -1,8 +1,8 @@
-package com.reactnativeai
+package com.callstack.ai
 
-import com.reactnativeai.NativeMLCEngineModule.Companion.MODEL_CONFIG_FILENAME
-import com.reactnativeai.NativeMLCEngineModule.Companion.MODEL_URL_SUFFIX
-import com.reactnativeai.NativeMLCEngineModule.Companion.PARAMS_CONFIG_FILENAME
+import com.callstack.ai.NativeMLCEngineModule.Companion.MODEL_CONFIG_FILENAME
+import com.callstack.ai.NativeMLCEngineModule.Companion.MODEL_URL_SUFFIX
+import com.callstack.ai.NativeMLCEngineModule.Companion.PARAMS_CONFIG_FILENAME
 import com.google.gson.Gson
 import java.io.File
 import java.io.FileOutputStream
@@ -112,17 +112,17 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
 
   private fun indexModel() {
     progress.value = 0
-    total.value = modelConfig.tokenizerFiles.size + paramsConfig.paramsRecords.size
+    total.value = modelConfig.tokenizer_files.size + paramsConfig.records.size
 
     // Adding Tokenizer to download tasks
-    for (tokenizerFilename in modelConfig.tokenizerFiles) {
+    for (tokenizerFilename in modelConfig.tokenizer_files) {
       val file = File(modelDir, tokenizerFilename)
       if (file.exists()) {
         ++progress.value
       } else {
         remainingTasks.add(
           DownloadTask(
-            URL("${modelConfig.modelUrl}$MODEL_URL_SUFFIX$tokenizerFilename"),
+            URL("${modelConfig.model_url}$MODEL_URL_SUFFIX$tokenizerFilename"),
             file
           )
         )
@@ -130,14 +130,14 @@ class ModelState(private val modelConfig: ModelConfig, private val modelDir: Fil
     }
 
     // Adding params to download tasks
-    for (paramsRecord in paramsConfig.paramsRecords) {
+    for (paramsRecord in paramsConfig.records) {
       val file = File(modelDir, paramsRecord.dataPath)
       if (file.exists()) {
         ++progress.value
       } else {
         remainingTasks.add(
           DownloadTask(
-            URL("${modelConfig.modelUrl}$MODEL_URL_SUFFIX${paramsRecord.dataPath}"),
+            URL("${modelConfig.model_url}$MODEL_URL_SUFFIX${paramsRecord.dataPath}"),
             file
           )
         )
