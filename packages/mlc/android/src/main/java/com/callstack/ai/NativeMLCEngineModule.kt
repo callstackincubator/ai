@@ -1,6 +1,8 @@
 package com.callstack.ai
 
 import ai.mlc.mlcllm.MLCEngine
+import ai.mlc.mlcllm.OpenAIProtocol
+import ai.mlc.mlcllm.OpenAIProtocol.ChatCompletionMessage
 import com.facebook.react.bridge.*
 import com.facebook.react.bridge.ReactContext.RCTDeviceEventEmitter
 import kotlinx.serialization.Serializable
@@ -9,19 +11,24 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.channels.toList
+import java.util.concurrent.Executors
 
 class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEngineSpec(reactContext) {
   override fun getName(): String = NAME
 
   companion object {
-    const val NAME = "NativeMLCEngine"
+    const val NAME = "MLCEngine"
     const val APP_CONFIG_FILENAME = "mlc-app-config.json"
   }
 
   private val json = Json { ignoreUnknownKeys = true }
   private val engine by lazy { MLCEngine() }
+  private val executorService = Executors.newSingleThreadExecutor()
+  private val engineScope = CoroutineScope(Dispatchers.Main + Job())
 
   private val appConfig by lazy {
     val jsonString = reactApplicationContext.applicationContext.assets.open(APP_CONFIG_FILENAME).bufferedReader().use { it.readText() }
@@ -42,92 +49,131 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   }
 
   override fun getModels(promise: Promise) {
-    promise.resolve(Arguments.fromList(appConfig.model_list))
+    val modelsList = Arguments.createArray()
+    appConfig.model_list.forEach { modelRecord ->
+      val modelMap = Arguments.createMap().apply {
+        putString("model_id", modelRecord.model_id)
+        putString("model_url", modelRecord.model_url)
+        putString("model_lib", modelRecord.model_lib)
+        modelRecord.estimated_vram_bytes?.let { putDouble("estimated_vram_bytes", it.toDouble()) }
+      }
+      modelsList.pushMap(modelMap)
+    }
+    promise.resolve(modelsList)
   }
 
   override fun generateText(
-    messages: ReadableArray?,
+    messages: ReadableArray,
     options: ReadableMap?,
-    promise: Promise?
+    promise: Promise
   ) {
-    TODO("Not yet implemented")
+    executorService.submit {
+      engineScope.launch {
+        try {
+          val messageList = mutableListOf<ChatCompletionMessage>()
+
+          for (i in 0 until messages.size()) {
+            val messageMap = messages.getMap(i)
+            val role = if (messageMap?.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
+            val content = messageMap?.getString("content") ?: ""
+            messageList.add(ChatCompletionMessage(role, content))
+          }
+
+          val responseFormat = options?.getMap("responseFormat")?.let { formatMap ->
+            val type = formatMap.getString("type") ?: "text"
+            val schema = formatMap.getString("schema")
+            OpenAIProtocol.ResponseFormat(type, schema)
+          }
+
+          val chatResponse = engine.chat.completions.create(
+            messages = messageList,
+            temperature = options?.getDouble("temperature")?.toFloat(),
+            max_tokens = options?.getInt("maxTokens"),
+            top_p = options?.getDouble("topP")?.toFloat(),
+            frequency_penalty = options?.getDouble("topK")?.toFloat(),
+            response_format = responseFormat
+          )
+
+          val response = chatResponse.toList().joinToString("") {
+            it.choices.joinToString("") { choice ->
+              choice.delta.content?.text ?: ""
+            }
+          }
+
+          promise.resolve(response)
+        } catch (e: Exception) {
+          promise.reject("GENERATION_ERROR", "Error generating text", e)
+        }
+      }
+    }
   }
 
   override fun streamText(
-    messages: ReadableArray?,
+    messages: ReadableArray,
     options: ReadableMap?,
-    promise: Promise?
+    promise: Promise
   ) {
-    TODO("Not yet implemented")
-  }
-
-  override fun cancelStream(streamId: String?, promise: Promise?) {
-    TODO("Not yet implemented")
-  }
-
-//  @ReactMethod
-//  fun doGenerate(instanceId: String, messages: ReadableArray, promise: Promise) {
-//    val messageList = mutableListOf<ChatCompletionMessage>()
+//    executorService.submit {
+//      engineScope.launch {
+//        try {
+//          val messageList = mutableListOf<ChatCompletionMessage>()
 //
-//    for (i in 0 until messages.size()) {
-//      val messageMap = messages.getMap(i) // Extract ReadableMap
-//
-//      val role = if (messageMap.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
-//      val content = messageMap.getString("content") ?: ""
-//
-//      messageList.add(ChatCompletionMessage(role, content))
-//    }
-//
-//    CoroutineScope(Dispatchers.Main).launch {
-//      try {
-//        chat.generateResponse(
-//          messageList,
-//          callback = object : Chat.GenerateCallback {
-//            override fun onMessageReceived(message: String) {
-//              promise.resolve(message)
-//            }
+//          for (i in 0 until messages.size()) {
+//            val messageMap = messages.getMap(i)
+//            val role = if (messageMap?.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
+//            val content = messageMap?.getString("content") ?: ""
+//            messageList.add(ChatCompletionMessage(role, content))
 //          }
-//        )
-//      } catch (e: Exception) {
-//        Log.e("AI", "Error generating response", e)
-//      }
-//    }
-//  }
-
-//  @ReactMethod
-//  fun doStream(instanceId: String, messages: ReadableArray, promise: Promise) {
-//    val messageList = mutableListOf<ChatCompletionMessage>()
 //
-//    for (i in 0 until messages.size()) {
-//      val messageMap = messages.getMap(i) // Extract ReadableMap
+//          val chatResponse = engine.chat.completions.create(
+//            messages = messageList,
+//            stream_options = OpenAIProtocol.StreamOptions(include_usage = true)
+//          )
+//          var finishReasonLength = false
+//          var streamingText = ""
 //
-//      val role = if (messageMap.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
-//      val content = messageMap.getString("content") ?: ""
+//          for (res in chatResponse) {
+//            for (choice in res.choices) {
+//              choice.delta.content?.let { content ->
+//                streamingText = content.asText()
+//              }
+//              choice.finish_reason?.let { finishReason ->
+//                if (finishReason == "length") {
+//                  finishReasonLength = true
+//                }
+//              }
+//            }
 //
-//      messageList.add(ChatCompletionMessage(role, content))
-//    }
-//    CoroutineScope(Dispatchers.Main).launch {
-//      chat.streamResponse(
-//        messageList,
-//        callback = object : Chat.StreamCallback {
-//          override fun onUpdate(message: String) {
 //            val event: WritableMap = Arguments.createMap().apply {
-//              putString("content", message)
+//              putString("content", streamingText)
 //            }
 //            sendEvent("onChatUpdate", event)
+//
+//            if (finishReasonLength) {
+//              streamingText = " [output truncated due to context length limit...]"
+//              val truncatedEvent: WritableMap = Arguments.createMap().apply {
+//                putString("content", streamingText)
+//              }
+//              sendEvent("onChatUpdate", truncatedEvent)
+//            }
 //          }
 //
-//          override fun onFinished(message: String) {
-//            val event: WritableMap = Arguments.createMap().apply {
-//              putString("content", message)
-//            }
-//            sendEvent("onChatComplete", event)
+//          val finalEvent: WritableMap = Arguments.createMap().apply {
+//            putString("content", streamingText)
 //          }
+//          sendEvent("onChatComplete", finalEvent)
+//
+//          promise.resolve(null)
+//        } catch (e: Exception) {
+//          promise.reject("STREAMING_ERROR", "Error streaming text", e)
 //        }
-//      )
+//      }
 //    }
-//    promise.resolve(null)
-//  }
+  }
+
+  override fun cancelStream(streamId: String, promise: Promise) {
+    TODO("Not yet implemented")
+  }
 
   override fun downloadModel(instanceId: String, promise: Promise) {
     CoroutineScope(Dispatchers.IO).launch {
@@ -178,9 +224,9 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     promise.resolve(Unit)
   }
 
-  override fun unloadModel(promise: Promise?) {
+  override fun unloadModel(promise: Promise) {
     engine.unload()
-    promise?.resolve(Unit)
+    promise.resolve(Unit)
   }
 
   private fun getModelConfig(modelId: String): Pair<ModelRecord, File>? {
