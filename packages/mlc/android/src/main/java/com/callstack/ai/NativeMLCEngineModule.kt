@@ -4,7 +4,6 @@ import ai.mlc.mlcllm.MLCEngine
 import ai.mlc.mlcllm.OpenAIProtocol
 import ai.mlc.mlcllm.OpenAIProtocol.ChatCompletionMessage
 import com.facebook.react.bridge.*
-import com.facebook.react.bridge.ReactContext.RCTDeviceEventEmitter
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -13,7 +12,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.toList
 import java.util.concurrent.Executors
 
@@ -102,7 +100,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
 
           promise.resolve(response)
         } catch (e: Exception) {
-          promise.reject("GENERATION_ERROR", "Error generating text", e)
+          promise.reject("GENERATION_ERROR", e.message)
         }
       }
     }
@@ -185,15 +183,15 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
 
         val modelDownloader = ModelDownloader(modelRecord.model_url, modelDir)
         modelDownloader.downloadModel { current, total ->
-          val event: WritableMap = Arguments.createMap().apply {
-            putDouble("percentage", current.toDouble() / total)
+          val args: WritableMap = Arguments.createMap().apply {
+            putDouble("percentage", kotlin.math.round(current.toDouble() / total * 100))
           }
-          sendEvent("onDownloadProgress", event)
+          emitOnDownloadProgress(args)
         }
 
-        promise.resolve(Unit)
+        promise.resolve(null)
       } catch (e: Exception) {
-        promise.reject("MODEL_ERROR", "Error downloading model", e)
+        promise.reject("MODEL_ERROR", e.message)
       }
     }
   }
@@ -208,9 +206,9 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
       if (modelDir.exists()) {
         modelDir.deleteRecursively()
       }
-      promise.resolve(Unit)
+      promise.resolve(null)
     } catch (e: Exception) {
-      promise.reject("MODEL_ERROR", "Error removing model", e)
+      promise.reject("MODEL_ERROR", e.message)
     }
   }
 
@@ -221,22 +219,18 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     }
 
     engine.reload(modelDir.path, modelRecord.model_lib)
-    promise.resolve(Unit)
+    promise.resolve(null)
   }
 
   override fun unloadModel(promise: Promise) {
     engine.unload()
-    promise.resolve(Unit)
+    promise.resolve(null)
   }
 
   private fun getModelConfig(modelId: String): Pair<ModelRecord, File>? {
     val modelRecord = appConfig.model_list.find { it.model_id == modelId } ?: return null
     val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
     return Pair(modelRecord, modelDir)
-  }
-
-  private fun sendEvent(eventName: String, data: Any?) {
-    reactApplicationContext.getJSModule(RCTDeviceEventEmitter::class.java)?.emit(eventName, data)
   }
 }
 

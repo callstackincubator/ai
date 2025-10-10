@@ -79,7 +79,7 @@ export interface GenerationOptions {
 }
 
 export interface DownloadProgress {
-  status: string
+  percentage: number
 }
 
 export interface ChatUpdateEvent {
