@@ -1,5 +1,6 @@
 package com.callstack.ai
 
+import ai.mlc.mlcllm.MLCEngine
 import com.facebook.react.bridge.*
 import com.facebook.react.bridge.ReactContext.RCTDeviceEventEmitter
 import kotlinx.serialization.Serializable
@@ -20,7 +21,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   }
 
   private val json = Json { ignoreUnknownKeys = true }
-  private lateinit var chat: Chat
+  private val engine by lazy { MLCEngine() }
 
   private val appConfig by lazy {
     val jsonString = reactApplicationContext.applicationContext.assets.open(APP_CONFIG_FILENAME).bufferedReader().use { it.readText() }
@@ -28,8 +29,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   }
 
   override fun getModel(name: String, promise: Promise) {
-    val modelRecord = appConfig.model_list.find { modelRecord -> modelRecord.model_id == name }
-    if (modelRecord == null) {
+    val (modelRecord, _) = getModelConfig(name) ?: run {
       promise.reject("Model not found", "Didn't find the model")
       return
     }
@@ -132,12 +132,10 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   override fun downloadModel(instanceId: String, promise: Promise) {
     CoroutineScope(Dispatchers.IO).launch {
       try {
-        val modelRecord = appConfig.model_list.find { modelRecord -> modelRecord.model_id == instanceId }
-        if (modelRecord == null) {
-          throw Error("There's no record for requested model")
+        val (modelRecord, modelDir) = getModelConfig(instanceId) ?: run {
+          promise.reject("Model not found", "There's no record for requested model")
+          return@launch
         }
-
-        val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
 
         val modelDownloader = ModelDownloader(modelRecord.model_url, modelDir)
         modelDownloader.downloadModel { current, total ->
@@ -154,21 +152,45 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     }
   }
 
-  override fun removeModel(modelId: String?, promise: Promise?) {
-    TODO("Not yet implemented")
-  }
+  override fun removeModel(modelId: String, promise: Promise) {
+    val (_, modelDir) = getModelConfig(modelId) ?: run {
+      promise.reject("Model not found", "Didn't find the model")
+      return
+    }
 
-  // tbd
-  private fun sendEvent(eventName: String, data: Any?) {
-    reactApplicationContext.getJSModule(RCTDeviceEventEmitter::class.java)?.emit(eventName, data)
+    try {
+      if (modelDir.exists()) {
+        modelDir.deleteRecursively()
+      }
+      promise.resolve(Unit)
+    } catch (e: Exception) {
+      promise.reject("MODEL_ERROR", "Error removing model", e)
+    }
   }
 
   override fun prepareModel(instanceId: String, promise: Promise) {
-    TODO("Not yet implemented")
+    val (modelRecord, modelDir) = getModelConfig(instanceId) ?: run {
+      promise.reject("Model not found", "Didn't find the model")
+      return
+    }
+
+    engine.reload(modelDir.path, modelRecord.model_lib)
+    promise.resolve(Unit)
   }
 
   override fun unloadModel(promise: Promise?) {
-    TODO("Not yet implemented")
+    engine.unload()
+    promise?.resolve(Unit)
+  }
+
+  private fun getModelConfig(modelId: String): Pair<ModelRecord, File>? {
+    val modelRecord = appConfig.model_list.find { it.model_id == modelId } ?: return null
+    val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
+    return Pair(modelRecord, modelDir)
+  }
+
+  private fun sendEvent(eventName: String, data: Any?) {
+    reactApplicationContext.getJSModule(RCTDeviceEventEmitter::class.java)?.emit(eventName, data)
   }
 }
 
