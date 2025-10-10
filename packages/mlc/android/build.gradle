@@ -100,7 +100,7 @@ dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
   // Dependencies
-  implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
+  implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
 
   // MLC4J dependency
   implementation files('../prebuilt/android/lib/mlc4j/output/tvm4j_core.jar')

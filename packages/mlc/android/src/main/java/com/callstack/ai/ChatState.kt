@@ -11,14 +11,14 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.Executors
 
-class Chat(modelConfig: ModelConfig, modelDir: File) {
+class Chat(modelRecord: ModelRecord, modelDir: File) {
   private val engine = MLCEngine()
   private val executorService = Executors.newSingleThreadExecutor()
   private val viewModelScope = CoroutineScope(Dispatchers.Main + Job())
 
   init {
     engine.unload()
-    engine.reload(modelDir.path, modelConfig.model_lib)
+    engine.reload(modelDir.path, modelRecord.model_lib)
   }
 
   fun generateResponse(
