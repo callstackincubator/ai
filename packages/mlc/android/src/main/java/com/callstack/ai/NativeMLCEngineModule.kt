@@ -85,10 +85,9 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
 
           val chatResponse = engine.chat.completions.create(
             messages = messageList,
-            temperature = options?.getDouble("temperature")?.toFloat(),
-            max_tokens = options?.getInt("maxTokens"),
-            top_p = options?.getDouble("topP")?.toFloat(),
-            frequency_penalty = options?.getDouble("topK")?.toFloat(),
+            temperature = options?.takeIf { it.hasKey("temperature") }?.getDouble("temperature")?.toFloat(),
+            max_tokens = options?.takeIf { it.hasKey("maxTokens") }?.getInt("maxTokens"),
+            top_p = options?.takeIf { it.hasKey("topP") }?.getDouble("topP")?.toFloat(),
             response_format = responseFormat
           )
 
