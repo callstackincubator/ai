@@ -32,9 +32,12 @@ export default function MLCScreen() {
   const setupModel = async () => {
     try {
       setIsLoading(true)
+
       setStatusText('Getting available models...')
+
       const models = await MLCEngine.getModels()
       const selectedModelId = models[0]!.model_id!
+
       setModelId(selectedModelId)
       setStatusText(`Selected model: ${selectedModelId}`)
 
@@ -42,8 +45,11 @@ export default function MLCScreen() {
       await modelInstance.download((event) => {
         setStatusText(`Downloading model: ${event.percentage}`)
       })
+
       setStatusText('Preparing model...')
+
       await modelInstance.prepare()
+
       setModel(modelInstance)
       setStatusText('Model ready')
     } catch (error) {
@@ -55,14 +61,9 @@ export default function MLCScreen() {
 
   const runGenerateText = async () => {
     try {
-      if (!model) {
-        setStatusText('Please setup model first')
-        return
-      }
       setIsLoading(true)
       setResponse('')
 
-      // Generate text using AI SDK
       setStatusText('Generating response...')
 
       const result = await generateText({
@@ -84,10 +85,9 @@ export default function MLCScreen() {
       setIsLoading(true)
       setResponse('')
 
-      // Stream text using AI SDK
       setStatusText('Streaming response...')
 
-      const result = await streamText({
+      const result = streamText({
         model,
         prompt: 'Hello! Who are you? Please introduce yourself.',
       })

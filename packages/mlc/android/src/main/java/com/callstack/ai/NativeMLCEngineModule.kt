@@ -10,7 +10,6 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.toList
 import java.util.concurrent.Executors
@@ -130,6 +129,9 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     options: ReadableMap?,
     promise: Promise
   ) {
+    // TODO: Patch MLC to return requestId and expose abortFunc from Android SDK
+    val streamId = UUID.randomUUID().toString()
+
     executorService.submit {
       engineScope.launch {
         try {
@@ -159,53 +161,50 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
             )
           )
 
-          var accumulatedContent = ""
-          var finalRole: String? = null
           var finalFinishReason: String? = null
-          var usage: Map<String, Any>? = null
 
           for (streamResponse in chatResponse) {
-            // Check for usage (indicates completion)
-            streamResponse.usage?.let {
-              usage = mapOf(
-                "prompt_tokens" to it.prompt_tokens,
-                "completion_tokens" to it.completion_tokens,
-                "total_tokens" to it.total_tokens
-              )
-            }
-
+            // Emit stream update
             streamResponse.choices.firstOrNull()?.let { choice ->
               choice.delta.content?.let { content ->
-                accumulatedContent += content.text ?: ""
+                val deltaArgs = Arguments.createMap().apply {
+                  val delta = Arguments.createMap().apply {
+                    putString("content", content.text ?: "")
+                    putString("role", choice.delta.role.toString())
+                  }
+                  putMap("delta", delta)
+                }
+                emitOnChatUpdate(deltaArgs)
               }
               choice.finish_reason?.let { finishReason ->
                 finalFinishReason = finishReason
               }
-              choice.delta.role?.let { role ->
-                finalRole = role.toString()
-              }
             }
 
-            if (usage != null) {
-              break
+            // Check for usage (indicates completion)
+            streamResponse.usage?.let { usage ->
+              val completeArgs = Arguments.createMap().apply {
+                val usageArgs = Arguments.createMap().apply {
+                  putInt("prompt_tokens", usage.prompt_tokens)
+                  putInt("completion_tokens", usage.completion_tokens)
+                  putInt("total_tokens", usage.total_tokens)
+                  val extraArgs = Arguments.createMap().apply {
+                    usage.extra?.let { extra ->
+                      extra.prefill_tokens_per_s?.let { putDouble("prefill_tokens_per_s", extra.prefill_tokens_per_s.toDouble()) }
+                      extra.decode_tokens_per_s?.let { putDouble("decode_tokens_per_s", it.toDouble()) }
+                      extra.num_prefill_tokens?.let { putInt("num_prefill_tokens", it) }
+                    }
+                  }
+                  putMap("extra", extraArgs)
+                }
+                putMap("usage", usageArgs)
+                putString("finish_reason", finalFinishReason)
+              }
+              emitOnChatComplete(completeArgs)
             }
           }
 
-          val response = Arguments.createMap().apply {
-            putString("role", finalRole ?: "assistant")
-            putString("content", accumulatedContent)
-            finalFinishReason?.let { putString("finish_reason", it) }
-            usage?.let { usageMap ->
-              val usageArgs = Arguments.createMap().apply {
-                putInt("prompt_tokens", usageMap["prompt_tokens"] as Int)
-                putInt("completion_tokens", usageMap["completion_tokens"] as Int)
-                putInt("total_tokens", usageMap["total_tokens"] as Int)
-              }
-              putMap("usage", usageArgs)
-            }
-          }
-
-          promise.resolve(response)
+          promise.resolve(streamId)
         } catch (e: Exception) {
           promise.reject("GENERATION_ERROR", e.message)
         }
