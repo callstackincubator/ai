@@ -56,7 +56,7 @@ You can track download progress:
 
 ```typescript
 await model.download((event) => {
-  console.log(`Download: ${event.status}`);
+  console.log(`Download: ${event.progress}`);
 });
 ```
 
