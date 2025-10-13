@@ -167,6 +167,8 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
 
           var finalFinishReason: String? = null
 
+          promise.resolve(streamId)
+
           for (streamResponse in chatResponse) {
             // Emit stream update
             streamResponse.choices.firstOrNull()?.let { choice ->
@@ -184,8 +186,6 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
                 finalFinishReason = finishReason
               }
             }
-
-            promise.resolve(streamId)
 
             // Check for usage (indicates completion)
             streamResponse.usage?.let { usage ->
