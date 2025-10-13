@@ -66,14 +66,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   ) {
     engineScope.launch {
       try {
-        val messageList = mutableListOf<ChatCompletionMessage>()
-
-        for (i in 0 until messages.size()) {
-          val messageMap = messages.getMap(i)
-          val role = if (messageMap?.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
-          val content = messageMap?.getString("content") ?: ""
-          messageList.add(ChatCompletionMessage(role, content))
-        }
+        val messageList = parseMessages(messages)
 
         val responseFormat = options?.getMap("responseFormat")?.let { formatMap ->
           val type = formatMap.getString("type") ?: "text"
@@ -112,6 +105,24 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
               putInt("prompt_tokens", usage.prompt_tokens)
               putInt("completion_tokens", usage.completion_tokens)
               putInt("total_tokens", usage.total_tokens)
+              val extraArgs = Arguments.createMap().apply {
+                usage.extra?.let { extra ->
+                  extra.prefill_tokens_per_s?.let {
+                    putDouble(
+                      "prefill_tokens_per_s",
+                      extra.prefill_tokens_per_s.toDouble()
+                    )
+                  }
+                  extra.decode_tokens_per_s?.let {
+                    putDouble(
+                      "decode_tokens_per_s",
+                      it.toDouble()
+                    )
+                  }
+                  extra.num_prefill_tokens?.let { putInt("num_prefill_tokens", it) }
+                }
+              }
+              putMap("extra", extraArgs)
             }
             putMap("usage", usageArgs)
           }
@@ -135,14 +146,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     executorService.submit {
       engineScope.launch {
         try {
-          val messageList = mutableListOf<ChatCompletionMessage>()
-
-          for (i in 0 until messages.size()) {
-            val messageMap = messages.getMap(i)
-            val role = if (messageMap?.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
-            val content = messageMap?.getString("content") ?: ""
-            messageList.add(ChatCompletionMessage(role, content))
-          }
+          val messageList = parseMessages(messages)
 
           val responseFormat = options?.getMap("responseFormat")?.let { formatMap ->
             val type = formatMap.getString("type") ?: "text"
@@ -181,6 +185,8 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
               }
             }
 
+            promise.resolve(streamId)
+
             // Check for usage (indicates completion)
             streamResponse.usage?.let { usage ->
               val completeArgs = Arguments.createMap().apply {
@@ -190,8 +196,18 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
                   putInt("total_tokens", usage.total_tokens)
                   val extraArgs = Arguments.createMap().apply {
                     usage.extra?.let { extra ->
-                      extra.prefill_tokens_per_s?.let { putDouble("prefill_tokens_per_s", extra.prefill_tokens_per_s.toDouble()) }
-                      extra.decode_tokens_per_s?.let { putDouble("decode_tokens_per_s", it.toDouble()) }
+                      extra.prefill_tokens_per_s?.let {
+                        putDouble(
+                          "prefill_tokens_per_s",
+                          extra.prefill_tokens_per_s.toDouble()
+                        )
+                      }
+                      extra.decode_tokens_per_s?.let {
+                        putDouble(
+                          "decode_tokens_per_s",
+                          it.toDouble()
+                        )
+                      }
                       extra.num_prefill_tokens?.let { putInt("num_prefill_tokens", it) }
                     }
                   }
@@ -203,8 +219,6 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
               emitOnChatComplete(completeArgs)
             }
           }
-
-          promise.resolve(streamId)
         } catch (e: Exception) {
           promise.reject("GENERATION_ERROR", e.message)
         }
@@ -268,6 +282,22 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
   override fun unloadModel(promise: Promise) {
     engine.unload()
     promise.resolve(null)
+  }
+
+  private fun parseMessages(messages: ReadableArray): List<ChatCompletionMessage> {
+    val messageList = mutableListOf<ChatCompletionMessage>()
+
+    for (i in 0 until messages.size()) {
+      val messageMap = messages.getMap(i)
+      val role = if (messageMap?.getString("role") == "user")
+        OpenAIProtocol.ChatCompletionRole.user
+      else
+        OpenAIProtocol.ChatCompletionRole.assistant
+      val content = messageMap?.getString("content") ?: ""
+      messageList.add(ChatCompletionMessage(role, content))
+    }
+
+    return messageList
   }
 
   private fun getModelConfig(modelId: String): Pair<ModelRecord, File>? {
