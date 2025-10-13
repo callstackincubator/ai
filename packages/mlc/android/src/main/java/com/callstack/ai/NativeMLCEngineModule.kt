@@ -25,8 +25,8 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
 
   private val json = Json { ignoreUnknownKeys = true }
   private val engine by lazy { MLCEngine() }
-  private val executorService = Executors.newSingleThreadExecutor()
-  private val engineScope = CoroutineScope(Dispatchers.Main + Job())
+  private val executorService = Executors.newFixedThreadPool(1)
+  private val engineScope = CoroutineScope(Dispatchers.IO)
 
   private val appConfig by lazy {
     val jsonString = reactApplicationContext.applicationContext.assets.open(APP_CONFIG_FILENAME).bufferedReader().use { it.readText() }
@@ -65,6 +65,71 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
     options: ReadableMap?,
     promise: Promise
   ) {
+    engineScope.launch {
+      try {
+        val messageList = mutableListOf<ChatCompletionMessage>()
+
+        for (i in 0 until messages.size()) {
+          val messageMap = messages.getMap(i)
+          val role = if (messageMap?.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
+          val content = messageMap?.getString("content") ?: ""
+          messageList.add(ChatCompletionMessage(role, content))
+        }
+
+        val responseFormat = options?.getMap("responseFormat")?.let { formatMap ->
+          val type = formatMap.getString("type") ?: "text"
+          val schema = formatMap.getString("schema")
+          OpenAIProtocol.ResponseFormat(type, schema)
+        }
+
+        val chatResponse = engine.chat.completions.create(
+          messages = messageList,
+          temperature = options?.takeIf { it.hasKey("temperature") }?.getDouble("temperature")?.toFloat(),
+          max_tokens = options?.takeIf { it.hasKey("maxTokens") }?.getInt("maxTokens"),
+          top_p = options?.takeIf { it.hasKey("topP") }?.getDouble("topP")?.toFloat(),
+          response_format = responseFormat,
+          stream_options = OpenAIProtocol.StreamOptions(
+            true
+          )
+        )
+
+        val responseList = chatResponse.toList()
+        val lastResponse = responseList.lastOrNull()
+
+        val accumulatedContent = responseList.joinToString("") { response ->
+          response.choices.firstOrNull()?.delta?.content?.text ?: ""
+        }
+
+        val finalRole = responseList.mapNotNull { it.choices.firstOrNull()?.delta?.role?.toString() }.lastOrNull()
+        val finalFinishReason = responseList.mapNotNull { it.choices.firstOrNull()?.finish_reason }.lastOrNull()
+
+        val response = Arguments.createMap().apply {
+          putString("role", finalRole ?: "assistant")
+          putString("content", accumulatedContent)
+          putArray("tool_calls", Arguments.createArray())
+          finalFinishReason?.let { putString("finish_reason", it) }
+          lastResponse?.usage?.let { usage ->
+            val usageArgs = Arguments.createMap().apply {
+              putInt("prompt_tokens", usage.prompt_tokens)
+              putInt("completion_tokens", usage.completion_tokens)
+              putInt("total_tokens", usage.total_tokens)
+            }
+            putMap("usage", usageArgs)
+          }
+        }
+
+        promise.resolve(response)
+      } catch (e: Exception) {
+        promise.reject("GENERATION_ERROR", e.message)
+      }
+    }
+  }
+
+  override fun streamText(
+    messages: ReadableArray,
+    options: ReadableMap?,
+    promise: Promise
+  ) {
     executorService.submit {
       engineScope.launch {
         try {
@@ -88,12 +153,55 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
             temperature = options?.takeIf { it.hasKey("temperature") }?.getDouble("temperature")?.toFloat(),
             max_tokens = options?.takeIf { it.hasKey("maxTokens") }?.getInt("maxTokens"),
             top_p = options?.takeIf { it.hasKey("topP") }?.getDouble("topP")?.toFloat(),
-            response_format = responseFormat
+            response_format = responseFormat,
+            stream_options = OpenAIProtocol.StreamOptions(
+              true
+            )
           )
 
-          val response = chatResponse.toList().joinToString("") {
-            it.choices.joinToString("") { choice ->
-              choice.delta.content?.text ?: ""
+          var accumulatedContent = ""
+          var finalRole: String? = null
+          var finalFinishReason: String? = null
+          var usage: Map<String, Any>? = null
+
+          for (streamResponse in chatResponse) {
+            // Check for usage (indicates completion)
+            streamResponse.usage?.let {
+              usage = mapOf(
+                "prompt_tokens" to it.prompt_tokens,
+                "completion_tokens" to it.completion_tokens,
+                "total_tokens" to it.total_tokens
+              )
+            }
+
+            streamResponse.choices.firstOrNull()?.let { choice ->
+              choice.delta.content?.let { content ->
+                accumulatedContent += content.text ?: ""
+              }
+              choice.finish_reason?.let { finishReason ->
+                finalFinishReason = finishReason
+              }
+              choice.delta.role?.let { role ->
+                finalRole = role.toString()
+              }
+            }
+
+            if (usage != null) {
+              break
+            }
+          }
+
+          val response = Arguments.createMap().apply {
+            putString("role", finalRole ?: "assistant")
+            putString("content", accumulatedContent)
+            finalFinishReason?.let { putString("finish_reason", it) }
+            usage?.let { usageMap ->
+              val usageArgs = Arguments.createMap().apply {
+                putInt("prompt_tokens", usageMap["prompt_tokens"] as Int)
+                putInt("completion_tokens", usageMap["completion_tokens"] as Int)
+                putInt("total_tokens", usageMap["total_tokens"] as Int)
+              }
+              putMap("usage", usageArgs)
             }
           }
 
@@ -103,69 +211,6 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
         }
       }
     }
-  }
-
-  override fun streamText(
-    messages: ReadableArray,
-    options: ReadableMap?,
-    promise: Promise
-  ) {
-//    executorService.submit {
-//      engineScope.launch {
-//        try {
-//          val messageList = mutableListOf<ChatCompletionMessage>()
-//
-//          for (i in 0 until messages.size()) {
-//            val messageMap = messages.getMap(i)
-//            val role = if (messageMap?.getString("role") == "user") OpenAIProtocol.ChatCompletionRole.user else OpenAIProtocol.ChatCompletionRole.assistant
-//            val content = messageMap?.getString("content") ?: ""
-//            messageList.add(ChatCompletionMessage(role, content))
-//          }
-//
-//          val chatResponse = engine.chat.completions.create(
-//            messages = messageList,
-//            stream_options = OpenAIProtocol.StreamOptions(include_usage = true)
-//          )
-//          var finishReasonLength = false
-//          var streamingText = ""
-//
-//          for (res in chatResponse) {
-//            for (choice in res.choices) {
-//              choice.delta.content?.let { content ->
-//                streamingText = content.asText()
-//              }
-//              choice.finish_reason?.let { finishReason ->
-//                if (finishReason == "length") {
-//                  finishReasonLength = true
-//                }
-//              }
-//            }
-//
-//            val event: WritableMap = Arguments.createMap().apply {
-//              putString("content", streamingText)
-//            }
-//            sendEvent("onChatUpdate", event)
-//
-//            if (finishReasonLength) {
-//              streamingText = " [output truncated due to context length limit...]"
-//              val truncatedEvent: WritableMap = Arguments.createMap().apply {
-//                putString("content", streamingText)
-//              }
-//              sendEvent("onChatUpdate", truncatedEvent)
-//            }
-//          }
-//
-//          val finalEvent: WritableMap = Arguments.createMap().apply {
-//            putString("content", streamingText)
-//          }
-//          sendEvent("onChatComplete", finalEvent)
-//
-//          promise.resolve(null)
-//        } catch (e: Exception) {
-//          promise.reject("STREAMING_ERROR", "Error streaming text", e)
-//        }
-//      }
-//    }
   }
 
   override fun cancelStream(streamId: String, promise: Promise) {
