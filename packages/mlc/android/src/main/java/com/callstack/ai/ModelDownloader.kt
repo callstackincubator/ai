@@ -44,11 +44,9 @@ class ModelDownloader(
       listOf(
         async {
           downloadSingleFile(MODEL_CONFIG_FILENAME)
-          onProgress(progressCounter.incrementAndGet(), -1)
         },
         async {
           downloadSingleFile(PARAMS_CONFIG_FILENAME)
-          onProgress(progressCounter.incrementAndGet(), -1)
         }
       ).awaitAll()
     }
