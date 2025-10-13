@@ -289,10 +289,15 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
 
     for (i in 0 until messages.size()) {
       val messageMap = messages.getMap(i)
-      val role = if (messageMap?.getString("role") == "user")
-        OpenAIProtocol.ChatCompletionRole.user
-      else
-        OpenAIProtocol.ChatCompletionRole.assistant
+      val roleString = messageMap?.getString("role") ?: throw IllegalArgumentException("Message role is required")
+      
+      val role = when (roleString) {
+        "user" -> OpenAIProtocol.ChatCompletionRole.user
+        "assistant" -> OpenAIProtocol.ChatCompletionRole.assistant
+        "system" -> OpenAIProtocol.ChatCompletionRole.system
+        else -> throw IllegalArgumentException("Unknown message role: $roleString")
+      }
+      
       val content = messageMap?.getString("content") ?: ""
       messageList.add(ChatCompletionMessage(role, content))
     }
