@@ -71,7 +71,7 @@ class ModelDownloader(
           chunk.map { filename ->
             async {
               downloadSingleFile(filename)
-              onProgress(progressCounter.incrementAndGet(), allFiles.size)
+              onProgress(progressCounter.incrementAndGet(), remainingFiles.size)
             }
           }.awaitAll()
         }
@@ -79,7 +79,7 @@ class ModelDownloader(
     }
 
     // Final progress update
-    onProgress(progressCounter.get(), allFiles.size)
+    onProgress(progressCounter.get(), remainingFiles.size)
   }
 
 

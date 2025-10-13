@@ -437,15 +437,15 @@ using namespace facebook;
     NSString* filename = filesToDownload[i];
     NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:filename];
     
-    // Calculate and emit progress
+    // Download the file first
+    if (![self downloadFile:modelUrl filename:filename toURL:fileURL error:error]) {
+      return;
+    }
+    
+    // Calculate and emit progress after successful download
     double percentage = totalFiles > 0 ? (double)(i + 1) / totalFiles * 100.0 : 100.0;
     if (progressCallback) {
       progressCallback(round(percentage));
-    }
-    
-    // Download the file
-    if (![self downloadFile:modelUrl filename:filename toURL:fileURL error:error]) {
-      return;
     }
   }
 }
