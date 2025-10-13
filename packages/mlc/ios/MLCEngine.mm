@@ -323,9 +323,9 @@ using namespace facebook;
   return YES;
 }
 
-// Download all model files with status updates
+// Download all model files with percentage updates
 - (void)downloadModelFiles:(NSDictionary*)modelRecord
-                    status:(void (^)(NSString* status))statusCallback
+                  progress:(void (^)(double percentage))progressCallback
                      error:(NSError**)error {
   NSString* modelId = modelRecord[@"model_id"];
   NSString* modelUrl = modelRecord[@"model_url"];
@@ -357,17 +357,8 @@ using namespace facebook;
     return;
   }
   
-  // Download and save model config if it doesn't exist
-  if (![[NSFileManager defaultManager] fileExistsAtPath:[modelConfigURL path]]) {
-    if (statusCallback) statusCallback(@"Downloading model configuration...");
-    if (![self downloadFile:modelUrl filename:@"mlc-chat-config.json" toURL:modelConfigURL error:error]) {
-      return;
-    }
-  }
-  
   // Download and save ndarray-cache if it doesn't exist
   if (![[NSFileManager defaultManager] fileExistsAtPath:[ndarrayCacheURL path]]) {
-    if (statusCallback) statusCallback(@"Downloading cache configuration...");
     if (![self downloadFile:modelUrl filename:@"ndarray-cache.json" toURL:ndarrayCacheURL error:error]) {
       return;
     }
@@ -388,31 +379,14 @@ using namespace facebook;
     *error = ndarrayCacheJsonError;
     return;
   }
-  
-  // Download parameter files from ndarray cache
-  NSArray* records = ndarrayCache[@"records"];
-  if ([records isKindOfClass:[NSArray class]] && records.count > 0) {
-    int currentFile = 0;
-    int totalFiles = (int)records.count;
-    
-    for (NSDictionary* record in records) {
-      NSString* dataPath = record[@"dataPath"];
-      if (dataPath) {
-        NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:dataPath];
-        if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
-          currentFile++;
-          NSString* fileName = [dataPath lastPathComponent];
-          if (statusCallback) {
-            statusCallback([NSString stringWithFormat:@"Downloading %@ (%d/%d)...", fileName, currentFile, totalFiles]);
-          }
-          if (![self downloadFile:modelUrl filename:dataPath toURL:fileURL error:error]) {
-            return;
-          }
-        }
-      }
+
+  // Download and save model config if it doesn't exist
+  if (![[NSFileManager defaultManager] fileExistsAtPath:[modelConfigURL path]]) {
+    if (![self downloadFile:modelUrl filename:@"mlc-chat-config.json" toURL:modelConfigURL error:error]) {
+      return;
     }
   }
-  
+
   // Read and parse model config
   NSData* modelConfigData = [NSData dataWithContentsOfURL:modelConfigURL];
   if (!modelConfigData) {
@@ -429,21 +403,51 @@ using namespace facebook;
     return;
   }
   
-  // Download tokenizer files
-  NSArray* tokenizerFiles = modelConfig[@"tokenizer_files"];
-  if ([tokenizerFiles isKindOfClass:[NSArray class]] && tokenizerFiles.count > 0) {
-    if (statusCallback) statusCallback(@"Downloading tokenizer files...");
-    for (NSString* filename in tokenizerFiles) {
-      NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:filename];
-      if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
-        if (![self downloadFile:modelUrl filename:filename toURL:fileURL error:error]) {
-          return;
+  // Create unified list of files to download
+  NSMutableArray* filesToDownload = [NSMutableArray new];
+  
+  // Add parameter files from ndarray cache
+  NSArray* records = ndarrayCache[@"records"];
+  if ([records isKindOfClass:[NSArray class]]) {
+    for (NSDictionary* record in records) {
+      NSString* dataPath = record[@"dataPath"];
+      if (dataPath) {
+        NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:dataPath];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+          [filesToDownload addObject:dataPath];
         }
       }
     }
   }
   
-  if (statusCallback) statusCallback(@"Download complete");
+  // Add tokenizer files
+  NSArray* tokenizerFiles = modelConfig[@"tokenizer_files"];
+  if ([tokenizerFiles isKindOfClass:[NSArray class]]) {
+    for (NSString* filename in tokenizerFiles) {
+      NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:filename];
+      if (![[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+        [filesToDownload addObject:filename];
+      }
+    }
+  }
+  
+  // Download all files with progress tracking
+  NSInteger totalFiles = filesToDownload.count;
+  for (NSInteger i = 0; i < totalFiles; i++) {
+    NSString* filename = filesToDownload[i];
+    NSURL* fileURL = [modelDirURL URLByAppendingPathComponent:filename];
+    
+    // Calculate and emit progress
+    double percentage = totalFiles > 0 ? (double)(i + 1) / totalFiles * 100.0 : 100.0;
+    if (progressCallback) {
+      progressCallback(round(percentage));
+    }
+    
+    // Download the file
+    if (![self downloadFile:modelUrl filename:filename toURL:fileURL error:error]) {
+      return;
+    }
+  }
 }
 
 - (void)downloadModel:(NSString*)modelId
@@ -460,8 +464,8 @@ using namespace facebook;
       
       NSError* downloadError = nil;
       [self downloadModelFiles:modelRecord
-                        status:^(NSString* status) {
-        [self emitOnDownloadProgress:@{@"status" : status}];
+                      progress:^(double percentage) {
+        [self emitOnDownloadProgress:@{@"percentage" : @(percentage)}];
       }
                          error:&downloadError];
       
