@@ -2,23 +2,13 @@
   "device": "iphone",
   "model_list": [
     {
-      "model": "HF://mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-      "model_id": "Qwen2.5-0.5B-Instruct",
-      "estimated_vram_bytes": 600000000,
-      "bundle_weight": false,
-      "overrides": {
-        "context_window_size": 2048,
-        "prefill_chunk_size": 1024
-      }
-    },
-    {
       "model": "HF://mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC",
       "model_id": "Llama-3.2-1B-Instruct",
       "estimated_vram_bytes": 1200000000,
       "bundle_weight": false,
       "overrides": {
         "context_window_size": 4096,
-        "prefill_chunk_size": 1024
+        "prefill_chunk_size": 512
       }
     },
     {
@@ -28,7 +18,7 @@
       "bundle_weight": false,
       "overrides": {
         "context_window_size": 4096,
-        "prefill_chunk_size": 1024
+        "prefill_chunk_size": 256
       }
     },
     {
@@ -38,6 +28,16 @@
       "bundle_weight": false,
       "overrides": {
         "context_window_size": 4096,
+        "prefill_chunk_size": 256
+      }
+    },
+    {
+      "model": "HF://mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
+      "model_id": "Qwen2.5-0.5B-Instruct",
+      "estimated_vram_bytes": 600000000,
+      "bundle_weight": false,
+      "overrides": {
+        "context_window_size": 2048,
         "prefill_chunk_size": 1024
       }
     }
