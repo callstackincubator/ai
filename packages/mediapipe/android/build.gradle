@@ -1,0 +1,103 @@
+import com.android.Version
+
+buildscript {
+  def kotlin_version = rootProject.ext.has("kotlinVersion") ? rootProject.ext.get("kotlinVersion") : project.properties["MLC_kotlinVersion"]
+
+  repositories {
+    google()
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath "com.android.tools.build:gradle:7.2.1"
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+  }
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+apply plugin: "com.facebook.react"
+
+def getExtOrDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties["MLC_" + name]
+}
+
+def getExtOrIntegerDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["MLC_" + name]).toInteger()
+}
+
+static def supportsNamespace() {
+  def parsed = Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')
+  def major = parsed[0].toInteger()
+  def minor = parsed[1].toInteger()
+
+  // Namespace support was added in 7.3.0
+  return (major == 7 && minor >= 3) || major >= 8
+}
+
+android {
+  if (supportsNamespace()) {
+    namespace "com.callstack.ai.mediapipe"
+
+    sourceSets {
+      main {
+        manifest.srcFile "src/main/AndroidManifest.xml"
+      }
+    }
+  }
+
+  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+  }
+
+  buildFeatures {
+    buildConfig true
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+    }
+  }
+
+  lintOptions {
+    disable "GradleCompatible"
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs += [
+        "src",
+        "generated/java",
+        "generated/jni"
+      ]
+    }
+  }
+}
+
+repositories {
+  mavenCentral()
+  google()
+}
+
+def kotlin_version = getExtOrDefault("kotlinVersion")
+
+dependencies {
+  implementation "com.facebook.react:react-native:+"
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+  implementation "com.google.mediapipe:tasks-genai:0.10.27"
+}
+
+react {
+  jsRootDir = file("../src/")
+  libraryName = "Mediapipe"
+  codegenJavaPackageName = "com.callstack.ai.mediapipe"
+}

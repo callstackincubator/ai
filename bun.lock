@@ -33,6 +33,7 @@
         "@azure/core-asynciterator-polyfill": "^1.0.2",
         "@bottom-tabs/react-navigation": "^0.10.2",
         "@react-native-ai/apple": "workspace:*",
+        "@react-native-ai/mediapipe": "workspace:*",
         "@react-native-ai/mlc": "workspace:*",
         "@react-native-picker/picker": "2.11.1",
         "@react-navigation/bottom-tabs": "^7.4.4",
@@ -68,7 +69,7 @@
     },
     "packages/apple-llm": {
       "name": "@react-native-ai/apple",
-      "version": "0.9.0",
+      "version": "0.11.0",
       "dependencies": {
         "@ai-sdk/provider": "^2.0.0",
         "@ai-sdk/provider-utils": "^3.0.10",
@@ -81,9 +82,28 @@
         "react-native": ">=0.76.0",
       },
     },
+    "packages/mediapipe": {
+      "name": "@react-native-ai/mediapipe",
+      "version": "0.11.0",
+      "dependencies": {
+        "@ai-sdk/provider": "^2.0.0",
+        "@ai-sdk/provider-utils": "^3.0.10",
+        "zod": "^4.0.0",
+      },
+      "devDependencies": {
+        "react-native": "0.81.4",
+      },
+      "peerDependencies": {
+        "expo": "*",
+        "react-native": ">=0.76.0",
+      },
+      "optionalPeers": [
+        "expo",
+      ],
+    },
     "packages/mlc": {
       "name": "@react-native-ai/mlc",
-      "version": "0.9.0",
+      "version": "0.11.0",
       "dependencies": {
         "@ai-sdk/provider": "^2.0.0",
         "@ai-sdk/provider-utils": "^3.0.10",
@@ -579,6 +599,8 @@
     "@pnpm/npm-conf": ["@pnpm/npm-conf@2.3.1", "", { "dependencies": { "@pnpm/config.env-replace": "^1.1.0", "@pnpm/network.ca-file": "^1.0.1", "config-chain": "^1.1.11" } }, "sha512-c83qWb22rNRuB0UaVCI0uRPNRr8Z0FWnEIvT47jiHAmOIUHbBOg5XvV7pM5x+rKn9HRpjxquDbXYSXr3fAKFcw=="],
 
     "@react-native-ai/apple": ["@react-native-ai/apple@workspace:packages/apple-llm"],
+
+    "@react-native-ai/mediapipe": ["@react-native-ai/mediapipe@workspace:packages/mediapipe"],
 
     "@react-native-ai/mlc": ["@react-native-ai/mlc@workspace:packages/mlc"],
 

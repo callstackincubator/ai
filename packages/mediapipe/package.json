@@ -1,0 +1,99 @@
+{
+  "name": "@react-native-ai/mediapipe",
+  "version": "0.11.0",
+  "description": "Mediapipe provider for Vercel AI SDK",
+  "main": "lib/commonjs/index",
+  "module": "lib/module/index",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index",
+  "source": "src/index",
+  "files": [
+    "src",
+    "lib",
+    "android",
+    "ios",
+    "cpp",
+    "*.podspec",
+    "!ios/build",
+    "!android/build",
+    "!android/gradle",
+    "!android/gradlew",
+    "!android/gradlew.bat",
+    "!android/local.properties",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "clean": "del-cli lib",
+    "typecheck": "tsc --noEmit",
+    "prepare": "bob build"
+  },
+  "keywords": [
+    "react-native",
+    "mediapipe",
+    "llm",
+    "ai",
+    "sdk",
+    "vercel",
+    "expo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/callstackincubator/ai.git"
+  },
+  "author": "Mike Grabowski <grabbou@gmail.com> (https://github.com/grabbou)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/callstackincubator/ai/issues"
+  },
+  "homepage": "https://github.com/callstackincubator/ai#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "react-native": "0.81.4"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "codegenConfig": {
+    "name": "MediaPipeEngine",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "ios": {
+      "modulesProvider": {
+        "MediaPipeEngine": "MediaPipeEngine"
+      }
+    },
+    "android": {
+      "javaPackageName": "com.callstack.ai.mediapipe"
+    }
+  },
+  "dependencies": {
+    "@ai-sdk/provider": "^2.0.0",
+    "@ai-sdk/provider-utils": "^3.0.10",
+    "zod": "^4.0.0"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.76.0",
+    "expo": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
+  }
+}
