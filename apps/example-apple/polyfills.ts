@@ -2,4 +2,6 @@ import '@azure/core-asynciterator-polyfill'
 
 import structuredClone from '@ungap/structured-clone'
 
-globalThis.structuredClone = structuredClone
+if (!('structuredClone' in globalThis)) {
+  globalThis.structuredClone = structuredClone
+}
