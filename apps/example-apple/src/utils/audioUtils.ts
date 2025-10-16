@@ -1,4 +1,5 @@
 import { addWAVHeader, AudioFormatType } from '@react-native-ai/apple'
+import type { AudioBuffer } from 'react-native-audio-api'
 
 /**
  * Merges multiple AudioBuffer objects into a single continuous Float32Array
