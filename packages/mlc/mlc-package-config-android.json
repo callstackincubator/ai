@@ -2,7 +2,7 @@
   "device": "android",
   "model_list": [
     {
-      "model": "HF://mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC",
+      "model": "HF://mlc-ai/Llama-3.2-1B-Instruct-q4f16_0-MLC",
       "model_id": "Llama-3.2-1B-Instruct",
       "estimated_vram_bytes": 1200000000,
       "bundle_weight": false,
@@ -12,7 +12,7 @@
       }
     },
     {
-      "model": "HF://mlc-ai/Llama-3.2-3B-Instruct-q4f16_1-MLC",
+      "model": "HF://mlc-ai/Llama-3.2-3B-Instruct-q4f16_0-MLC",
       "model_id": "Llama-3.2-3B-Instruct",
       "estimated_vram_bytes": 2000000000,
       "bundle_weight": false,
@@ -22,7 +22,7 @@
       }
     },
     {
-      "model": "HF://mlc-ai/Phi-3.5-mini-instruct-q4f16_1-MLC",
+      "model": "HF://mlc-ai/Phi-3.5-mini-instruct-q4f16_0-MLC",
       "model_id": "Phi-3.5-mini-instruct",
       "estimated_vram_bytes": 2300000000,
       "bundle_weight": false,
@@ -32,8 +32,8 @@
       }
     },
     {
-      "model": "HF://mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-      "model_id": "Qwen2.5-0.5B-Instruct",
+      "model": "HF://mlc-ai/Qwen2-1.5B-Instruct-q4f16_0-MLC",
+      "model_id": "Qwen2-1.5B-Instruct",
       "estimated_vram_bytes": 600000000,
       "bundle_weight": false,
       "overrides": {
