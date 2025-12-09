@@ -21,6 +21,12 @@ npm install ai@beta
 - **React Native New Architecture** - Required for native module functionality
 - **Increased Memory Limit capability** - Required for large model loading
 
+## Running Your Application
+
+**Important:** You must run your application on a **physical iOS device** or using **Mac (Designed for iPad)** destination in Xcode. The prebuilt model binaries are compiled for device architectures and will not work in the iOS Simulator.
+
+If you need to test on a Mac, select the "My Mac (Designed for iPad)" destination in Xcode.
+
 ## Configuration
 
 ### Expo Config Plugin
