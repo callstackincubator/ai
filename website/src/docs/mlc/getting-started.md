@@ -23,9 +23,9 @@ npm install ai@beta
 
 ## Running Your Application
 
-**Important:** You must run your application on a **physical iOS device** or using **Mac (Designed for iPad)** destination in Xcode. The prebuilt model binaries are compiled for device architectures and will not work in the iOS Simulator.
-
-If you need to test on a Mac, select the "My Mac (Designed for iPad)" destination in Xcode.
+:::danger Physical Device Required
+You must run your application on a **physical iOS device** or using **Mac (Designed for iPad)** destination in Xcode, as prebuilt model binaries will not work in the iOS Simulator.
+:::
 
 ## Configuration
 
