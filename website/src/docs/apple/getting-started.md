@@ -13,7 +13,7 @@ npm install @react-native-ai/apple
 While you can use the Apple provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](https://v5.ai-sdk.dev/docs/getting-started/expo#polyfills):
 
 ```bash
-npm install ai@beta
+npm install ai
 ```
 
 ## Requirements
