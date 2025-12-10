@@ -23,6 +23,10 @@ npm install ai@beta
 > [!NOTE]
 > Different Apple AI features have varying iOS version requirements. Check the specific API documentation for compatibility details.
 
+## Running on Simulator
+
+To use Apple Intelligence with the iOS Simulator, you need to enable it on your macOS system first. See the [Running on Simulator](./running-on-simulator) guide for detailed setup instructions.
+
 ## Basic Usage
 
 Import the Apple provider and use it with the AI SDK:

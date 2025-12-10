@@ -3,5 +3,6 @@
   { "type": "file", "name": "generating", "label": "Generating" },
   { "type": "file", "name": "embeddings", "label": "Embeddings" },
   { "type": "file", "name": "transcription", "label": "Transcription" },
-  { "type": "file", "name": "speech", "label": "Speech" }
+  { "type": "file", "name": "speech", "label": "Speech" },
+  { "type": "file", "name": "running-on-simulator", "label": "Running on Simulator" }
 ]
