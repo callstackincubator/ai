@@ -21,6 +21,12 @@ npm install ai
 - **React Native New Architecture** - Required for native module functionality
 - **Increased Memory Limit capability** - Required for large model loading
 
+## Running Your Application
+
+:::danger Physical Device Required
+You must run your application on a **physical iOS device** or using **Mac (Designed for iPad)** destination in Xcode, as prebuilt model binaries will not work in the iOS Simulator.
+:::
+
 ## Configuration
 
 ### Expo Config Plugin
