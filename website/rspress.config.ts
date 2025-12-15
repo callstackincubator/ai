@@ -13,7 +13,8 @@ export default withCallstackPreset(
       description:
         'react-native-ai brings on-device LLMs capabilities to mobile React Native apps',
       rootUrl: 'https://react-native-ai.dev',
-      icon: '/rspress-icon.png',
+      icon: '/icon.svg',
+      ogImage: '/og-image.jpg',
       logoLight: '/logo-light.png',
       logoDark: '/logo-dark.png',
       editUrl: 'https://github.com/callstackincubator/ai/edit/main/website/src',
