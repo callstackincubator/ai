@@ -6,12 +6,12 @@ import type {
   LanguageModelV2StreamPart,
 } from '@ai-sdk/provider'
 import {
-  type ContextParams,
   type CompletionParams,
-  type TokenData,
-  type NativeCompletionResult,
+  type ContextParams,
   initLlama,
   type LlamaContext,
+  type NativeCompletionResult,
+  type TokenData,
 } from 'llama.rn'
 
 import {
@@ -44,8 +44,8 @@ function convertFinishReason(
 
 function prepareMessages(
   prompt: LanguageModelV2Prompt
-): Array<{ role: string; content: string }> {
-  const messages: Array<{ role: string; content: string }> = []
+): { role: string; content: string }[] {
+  const messages: { role: string; content: string }[] = []
 
   for (const message of prompt) {
     let content = ''

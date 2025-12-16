@@ -3,10 +3,8 @@ import {
   llama,
   LlamaEngine,
 } from '@react-native-ai/llama'
-import { generateText, streamText } from 'ai'
-
-type LlamaModel = ReturnType<typeof llama.languageModel>
 import { Picker } from '@react-native-picker/picker'
+import { generateText, streamText } from 'ai'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -20,6 +18,8 @@ import {
 import { useBottomTabBarHeight } from 'react-native-bottom-tabs'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { useDerivedValue } from 'react-native-reanimated'
+
+type LlamaModel = ReturnType<typeof llama.languageModel>
 
 interface Message {
   role: 'system' | 'user' | 'assistant'
