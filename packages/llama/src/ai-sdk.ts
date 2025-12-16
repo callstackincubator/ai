@@ -72,7 +72,7 @@ function prepareMessages(
 /**
  * Configuration options for llama.rn model initialization
  */
-export interface LlamaRnModelOptions {
+export interface LlamaModelOptions {
   /** Context size (default: 2048) */
   n_ctx?: number
   /** Number of GPU layers (default: 99) */
@@ -84,7 +84,7 @@ export interface LlamaRnModelOptions {
 /**
  * Engine for managing llama.rn models (similar to MLCEngine)
  */
-export const LlamaRnEngine = {
+export const LlamaEngine = {
   /**
    * Get all downloaded models
    */
@@ -101,7 +101,7 @@ export const LlamaRnEngine = {
 
   /**
    * Set custom storage path for models
-   * Default: ${DocumentDir}/llama-rn-models/
+   * Default: ${DocumentDir}/llama-models/
    */
   setStoragePath: (path: string): void => {
     setStoragePath(path)
@@ -111,16 +111,16 @@ export const LlamaRnEngine = {
 /**
  * llama.rn Language Model for AI SDK
  */
-export class LlamaRnLanguageModel implements LanguageModelV2 {
+export class LlamaLanguageModel implements LanguageModelV2 {
   readonly specificationVersion = 'v2'
   readonly supportedUrls = {}
-  readonly provider = 'llama-rn'
+  readonly provider = 'llama'
   readonly modelId: string
 
-  private options: LlamaRnModelOptions
+  private options: LlamaModelOptions
   private context: LlamaContext | null = null
 
-  constructor(modelId: string, options: LlamaRnModelOptions = {}) {
+  constructor(modelId: string, options: LlamaModelOptions = {}) {
     this.modelId = modelId
     this.options = {
       n_ctx: 2048,
@@ -220,13 +220,13 @@ export class LlamaRnLanguageModel implements LanguageModelV2 {
       }
     }
 
-    console.log('[llama-rn] Generating text (non-streaming)')
+    console.log('[llama] Generating text (non-streaming)')
 
     const response = await this.context.completion(completionOptions)
 
     const textContent = response.content || response.text || ''
 
-    console.log('[llama-rn] Generation complete:', {
+    console.log('[llama] Generation complete:', {
       contentLength: textContent.length,
       finishReason: convertFinishReason(response),
     })
@@ -281,7 +281,7 @@ export class LlamaRnLanguageModel implements LanguageModelV2 {
       }
     }
 
-    console.log('[llama-rn] Starting streaming generation')
+    console.log('[llama] Starting streaming generation')
 
     let streamFinished = false
     let isCancelled = false
@@ -315,7 +315,7 @@ export class LlamaRnLanguageModel implements LanguageModelV2 {
                   })
                 }
               } catch (err) {
-                console.error('[llama-rn] Error in token callback:', err)
+                console.error('[llama] Error in token callback:', err)
               }
             }
           )
@@ -323,7 +323,7 @@ export class LlamaRnLanguageModel implements LanguageModelV2 {
           streamFinished = true
 
           if (isCancelled) {
-            console.log('[llama-rn] Stream was cancelled')
+            console.log('[llama] Stream was cancelled')
             return
           }
 
@@ -344,36 +344,36 @@ export class LlamaRnLanguageModel implements LanguageModelV2 {
                   (result.timings?.predicted_n || 0),
               },
               providerMetadata: {
-                'llama-rn': {
+                llama: {
                   timings: result.timings,
                 },
               },
             })
 
             controller.close()
-            console.log('[llama-rn] Streaming complete')
+            console.log('[llama] Streaming complete')
           } catch (err) {
-            console.error('[llama-rn] Error closing stream:', err)
+            console.error('[llama] Error closing stream:', err)
           }
         } catch (error) {
-          console.error('[llama-rn] Streaming error:', error)
+          console.error('[llama] Streaming error:', error)
           if (!isCancelled && !streamFinished) {
             try {
               controller.error(error)
             } catch (err) {
-              console.error('[llama-rn] Error reporting error:', err)
+              console.error('[llama] Error reporting error:', err)
             }
           }
         }
       },
       cancel: async () => {
-        console.log('[llama-rn] Stream cancelled')
+        console.log('[llama] Stream cancelled')
         isCancelled = true
         streamFinished = true
         try {
           await context.stopCompletion()
         } catch (error) {
-          console.error('[llama-rn] Error stopping completion:', error)
+          console.error('[llama] Error stopping completion:', error)
         }
       },
     })
@@ -387,14 +387,14 @@ export class LlamaRnLanguageModel implements LanguageModelV2 {
 /**
  * llama.rn provider factory
  */
-export const llamaRn = {
+export const llama = {
   /**
    * Create a language model instance
    */
   languageModel: (
     modelId: string,
-    options: LlamaRnModelOptions = {}
-  ): LlamaRnLanguageModel => {
-    return new LlamaRnLanguageModel(modelId, options)
+    options: LlamaModelOptions = {}
+  ): LlamaLanguageModel => {
+    return new LlamaLanguageModel(modelId, options)
   },
 }

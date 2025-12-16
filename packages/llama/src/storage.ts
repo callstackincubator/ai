@@ -1,6 +1,6 @@
 import RNBlobUtil from 'react-native-blob-util'
 
-let storagePath = `${RNBlobUtil.fs.dirs.DocumentDir}/llama-rn-models`
+let storagePath = `${RNBlobUtil.fs.dirs.DocumentDir}/llama-models`
 
 export interface DownloadProgress {
   percentage: number

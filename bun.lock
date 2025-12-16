@@ -34,7 +34,7 @@
         "@azure/core-asynciterator-polyfill": "^1.0.2",
         "@bottom-tabs/react-navigation": "^0.10.2",
         "@react-native-ai/apple": "workspace:*",
-        "@react-native-ai/llama-rn": "workspace:*",
+        "@react-native-ai/llama": "workspace:*",
         "@react-native-picker/picker": "2.11.1",
         "@react-navigation/bottom-tabs": "^7.4.4",
         "@react-navigation/native": "^7.1.16",
@@ -85,8 +85,8 @@
         "react-native": ">=0.76.0",
       },
     },
-    "packages/llama-rn": {
-      "name": "@react-native-ai/llama-rn",
+    "packages/llama": {
+      "name": "@react-native-ai/llama",
       "version": "0.11.0",
       "dependencies": {
         "@ai-sdk/provider": "^2.0.0",
@@ -606,7 +606,7 @@
 
     "@react-native-ai/apple": ["@react-native-ai/apple@workspace:packages/apple-llm"],
 
-    "@react-native-ai/llama-rn": ["@react-native-ai/llama-rn@workspace:packages/llama-rn"],
+    "@react-native-ai/llama": ["@react-native-ai/llama@workspace:packages/llama"],
 
     "@react-native-ai/mlc": ["@react-native-ai/mlc@workspace:packages/mlc"],
 

@@ -1,11 +1,11 @@
 import {
   type DownloadProgress,
-  llamaRn,
-  LlamaRnEngine,
-} from '@react-native-ai/llama-rn'
+  llama,
+  LlamaEngine,
+} from '@react-native-ai/llama'
 import { generateText, streamText } from 'ai'
 
-type LlamaRnModel = ReturnType<typeof llamaRn.languageModel>
+type LlamaModel = ReturnType<typeof llama.languageModel>
 import { Picker } from '@react-native-picker/picker'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -64,7 +64,7 @@ export default function LlamaRNScreen() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [isInitializing, setIsInitializing] = useState(false)
-  const [model, setModel] = useState<LlamaRnModel | null>(null)
+  const [model, setModel] = useState<LlamaModel | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -78,7 +78,7 @@ export default function LlamaRNScreen() {
 
   if (!hasLoadedModels.current) {
     hasLoadedModels.current = true
-    LlamaRnEngine.getModels().then((models) => {
+    LlamaEngine.getModels().then((models) => {
       const downloadedFilenames = new Set(models.map((m) => m.filename))
       setDownloadedModels(downloadedFilenames)
 
@@ -125,7 +125,7 @@ export default function LlamaRNScreen() {
   const initializeModelById = async (modelId: string) => {
     setIsInitializing(true)
     try {
-      const newModel = llamaRn.languageModel(modelId, {
+      const newModel = llama.languageModel(modelId, {
         n_ctx: 2048,
         n_gpu_layers: 99,
       })
@@ -146,7 +146,7 @@ export default function LlamaRNScreen() {
     setDownloadProgress(0)
 
     try {
-      const model = llamaRn.languageModel(selectedModel.modelId)
+      const model = llama.languageModel(selectedModel.modelId)
       await model.download((progress: DownloadProgress) => {
         setDownloadProgress(progress.percentage)
       })
@@ -177,7 +177,7 @@ export default function LlamaRNScreen() {
         setModel(null)
       }
 
-      const modelToDelete = llamaRn.languageModel(selectedModel.modelId)
+      const modelToDelete = llama.languageModel(selectedModel.modelId)
       await modelToDelete.remove()
 
       // Update downloaded models set

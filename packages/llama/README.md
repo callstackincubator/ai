@@ -1,21 +1,21 @@
-# @react-native-ai/llama-rn
+# @react-native-ai/llama
 
 llama.rn provider for Vercel AI SDK - run GGUF models on-device in React Native.
 
 ## Installation
 
 ```bash
-npm install @react-native-ai/llama-rn llama.rn react-native-blob-util ai
+npm install @react-native-ai/llama llama.rn react-native-blob-util ai
 ```
 
 ## Usage with AI SDK
 
 ```typescript
-import { llamaRn } from '@react-native-ai/llama-rn'
+import { llama } from '@react-native-ai/llama'
 import { generateText, streamText } from 'ai'
 
 // Create model instance (Model ID format: "owner/repo/filename.gguf")
-const model = llamaRn.languageModel(
+const model = llama.languageModel(
   'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf',
   {
     n_ctx: 2048,
@@ -68,13 +68,13 @@ await model.unload()
 For advanced use cases, you can access the underlying `LlamaContext` directly:
 
 ```typescript
-import { llamaRn, LlamaRnEngine } from '@react-native-ai/llama-rn'
+import { llama, LlamaEngine } from '@react-native-ai/llama'
 
 // List downloaded models
-const models = await LlamaRnEngine.getModels()
+const models = await LlamaEngine.getModels()
 
 // Create and prepare model
-const model = llamaRn.languageModel(
+const model = llama.languageModel(
   'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
 )
 await model.prepare()
@@ -95,7 +95,7 @@ await model.remove()
 
 ## API
 
-### `llamaRn.languageModel(modelId, options?)`
+### `llama.languageModel(modelId, options?)`
 
 Creates a language model instance.
 
@@ -105,7 +105,7 @@ Creates a language model instance.
   - `n_gpu_layers`: Number of GPU layers (default: 99)
   - `contextParams`: Additional llama.rn context parameters
 
-### `LlamaRnEngine`
+### `LlamaEngine`
 
 - `getModels()`: Get list of downloaded models
 - `isDownloaded(modelId)`: Check if a model is downloaded

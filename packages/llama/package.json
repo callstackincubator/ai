@@ -1,5 +1,5 @@
 {
-  "name": "@react-native-ai/llama-rn",
+  "name": "@react-native-ai/llama",
   "version": "0.11.0",
   "description": "llama.rn provider for Vercel AI SDK",
   "main": "lib/commonjs/index",
