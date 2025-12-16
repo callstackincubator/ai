@@ -1,8 +1,18 @@
 import type {
   LanguageModelV2,
   LanguageModelV2CallOptions,
+  LanguageModelV2FinishReason,
+  LanguageModelV2Prompt,
+  LanguageModelV2StreamPart,
 } from '@ai-sdk/provider'
-import { type ContextParams, initLlama, type LlamaContext } from 'llama.rn'
+import {
+  type ContextParams,
+  type CompletionParams,
+  type TokenData,
+  type NativeCompletionResult,
+  initLlama,
+  type LlamaContext,
+} from 'llama.rn'
 
 import {
   downloadModel,
@@ -15,11 +25,52 @@ import {
   setStoragePath,
 } from './storage'
 
-// Re-export types
 export type { DownloadProgress, ModelInfo }
 
+function convertFinishReason(
+  result: NativeCompletionResult
+): LanguageModelV2FinishReason {
+  if (result.stopped_eos) {
+    return 'stop'
+  }
+  if (result.stopped_word) {
+    return 'stop'
+  }
+  if (result.stopped_limit) {
+    return 'length'
+  }
+  return 'unknown'
+}
+
+function prepareMessages(
+  prompt: LanguageModelV2Prompt
+): Array<{ role: string; content: string }> {
+  const messages: Array<{ role: string; content: string }> = []
+
+  for (const message of prompt) {
+    let content = ''
+
+    if (Array.isArray(message.content)) {
+      for (const part of message.content) {
+        if (part.type === 'text') {
+          content += part.text
+        }
+      }
+    } else if (typeof message.content === 'string') {
+      content = message.content
+    }
+
+    messages.push({
+      role: message.role,
+      content,
+    })
+  }
+
+  return messages
+}
+
 /**
- * Configuration for model context
+ * Configuration options for llama.rn model initialization
  */
 export interface LlamaRnModelOptions {
   /** Context size (default: 2048) */
@@ -60,7 +111,7 @@ export const LlamaRnEngine = {
 /**
  * llama.rn Language Model for AI SDK
  */
-class LlamaRnLanguageModel implements LanguageModelV2 {
+export class LlamaRnLanguageModel implements LanguageModelV2 {
   readonly specificationVersion = 'v2'
   readonly supportedUrls = {}
   readonly provider = 'llama-rn'
@@ -99,7 +150,7 @@ class LlamaRnLanguageModel implements LanguageModelV2 {
    */
   async prepare(): Promise<void> {
     if (this.context) {
-      return // Already prepared
+      return
     }
 
     const modelPath = getModelPath(this.modelId)
@@ -145,36 +196,201 @@ class LlamaRnLanguageModel implements LanguageModelV2 {
   }
 
   /**
-   * Non-streaming text generation
-   *
-   * TODO: Implement in Phase 2
+   * Non-streaming text generation (AI SDK LanguageModelV2)
    */
-  async doGenerate(_options: LanguageModelV2CallOptions): Promise<any> {
+  async doGenerate(options: LanguageModelV2CallOptions) {
     if (!this.context) {
       throw new Error('Model not prepared. Call prepare() first.')
     }
-    // TODO: Implement using this.context.completion()
-    throw new Error('doGenerate() not implemented yet. Coming in Phase 2.')
+
+    const messages = prepareMessages(options.prompt)
+
+    const completionOptions: Partial<CompletionParams> = {
+      messages,
+      temperature: options.temperature,
+      n_predict: options.maxOutputTokens,
+      top_p: options.topP,
+      top_k: options.topK,
+    }
+
+    if (options.responseFormat?.type === 'json') {
+      completionOptions.response_format = {
+        type: 'json_object',
+        schema: options.responseFormat.schema,
+      }
+    }
+
+    console.log('[llama-rn] Generating text (non-streaming)')
+
+    const response = await this.context.completion(completionOptions)
+
+    const textContent = response.content || response.text || ''
+
+    console.log('[llama-rn] Generation complete:', {
+      contentLength: textContent.length,
+      finishReason: convertFinishReason(response),
+    })
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: textContent,
+        },
+      ],
+      finishReason: convertFinishReason(response),
+      usage: {
+        inputTokens: response.timings?.prompt_n || 0,
+        outputTokens: response.timings?.predicted_n || 0,
+        totalTokens:
+          (response.timings?.prompt_n || 0) +
+          (response.timings?.predicted_n || 0),
+      },
+      warnings: [],
+    }
   }
 
   /**
-   * Streaming text generation
-   *
-   * TODO: Implement in Phase 2
+   * Streaming text generation (AI SDK LanguageModelV2)
    */
-  async doStream(_options: LanguageModelV2CallOptions): Promise<any> {
+  async doStream(options: LanguageModelV2CallOptions) {
     if (!this.context) {
       throw new Error('Model not prepared. Call prepare() first.')
     }
-    // TODO: Implement using this.context.completion() with callback
-    throw new Error('doStream() not implemented yet. Coming in Phase 2.')
+
+    if (typeof ReadableStream === 'undefined') {
+      throw new TypeError(
+        'ReadableStream is not available in this environment. Please load a polyfill such as web-streams-polyfill.'
+      )
+    }
+
+    const messages = prepareMessages(options.prompt)
+
+    const completionOptions: Partial<CompletionParams> = {
+      messages,
+      temperature: options.temperature,
+      n_predict: options.maxOutputTokens,
+      top_p: options.topP,
+      top_k: options.topK,
+    }
+
+    if (options.responseFormat?.type === 'json') {
+      completionOptions.response_format = {
+        type: 'json_object',
+        schema: options.responseFormat.schema,
+      }
+    }
+
+    console.log('[llama-rn] Starting streaming generation')
+
+    let streamFinished = false
+    let isCancelled = false
+    const context = this.context
+
+    const stream = new ReadableStream<LanguageModelV2StreamPart>({
+      start: async (controller) => {
+        try {
+          const textId = `text-${Date.now()}`
+
+          controller.enqueue({
+            type: 'text-start',
+            id: textId,
+          })
+
+          const result = await context.completion(
+            completionOptions,
+            (tokenData: TokenData) => {
+              if (streamFinished || isCancelled) {
+                return
+              }
+
+              try {
+                const delta = tokenData.token || tokenData.content || ''
+
+                if (delta) {
+                  controller.enqueue({
+                    type: 'text-delta',
+                    id: textId,
+                    delta,
+                  })
+                }
+              } catch (err) {
+                console.error('[llama-rn] Error in token callback:', err)
+              }
+            }
+          )
+
+          streamFinished = true
+
+          if (isCancelled) {
+            console.log('[llama-rn] Stream was cancelled')
+            return
+          }
+
+          try {
+            controller.enqueue({
+              type: 'text-end',
+              id: textId,
+            })
+
+            controller.enqueue({
+              type: 'finish',
+              finishReason: convertFinishReason(result),
+              usage: {
+                inputTokens: result.timings?.prompt_n || 0,
+                outputTokens: result.timings?.predicted_n || 0,
+                totalTokens:
+                  (result.timings?.prompt_n || 0) +
+                  (result.timings?.predicted_n || 0),
+              },
+              providerMetadata: {
+                'llama-rn': {
+                  timings: result.timings,
+                },
+              },
+            })
+
+            controller.close()
+            console.log('[llama-rn] Streaming complete')
+          } catch (err) {
+            console.error('[llama-rn] Error closing stream:', err)
+          }
+        } catch (error) {
+          console.error('[llama-rn] Streaming error:', error)
+          if (!isCancelled && !streamFinished) {
+            try {
+              controller.error(error)
+            } catch (err) {
+              console.error('[llama-rn] Error reporting error:', err)
+            }
+          }
+        }
+      },
+      cancel: async () => {
+        console.log('[llama-rn] Stream cancelled')
+        isCancelled = true
+        streamFinished = true
+        try {
+          await context.stopCompletion()
+        } catch (error) {
+          console.error('[llama-rn] Error stopping completion:', error)
+        }
+      },
+    })
+
+    return {
+      stream,
+    }
   }
 }
 
 /**
- * llama.rn provider factory (matching MLC pattern)
+ * llama.rn provider factory
  */
 export const llamaRn = {
+  /**
+   * Create a language model instance
+   */
   languageModel: (
     modelId: string,
     options: LlamaRnModelOptions = {}

@@ -1,9 +1,11 @@
 import {
   type DownloadProgress,
-  type LlamaContext,
   llamaRn,
   LlamaRnEngine,
 } from '@react-native-ai/llama-rn'
+import { generateText, streamText } from 'ai'
+
+type LlamaRnModel = ReturnType<typeof llamaRn.languageModel>
 import { Picker } from '@react-native-picker/picker'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -62,7 +64,7 @@ export default function LlamaRNScreen() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [isInitializing, setIsInitializing] = useState(false)
-  const [context, setContext] = useState<LlamaContext | null>(null)
+  const [model, setModel] = useState<LlamaRnModel | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -106,16 +108,16 @@ export default function LlamaRNScreen() {
 
   useEffect(() => {
     return () => {
-      if (context) {
-        context.release()
+      if (model) {
+        model.unload()
       }
     }
-  }, [context])
+  }, [model])
 
   useEffect(() => {
-    if (context) {
-      context.release()
-      setContext(null)
+    if (model) {
+      model.unload()
+      setModel(null)
       setMessages([])
     }
   }, [selectedModel])
@@ -123,15 +125,17 @@ export default function LlamaRNScreen() {
   const initializeModelById = async (modelId: string) => {
     setIsInitializing(true)
     try {
-      const model = llamaRn.languageModel(modelId, {
+      const newModel = llamaRn.languageModel(modelId, {
         n_ctx: 2048,
         n_gpu_layers: 99,
       })
-      await model.prepare()
-      setContext(model.getContext())
+      await newModel.prepare()
+      setModel(newModel)
     } catch (error) {
       console.error('Model initialization failed:', error)
-      alert('Failed to initialize model. Please try again.')
+      throw new Error(
+        `Failed to initialize model: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
     } finally {
       setIsInitializing(false)
     }
@@ -167,14 +171,14 @@ export default function LlamaRNScreen() {
 
   const deleteModel = async () => {
     try {
-      // Release context first if loaded
-      if (context) {
-        await context.release()
-        setContext(null)
+      // Unload model first if loaded
+      if (model) {
+        await model.unload()
+        setModel(null)
       }
 
-      const model = llamaRn.languageModel(selectedModel.modelId)
-      await model.remove()
+      const modelToDelete = llamaRn.languageModel(selectedModel.modelId)
+      await modelToDelete.remove()
 
       // Update downloaded models set
       setDownloadedModels((prev) => {
@@ -185,12 +189,93 @@ export default function LlamaRNScreen() {
       setMessages([])
     } catch (error) {
       console.error('Delete failed:', error)
-      alert('Failed to delete model. Please try again.')
+      throw new Error(
+        `Failed to delete model: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
+  }
+
+  const testStreamText = async () => {
+    if (!model || isGenerating) return
+
+    setIsGenerating(true)
+    setMessages([
+      { role: 'user', content: '[Test] streamText()' },
+      { role: 'assistant', content: '...' },
+    ])
+
+    let accumulatedContent = ''
+
+    try {
+      const result = streamText({
+        model,
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'user', content: 'Write a short haiku about coding.' },
+        ],
+        maxOutputTokens: 100,
+        temperature: 0.7,
+      })
+
+      for await (const chunk of result.textStream) {
+        accumulatedContent += chunk
+        setMessages([
+          { role: 'user', content: '[Test] streamText()' },
+          { role: 'assistant', content: accumulatedContent },
+        ])
+      }
+    } catch (error) {
+      setMessages([
+        { role: 'user', content: '[Test] streamText()' },
+        {
+          role: 'assistant',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ])
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const testGenerateText = async () => {
+    if (!model || isGenerating) return
+
+    setIsGenerating(true)
+    setMessages([
+      { role: 'user', content: '[Test] generateText()' },
+      { role: 'assistant', content: 'Generating...' },
+    ])
+
+    try {
+      const result = await generateText({
+        model,
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'user', content: 'Write a short haiku about coding.' },
+        ],
+        maxOutputTokens: 100,
+        temperature: 0.7,
+      })
+
+      setMessages([
+        { role: 'user', content: '[Test] generateText()' },
+        { role: 'assistant', content: result.text },
+      ])
+    } catch (error) {
+      setMessages([
+        { role: 'user', content: '[Test] generateText()' },
+        {
+          role: 'assistant',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ])
+    } finally {
+      setIsGenerating(false)
     }
   }
 
   const sendMessage = async () => {
-    if (!inputText.trim() || isGenerating || !context) return
+    if (!inputText.trim() || isGenerating || !model) return
 
     const userMessage: Message = {
       role: 'user',
@@ -223,24 +308,24 @@ export default function LlamaRNScreen() {
         })),
       ]
 
-      await context.completion(
-        {
-          messages: conversationMessages,
-          n_predict: 400,
-          temperature: 0.7,
-        },
-        (data: { token: string }) => {
-          accumulatedContent += data.token
-          setMessages((prev) => {
-            const newMessages = [...prev]
-            newMessages[messageIdx] = {
-              role: 'assistant',
-              content: accumulatedContent,
-            }
-            return newMessages
-          })
-        }
-      )
+      const result = streamText({
+        model,
+        messages: conversationMessages,
+        maxOutputTokens: 400,
+        temperature: 0.7,
+      })
+
+      for await (const chunk of result.textStream) {
+        accumulatedContent += chunk
+        setMessages((prev) => {
+          const newMessages = [...prev]
+          newMessages[messageIdx] = {
+            role: 'assistant',
+            content: accumulatedContent,
+          }
+          return newMessages
+        })
+      }
     } catch (error) {
       const errorMessage = `Error: ${error instanceof Error ? error.message : 'Failed to generate response'}`
       setMessages((prev) => {
@@ -339,7 +424,7 @@ export default function LlamaRNScreen() {
             </View>
           )}
 
-          {isModelReady && !context && !isInitializing && (
+          {isModelReady && !model && !isInitializing && (
             <View className="flex-row mt-3 gap-2">
               <TouchableOpacity
                 className="flex-1 bg-green-500 rounded-lg py-3"
@@ -367,21 +452,43 @@ export default function LlamaRNScreen() {
             </View>
           )}
 
-          {context && (
-            <View className="flex-row mt-3 gap-2">
-              <View className="flex-1 bg-green-50 rounded-lg p-3">
-                <Text className="text-green-700 text-center font-semibold">
-                  Model Ready
-                </Text>
+          {model && (
+            <View className="mt-3 gap-2">
+              <View className="flex-row gap-2">
+                <View className="flex-1 bg-green-50 rounded-lg p-3">
+                  <Text className="text-green-700 text-center font-semibold">
+                    Model Ready
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  className="bg-red-500 rounded-lg py-3 px-4"
+                  onPress={deleteModel}
+                >
+                  <Text className="text-white text-center font-semibold">
+                    Delete
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                className="bg-red-500 rounded-lg py-3 px-4"
-                onPress={deleteModel}
-              >
-                <Text className="text-white text-center font-semibold">
-                  Delete
-                </Text>
-              </TouchableOpacity>
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  className={`flex-1 rounded-lg py-3 ${isGenerating ? 'bg-gray-300' : 'bg-purple-500'}`}
+                  onPress={testStreamText}
+                  disabled={isGenerating}
+                >
+                  <Text className="text-white text-center font-semibold">
+                    Test streamText()
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className={`flex-1 rounded-lg py-3 ${isGenerating ? 'bg-gray-300' : 'bg-orange-500'}`}
+                  onPress={testGenerateText}
+                  disabled={isGenerating}
+                >
+                  <Text className="text-white text-center font-semibold">
+                    Test generateText()
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -393,7 +500,7 @@ export default function LlamaRNScreen() {
             scrollViewRef.current?.scrollToEnd({ animated: true })
           }}
         >
-          {messages.length === 0 && context && (
+          {messages.length === 0 && model && (
             <View className="items-center justify-center py-8">
               <Text className="text-gray-400 text-center">
                 Model is ready. Start chatting!
@@ -427,28 +534,26 @@ export default function LlamaRNScreen() {
             className="flex-1 bg-gray-100 rounded-full px-4 py-2 mr-2"
             value={inputText}
             onChangeText={setInputText}
-            placeholder={
-              context ? 'Type a message...' : 'Initialize model first'
-            }
+            placeholder={model ? 'Type a message...' : 'Initialize model first'}
             placeholderTextColor="#9CA3AF"
             onSubmitEditing={sendMessage}
-            editable={!isGenerating && !!context}
+            editable={!isGenerating && !!model}
           />
           <TouchableOpacity
             className={`w-10 h-10 rounded-full justify-center items-center ${
-              inputText.trim() && !isGenerating && context
+              inputText.trim() && !isGenerating && model
                 ? 'bg-blue-500'
                 : 'bg-gray-300'
             }`}
             onPress={sendMessage}
-            disabled={!inputText.trim() || isGenerating || !context}
+            disabled={!inputText.trim() || isGenerating || !model}
           >
             {isGenerating ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Text
                 className={
-                  inputText.trim() && context
+                  inputText.trim() && model
                     ? 'text-white font-bold'
                     : 'text-gray-500 font-bold'
                 }

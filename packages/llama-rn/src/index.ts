@@ -1,3 +1,8 @@
 export type { DownloadProgress, LlamaRnModelOptions, ModelInfo } from './ai-sdk'
-export { llamaRn, LlamaRnEngine } from './ai-sdk'
-export type { CompletionParams, ContextParams, LlamaContext } from 'llama.rn'
+export { llamaRn, LlamaRnEngine, LlamaRnLanguageModel } from './ai-sdk'
+export type {
+  CompletionParams,
+  ContextParams,
+  LlamaContext,
+  TokenData,
+} from 'llama.rn'
