@@ -5,19 +5,16 @@ llama.rn provider for Vercel AI SDK - run GGUF models on-device in React Native.
 ## Installation
 
 ```bash
-npm install @react-native-ai/llama-rn llama.rn
+npm install @react-native-ai/llama-rn llama.rn react-native-blob-util ai
 ```
 
-## Usage
+## Usage with AI SDK
 
 ```typescript
-import { llamaRn, LlamaRnEngine } from '@react-native-ai/llama-rn'
+import { llamaRn } from '@react-native-ai/llama-rn'
+import { generateText, streamText } from 'ai'
 
-// List downloaded models
-const models = await LlamaRnEngine.getModels()
-
-// Create model instance
-// Model ID format: "owner/repo/filename.gguf"
+// Create model instance (Model ID format: "owner/repo/filename.gguf")
 const model = llamaRn.languageModel(
   'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf',
   {
@@ -34,7 +31,55 @@ await model.download((progress) => {
 // Initialize model (loads into memory)
 await model.prepare()
 
-// Access underlying LlamaContext for direct usage
+// Generate text (non-streaming)
+const { text } = await generateText({
+  model,
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Write a haiku about coding.' },
+  ],
+  maxOutputTokens: 100,
+  temperature: 0.7,
+})
+
+console.log(text)
+
+// Stream text
+const result = streamText({
+  model,
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Tell me a story.' },
+  ],
+  maxOutputTokens: 500,
+  temperature: 0.7,
+})
+
+for await (const chunk of result.textStream) {
+  process.stdout.write(chunk)
+}
+
+// Cleanup
+await model.unload()
+```
+
+## Direct Context Usage
+
+For advanced use cases, you can access the underlying `LlamaContext` directly:
+
+```typescript
+import { llamaRn, LlamaRnEngine } from '@react-native-ai/llama-rn'
+
+// List downloaded models
+const models = await LlamaRnEngine.getModels()
+
+// Create and prepare model
+const model = llamaRn.languageModel(
+  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+)
+await model.prepare()
+
+// Access underlying LlamaContext
 const context = model.getContext()
 const result = await context.completion({
   messages: [{ role: 'user', content: 'Hello!' }],
