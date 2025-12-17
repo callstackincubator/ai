@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@react-native-ai/monorepo",
@@ -36,7 +35,7 @@
         "@react-native-ai/apple": "workspace:*",
         "@react-native-ai/llama": "workspace:*",
         "@react-native-ai/mlc": "workspace:*",
-        "@react-native-picker/picker": "2.11.1",
+        "@react-native-picker/picker": "^2.11.4",
         "@react-navigation/bottom-tabs": "^7.4.4",
         "@react-navigation/native": "^7.1.16",
         "@react-navigation/native-stack": "^7.3.25",
@@ -611,7 +610,7 @@
 
     "@react-native-ai/mlc": ["@react-native-ai/mlc@workspace:packages/mlc"],
 
-    "@react-native-picker/picker": ["@react-native-picker/picker@2.11.1", "", { "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-ThklnkK4fV3yynnIIRBkxxjxR4IFbdMNJVF6tlLdOJ/zEFUEFUEdXY0KmH0iYzMwY8W4/InWsLiA7AkpAbnexA=="],
+    "@react-native-picker/picker": ["@react-native-picker/picker@2.11.4", "", { "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-Kf8h1AMnBo54b1fdiVylP2P/iFcZqzpMYcglC28EEFB1DEnOjsNr6Ucqc+3R9e91vHxEDnhZFbYDmAe79P2gjA=="],
 
     "@react-native/assets-registry": ["@react-native/assets-registry@0.81.4", "", {}, "sha512-AMcDadefBIjD10BRqkWw+W/VdvXEomR6aEZ0fhQRAv7igrBzb4PTn4vHKYg+sUK0e3wa74kcMy2DLc/HtnGcMA=="],
 
