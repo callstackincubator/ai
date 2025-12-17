@@ -28,6 +28,8 @@ import {
 
 export type { DownloadProgress, ModelInfo }
 
+type LLMState = 'text' | 'reasoning' | 'none'
+
 function convertFinishReason(
   result: NativeCompletionResult
 ): LanguageModelV2FinishReason {
@@ -291,11 +293,13 @@ export class LlamaLanguageModel implements LanguageModelV2 {
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       start: async (controller) => {
         try {
-          const textId = generateId()
+          let textId = generateId()
+
+          let state: LLMState = 'none' as LLMState
 
           controller.enqueue({
-            type: 'text-start',
-            id: textId,
+            type: 'stream-start',
+            warnings: [],
           })
 
           const result = await context.completion(
@@ -306,13 +310,61 @@ export class LlamaLanguageModel implements LanguageModelV2 {
               }
 
               try {
-                const delta = tokenData.token || tokenData.content || ''
+                const { token } = tokenData
 
-                if (delta) {
+                if (token === '<think>') {
+                  // start reasoning block
+                  if (state === 'text') {
+                    // finish text block
+                    controller.enqueue({
+                      type: 'text-end',
+                      id: textId,
+                    })
+                  }
+
+                  state = 'reasoning'
+                  textId = generateId()
+
+                  controller.enqueue({
+                    type: 'reasoning-start',
+                    id: textId,
+                  })
+                } else if (token === '</think>') {
+                  // finish reasoning block
+                  if (state === 'reasoning') {
+                    controller.enqueue({
+                      type: 'reasoning-end',
+                      id: textId,
+                    })
+                  }
+
+                  state = 'none'
+                } else {
+                  // regular text token
+                  if (state !== 'text') {
+                    // start text block
+                    if (state === 'reasoning') {
+                      // finish reasoning block
+                      controller.enqueue({
+                        type: 'reasoning-end',
+                        id: textId,
+                      })
+                    }
+
+                    state = 'text'
+                    textId = generateId()
+
+                    controller.enqueue({
+                      type: 'text-start',
+                      id: textId,
+                    })
+                  }
+
+                  // enqueue text token
                   controller.enqueue({
                     type: 'text-delta',
                     id: textId,
-                    delta,
+                    delta: token,
                   })
                 }
               } catch (err) {
@@ -323,17 +375,28 @@ export class LlamaLanguageModel implements LanguageModelV2 {
 
           streamFinished = true
 
+          if (state === 'text') {
+            // finish text block
+            controller.enqueue({
+              type: 'text-end',
+              id: textId,
+            })
+          }
+
+          if (state === 'reasoning') {
+            // finish reasoning block
+            controller.enqueue({
+              type: 'reasoning-end',
+              id: textId,
+            })
+          }
+
           if (isCancelled) {
             console.log('[llama] Stream was cancelled')
             return
           }
 
           try {
-            controller.enqueue({
-              type: 'text-end',
-              id: textId,
-            })
-
             controller.enqueue({
               type: 'finish',
               finishReason: convertFinishReason(result),
