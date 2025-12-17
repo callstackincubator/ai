@@ -76,23 +76,25 @@ export default function LlamaRNScreen() {
 
   const hasLoadedModels = useRef(false)
 
-  if (!hasLoadedModels.current) {
-    hasLoadedModels.current = true
-    LlamaEngine.getModels().then((models) => {
-      const downloadedFilenames = new Set(models.map((m) => m.filename))
-      setDownloadedModels(downloadedFilenames)
+  useEffect(() => {
+    if (!hasLoadedModels.current) {
+      hasLoadedModels.current = true
+      LlamaEngine.getModels().then((models) => {
+        const downloadedFilenames = new Set(models.map((m) => m.filename))
+        setDownloadedModels(downloadedFilenames)
 
-      const firstDownloadedModel = MODELS.find((m) =>
-        downloadedFilenames.has(getFilenameFromModelId(m.modelId))
-      )
+        const firstDownloadedModel = MODELS.find((m) =>
+          downloadedFilenames.has(getFilenameFromModelId(m.modelId))
+        )
 
-      if (firstDownloadedModel) {
-        setSelectedModel(firstDownloadedModel)
-      }
+        if (firstDownloadedModel) {
+          setSelectedModel(firstDownloadedModel)
+        }
 
-      setIsLoading(false)
-    })
-  }
+        setIsLoading(false)
+      })
+    }
+  }, [])
 
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
@@ -120,6 +122,7 @@ export default function LlamaRNScreen() {
       setModel(null)
       setMessages([])
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedModel])
 
   const initializeModelById = async (modelId: string) => {
