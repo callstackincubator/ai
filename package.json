@@ -4,7 +4,8 @@
   "scripts": {
     "typecheck": "bun run --filter='*' typecheck",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "release": "release-it"
+    "release": "release-it",
+    "build": "bun run --filter='@react-native-ai/*' prepare"
   },
   "repository": {
     "type": "git",

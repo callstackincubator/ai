@@ -85,7 +85,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 Build all packages
 
 ```bash 
-bun run --filter='packages/*' prepare
+bun run --filter='@react-native-ai/*' prepare
 ```
 
 Work on specific package
