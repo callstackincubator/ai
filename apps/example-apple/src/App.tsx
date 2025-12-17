@@ -113,7 +113,7 @@ const screens = (
       Component: NonNullable<ScreenProto['Component']>
     } => screen.Component !== null
   )
-  // lazy-load screens & initialize stack navigators
+  // initialize stack navigators
   .map((screen) => ({
     ...screen,
     StackNavigator: createNativeStackNavigator(),

@@ -13,6 +13,7 @@
     "@azure/core-asynciterator-polyfill": "^1.0.2",
     "@bottom-tabs/react-navigation": "^0.10.2",
     "@react-native-ai/apple": "workspace:*",
+    "@react-native-ai/mlc": "workspace:*",
     "@react-native-ai/llama": "workspace:*",
     "@react-native-picker/picker": "^2.11.4",
     "@react-navigation/bottom-tabs": "^7.9.0",

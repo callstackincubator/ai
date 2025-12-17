@@ -18,7 +18,7 @@
   "dependencies": {
     "@ai-sdk/provider": "^2.0.0",
     "@ai-sdk/provider-utils": "^3.0.10",
-    "zod": "^4.0.0"
+    "zod": "^4.2.1"
   },
   "peerDependencies": {
     "react-native": ">=0.76.0"
