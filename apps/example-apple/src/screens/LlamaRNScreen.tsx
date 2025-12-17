@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import { useBottomTabBarHeight } from 'react-native-bottom-tabs'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
-import Animated, { useDerivedValue } from 'react-native-reanimated'
+import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 
 type LlamaModel = ReturnType<typeof llama.languageModel>
 
@@ -344,11 +344,16 @@ export default function LlamaRNScreen() {
   const bottomTabBarHeight = useBottomTabBarHeight()
   const keyboardAnimation = useReanimatedKeyboardAnimation()
 
-  const height = useDerivedValue(() =>
-    keyboardAnimation.progress.value === 0
-      ? -bottomTabBarHeight
-      : keyboardAnimation.height.value
-  )
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY:
+          keyboardAnimation.progress.value === 0
+            ? -bottomTabBarHeight
+            : keyboardAnimation.height.value,
+      },
+    ],
+  }))
 
   if (isLoading) {
     return (
@@ -362,10 +367,7 @@ export default function LlamaRNScreen() {
   return (
     <Animated.View
       className="flex-1"
-      style={{
-        transform: [{ translateY: height }],
-        marginTop: bottomTabBarHeight,
-      }}
+      style={[{ marginTop: bottomTabBarHeight }, animatedStyle]}
     >
       <View className="flex-1">
         <View className="bg-white border-b border-gray-200 p-4">

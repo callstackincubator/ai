@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { useBottomTabBarHeight } from 'react-native-bottom-tabs'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
-import Animated, { useDerivedValue } from 'react-native-reanimated'
+import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 
 import {
   checkCalendarEvents,
@@ -110,19 +110,21 @@ export default function LLMScreen() {
   const bottomTabBarHeight = useBottomTabBarHeight()
   const keyboardAnimation = useReanimatedKeyboardAnimation()
 
-  const height = useDerivedValue(() =>
-    keyboardAnimation.progress.value === 0
-      ? -bottomTabBarHeight
-      : keyboardAnimation.height.value
-  )
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY:
+          keyboardAnimation.progress.value === 0
+            ? -bottomTabBarHeight
+            : keyboardAnimation.height.value,
+      },
+    ],
+  }))
 
   return (
     <Animated.View
       className="flex-1"
-      style={{
-        transform: [{ translateY: height }],
-        marginTop: bottomTabBarHeight,
-      }}
+      style={[{ marginTop: bottomTabBarHeight }, animatedStyle]}
     >
       <ScrollView
         ref={scrollViewRef}
