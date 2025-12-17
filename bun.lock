@@ -35,6 +35,7 @@
         "@bottom-tabs/react-navigation": "^0.10.2",
         "@react-native-ai/apple": "workspace:*",
         "@react-native-ai/llama": "workspace:*",
+        "@react-native-ai/mlc": "workspace:*",
         "@react-native-picker/picker": "2.11.1",
         "@react-navigation/bottom-tabs": "^7.4.4",
         "@react-navigation/native": "^7.1.16",

@@ -12,6 +12,7 @@
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",
     "@bottom-tabs/react-navigation": "^0.10.2",
+    "@react-native-ai/mlc": "workspace:*",
     "@react-native-ai/apple": "workspace:*",
     "@react-native-ai/llama": "workspace:*",
     "@react-native-picker/picker": "2.11.1",

@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import LlamaRNScreen from './screens/LlamaRNScreen'
 import LLMScreen from './screens/LLMScreen'
+import MLCScreen from './screens/MLCScreen'
 import PlaygroundScreen from './screens/PlaygroundScreen'
 import SpeechScreen from './screens/SpeechScreen'
 import TranscribeScreen from './screens/TranscribeScreen'
@@ -64,7 +65,7 @@ function MLCStackScreen() {
     <MLCStack.Navigator>
       <MLCStack.Screen
         name="MLCScreen"
-        component={null}
+        component={MLCScreen}
         options={{
           title: 'MLC Engine',
         }}
