@@ -5,6 +5,7 @@ import type {
   LanguageModelV2Prompt,
   LanguageModelV2StreamPart,
 } from '@ai-sdk/provider'
+import { generateId } from '@ai-sdk/provider-utils'
 import {
   type CompletionParams,
   type ContextParams,
@@ -290,7 +291,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       start: async (controller) => {
         try {
-          const textId = `text-${Date.now()}`
+          const textId = generateId()
 
           controller.enqueue({
             type: 'text-start',
