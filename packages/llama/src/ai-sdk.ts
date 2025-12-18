@@ -1,6 +1,7 @@
 import type {
   LanguageModelV2,
   LanguageModelV2CallOptions,
+  LanguageModelV2Content,
   LanguageModelV2FinishReason,
   LanguageModelV2Prompt,
   LanguageModelV2StreamPart,
@@ -110,6 +111,9 @@ export const LlamaEngine = {
     setStoragePath(path)
   },
 }
+
+const START_OF_THINKING_PLACEHOLDER = '<think>'
+const END_OF_THINKING_PLACEHOLDER = '</think>'
 
 /**
  * llama.rn Language Model for AI SDK
@@ -226,8 +230,22 @@ export class LlamaLanguageModel implements LanguageModelV2 {
     console.log('[llama] Generating text (non-streaming)')
 
     const response = await this.context.completion(completionOptions)
+    let textContent = response.content
 
-    const textContent = response.content || response.text || ''
+    // filter out thinking tags from content
+    const thinkingStartIndex = textContent.indexOf(
+      START_OF_THINKING_PLACEHOLDER
+    )
+    const thinkingEndIndex = textContent.indexOf(END_OF_THINKING_PLACEHOLDER)
+
+    if (thinkingStartIndex !== -1 && thinkingEndIndex !== -1) {
+      // remove reasoning block from text content
+      const beforeThinking = textContent.slice(0, thinkingStartIndex)
+      const afterThinking = textContent.slice(
+        thinkingEndIndex + END_OF_THINKING_PLACEHOLDER.length
+      )
+      textContent = beforeThinking + afterThinking
+    }
 
     console.log('[llama] Generation complete:', {
       contentLength: textContent.length,
@@ -237,10 +255,14 @@ export class LlamaLanguageModel implements LanguageModelV2 {
     return {
       content: [
         {
-          type: 'text' as const,
+          type: 'text',
           text: textContent,
         },
-      ],
+        {
+          type: 'reasoning',
+          text: response.reasoning_content,
+        },
+      ] as LanguageModelV2Content[],
       finishReason: convertFinishReason(response),
       usage: {
         inputTokens: response.timings?.prompt_n || 0,
@@ -312,60 +334,70 @@ export class LlamaLanguageModel implements LanguageModelV2 {
               try {
                 const { token } = tokenData
 
-                if (token === '<think>') {
-                  // start reasoning block
-                  if (state === 'text') {
-                    // finish text block
+                switch (token) {
+                  case START_OF_THINKING_PLACEHOLDER:
+                    // start reasoning block
+                    if (state === 'text') {
+                      // finish text block
+                      controller.enqueue({
+                        type: 'text-end',
+                        id: textId,
+                      })
+                    }
+
+                    state = 'reasoning'
+                    textId = generateId()
+
                     controller.enqueue({
-                      type: 'text-end',
+                      type: 'reasoning-start',
                       id: textId,
                     })
-                  }
+                    break
 
-                  state = 'reasoning'
-                  textId = generateId()
-
-                  controller.enqueue({
-                    type: 'reasoning-start',
-                    id: textId,
-                  })
-                } else if (token === '</think>') {
-                  // finish reasoning block
-                  if (state === 'reasoning') {
-                    controller.enqueue({
-                      type: 'reasoning-end',
-                      id: textId,
-                    })
-                  }
-
-                  state = 'none'
-                } else {
-                  // regular text token
-                  if (state !== 'text') {
-                    // start text block
+                  case END_OF_THINKING_PLACEHOLDER:
+                    // finish reasoning block
                     if (state === 'reasoning') {
-                      // finish reasoning block
                       controller.enqueue({
                         type: 'reasoning-end',
                         id: textId,
                       })
                     }
 
-                    state = 'text'
-                    textId = generateId()
+                    state = 'none'
+                    break
 
-                    controller.enqueue({
-                      type: 'text-start',
-                      id: textId,
-                    })
-                  }
+                  default:
+                    // process regular token
 
-                  // enqueue text token
-                  controller.enqueue({
-                    type: 'text-delta',
-                    id: textId,
-                    delta: token,
-                  })
+                    switch (state) {
+                      case 'none':
+                        // start text block
+                        state = 'text'
+                        textId = generateId()
+                        controller.enqueue({
+                          type: 'text-start',
+                          id: textId,
+                        })
+                        break
+
+                      case 'text':
+                        // continue text block
+                        controller.enqueue({
+                          type: 'text-delta',
+                          id: textId,
+                          delta: token,
+                        })
+                        break
+
+                      case 'reasoning':
+                        // continue reasoning block
+                        controller.enqueue({
+                          type: 'reasoning-delta',
+                          id: textId,
+                          delta: token,
+                        })
+                        break
+                    }
                 }
               } catch (err) {
                 console.error('[llama] Error in token callback:', err)

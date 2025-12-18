@@ -55,6 +55,11 @@ const getFilenameFromModelId = (modelId: string) => {
   return parts[parts.length - 1]
 }
 
+const exampleMessages: Message[] = [
+  { role: 'system', content: 'You are a helpful assistant.' },
+  { role: 'user', content: 'Write a short haiku about coding.' },
+]
+
 export default function LlamaRNScreen() {
   const [selectedModel, setSelectedModel] = useState<ModelOption>(MODELS[0])
   const [downloadedModels, setDownloadedModels] = useState<Set<string>>(
@@ -202,20 +207,14 @@ export default function LlamaRNScreen() {
     if (!model || isGenerating) return
 
     setIsGenerating(true)
-    setMessages([
-      { role: 'user', content: '[Test] streamText()' },
-      { role: 'assistant', content: '...' },
-    ])
+    setMessages([...exampleMessages, { role: 'assistant', content: '...' }])
 
     let accumulatedContent = ''
 
     try {
       const result = streamText({
         model,
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
-          { role: 'user', content: 'Write a short haiku about coding.' },
-        ],
+        messages: exampleMessages,
         maxOutputTokens: 100,
         temperature: 0.7,
       })
@@ -223,13 +222,23 @@ export default function LlamaRNScreen() {
       for await (const chunk of result.textStream) {
         accumulatedContent += chunk
         setMessages([
-          { role: 'user', content: '[Test] streamText()' },
+          ...exampleMessages,
           { role: 'assistant', content: accumulatedContent },
+        ])
+      }
+
+      let accumulatedReasoning = ''
+      for (const reasoningChunk of await result.reasoning) {
+        accumulatedReasoning += reasoningChunk.text
+        setMessages([
+          ...exampleMessages,
+          { role: 'assistant', content: accumulatedContent },
+          { role: 'system', content: `Reasoning: ${accumulatedReasoning}` },
         ])
       }
     } catch (error) {
       setMessages([
-        { role: 'user', content: '[Test] streamText()' },
+        ...exampleMessages,
         {
           role: 'assistant',
           content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -245,28 +254,25 @@ export default function LlamaRNScreen() {
 
     setIsGenerating(true)
     setMessages([
-      { role: 'user', content: '[Test] generateText()' },
+      ...exampleMessages,
       { role: 'assistant', content: 'Generating...' },
     ])
 
     try {
       const result = await generateText({
         model,
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
-          { role: 'user', content: 'Write a short haiku about coding.' },
-        ],
+        messages: exampleMessages,
         maxOutputTokens: 100,
         temperature: 0.7,
       })
 
       setMessages([
-        { role: 'user', content: '[Test] generateText()' },
+        ...exampleMessages,
         { role: 'assistant', content: result.text },
       ])
     } catch (error) {
       setMessages([
-        { role: 'user', content: '[Test] generateText()' },
+        ...exampleMessages,
         {
           role: 'assistant',
           content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
