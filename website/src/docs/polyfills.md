@@ -1,14 +1,14 @@
 # Polyfills
 
+import { PackageManagerTabs } from '@theme'
+
 Several functions that are internally used by the AI SDK might not be available in the React Native runtime depending on your configuration and the target platform.
 
 ## Expo
 
 First, install the following packages:
 
-```bash
-npm install @ungap/structured-clone @stardazed/streams-text-encoding
-```
+<PackageManagerTabs command="install @ungap/structured-clone @stardazed/streams-text-encoding" />
 
 Then create a new file in the root of your project with the following polyfills:
 
@@ -52,9 +52,7 @@ For projects not using Expo, you'll need additional stream polyfills since Expo 
 
 First, install the following packages:
 
-```bash
-npm install @ungap/structured-clone @stardazed/streams-text-encoding web-streams-polyfill
-```
+<PackageManagerTabs command="install @ungap/structured-clone @stardazed/streams-text-encoding web-streams-polyfill" />
 
 Then create a new file in the root of your project with the following polyfills:
 
