@@ -7,8 +7,10 @@ import {
 } from 'react-native'
 
 declare module '@react-native/virtualized-lists' {
-  export interface VirtualizedListWithoutRenderItemProps<ItemT>
-    extends ScrollViewProps {
+  export interface VirtualizedListWithoutRenderItemProps<
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ItemT,
+  > extends ScrollViewProps {
     ListFooterComponentClassName?: string
     ListHeaderComponentClassName?: string
   }
@@ -16,10 +18,7 @@ declare module '@react-native/virtualized-lists' {
 
 declare module 'react-native' {
   interface ScrollViewProps
-    extends ViewProps,
-      ScrollViewPropsIOS,
-      ScrollViewPropsAndroid,
-      Touchable {
+    extends ViewProps, ScrollViewPropsIOS, ScrollViewPropsAndroid, Touchable {
     contentContainerClassName?: string
     indicatorClassName?: string
   }

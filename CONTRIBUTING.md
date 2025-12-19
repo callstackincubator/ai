@@ -13,8 +13,7 @@ This is a monorepo with the following packages:
 
 - **`packages/mlc/`** - MLC-LLM integration for React Native
 - **`packages/apple-llm/`** - Apple Intelligence turbo module for iOS
-- **`apps/example/`** - React Native CLI example app
-- **`apps/example-apple/`** - Expo example app showcasing Apple Intelligence
+- **`apps/expo-example/`** - example Expo app
 
 ## Quick Start
 
@@ -33,15 +32,10 @@ This is a monorepo with the following packages:
 
 3. **Test your changes:**
    ```bash
-   # Run React Native Community CLI example (MLC)
-   cd apps/example
+   # Run example app
+   cd apps/expo-example
    bun run start
    bun run android  # or ios
-   
-   # Run Expo example (Apple Intelligence)
-   cd apps/example-apple
-   bun run start
-   bun run ios
    ```
 
 ## Development Guidelines
@@ -85,7 +79,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 Build all packages
 
 ```bash 
-bun run --filter='packages/*' prepare
+bun run --filter='@react-native-ai/*' prepare
 ```
 
 Work on specific package
@@ -97,28 +91,19 @@ bun run typecheck
 
 ### Running examples
 
-MLC example (React Native CLI)
-
 ```bash
-cd apps/example
+cd apps/expo-example
 bun run prestart    # Setup MLC dependencies
 bun run start
 bun run android
 ```
 
-Apple Intelligence example (Expo)
-
-```bash
-cd apps/example-apple
-bun run ios
-```
-
 ### Native Development
 
-- **Android**: Open `apps/example/android` in Android Studio
-- **iOS MLC**: Open `apps/example/ios/AiExample.xcworkspace` in Xcode
+- **Android**: Open `apps/expo-example/android` in Android Studio
+- **iOS MLC**: Open `apps/expo-example/ios/AiExample.xcworkspace` in Xcode
 
-- **iOS Apple Intelligence**: Open `apps/example-apple/ios/exampleapple.xcworkspace` in Xcode
+- **RN example app**: Open `apps/expo-example/ios/example.xcworkspace` in Xcode
   - The Apple Intelligence package is a Turbo Module - work directly from the integrated Xcode project
   - Native code is in `packages/apple-llm/ios/` but best developed through the example app
 

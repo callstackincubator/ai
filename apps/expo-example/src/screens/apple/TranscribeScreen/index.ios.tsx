@@ -13,7 +13,7 @@ import {
 import {
   float32ArrayToWAV,
   mergeBuffersToFloat32Array,
-} from '../utils/audioUtils'
+} from '../../../utils/audioUtils'
 
 const SAMPLE_RATE = 16000
 

@@ -17,7 +17,7 @@ import {
   checkCalendarEvents,
   createCalendarEvent,
   getCurrentTime,
-} from '../tools'
+} from '../../../tools'
 
 const apple = createAppleProvider({
   availableTools: {
@@ -27,7 +27,7 @@ const apple = createAppleProvider({
   },
 })
 
-export default function LLMScreen() {
+export default function AppleLLMScreen() {
   const [messages, setMessages] = useState<ModelMessage[]>([])
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
