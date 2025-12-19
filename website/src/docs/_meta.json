@@ -13,6 +13,13 @@
   },
   {
     "type": "dir",
+    "name": "llama",
+    "label": "Llama",
+    "collapsible": true,
+    "collapsed": false
+  },
+  {
+    "type": "dir",
     "name": "mlc",
     "label": "MLC",
     "collapsible": true,
