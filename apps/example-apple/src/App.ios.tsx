@@ -9,6 +9,7 @@ import { Image } from 'react-native'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import LlamaRNScreen from './screens/LlamaRNScreen'
 import LLMScreen from './screens/LLMScreen'
 import MLCScreen from './screens/MLCScreen'
 import PlaygroundScreen from './screens/PlaygroundScreen'
@@ -19,6 +20,7 @@ const Tab = createNativeBottomTabNavigator()
 
 const RootStack = createNativeStackNavigator()
 const LLMStack = createNativeStackNavigator()
+const LlamaStack = createNativeStackNavigator()
 const MLCStack = createNativeStackNavigator()
 const PlaygroundStack = createNativeStackNavigator()
 const TranscribeStack = createNativeStackNavigator()
@@ -41,6 +43,20 @@ function LLMStackScreen() {
         }}
       />
     </LLMStack.Navigator>
+  )
+}
+
+function LlamaStackScreen() {
+  return (
+    <LlamaStack.Navigator>
+      <LlamaStack.Screen
+        name="LlamaScreen"
+        component={LlamaRNScreen}
+        options={{
+          title: 'Llama.rn',
+        }}
+      />
+    </LlamaStack.Navigator>
   )
 }
 
@@ -108,6 +124,13 @@ function Tabs() {
         component={LLMStackScreen}
         options={{
           tabBarIcon: () => ({ sfSymbol: 'brain.head.profile' }),
+        }}
+      />
+      <Tab.Screen
+        name="Llama"
+        component={LlamaStackScreen}
+        options={{
+          tabBarIcon: () => ({ sfSymbol: 'sparkles' }),
         }}
       />
       <Tab.Screen
