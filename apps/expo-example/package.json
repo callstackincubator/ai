@@ -12,10 +12,12 @@
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",
     "@bottom-tabs/react-navigation": "^0.10.2",
-    "@react-native-ai/mlc": "workspace:*",
     "@react-native-ai/apple": "workspace:*",
     "@react-native-ai/llama": "workspace:*",
+    "@react-native-ai/mlc": "workspace:*",
     "@react-native-picker/picker": "^2.11.4",
+    "@react-native-vector-icons/get-image": "^12.3.0",
+    "@react-native-vector-icons/material-icons": "^12.4.0",
     "@react-navigation/bottom-tabs": "^7.9.0",
     "@react-navigation/native": "^7.1.16",
     "@react-navigation/native-stack": "^7.3.25",

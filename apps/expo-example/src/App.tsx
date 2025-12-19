@@ -4,6 +4,7 @@ import {
   createNativeBottomTabNavigator,
   NativeBottomTabNavigationOptions,
 } from '@bottom-tabs/react-navigation'
+import Icon from '@react-native-vector-icons/material-icons'
 import { NavigationContainer } from '@react-navigation/native'
 import {
   createNativeStackNavigator,
@@ -39,12 +40,9 @@ const screens = (
       routeName: 'AppleLLM',
       screenOptions: { title: 'AppleLLM' },
       tabScreenOptions: {
-        tabBarIcon:
-          Platform.OS === 'ios'
-            ? () => ({
-                sfSymbol: () => 'brain.head.profile',
-              })
-            : undefined,
+        tabBarIcon: () => ({
+          sfSymbol: () => 'brain.head.profile',
+        }),
       },
       Component: AppleLLMScreen,
     },
@@ -52,10 +50,10 @@ const screens = (
       routeName: 'Llama',
       screenOptions: { title: 'Llama.rn' },
       tabScreenOptions: {
-        tabBarIcon:
+        tabBarIcon: () =>
           Platform.OS === 'ios'
-            ? () => ({ sfSymbol: () => 'sparkles' })
-            : undefined,
+            ? { sfSymbol: () => 'sparkles' }
+            : Icon.getImageSourceSync('auto-fix-high', 24),
       },
       Component: LlamaRNScreen,
     },
@@ -63,8 +61,10 @@ const screens = (
       routeName: 'MLC',
       screenOptions: { title: 'MLC Engine' },
       tabScreenOptions: {
-        tabBarIcon:
-          Platform.OS === 'ios' ? () => ({ sfSymbol: () => 'cpu' }) : undefined,
+        tabBarIcon: () =>
+          Platform.OS === 'ios'
+            ? { sfSymbol: () => 'cpu' }
+            : Icon.getImageSourceSync('memory', 24),
       },
       Component: MLCScreen,
     },
@@ -72,10 +72,7 @@ const screens = (
       routeName: 'Playground',
       screenOptions: { title: 'Playground' },
       tabScreenOptions: {
-        tabBarIcon:
-          Platform.OS === 'ios'
-            ? () => ({ sfSymbol: () => 'play.circle' })
-            : undefined,
+        tabBarIcon: () => ({ sfSymbol: () => 'play.circle' }),
       },
       Component: PlaygroundScreen,
     },
@@ -85,10 +82,7 @@ const screens = (
         title: 'Speech to Text',
       },
       tabScreenOptions: {
-        tabBarIcon:
-          Platform.OS === 'ios'
-            ? () => ({ sfSymbol: () => 'text.quote' })
-            : undefined,
+        tabBarIcon: () => ({ sfSymbol: () => 'text.quote' }),
       },
       Component: TranscribeScreen,
     },
@@ -96,10 +90,7 @@ const screens = (
       routeName: 'Speech',
       screenOptions: { title: 'Text to Speech' },
       tabScreenOptions: {
-        tabBarIcon:
-          Platform.OS === 'ios'
-            ? () => ({ sfSymbol: () => 'speaker.wave.3' })
-            : undefined,
+        tabBarIcon: () => ({ sfSymbol: () => 'speaker.wave.3' }),
       },
       Component: SpeechScreen,
     },
