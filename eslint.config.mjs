@@ -5,7 +5,7 @@ import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import globals from 'globals'
 
 export default defineConfig([
-  globalIgnores(['website/**/*', '**/node_modules', '**/lib']),
+  globalIgnores(['website/**/*', '**/node_modules', '**/lib', '**/build']),
   expoConfig,
   eslintPluginPrettierRecommended,
   {
