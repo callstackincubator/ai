@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "example-apple",
-    "slug": "example-apple",
+    "name": "@react-native-ai example",
+    "slug": "rn-ai-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.exampleapple"
+      "bundleIdentifier": "com.callstack.ai.example"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.exampleapple"
+      "package": "com.callstack.ai.example"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -57,15 +57,13 @@
         {
           "iosBackgroundMode": true,
           "iosMicrophonePermission": "This app requires access to the microphone to record audio.",
-          "androidPermissions" : [
+          "androidPermissions": [
             "android.permission.MODIFY_AUDIO_SETTINGS",
             "android.permission.FOREGROUND_SERVICE",
             "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
           ],
           "androidForegroundService": true,
-          "androidFSTypes": [
-            "mediaPlayback"
-          ]
+          "androidFSTypes": ["mediaPlayback"]
         }
       ],
       "@react-native-ai/mlc"

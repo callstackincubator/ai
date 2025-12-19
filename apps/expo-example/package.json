@@ -1,5 +1,5 @@
 {
-  "name": "example-apple",
+  "name": "@react-native-ai/example",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
