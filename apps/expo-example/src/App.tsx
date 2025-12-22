@@ -41,7 +41,7 @@ const screens = (
       screenOptions: { title: 'AppleLLM' },
       tabScreenOptions: {
         tabBarIcon: () => ({
-          sfSymbol: () => 'brain.head.profile',
+          sfSymbol: 'brain.head.profile',
         }),
       },
       Component: AppleLLMScreen,
@@ -52,7 +52,7 @@ const screens = (
       tabScreenOptions: {
         tabBarIcon: () =>
           Platform.OS === 'ios'
-            ? { sfSymbol: () => 'sparkles' }
+            ? { sfSymbol: 'sparkles' }
             : Icon.getImageSourceSync('auto-fix-high', 24),
       },
       Component: LlamaRNScreen,
@@ -63,7 +63,7 @@ const screens = (
       tabScreenOptions: {
         tabBarIcon: () =>
           Platform.OS === 'ios'
-            ? { sfSymbol: () => 'cpu' }
+            ? { sfSymbol: 'cpu' }
             : Icon.getImageSourceSync('memory', 24),
       },
       Component: MLCScreen,
@@ -72,7 +72,7 @@ const screens = (
       routeName: 'Playground',
       screenOptions: { title: 'Playground' },
       tabScreenOptions: {
-        tabBarIcon: () => ({ sfSymbol: () => 'play.circle' }),
+        tabBarIcon: () => ({ sfSymbol: 'play.circle' }),
       },
       Component: PlaygroundScreen,
     },
@@ -82,7 +82,7 @@ const screens = (
         title: 'Speech to Text',
       },
       tabScreenOptions: {
-        tabBarIcon: () => ({ sfSymbol: () => 'text.quote' }),
+        tabBarIcon: () => ({ sfSymbol: 'text.quote' }),
       },
       Component: TranscribeScreen,
     },
@@ -90,7 +90,7 @@ const screens = (
       routeName: 'Speech',
       screenOptions: { title: 'Text to Speech' },
       tabScreenOptions: {
-        tabBarIcon: () => ({ sfSymbol: () => 'speaker.wave.3' }),
+        tabBarIcon: () => ({ sfSymbol: 'speaker.wave.3' }),
       },
       Component: SpeechScreen,
     },
