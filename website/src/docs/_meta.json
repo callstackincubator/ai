@@ -5,6 +5,11 @@
     "label": "Introduction"
   },
   {
+    "type": "file",
+    "name": "polyfills",
+    "label": "Polyfills"
+  },
+  {
     "type": "dir",
     "name": "apple",
     "label": "Apple",
