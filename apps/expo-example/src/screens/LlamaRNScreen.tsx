@@ -233,7 +233,14 @@ export default function LlamaRNScreen() {
         setMessages([
           ...exampleMessages,
           { role: 'assistant', content: accumulatedContent },
-          { role: 'system', content: `Reasoning: ${accumulatedReasoning}` },
+          ...(accumulatedReasoning.trim().length
+            ? [
+                {
+                  role: 'system',
+                  content: `Reasoning: ${accumulatedReasoning}`,
+                } as const,
+              ]
+            : []),
         ])
       }
     } catch (error) {
