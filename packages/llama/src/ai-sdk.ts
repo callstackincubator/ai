@@ -378,6 +378,11 @@ export class LlamaLanguageModel implements LanguageModelV2 {
                           type: 'text-start',
                           id: textId,
                         })
+                        controller.enqueue({
+                          type: 'text-delta',
+                          id: textId,
+                          delta: token,
+                        })
                         break
 
                       case 'text':
