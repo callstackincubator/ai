@@ -39,14 +39,15 @@ const MODELS: ModelOption[] = [
     size: '1.78GB',
   },
   {
+    name: 'FunctionGemma 270M IT (Q4_K_M)',
+    modelId:
+      'unsloth/functiongemma-270m-it-GGUF/functiongemma-270m-it-Q4_K_M.gguf',
+    size: '240MB',
+  },
+  {
     name: 'Qwen 3 4B (Q3_K_M)',
     modelId: 'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf',
     size: '1.93GB',
-  },
-  {
-    name: 'Gemma 2 2B IT (Q3_K_M)',
-    modelId: 'lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q3_K_M.gguf',
-    size: '2.31GB',
   },
 ]
 
