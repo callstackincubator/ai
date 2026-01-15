@@ -304,8 +304,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       }
     }
 
-    let streamFinished = false
-    let isCancelled = false
     const context = this.context
 
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
@@ -323,10 +321,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
           const result = await context.completion(
             completionOptions,
             (tokenData: TokenData) => {
-              if (streamFinished || isCancelled) {
-                return
-              }
-
               const { token } = tokenData
 
               switch (token) {
@@ -402,8 +396,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
             }
           )
 
-          streamFinished = true
-
           if (state === 'text') {
             // finish text block
             controller.enqueue({
@@ -418,10 +410,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
               type: 'reasoning-end',
               id: textId,
             })
-          }
-
-          if (isCancelled) {
-            return
           }
 
           controller.enqueue({
@@ -447,9 +435,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
         }
       },
       cancel: async () => {
-        // tbd: verify what happens here on cancel with stream itself.
-        isCancelled = true
-        streamFinished = true
         await context.stopCompletion()
       },
     })
