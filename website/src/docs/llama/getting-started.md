@@ -7,7 +7,7 @@ The Llama provider enables you to run GGUF models directly on-device in React Na
 Install the Llama provider and its peer dependencies:
 
 ```bash
-npm install @react-native-ai/llama llama.rn react-native-blob-util
+npm install @react-native-ai/llama llama.rn
 ```
 
 While you can use the Llama provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](../polyfills.md):
