@@ -1,9 +1,6 @@
 Third-Party Notices
 ===================
 
-This package includes software developed by third parties. The following notices
-are provided for attribution and licensing compliance.
-
 MLC-LLM (mlc-ai/mlc-llm)
 -----------------------
 Portions of the iOS engine implementation are derived from the MLC-LLM project,

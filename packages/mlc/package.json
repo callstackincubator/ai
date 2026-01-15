@@ -16,6 +16,8 @@
     "prebuilt",
     "*.podspec",
     "app.plugin.js",
+    "NOTICE",
+    "ATTRIBUTIONS.md",
     "!ios/build",
     "!android/build",
     "!android/gradle",

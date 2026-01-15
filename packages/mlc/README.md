@@ -35,7 +35,7 @@ For complete installation instructions and API documentation, visit our [documen
 MIT
 
 This package includes third-party components licensed under their own terms.
-See `THIRD_PARTY_NOTICES.md`.
+See `NOTICE` and `ATTRIBUTIONS.md`.
 
 ---
 
