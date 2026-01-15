@@ -34,6 +34,9 @@ For complete installation instructions and API documentation, visit our [documen
 
 MIT
 
+This package includes third-party components licensed under their own terms.
+See `NOTICE` and `ATTRIBUTIONS.md`.
+
 ---
 
 Made with ❤️ and [create-react-native-library](https://github.com/callstack/react-native-builder-bob)
