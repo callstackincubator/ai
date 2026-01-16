@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@react-native-ai/monorepo",
@@ -90,7 +89,7 @@
     },
     "packages/llama": {
       "name": "@react-native-ai/llama",
-      "version": "0.11.0",
+      "version": "0.10.0",
       "dependencies": {
         "@ai-sdk/provider": "^2.0.0",
         "@ai-sdk/provider-utils": "^3.0.10",

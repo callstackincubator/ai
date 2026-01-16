@@ -227,8 +227,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       }
     }
 
-    console.log('[llama] Generating text (non-streaming)')
-
     const response = await this.context.completion(completionOptions)
     let textContent = response.content
 
@@ -246,11 +244,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       )
       textContent = beforeThinking + afterThinking
     }
-
-    console.log('[llama] Generation complete:', {
-      contentLength: textContent.length,
-      finishReason: convertFinishReason(response),
-    })
 
     return {
       content: [
@@ -271,6 +264,11 @@ export class LlamaLanguageModel implements LanguageModelV2 {
           (response.timings?.prompt_n || 0) +
           (response.timings?.predicted_n || 0),
       },
+      providerMetadata: {
+        llama: {
+          timings: response.timings,
+        },
+      },
       warnings: [],
     }
   }
@@ -285,7 +283,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
 
     if (typeof ReadableStream === 'undefined') {
       throw new TypeError(
-        'ReadableStream is not available in this environment. Please load a polyfill such as web-streams-polyfill.'
+        'ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.'
       )
     }
 
@@ -306,10 +304,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       }
     }
 
-    console.log('[llama] Starting streaming generation')
-
-    let streamFinished = false
-    let isCancelled = false
     const context = this.context
 
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
@@ -327,90 +321,80 @@ export class LlamaLanguageModel implements LanguageModelV2 {
           const result = await context.completion(
             completionOptions,
             (tokenData: TokenData) => {
-              if (streamFinished || isCancelled) {
-                return
-              }
+              const { token } = tokenData
 
-              try {
-                const { token } = tokenData
-
-                switch (token) {
-                  case START_OF_THINKING_PLACEHOLDER:
-                    // start reasoning block
-                    if (state === 'text') {
-                      // finish text block
-                      controller.enqueue({
-                        type: 'text-end',
-                        id: textId,
-                      })
-                    }
-
-                    state = 'reasoning'
-                    textId = generateId()
-
+              switch (token) {
+                case START_OF_THINKING_PLACEHOLDER:
+                  // start reasoning block
+                  if (state === 'text') {
+                    // finish text block
                     controller.enqueue({
-                      type: 'reasoning-start',
+                      type: 'text-end',
                       id: textId,
                     })
-                    break
+                  }
 
-                  case END_OF_THINKING_PLACEHOLDER:
-                    // finish reasoning block
-                    if (state === 'reasoning') {
+                  state = 'reasoning'
+                  textId = generateId()
+
+                  controller.enqueue({
+                    type: 'reasoning-start',
+                    id: textId,
+                  })
+                  break
+
+                case END_OF_THINKING_PLACEHOLDER:
+                  // finish reasoning block
+                  if (state === 'reasoning') {
+                    controller.enqueue({
+                      type: 'reasoning-end',
+                      id: textId,
+                    })
+                  }
+
+                  state = 'none'
+                  break
+
+                default:
+                  // process regular token
+
+                  switch (state) {
+                    case 'none':
+                      // start text block
+                      state = 'text'
+                      textId = generateId()
                       controller.enqueue({
-                        type: 'reasoning-end',
+                        type: 'text-start',
                         id: textId,
                       })
-                    }
+                      controller.enqueue({
+                        type: 'text-delta',
+                        id: textId,
+                        delta: token,
+                      })
+                      break
 
-                    state = 'none'
-                    break
+                    case 'text':
+                      // continue text block
+                      controller.enqueue({
+                        type: 'text-delta',
+                        id: textId,
+                        delta: token,
+                      })
+                      break
 
-                  default:
-                    // process regular token
-
-                    switch (state) {
-                      case 'none':
-                        // start text block
-                        state = 'text'
-                        textId = generateId()
-                        controller.enqueue({
-                          type: 'text-start',
-                          id: textId,
-                        })
-                        controller.enqueue({
-                          type: 'text-delta',
-                          id: textId,
-                          delta: token,
-                        })
-                        break
-
-                      case 'text':
-                        // continue text block
-                        controller.enqueue({
-                          type: 'text-delta',
-                          id: textId,
-                          delta: token,
-                        })
-                        break
-
-                      case 'reasoning':
-                        // continue reasoning block
-                        controller.enqueue({
-                          type: 'reasoning-delta',
-                          id: textId,
-                          delta: token,
-                        })
-                        break
-                    }
-                }
-              } catch (err) {
-                console.error('[llama] Error in token callback:', err)
+                    case 'reasoning':
+                      // continue reasoning block
+                      controller.enqueue({
+                        type: 'reasoning-delta',
+                        id: textId,
+                        delta: token,
+                      })
+                      break
+                  }
               }
             }
           )
-
-          streamFinished = true
 
           if (state === 'text') {
             // finish text block
@@ -428,59 +412,39 @@ export class LlamaLanguageModel implements LanguageModelV2 {
             })
           }
 
-          if (isCancelled) {
-            console.log('[llama] Stream was cancelled')
-            return
-          }
-
-          try {
-            controller.enqueue({
-              type: 'finish',
-              finishReason: convertFinishReason(result),
-              usage: {
-                inputTokens: result.timings?.prompt_n || 0,
-                outputTokens: result.timings?.predicted_n || 0,
-                totalTokens:
-                  (result.timings?.prompt_n || 0) +
-                  (result.timings?.predicted_n || 0),
+          controller.enqueue({
+            type: 'finish',
+            finishReason: convertFinishReason(result),
+            usage: {
+              inputTokens: result.timings?.prompt_n || 0,
+              outputTokens: result.timings?.predicted_n || 0,
+              totalTokens:
+                (result.timings?.prompt_n || 0) +
+                (result.timings?.predicted_n || 0),
+            },
+            providerMetadata: {
+              llama: {
+                timings: result.timings,
               },
-              providerMetadata: {
-                llama: {
-                  timings: result.timings,
-                },
-              },
-            })
+            },
+          })
 
-            controller.close()
-            console.log('[llama] Streaming complete')
-          } catch (err) {
-            console.error('[llama] Error closing stream:', err)
-          }
+          controller.close()
         } catch (error) {
-          console.error('[llama] Streaming error:', error)
-          if (!isCancelled && !streamFinished) {
-            try {
-              controller.error(error)
-            } catch (err) {
-              console.error('[llama] Error reporting error:', err)
-            }
-          }
+          controller.error(new Error(`Llama stream failed: ${error}`))
         }
       },
       cancel: async () => {
-        console.log('[llama] Stream cancelled')
-        isCancelled = true
-        streamFinished = true
-        try {
-          await context.stopCompletion()
-        } catch (error) {
-          console.error('[llama] Error stopping completion:', error)
-        }
+        await context.stopCompletion()
       },
     })
 
     return {
       stream,
+      rawCall: {
+        rawPrompt: options.prompt,
+        rawSettings: {},
+      },
     }
   }
 }

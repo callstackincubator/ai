@@ -28,6 +28,9 @@
     "registry": "https://registry.npmjs.org/"
   },
   "author": "Szymon Rybczak <szymon.rybczak@gmail.com> (https://github.com/szymonrybczak)",
+  "contributors": [
+    "Mike Grabowski <grabbou@gmail.com> (https://github.com/grabbou)"
+  ],
   "scripts": {
     "clean": "del-cli lib",
     "typecheck": "tsc --noEmit",
