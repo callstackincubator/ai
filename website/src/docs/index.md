@@ -22,6 +22,16 @@ Native integration with Apple's on-device AI capabilities through `@react-native
 
 Production-ready with instant availability on supported iOS devices.
 
+### Llama Engine
+
+Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-native-ai/llama`:
+
+- **Text Generation** - High-performance GGUF inference with full streaming support
+- **Model Management** - Automatic downloading and caching from HuggingFace
+- **Customizable** - Support for context size, threads, and GGUF-specific parameters
+
+Cross-platform parity with optimized performance on both iOS and Android.
+
 ### MLC Engine (Work in Progress)
 
 Run any open-source LLM locally using MLC's optimized runtime through `@react-native-ai/mlc`:
