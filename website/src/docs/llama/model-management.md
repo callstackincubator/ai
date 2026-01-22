@@ -33,15 +33,27 @@ console.log('Downloaded models:', models)
 // Output: [{ model_id: 'SmolLM3-Q4_K_M.gguf', path: '...', filename: '...', sizeBytes: 1800000000 }, ...]
 ```
 
-### Creating Model Instance
+### Creating Model Instances
 
-Create a model instance using the `llama.languageModel()` method:
+Create model instances using the provider methods:
 
 ```typescript
 import { llama } from '@react-native-ai/llama'
 
-const model = llama.languageModel(
+// Language model for text generation
+const languageModel = llama.languageModel(
   'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+)
+
+// Embedding model for text embeddings
+const embeddingModel = llama.textEmbeddingModel(
+  'owner/repo/embedding-model.gguf'
+)
+
+// Speech model for text-to-speech (requires vocoder)
+const speechModel = llama.speechModel(
+  'owner/repo/tts-model.gguf',
+  { vocoderPath: '/path/to/vocoder.gguf' }
 )
 ```
 
@@ -51,8 +63,10 @@ With configuration options:
 const model = llama.languageModel(
   'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf',
   {
-    n_ctx: 4096, // Context window size (default: 2048)
-    n_gpu_layers: 99, // GPU layers for acceleration (default: 99)
+    contextParams: {
+      n_ctx: 4096, // Context window size (default: 2048)
+      n_gpu_layers: 99, // GPU layers for acceleration (default: 99)
+    },
   }
 )
 ```
@@ -115,6 +129,14 @@ for await (const delta of textStream) {
 }
 ```
 
+### Accessing the Native Context
+
+For advanced usage, you can access the underlying `LlamaContext`:
+
+```typescript
+const context = model.getContext()
+```
+
 ### Unloading Models
 
 Unload the model from memory to free resources:
@@ -141,7 +163,27 @@ import { LlamaEngine } from '@react-native-ai/llama'
 LlamaEngine.setStoragePath('/custom/path/to/models')
 ```
 
+Or when creating the provider:
+
+```typescript
+import { createLlamaProvider } from '@react-native-ai/llama'
+
+const llama = createLlamaProvider({
+  storagePath: '/custom/path/to/models',
+})
+```
+
 ## API Reference
+
+### `createLlamaProvider(options?)`
+
+Creates a customized Llama provider instance.
+
+- `options.storagePath`: Custom storage path for downloaded models
+
+### `llama`
+
+Default provider instance with the following methods:
 
 ### `llama.languageModel(modelId, options?)`
 
@@ -149,9 +191,33 @@ Creates a language model instance.
 
 - `modelId`: Model identifier in format `owner/repo/filename.gguf`
 - `options`:
-  - `n_ctx`: Context size (default: 2048)
-  - `n_gpu_layers`: Number of GPU layers (default: 99)
-  - `contextParams`: Additional llama.rn context parameters
+  - `projectorPath`: Path to multimodal projector for vision/audio support
+  - `projectorUseGpu`: Use GPU for multimodal processing (default: `true`)
+  - `contextParams`: llama.rn context parameters
+    - `n_ctx`: Context size (default: 2048, or 4096 for multimodal)
+    - `n_gpu_layers`: Number of GPU layers (default: 99)
+
+### `llama.textEmbeddingModel(modelId, options?)`
+
+Creates an embedding model instance.
+
+- `modelId`: Model identifier in format `owner/repo/filename.gguf`
+- `options`:
+  - `normalize`: Normalize embeddings (default: -1)
+  - `contextParams`: llama.rn context parameters
+    - `n_ctx`: Context size (default: 2048)
+    - `n_gpu_layers`: Number of GPU layers (default: 99)
+    - `n_parallel`: Parallel embeddings (default: 8)
+
+### `llama.speechModel(modelId, options)`
+
+Creates a speech model instance for text-to-speech.
+
+- `modelId`: Model identifier in format `owner/repo/filename.gguf`
+- `options`:
+  - `vocoderPath`: **Required** - Path to vocoder model file
+  - `vocoderBatchSize`: Batch size for vocoder processing
+  - `contextParams`: llama.rn context parameters
 
 ### `LlamaEngine`
 
@@ -161,8 +227,11 @@ Creates a language model instance.
 
 ### Model Instance Methods
 
+All model types share these common methods:
+
 - `download(progressCallback?)`: Download model from HuggingFace
 - `isDownloaded()`: Check if this model is downloaded
 - `prepare()`: Initialize/load model into memory
+- `getContext()`: Get the underlying LlamaContext (for advanced usage)
 - `unload()`: Release model from memory
 - `remove()`: Delete model from disk
