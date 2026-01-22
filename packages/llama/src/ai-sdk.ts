@@ -6,6 +6,8 @@ import type {
   LanguageModelV2FinishReason,
   LanguageModelV2Prompt,
   LanguageModelV2StreamPart,
+  RerankingModelV3,
+  RerankingModelV3CallOptions,
   SpeechModelV2,
   SpeechModelV2CallOptions,
 } from '@ai-sdk/provider'
@@ -21,88 +23,6 @@ import {
   type RNLlamaOAICompatibleMessage,
   type TokenData,
 } from 'llama.rn'
-
-/**
- * Rerank model interface (AI SDK RerankModelV1)
- *
- * @see https://ai-sdk.dev/docs/ai-sdk-core/reranking
- */
-export interface RerankModelV1<VALUE> {
-  /**
-   * The specification version for this model interface.
-   */
-  readonly specificationVersion: 'v1'
-
-  /**
-   * The provider name (e.g., 'llama').
-   */
-  readonly provider: string
-
-  /**
-   * The model ID (e.g., model file path).
-   */
-  readonly modelId: string
-
-  /**
-   * Rank documents based on their relevance to a query.
-   *
-   * @param options - Rerank options
-   * @returns Ranked documents sorted by relevance score (highest first)
-   */
-  doRerank(options: {
-    /**
-     * Documents to rank
-     */
-    values: VALUE[]
-
-    /**
-     * Query to rank documents against
-     */
-    query: string
-
-    /**
-     * Maximum number of documents to return
-     */
-    topN?: number
-
-    /**
-     * Abort signal for cancellation
-     */
-    abortSignal?: AbortSignal
-
-    /**
-     * Optional headers (for API-based providers)
-     */
-    headers?: Record<string, string | undefined>
-  }): PromiseLike<{
-    /**
-     * Ranked documents sorted by score (highest first)
-     */
-    ranking: {
-      /**
-       * Index of the document in the original input array
-       */
-      originalIndex: number
-
-      /**
-       * Relevance score (higher = more relevant)
-       */
-      score: number
-
-      /**
-       * The document content
-       */
-      document: VALUE
-    }[]
-
-    /**
-     * Optional usage information
-     */
-    usage?: {
-      tokens?: number
-    }
-  }>
-}
 
 type LLMState = 'text' | 'reasoning' | 'none'
 
@@ -770,8 +690,8 @@ export interface LlamaRerankOptions {
  *
  * @see https://github.com/mybigday/llama.rn
  */
-export class LlamaRerankModel implements RerankModelV1<string> {
-  readonly specificationVersion = 'v1'
+export class LlamaRerankModel implements RerankingModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -834,15 +754,9 @@ export class LlamaRerankModel implements RerankModelV1<string> {
   }
 
   /**
-   * Rerank documents based on relevance to query (AI SDK RerankModelV1)
+   * Rerank documents based on relevance to query (AI SDK RerankingModelV3)
    */
-  async doRerank(options: {
-    values: string[]
-    query: string
-    topN?: number
-    abortSignal?: AbortSignal
-    headers?: Record<string, string | undefined>
-  }) {
+  async doRerank(options: RerankingModelV3CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -851,22 +765,20 @@ export class LlamaRerankModel implements RerankModelV1<string> {
 
     const context = this.context ?? (await this.prepare())
 
-    const rerankOptions =
-      this.options.normalize !== undefined
-        ? { normalize: this.options.normalize }
-        : undefined
+    // Convert documents to string array for llama.rn
+    const documentStrings =
+      options.documents.type === 'text'
+        ? options.documents.values
+        : options.documents.values.map((doc) => JSON.stringify(doc))
 
-    const results = await context.rerank(
-      options.query,
-      options.values,
-      rerankOptions
-    )
+    const results = await context.rerank(options.query, documentStrings, {
+      normalize: this.options.normalize,
+    })
 
-    // Map to AI SDK format
+    // Map to AI SDK V3 format
     let ranking = results.map((result) => ({
-      originalIndex: result.index,
-      score: result.score,
-      document: result.document ?? options.values[result.index],
+      index: result.index,
+      relevanceScore: result.score,
     }))
 
     // Apply topN filter if specified

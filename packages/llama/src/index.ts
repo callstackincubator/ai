@@ -3,7 +3,6 @@ export type {
   LlamaModelOptions,
   LlamaRerankOptions,
   LlamaSpeechOptions,
-  RerankModelV1,
 } from './ai-sdk'
 export {
   createLlamaProvider,
