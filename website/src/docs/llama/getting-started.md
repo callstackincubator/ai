@@ -21,6 +21,33 @@ npm install ai
 - **React Native >= 0.76.0** - Required for native module functionality
 - **llama.rn >= 0.10.0** - The underlying llama.cpp bindings
 
+## Expo Setup
+
+For use with the Expo framework and CNG builds, you will need `expo-build-properties` to utilize iOS and OpenCL features. Simply add the following to your `app.json` or `app.config.js` file:
+
+```javascript
+module.exports = {
+  expo: {
+    // ...
+    plugins: [
+      // ...
+      [
+        'llama.rn',
+        // optional fields, below are the default values
+        {
+          enableEntitlements: true,
+          entitlementsProfile: 'production',
+          forceCxx20: true,
+          enableOpenCL: true,
+        },
+      ],
+    ],
+  },
+}
+```
+
+For all other installation tips and tricks, refer to the [llama.rn Expo documentation](https://github.com/mybigday/llama.rn?tab=readme-ov-file#expo).
+
 ## Available Model Types
 
 The Llama provider supports multiple model types:
