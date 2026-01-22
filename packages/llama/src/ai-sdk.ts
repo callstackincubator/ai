@@ -426,9 +426,6 @@ export class LlamaLanguageModel implements LanguageModelV3 {
         try {
           let textId = generateId()
 
-          // Start in 'text' state and emit text-start immediately
-          // This fixes the issue where the first character/word was being dropped
-          // when text-start and text-delta were emitted synchronously in the same callback
           let state: LLMState = 'text' as LLMState
 
           controller.enqueue({
@@ -436,7 +433,6 @@ export class LlamaLanguageModel implements LanguageModelV3 {
             warnings: [],
           })
 
-          // Emit text-start before completion begins (matching apple-llm behavior)
           controller.enqueue({
             type: 'text-start',
             id: textId,
@@ -476,7 +472,6 @@ export class LlamaLanguageModel implements LanguageModelV3 {
                     })
                   }
 
-                  // After reasoning ends, emit text-start for subsequent text
                   state = 'text'
                   textId = generateId()
                   controller.enqueue({
@@ -486,8 +481,6 @@ export class LlamaLanguageModel implements LanguageModelV3 {
                   break
 
                 default:
-                  // process regular token
-
                   switch (state) {
                     case 'text':
                       // continue text block
