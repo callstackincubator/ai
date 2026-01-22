@@ -65,10 +65,6 @@ const model = llama.languageModel(
   'owner/repo/vision-model.gguf',
   {
     projectorPath: '/path/to/mmproj-model.gguf',
-    projectorUseGpu: true, // Recommended (default: true)
-    contextParams: {
-      n_ctx: 4096, // Recommended for multimodal
-    },
   }
 )
 
