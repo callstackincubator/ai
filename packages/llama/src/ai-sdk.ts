@@ -92,7 +92,7 @@ function prepareMessagesWithMedia(prompt: LanguageModelV2Prompt): {
     }
 
     // Process array content parts
-    const parts: any[] = []
+    const parts: RNLlamaOAICompatibleMessage['content'] = []
 
     for (const part of message.content) {
       switch (part.type) {
