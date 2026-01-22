@@ -419,7 +419,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
               })
               controller.enqueue({
                 type: 'finish',
-                finishReason: { unified: 'stop' as const, raw: undefined },
+                finishReason: { unified: 'stop' as const, raw: 'stop' },
                 usage: {
                   inputTokens: {
                     total: 0,

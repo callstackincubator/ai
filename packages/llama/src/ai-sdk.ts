@@ -32,18 +32,22 @@ function convertFinishReason(
   result: NativeCompletionResult
 ): LanguageModelV3FinishReason {
   let unified: LanguageModelV3FinishReason['unified'] = 'other'
+  let raw: string | undefined
 
   if (result.stopped_eos) {
     unified = 'stop'
+    raw = 'stopped_eos'
   } else if (result.stopped_word) {
     unified = 'stop'
+    raw = 'stopped_word'
   } else if (result.stopped_limit) {
     unified = 'length'
+    raw = 'stopped_limit'
   }
 
   return {
     unified,
-    raw: undefined,
+    raw,
   }
 }
 
