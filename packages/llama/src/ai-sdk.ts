@@ -1,18 +1,24 @@
 import type {
+  EmbeddingModelV2,
   LanguageModelV2,
   LanguageModelV2CallOptions,
   LanguageModelV2Content,
   LanguageModelV2FinishReason,
   LanguageModelV2Prompt,
   LanguageModelV2StreamPart,
+  SpeechModelV2,
+  SpeechModelV2CallOptions,
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
   type CompletionParams,
   type ContextParams,
+  type EmbeddingParams,
   initLlama,
   type LlamaContext,
   type NativeCompletionResult,
+  type NativeEmbeddingResult,
+  type RNLlamaOAICompatibleMessage,
   type TokenData,
 } from 'llama.rn'
 
@@ -46,42 +52,122 @@ function convertFinishReason(
   return 'unknown'
 }
 
-function prepareMessages(
-  prompt: LanguageModelV2Prompt
-): { role: string; content: string }[] {
-  const messages: { role: string; content: string }[] = []
+/**
+ * Convert Uint8Array to base64 string
+ */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+/**
+ * Prepare messages with multimodal support for llama.rn
+ *
+ * Supports:
+ * - Images: JPEG, PNG, BMP, GIF, TGA, HDR, PIC, PNM
+ * - Audio: WAV, MP3
+ * - Base64 data URLs and local file paths (file:///)
+ * - Note: HTTP URLs are not yet supported
+ *
+ * @see https://github.com/mybigday/llama.rn#multimodal-vision--audio
+ */
+function prepareMessagesWithMedia(prompt: LanguageModelV2Prompt): {
+  messages: RNLlamaOAICompatibleMessage[]
+} {
+  const messages: RNLlamaOAICompatibleMessage[] = []
 
   for (const message of prompt) {
-    let content = ''
-
-    if (Array.isArray(message.content)) {
-      for (const part of message.content) {
-        if (part.type === 'text') {
-          content += part.text
-        }
-      }
-    } else if (typeof message.content === 'string') {
-      content = message.content
+    // String content - push directly
+    if (typeof message.content === 'string') {
+      messages.push({ role: message.role, content: message.content })
+      continue
     }
 
-    messages.push({
-      role: message.role,
-      content,
-    })
+    // Non-array content - skip
+    if (!Array.isArray(message.content)) {
+      continue
+    }
+
+    // Process array content parts
+    const parts: RNLlamaOAICompatibleMessage['content'] = []
+
+    for (const part of message.content) {
+      switch (part.type) {
+        case 'text':
+          parts.push({ type: 'text', text: part.text })
+          break
+
+        case 'file': {
+          const mediaType = part.mediaType.toLowerCase()
+          const { data } = part
+
+          // Convert data to URL string
+          const url =
+            data instanceof Uint8Array
+              ? `data:${part.mediaType};base64,${uint8ArrayToBase64(data)}`
+              : data instanceof URL
+                ? data.toString()
+                : typeof data === 'string'
+                  ? data
+                  : null
+
+          if (!url) break
+
+          // Handle images
+          if (mediaType.startsWith('image/')) {
+            parts.push({ type: 'image_url', image_url: { url } })
+            break
+          }
+
+          // Handle audio
+          if (mediaType.startsWith('audio/')) {
+            const format = mediaType.includes('wav') ? 'wav' : 'mp3'
+            const isDataUrl = url.startsWith('data:')
+            parts.push({
+              type: 'input_audio',
+              input_audio: {
+                format,
+                data: isDataUrl ? url : undefined,
+                url: isDataUrl ? undefined : url,
+              },
+            })
+          }
+          break
+        }
+      }
+    }
+
+    if (parts.length > 0) {
+      messages.push({ role: message.role, content: parts })
+    }
   }
 
-  return messages
+  return { messages }
 }
 
 /**
  * Configuration options for llama.rn model initialization
+ *
+ * @see https://github.com/mybigday/llama.rn
  */
 export interface LlamaModelOptions {
-  /** Context size (default: 2048) */
-  n_ctx?: number
-  /** Number of GPU layers (default: 99) */
-  n_gpu_layers?: number
-  /** Additional llama.rn context params */
+  /**
+   * Path to multimodal projector (mmproj) file for vision/audio support
+   * When provided, enables multimodal capabilities automatically
+   *
+   * @see https://github.com/mybigday/llama.rn#multimodal-vision--audio
+   */
+  projectorPath?: string
+  /**
+   * Use GPU for multimodal processing. Default/Recommended: true
+   */
+  projectorUseGpu?: boolean
+  /**
+   * llama.rn context params passed to initLlama()
+   */
   contextParams?: Partial<ContextParams>
 }
 
@@ -117,22 +203,45 @@ const END_OF_THINKING_PLACEHOLDER = '</think>'
 
 /**
  * llama.rn Language Model for AI SDK
+ *
+ * Supports multimodal (vision & audio) when projectorPath is provided
+ *
+ * @see https://github.com/mybigday/llama.rn
  */
 export class LlamaLanguageModel implements LanguageModelV2 {
   readonly specificationVersion = 'v2'
-  readonly supportedUrls = {}
   readonly provider = 'llama'
   readonly modelId: string
 
   private options: LlamaModelOptions
   private context: LlamaContext | null = null
+  private multimodalInitialized: boolean = false
+
+  /**
+   * Supported URL patterns
+   * Note: Only file:// and data: URLs supported (HTTP URLs not yet supported)
+   */
+  get supportedUrls(): Record<string, RegExp[]> {
+    if (this.options.projectorPath) {
+      return {
+        'image/*': [/^file:\/\//, /^data:image\//],
+        'audio/*': [/^file:\/\//, /^data:audio\//],
+      }
+    }
+    return {}
+  }
 
   constructor(modelId: string, options: LlamaModelOptions = {}) {
     this.modelId = modelId
+
     this.options = {
-      n_ctx: 2048,
-      n_gpu_layers: 99,
+      projectorUseGpu: true,
       ...options,
+      contextParams: {
+        n_ctx: Boolean(options.projectorPath) ? 4096 : 2048,
+        n_gpu_layers: 99,
+        ...options.contextParams,
+      },
     }
   }
 
@@ -171,10 +280,39 @@ export class LlamaLanguageModel implements LanguageModelV2 {
 
     this.context = await initLlama({
       model: modelPath,
-      n_ctx: this.options.n_ctx,
-      n_gpu_layers: this.options.n_gpu_layers,
+      // Important: ctx_shift must be false for multimodal (required per docs)
+      ...(this.options.projectorPath ? { ctx_shift: false } : {}),
       ...this.options.contextParams,
     })
+
+    // Initialize multimodal support if projector path is provided
+    if (this.options.projectorPath) {
+      await this.initializeMultimodal()
+    }
+  }
+
+  /**
+   * Initialize multimodal support (vision/audio)
+   *
+   * @see https://github.com/mybigday/llama.rn#multimodal-vision--audio
+   */
+  private async initializeMultimodal(): Promise<void> {
+    if (!this.context) {
+      throw new Error('Context not initialized')
+    }
+
+    if (!this.options.projectorPath) {
+      throw new Error('Projector path not provided in options')
+    }
+
+    this.multimodalInitialized = await this.context.initMultimodal({
+      path: this.options.projectorPath,
+      use_gpu: this.options.projectorUseGpu ?? true,
+    })
+
+    if (!this.multimodalInitialized) {
+      throw new Error('Failed to initialize multimodal support')
+    }
   }
 
   /**
@@ -189,6 +327,10 @@ export class LlamaLanguageModel implements LanguageModelV2 {
    */
   async unload(): Promise<void> {
     if (this.context) {
+      if (this.multimodalInitialized) {
+        await this.context.releaseMultimodal()
+        this.multimodalInitialized = false
+      }
       await this.context.release()
       this.context = null
     }
@@ -210,7 +352,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       throw new Error('Model not prepared. Call prepare() first.')
     }
 
-    const messages = prepareMessages(options.prompt)
+    const { messages } = prepareMessagesWithMedia(options.prompt)
 
     const completionOptions: Partial<CompletionParams> = {
       messages,
@@ -218,6 +360,10 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       n_predict: options.maxOutputTokens,
       top_p: options.topP,
       top_k: options.topK,
+      penalty_present: options.presencePenalty,
+      penalty_freq: options.frequencyPenalty,
+      stop: options.stopSequences,
+      seed: options.seed,
     }
 
     if (options.responseFormat?.type === 'json') {
@@ -287,7 +433,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       )
     }
 
-    const messages = prepareMessages(options.prompt)
+    const { messages } = prepareMessagesWithMedia(options.prompt)
 
     const completionOptions: Partial<CompletionParams> = {
       messages,
@@ -295,6 +441,10 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       n_predict: options.maxOutputTokens,
       top_p: options.topP,
       top_k: options.topK,
+      penalty_present: options.presencePenalty,
+      penalty_freq: options.frequencyPenalty,
+      stop: options.stopSequences,
+      seed: options.seed,
     }
 
     if (options.responseFormat?.type === 'json') {
@@ -449,17 +599,396 @@ export class LlamaLanguageModel implements LanguageModelV2 {
   }
 }
 
-/**
- * llama.rn provider factory
- */
-export const llama = {
+export interface LlamaEmbeddingOptions {
   /**
-   * Create a language model instance
+   * Normalize embeddings
    */
-  languageModel: (
+  normalize?: number
+  /**
+   * llama.rn context params passed to initLlama()
+   */
+  contextParams?: Partial<ContextParams>
+}
+
+/**
+ * llama.rn Embedding Model for AI SDK
+ */
+export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
+  readonly specificationVersion = 'v2'
+  readonly provider = 'llama'
+  readonly modelId: string
+
+  get maxEmbeddingsPerCall(): number {
+    return this.options.contextParams?.n_parallel ?? 8
+  }
+  get supportsParallelCalls(): boolean {
+    return this.maxEmbeddingsPerCall > 0
+  }
+
+  private options: LlamaEmbeddingOptions
+  private context: LlamaContext | null = null
+
+  constructor(modelId: string, options: LlamaEmbeddingOptions = {}) {
+    this.modelId = modelId
+    this.options = {
+      normalize: -1,
+      ...options,
+      contextParams: {
+        n_ctx: 2048,
+        n_gpu_layers: 99,
+        n_parallel: 8,
+        embedding: true,
+        embd_normalize: options.normalize ?? -1,
+        ...options.contextParams,
+      },
+    }
+  }
+
+  /**
+   * Check if model is downloaded
+   */
+  async isDownloaded(): Promise<boolean> {
+    return isModelDownloaded(this.modelId)
+  }
+
+  /**
+   * Download model from HuggingFace
+   */
+  async download(
+    progressCallback?: (progress: DownloadProgress) => void
+  ): Promise<void> {
+    await downloadModel(this.modelId, progressCallback)
+  }
+
+  /**
+   * Initialize the model (load LlamaContext with embedding enabled)
+   */
+  async prepare(): Promise<void> {
+    if (this.context) {
+      return
+    }
+
+    const modelPath = getModelPath(this.modelId)
+    const exists = await isModelDownloaded(this.modelId)
+
+    if (!exists) {
+      throw new Error(
+        `Model not downloaded. Call download() first. Model ID: ${this.modelId}`
+      )
+    }
+
+    this.context = await initLlama({
+      model: modelPath,
+      ...this.options.contextParams,
+    })
+  }
+
+  /**
+   * Get the underlying LlamaContext (for advanced usage)
+   */
+  getContext(): LlamaContext | null {
+    return this.context
+  }
+
+  /**
+   * Unload model from memory
+   */
+  async unload(): Promise<void> {
+    if (this.context) {
+      await this.context.release()
+      this.context = null
+    }
+  }
+
+  /**
+   * Remove model from disk
+   */
+  async remove(): Promise<void> {
+    await this.unload()
+    await removeModelFromStorage(this.modelId)
+  }
+
+  /**
+   * Generate embeddings (AI SDK EmbeddingModelV2)
+   */
+  async doEmbed(options: {
+    values: string[]
+    abortSignal?: AbortSignal
+    headers?: Record<string, string | undefined>
+  }) {
+    if (!this.context) {
+      throw new Error('Model not prepared. Call prepare() first.')
+    }
+
+    const embeddings: number[][] = []
+    const embeddingParams: EmbeddingParams = {
+      embd_normalize: this.options.normalize,
+    }
+
+    // Process one at a time since maxEmbeddingsPerCall = 1
+    for (const value of options.values) {
+      if (options.abortSignal?.aborted) {
+        throw new Error('Embedding generation was aborted')
+      }
+
+      const result: NativeEmbeddingResult = await this.context.embedding(
+        value,
+        embeddingParams
+      )
+      embeddings.push(result.embedding)
+    }
+
+    return {
+      embeddings,
+      usage: {
+        tokens: options.values.reduce((acc, val) => acc + val.length, 0),
+      },
+    }
+  }
+}
+
+/**
+ * Configuration options for llama.rn speech model (vocoder-based TTS)
+ */
+export interface LlamaSpeechOptions {
+  /** Path to vocoder model for TTS */
+  vocoderPath?: string
+  /** Batch size for vocoder processing */
+  vocoderBatchSize?: number
+  /** llama.rn context params passed to initLlama() */
+  contextParams?: Partial<ContextParams>
+}
+
+/**
+ * llama.rn Speech Model for AI SDK (using vocoder for TTS)
+ */
+export class LlamaSpeechModel implements SpeechModelV2 {
+  readonly specificationVersion = 'v2'
+  readonly provider = 'llama'
+  readonly modelId: string
+
+  private options: LlamaSpeechOptions
+  private context: LlamaContext | null = null
+  private vocoderInitialized: boolean = false
+
+  constructor(modelId: string, options: LlamaSpeechOptions = {}) {
+    this.modelId = modelId
+    this.options = {
+      ...options,
+      contextParams: {
+        n_ctx: 2048,
+        n_gpu_layers: 99,
+        ...options.contextParams,
+      },
+    }
+  }
+
+  /**
+   * Check if model is downloaded
+   */
+  async isDownloaded(): Promise<boolean> {
+    return isModelDownloaded(this.modelId)
+  }
+
+  /**
+   * Download model from HuggingFace
+   */
+  async download(
+    progressCallback?: (progress: DownloadProgress) => void
+  ): Promise<void> {
+    await downloadModel(this.modelId, progressCallback)
+  }
+
+  /**
+   * Initialize the model and vocoder
+   */
+  async prepare(): Promise<void> {
+    if (this.context) {
+      return
+    }
+
+    const modelPath = getModelPath(this.modelId)
+    const exists = await isModelDownloaded(this.modelId)
+
+    if (!exists) {
+      throw new Error(
+        `Model not downloaded. Call download() first. Model ID: ${this.modelId}`
+      )
+    }
+
+    this.context = await initLlama({
+      model: modelPath,
+      ...this.options.contextParams,
+    })
+
+    // Initialize vocoder if path provided
+    if (this.options.vocoderPath) {
+      await this.initializeVocoder()
+    }
+  }
+
+  /**
+   * Initialize vocoder for TTS
+   */
+  private async initializeVocoder(): Promise<void> {
+    if (!this.context) {
+      throw new Error('Context not initialized')
+    }
+
+    if (!this.options.vocoderPath) {
+      throw new Error('Vocoder path not provided in options')
+    }
+
+    this.vocoderInitialized = await this.context.initVocoder({
+      path: this.options.vocoderPath,
+      n_batch: this.options.vocoderBatchSize,
+    })
+
+    if (!this.vocoderInitialized) {
+      throw new Error('Failed to initialize vocoder')
+    }
+  }
+
+  /**
+   * Get the underlying LlamaContext (for advanced usage)
+   */
+  getContext(): LlamaContext | null {
+    return this.context
+  }
+
+  /**
+   * Unload model from memory
+   */
+  async unload(): Promise<void> {
+    if (this.context) {
+      if (this.vocoderInitialized) {
+        await this.context.releaseVocoder()
+        this.vocoderInitialized = false
+      }
+      await this.context.release()
+      this.context = null
+    }
+  }
+
+  /**
+   * Remove model from disk
+   */
+  async remove(): Promise<void> {
+    await this.unload()
+    await removeModelFromStorage(this.modelId)
+  }
+
+  /**
+   * Generate speech audio (AI SDK SpeechModelV2)
+   */
+  async doGenerate(options: SpeechModelV2CallOptions) {
+    if (!this.context) {
+      throw new Error('Model not prepared. Call prepare() first.')
+    }
+
+    if (!this.vocoderInitialized) {
+      throw new Error(
+        'Vocoder not initialized. Provide vocoderPath in constructor options.'
+      )
+    }
+
+    // Get formatted audio completion prompt
+    const speaker = null // Can be extended to support different speakers
+    const formatted = await this.context.getFormattedAudioCompletion(
+      speaker,
+      options.text
+    )
+
+    // Generate audio tokens via completion
+    const completionResult = await this.context.completion({
+      prompt: formatted.prompt,
+      grammar: formatted.grammar,
+      temperature: 0.8,
+      n_predict: -1,
+    })
+
+    if (
+      !completionResult.audio_tokens ||
+      completionResult.audio_tokens.length === 0
+    ) {
+      throw new Error('No audio tokens generated')
+    }
+
+    // Decode audio tokens to PCM
+    const audioData = await this.context.decodeAudioTokens(
+      completionResult.audio_tokens
+    )
+
+    // Convert to Uint8Array
+    const audio = new Uint8Array(audioData)
+
+    return {
+      audio,
+      warnings: [],
+      response: {
+        timestamp: new Date(),
+        modelId: this.modelId,
+      },
+    }
+  }
+}
+
+/**
+ * Configuration options for llama.rn provider
+ */
+export interface LlamaProviderOptions {
+  /** Custom storage path for downloaded models */
+  storagePath?: string
+}
+
+/**
+ * Create a llama.rn provider with all model types
+ */
+export function createLlamaProvider(providerOptions?: LlamaProviderOptions) {
+  // Set custom storage path if provided
+  if (providerOptions?.storagePath) {
+    setStoragePath(providerOptions.storagePath)
+  }
+
+  const provider = function (modelId: string, options?: LlamaModelOptions) {
+    return provider.languageModel(modelId, options)
+  }
+
+  provider.languageModel = (
     modelId: string,
     options: LlamaModelOptions = {}
   ): LlamaLanguageModel => {
     return new LlamaLanguageModel(modelId, options)
-  },
+  }
+
+  provider.textEmbeddingModel = (
+    modelId: string,
+    options: LlamaEmbeddingOptions = {}
+  ): LlamaEmbeddingModel => {
+    return new LlamaEmbeddingModel(modelId, options)
+  }
+
+  provider.speechModel = (
+    modelId: string,
+    options: LlamaSpeechOptions = {}
+  ): LlamaSpeechModel => {
+    if (!options.vocoderPath) {
+      throw new Error(
+        'vocoderPath is required in options for speech model. ' +
+          'Provide the path to a vocoder model file.'
+      )
+    }
+    return new LlamaSpeechModel(modelId, options)
+  }
+
+  provider.imageModel = () => {
+    throw new Error('Image generation models are not supported by llama.rn')
+  }
+
+  return provider
 }
+
+/**
+ * Default llama.rn provider instance
+ */
+export const llama = createLlamaProvider()

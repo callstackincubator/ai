@@ -13,11 +13,11 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 
 ## Available Providers
 
-| Provider | Built-in | Platforms | Description |
-|----------|----------|-----------|-------------|
-| [Apple](#apple) | ✅ Yes | iOS | Apple Foundation Models, embeddings, transcription, speech |
-| [Llama](#llama) | ❌ No | iOS, Android | Run GGUF models via llama.rn |
-| [MLC](#mlc) | ❌ No | iOS, Android | Run open-source LLMs via MLC runtime |
+| Provider | Built-in | Platforms | Runtime | Description |
+|----------|----------|-----------|---------|-------------|
+| [Apple](#apple) | ✅ Yes | iOS | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
+| [Llama](#llama) | ❌ No | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn) | Run GGUF models via llama.rn |
+| [MLC](#mlc) | ❌ No | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm) | Run open-source LLMs via MLC runtime |
 
 ---
 
@@ -91,6 +91,14 @@ See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-sta
 
 Run any GGUF model on-device using [llama.rn](https://github.com/mybigday/llama.rn). **Requires download** - models are downloaded from HuggingFace.
 
+#### Supported Features
+
+| Feature | Method | Description |
+|---------|--------|-------------|
+| Text Generation | `llama.languageModel()` | Chat, completion, streaming, reasoning models |
+| Embeddings | `llama.textEmbeddingModel()` | Text embeddings for RAG and similarity search |
+| Speech | `llama.speechModel()` | Text-to-speech with vocoder models |
+
 #### Installation
 
 ```bash
@@ -135,7 +143,7 @@ Any GGUF model from HuggingFace can be used. Use the format `owner/repo/filename
 - `bartowski/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct-Q4_K_M.gguf`
 - `Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf`
 
-See the [Llama documentation](https://react-native-ai.dev/docs/llama/getting-started) for detailed setup and usage guides.
+📚 **[View full Llama documentation →](https://react-native-ai.dev/docs/llama/getting-started)**
 
 ---
 

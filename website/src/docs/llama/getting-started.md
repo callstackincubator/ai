@@ -21,6 +21,16 @@ npm install ai
 - **React Native >= 0.76.0** - Required for native module functionality
 - **llama.rn >= 0.10.0** - The underlying llama.cpp bindings
 
+## Available Model Types
+
+The Llama provider supports multiple model types:
+
+| Model Type | Method | Use Case |
+| --- | --- | --- |
+| Language Model | `llama.languageModel()` | Text generation, chat, reasoning |
+| Embedding Model | `llama.textEmbeddingModel()` | Text embeddings for RAG, similarity |
+| Speech Model | `llama.speechModel()` | Text-to-speech with vocoder |
+
 ## Basic Usage
 
 Import the Llama provider and use it with the AI SDK:
@@ -68,4 +78,5 @@ You can find GGUF models on [HuggingFace](https://huggingface.co/models?library=
 ## Next Steps
 
 - **[Model Management](./model-management.md)** - Complete guide to model lifecycle, downloading, and API reference
-- **[Generating](./generating.md)** - Learn how to generate text and stream responses
+- **[Generating](./generating.md)** - Learn how to generate text, use multimodal inputs, and stream responses
+- **[Embeddings](./embeddings.md)** - Generate text embeddings for RAG and similarity search
