@@ -33,12 +33,11 @@ const { ranking } = await rerank({
   ],
 })
 
-// Results are sorted by score (highest first)
-ranking.forEach((result, index) => {
-  console.log(`Rank ${index + 1}:`, {
-    score: result.score,
-    document: result.document,
-    originalIndex: result.originalIndex,
+// Results are sorted by relevance (highest first)
+ranking.forEach((result, rank) => {
+  console.log(`Rank ${rank + 1}:`, {
+    relevanceScore: result.relevanceScore,
+    index: result.index, // Original index in the documents array
   })
 })
 ```
@@ -84,9 +83,8 @@ Each result in the ranking array contains:
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `score` | number | Relevance score (higher = more relevant) |
-| `document` | string | The document content |
-| `originalIndex` | number | Index of the document in the original input array |
+| `relevanceScore` | number | Relevance score (higher = more relevant) |
+| `index` | number | Index of the document in the original input array |
 
 ## Cleanup
 
