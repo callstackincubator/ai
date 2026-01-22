@@ -329,7 +329,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
             }
         }
       }),
-      finishReason: { unified: 'stop' as const, raw: undefined },
+      finishReason: { unified: 'stop' as const, raw: 'stop' },
       usage: {
         inputTokens: {
           total: 0,
