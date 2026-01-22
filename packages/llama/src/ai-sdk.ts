@@ -22,6 +22,88 @@ import {
   type TokenData,
 } from 'llama.rn'
 
+/**
+ * Rerank model interface (AI SDK RerankModelV1)
+ *
+ * @see https://ai-sdk.dev/docs/ai-sdk-core/reranking
+ */
+export interface RerankModelV1<VALUE> {
+  /**
+   * The specification version for this model interface.
+   */
+  readonly specificationVersion: 'v1'
+
+  /**
+   * The provider name (e.g., 'llama').
+   */
+  readonly provider: string
+
+  /**
+   * The model ID (e.g., model file path).
+   */
+  readonly modelId: string
+
+  /**
+   * Rank documents based on their relevance to a query.
+   *
+   * @param options - Rerank options
+   * @returns Ranked documents sorted by relevance score (highest first)
+   */
+  doRerank(options: {
+    /**
+     * Documents to rank
+     */
+    values: VALUE[]
+
+    /**
+     * Query to rank documents against
+     */
+    query: string
+
+    /**
+     * Maximum number of documents to return
+     */
+    topN?: number
+
+    /**
+     * Abort signal for cancellation
+     */
+    abortSignal?: AbortSignal
+
+    /**
+     * Optional headers (for API-based providers)
+     */
+    headers?: Record<string, string | undefined>
+  }): PromiseLike<{
+    /**
+     * Ranked documents sorted by score (highest first)
+     */
+    ranking: {
+      /**
+       * Index of the document in the original input array
+       */
+      originalIndex: number
+
+      /**
+       * Relevance score (higher = more relevant)
+       */
+      score: number
+
+      /**
+       * The document content
+       */
+      document: VALUE
+    }[]
+
+    /**
+     * Optional usage information
+     */
+    usage?: {
+      tokens?: number
+    }
+  }>
+}
+
 type LLMState = 'text' | 'reasoning' | 'none'
 
 function convertFinishReason(
@@ -669,6 +751,135 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
   }
 }
 
+export interface LlamaRerankOptions {
+  /**
+   * Normalize scores (default: from model config)
+   */
+  normalize?: number
+  /**
+   * llama.rn context params passed to initLlama()
+   */
+  contextParams?: Partial<ContextParams>
+}
+
+/**
+ * llama.rn Rerank Model for AI SDK
+ *
+ * Ranks documents based on their relevance to a query.
+ * Useful for improving search results and implementing RAG systems.
+ *
+ * @see https://github.com/mybigday/llama.rn
+ */
+export class LlamaRerankModel implements RerankModelV1<string> {
+  readonly specificationVersion = 'v1'
+  readonly provider = 'llama'
+  readonly modelId: string
+
+  private modelPath: string
+  private options: LlamaRerankOptions
+  private context: LlamaContext | null = null
+
+  /**
+   * @param modelPath - Path to the reranker model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
+  constructor(modelPath: string, options: LlamaRerankOptions = {}) {
+    this.modelPath = modelPath
+    this.modelId = modelPath
+    this.options = {
+      normalize: options.normalize,
+      ...options,
+      contextParams: {
+        n_ctx: 2048,
+        n_gpu_layers: 99,
+        embedding: true,
+        pooling_type: 'rank',
+        ...options.contextParams,
+      },
+    }
+  }
+
+  /**
+   * Initialize the model (load LlamaContext with rank pooling enabled)
+   * @returns The initialized LlamaContext
+   */
+  async prepare(): Promise<LlamaContext> {
+    if (this.context) {
+      return this.context
+    }
+
+    this.context = await initLlama({
+      model: this.modelPath,
+      ...this.options.contextParams,
+    })
+
+    return this.context
+  }
+
+  /**
+   * Get the underlying LlamaContext (for advanced usage)
+   */
+  getContext(): LlamaContext | null {
+    return this.context
+  }
+
+  /**
+   * Unload model from memory
+   */
+  async unload(): Promise<void> {
+    if (this.context) {
+      await this.context.release()
+      this.context = null
+    }
+  }
+
+  /**
+   * Rerank documents based on relevance to query (AI SDK RerankModelV1)
+   */
+  async doRerank(options: {
+    values: string[]
+    query: string
+    topN?: number
+    abortSignal?: AbortSignal
+    headers?: Record<string, string | undefined>
+  }) {
+    if (!this.context) {
+      console.warn(
+        '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
+      )
+    }
+
+    const context = this.context ?? (await this.prepare())
+
+    const rerankOptions =
+      this.options.normalize !== undefined
+        ? { normalize: this.options.normalize }
+        : undefined
+
+    const results = await context.rerank(
+      options.query,
+      options.values,
+      rerankOptions
+    )
+
+    // Map to AI SDK format
+    let ranking = results.map((result) => ({
+      originalIndex: result.index,
+      score: result.score,
+      document: result.document ?? options.values[result.index],
+    }))
+
+    // Apply topN filter if specified
+    if (options.topN !== undefined && options.topN > 0) {
+      ranking = ranking.slice(0, options.topN)
+    }
+
+    return {
+      ranking,
+    }
+  }
+}
+
 /**
  * Configuration options for llama.rn speech model (vocoder-based TTS)
  */
@@ -865,6 +1076,18 @@ export function createLlamaProvider() {
     options: LlamaEmbeddingOptions = {}
   ): LlamaEmbeddingModel => {
     return new LlamaEmbeddingModel(modelPath, options)
+  }
+
+  /**
+   * Create a rerank model instance for document ranking
+   * @param modelPath - Path to a reranker model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
+  provider.rerankModel = (
+    modelPath: string,
+    options: LlamaRerankOptions = {}
+  ): LlamaRerankModel => {
+    return new LlamaRerankModel(modelPath, options)
   }
 
   /**
