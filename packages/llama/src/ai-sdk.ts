@@ -311,7 +311,8 @@ export class LlamaLanguageModel implements LanguageModelV2 {
         try {
           let textId = generateId()
 
-          let state: LLMState = 'none' as LLMState
+          // Start in 'text' state since we emit text-start upfront
+          let state: LLMState = 'text'
 
           controller.enqueue({
             type: 'stream-start',
@@ -323,7 +324,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
             type: 'text-start',
             id: textId,
           })
-          state = 'text'
 
           const result = await context.completion(
             completionOptions,
@@ -364,8 +364,8 @@ export class LlamaLanguageModel implements LanguageModelV2 {
 
                 default:
                   // process regular token
-                  // Skip empty tokens
-                  if (!token) {
+                  // Skip null/undefined tokens
+                  if (token == null) {
                     break
                   }
 
