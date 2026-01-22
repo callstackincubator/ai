@@ -1,3 +1,4 @@
+import type { SpeechModelV3 } from '@ai-sdk/provider'
 import { apple, AppleSpeech, VoiceInfo } from '@react-native-ai/apple'
 import { Picker } from '@react-native-picker/picker'
 import { experimental_generateSpeech } from 'ai'
@@ -13,6 +14,10 @@ import {
 } from 'react-native'
 import { AudioContext } from 'react-native-audio-api'
 
+import ProviderSelector from '../../../components/ProviderSelector'
+import SpeechProviderSetup from '../../../components/SpeechProviderSetup'
+import { SPEECH_LLAMA_MODELS } from '../../../config/models'
+
 const play = async (arrayBuffer: ArrayBufferLike) => {
   const context = new AudioContext()
 
@@ -24,6 +29,8 @@ const play = async (arrayBuffer: ArrayBufferLike) => {
 }
 
 export default function SpeechScreen() {
+  const [provider, setProvider] = useState<'apple' | 'llama'>('apple')
+  const [speechModel, setSpeechModel] = useState<SpeechModelV3 | null>(null)
   const [inputText, setInputText] = useState(
     'On-device text to speech is awesome'
   )
@@ -51,6 +58,14 @@ export default function SpeechScreen() {
   const generateSpeech = async () => {
     if (!inputText.trim() || isGenerating) return
 
+    const currentModel =
+      provider === 'apple' ? apple.speechModel() : speechModel
+
+    if (!currentModel) {
+      Alert.alert('Error', 'Please initialize the speech model first')
+      return
+    }
+
     setIsGenerating(true)
     setGeneratedSpeech(null)
 
@@ -58,7 +73,7 @@ export default function SpeechScreen() {
 
     try {
       const result = await experimental_generateSpeech({
-        model: apple.speechModel(),
+        model: currentModel,
         text: inputText,
         voice: selectedVoice ?? undefined,
       })
@@ -80,11 +95,31 @@ export default function SpeechScreen() {
     }
   }
 
+  // For Llama provider with speech support
+  if (provider === 'llama' && !speechModel) {
+    return (
+      <SpeechProviderSetup
+        models={SPEECH_LLAMA_MODELS}
+        onReady={(llamaSpeechModel) => setSpeechModel(llamaSpeechModel)}
+        onBack={() => setProvider('apple')}
+      />
+    )
+  }
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       className="flex-1 bg-gray-50"
     >
+      <ProviderSelector
+        provider={provider}
+        onProviderChange={(newProvider) => {
+          setProvider(newProvider)
+          setSpeechModel(null)
+        }}
+        disabled={isGenerating}
+      />
+
       <View className="p-4">
         <View className="bg-white rounded-xl p-4">
           <Text className="text-lg font-semibold mb-4">Enter Your Text</Text>
@@ -121,7 +156,7 @@ export default function SpeechScreen() {
           </TouchableOpacity>
         </View>
 
-        {voices.length > 0 && (
+        {provider === 'apple' && voices.length > 0 && (
           <View className="bg-white rounded-xl p-4 mt-4">
             <Text className="text-lg font-semibold mb-3">Voice Selection</Text>
             <View className="border border-gray-200 rounded-lg bg-gray-50">

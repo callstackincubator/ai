@@ -1,3 +1,4 @@
+import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { apple } from '@react-native-ai/apple'
 import { generateObject, generateText, streamText } from 'ai'
 import React, { useState } from 'react'
@@ -11,28 +12,33 @@ import {
 } from 'react-native'
 import { z } from 'zod'
 
-async function basicStringDemo() {
+import ProviderSelector from '../../../components/ProviderSelector'
+import ProviderSetup from '../../../components/ProviderSetup'
+import { LLAMA_MODELS } from '../../../config/models'
+
+async function basicStringDemo(model: LanguageModelV3) {
   const response = await generateText({
-    model: apple(),
+    model,
     prompt: 'Who founded Apple?',
   })
   return response.text
 }
 
-async function basicStringStreamingDemo() {
+async function basicStringStreamingDemo(model: LanguageModelV3) {
   const response = streamText({
-    model: apple(),
+    model,
     prompt: 'Write me short essay on the meaning of life',
   })
+  let text = ''
   for await (const chunk of response.textStream) {
-    console.log(chunk)
+    text += chunk
   }
-  return response.text
+  return text
 }
 
-async function colorEnumDemo() {
+async function colorEnumDemo(model: LanguageModelV3) {
   const response = await generateObject({
-    model: apple(),
+    model,
     prompt: 'What color is the grass?',
     schema: z
       .object({
@@ -43,9 +49,9 @@ async function colorEnumDemo() {
   return response.object
 }
 
-async function basicNumberDemo() {
+async function basicNumberDemo(model: LanguageModelV3) {
   const response = await generateObject({
-    model: apple(),
+    model,
     system: 'There are 3 people in the room.',
     prompt: 'How many people are in the room?',
     schema: z
@@ -57,9 +63,9 @@ async function basicNumberDemo() {
   return response.object
 }
 
-async function basicBooleanDemo() {
+async function basicBooleanDemo(model: LanguageModelV3) {
   const response = await generateObject({
-    model: apple(),
+    model,
     prompt: 'Is the sky blue?',
     schema: z
       .object({
@@ -70,9 +76,9 @@ async function basicBooleanDemo() {
   return response.object
 }
 
-async function basicObjectDemo() {
+async function basicObjectDemo(model: LanguageModelV3) {
   const response = await generateObject({
-    model: apple(),
+    model,
     prompt: 'Create a simple person',
     schema: z
       .object({
@@ -85,9 +91,9 @@ async function basicObjectDemo() {
   return response.object
 }
 
-async function basicArrayDemo() {
+async function basicArrayDemo(model: LanguageModelV3) {
   const response = await generateObject({
-    model: apple(),
+    model,
     prompt: 'Random list of fruits',
     topK: 50,
     temperature: 1,
@@ -114,16 +120,22 @@ const playgroundDemos = {
 }
 
 export default function PlaygroundScreen() {
+  const [provider, setProvider] = useState<'apple' | 'llama'>('apple')
+  const [model, setModel] = useState<LanguageModelV3 | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
+
   const isAvailable = apple.isAvailable()
 
   const runDemo = async (key: string) => {
     if (loading) return
 
+    const currentModel = provider === 'apple' ? apple() : model
+    if (!currentModel) return
+
     setLoading(key)
 
     try {
-      const result = await playgroundDemos[key].func()
+      const result = await playgroundDemos[key].func(currentModel)
       Alert.alert('Success', JSON.stringify(result, null, 2))
     } catch (error) {
       Alert.alert(
@@ -151,13 +163,37 @@ export default function PlaygroundScreen() {
     return colors[index % colors.length]
   }
 
+  // Llama provider needs setup
+  if (provider === 'llama' && !model) {
+    return (
+      <ProviderSetup
+        models={LLAMA_MODELS}
+        onReady={(llamaModel) => setModel(llamaModel)}
+        onBack={() => setProvider('apple')}
+      />
+    )
+  }
+
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1">
+      <ProviderSelector
+        provider={provider}
+        onProviderChange={(newProvider) => {
+          setProvider(newProvider)
+          setModel(null)
+        }}
+        disabled={loading !== null}
+      />
+
       <View className="p-4">
         <Text className="text-center my-4 text-gray-500">
-          Apple Intelligence:{' '}
-          {isAvailable ? '✅ Available' : '❌ Not Available'}
+          Provider: {provider === 'apple' ? 'Apple Intelligence' : 'Llama'}
         </Text>
+        {provider === 'apple' && (
+          <Text className="text-center mb-4 text-gray-500">
+            {isAvailable ? '✅ Available' : '❌ Not Available'}
+          </Text>
+        )}
 
         <View className="flex-row flex-wrap justify-between">
           {Object.entries(playgroundDemos).map(([key, demo], index) => {

@@ -4,7 +4,6 @@ import {
   createNativeBottomTabNavigator,
   NativeBottomTabNavigationOptions,
 } from '@bottom-tabs/react-navigation'
-import Icon from '@react-native-vector-icons/material-icons'
 import { NavigationContainer } from '@react-navigation/native'
 import {
   createNativeStackNavigator,
@@ -12,7 +11,6 @@ import {
 } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import React from 'react'
-import { Platform } from 'react-native'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
@@ -20,8 +18,6 @@ import AppleLLMScreen from './screens/apple/AppleLLMScreen'
 import PlaygroundScreen from './screens/apple/PlaygroundScreen'
 import SpeechScreen from './screens/apple/SpeechScreen'
 import TranscribeScreen from './screens/apple/TranscribeScreen'
-import LlamaRNScreen from './screens/LlamaRNScreen'
-import MLCScreen from './screens/MLCScreen'
 
 const Tab = createNativeBottomTabNavigator()
 
@@ -37,36 +33,14 @@ type ScreenProto = {
 const screens = (
   [
     {
-      routeName: 'AppleLLM',
-      screenOptions: { title: 'AppleLLM' },
+      routeName: 'Chat',
+      screenOptions: { title: 'Chat' },
       tabScreenOptions: {
         tabBarIcon: () => ({
           sfSymbol: 'brain.head.profile',
         }),
       },
       Component: AppleLLMScreen,
-    },
-    {
-      routeName: 'Llama',
-      screenOptions: { title: 'Llama.rn' },
-      tabScreenOptions: {
-        tabBarIcon: () =>
-          Platform.OS === 'ios'
-            ? { sfSymbol: 'sparkles' }
-            : Icon.getImageSourceSync('auto-fix-high', 24),
-      },
-      Component: LlamaRNScreen,
-    },
-    {
-      routeName: 'MLC',
-      screenOptions: { title: 'MLC Engine' },
-      tabScreenOptions: {
-        tabBarIcon: () =>
-          Platform.OS === 'ios'
-            ? { sfSymbol: 'cpu' }
-            : Icon.getImageSourceSync('memory', 24),
-      },
-      Component: MLCScreen,
     },
     {
       routeName: 'Playground',
