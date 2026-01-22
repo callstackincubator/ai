@@ -1,15 +1,17 @@
 import type {
-  EmbeddingModelV2,
-  LanguageModelV2,
-  LanguageModelV2CallOptions,
-  LanguageModelV2Content,
-  LanguageModelV2FinishReason,
-  LanguageModelV2Prompt,
-  LanguageModelV2StreamPart,
+  EmbeddingModelV3,
+  EmbeddingModelV3CallOptions,
+  EmbeddingModelV3Result,
+  LanguageModelV3,
+  LanguageModelV3CallOptions,
+  LanguageModelV3Content,
+  LanguageModelV3FinishReason,
+  LanguageModelV3Prompt,
+  LanguageModelV3StreamPart,
   RerankingModelV3,
   RerankingModelV3CallOptions,
-  SpeechModelV2,
-  SpeechModelV2CallOptions,
+  SpeechModelV3,
+  SpeechModelV3CallOptions,
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
@@ -28,17 +30,21 @@ type LLMState = 'text' | 'reasoning' | 'none'
 
 function convertFinishReason(
   result: NativeCompletionResult
-): LanguageModelV2FinishReason {
+): LanguageModelV3FinishReason {
+  let unified: LanguageModelV3FinishReason['unified'] = 'other'
+
   if (result.stopped_eos) {
-    return 'stop'
+    unified = 'stop'
+  } else if (result.stopped_word) {
+    unified = 'stop'
+  } else if (result.stopped_limit) {
+    unified = 'length'
   }
-  if (result.stopped_word) {
-    return 'stop'
+
+  return {
+    unified,
+    raw: undefined,
   }
-  if (result.stopped_limit) {
-    return 'length'
-  }
-  return 'unknown'
 }
 
 /**
@@ -63,7 +69,7 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
  *
  * @see https://github.com/mybigday/llama.rn#multimodal-vision--audio
  */
-function prepareMessagesWithMedia(prompt: LanguageModelV2Prompt): {
+function prepareMessagesWithMedia(prompt: LanguageModelV3Prompt): {
   messages: RNLlamaOAICompatibleMessage[]
 } {
   const messages: RNLlamaOAICompatibleMessage[] = []
@@ -170,8 +176,8 @@ const END_OF_THINKING_PLACEHOLDER = '</think>'
  *
  * @see https://github.com/mybigday/llama.rn
  */
-export class LlamaLanguageModel implements LanguageModelV2 {
-  readonly specificationVersion = 'v2'
+export class LlamaLanguageModel implements LanguageModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -283,9 +289,9 @@ export class LlamaLanguageModel implements LanguageModelV2 {
   }
 
   /**
-   * Non-streaming text generation (AI SDK LanguageModelV2)
+   * Non-streaming text generation (AI SDK LanguageModelV3)
    */
-  async doGenerate(options: LanguageModelV2CallOptions) {
+  async doGenerate(options: LanguageModelV3CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -333,24 +339,35 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       textContent = beforeThinking + afterThinking
     }
 
+    const content: LanguageModelV3Content[] = [
+      {
+        type: 'text',
+        text: textContent,
+      },
+    ]
+
+    if (response.reasoning_content) {
+      content.push({
+        type: 'reasoning',
+        text: response.reasoning_content,
+      })
+    }
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: textContent,
-        },
-        {
-          type: 'reasoning',
-          text: response.reasoning_content,
-        },
-      ] as LanguageModelV2Content[],
+      content,
       finishReason: convertFinishReason(response),
       usage: {
-        inputTokens: response.timings?.prompt_n || 0,
-        outputTokens: response.timings?.predicted_n || 0,
-        totalTokens:
-          (response.timings?.prompt_n || 0) +
-          (response.timings?.predicted_n || 0),
+        inputTokens: {
+          total: response.timings?.prompt_n || 0,
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: {
+          total: response.timings?.predicted_n || 0,
+          text: undefined,
+          reasoning: undefined,
+        },
       },
       providerMetadata: {
         llama: {
@@ -362,9 +379,9 @@ export class LlamaLanguageModel implements LanguageModelV2 {
   }
 
   /**
-   * Streaming text generation (AI SDK LanguageModelV2)
+   * Streaming text generation (AI SDK LanguageModelV3)
    */
-  async doStream(options: LanguageModelV2CallOptions) {
+  async doStream(options: LanguageModelV3CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -400,7 +417,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       }
     }
 
-    const stream = new ReadableStream<LanguageModelV2StreamPart>({
+    const stream = new ReadableStream<LanguageModelV3StreamPart>({
       start: async (controller) => {
         try {
           let textId = generateId()
@@ -510,11 +527,17 @@ export class LlamaLanguageModel implements LanguageModelV2 {
             type: 'finish',
             finishReason: convertFinishReason(result),
             usage: {
-              inputTokens: result.timings?.prompt_n || 0,
-              outputTokens: result.timings?.predicted_n || 0,
-              totalTokens:
-                (result.timings?.prompt_n || 0) +
-                (result.timings?.predicted_n || 0),
+              inputTokens: {
+                total: result.timings?.prompt_n || 0,
+                noCache: undefined,
+                cacheRead: undefined,
+                cacheWrite: undefined,
+              },
+              outputTokens: {
+                total: result.timings?.predicted_n || 0,
+                text: undefined,
+                reasoning: undefined,
+              },
             },
             providerMetadata: {
               llama: {
@@ -557,8 +580,8 @@ export interface LlamaEmbeddingOptions {
 /**
  * llama.rn Embedding Model for AI SDK
  */
-export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
-  readonly specificationVersion = 'v2'
+export class LlamaEmbeddingModel implements EmbeddingModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -629,13 +652,11 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
   }
 
   /**
-   * Generate embeddings (AI SDK EmbeddingModelV2)
+   * Generate embeddings (AI SDK EmbeddingModelV3)
    */
-  async doEmbed(options: {
-    values: string[]
-    abortSignal?: AbortSignal
-    headers?: Record<string, string | undefined>
-  }) {
+  async doEmbed(
+    options: EmbeddingModelV3CallOptions
+  ): Promise<EmbeddingModelV3Result> {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -667,6 +688,7 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
       usage: {
         tokens: options.values.reduce((acc, val) => acc + val.length, 0),
       },
+      warnings: [],
     }
   }
 }
@@ -807,8 +829,8 @@ export interface LlamaSpeechOptions {
 /**
  * llama.rn Speech Model for AI SDK (using vocoder for TTS)
  */
-export class LlamaSpeechModel implements SpeechModelV2 {
-  readonly specificationVersion = 'v2'
+export class LlamaSpeechModel implements SpeechModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -900,9 +922,9 @@ export class LlamaSpeechModel implements SpeechModelV2 {
   }
 
   /**
-   * Generate speech audio (AI SDK SpeechModelV2)
+   * Generate speech audio (AI SDK SpeechModelV3)
    */
-  async doGenerate(options: SpeechModelV2CallOptions) {
+  async doGenerate(options: SpeechModelV3CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
