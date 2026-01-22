@@ -10,15 +10,15 @@ Generate text embeddings for RAG (Retrieval-Augmented Generation), semantic sear
 ## Basic Usage
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { embed } from 'ai'
 
-// Create embedding model
-const model = llama.textEmbeddingModel(
-  'owner/repo/embedding-model.gguf'
-)
+// Download embedding model - returns the file path
+const modelPath = await downloadModel('owner/repo/embedding-model.gguf')
 
-await model.download()
+// Create embedding model with the path
+const model = llama.textEmbeddingModel(modelPath)
+
 await model.prepare()
 
 // Generate embedding for a single text
@@ -35,13 +35,12 @@ console.log(embedding) // [0.123, -0.456, ...]
 Generate embeddings for multiple texts:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { embedMany } from 'ai'
 
-const model = llama.textEmbeddingModel(
-  'owner/repo/embedding-model.gguf'
-)
-await model.download()
+const modelPath = await downloadModel('owner/repo/embedding-model.gguf')
+
+const model = llama.textEmbeddingModel(modelPath)
 await model.prepare()
 
 const { embeddings } = await embedMany({
@@ -62,17 +61,14 @@ console.log(embeddings[0].length) // Embedding dimension (e.g., 384, 768)
 Configure the embedding model with specific options:
 
 ```typescript
-const model = llama.textEmbeddingModel(
-  'owner/repo/embedding-model.gguf',
-  {
-    normalize: -1, // Normalization mode (default: -1)
-    contextParams: {
-      n_ctx: 2048, // Context size (default: 2048)
-      n_gpu_layers: 99, // GPU layers (default: 99)
-      n_parallel: 8, // Parallel embeddings (default: 8)
-    },
-  }
-)
+const model = llama.textEmbeddingModel(modelPath, {
+  normalize: -1, // Normalization mode (default: -1)
+  contextParams: {
+    n_ctx: 2048, // Context size (default: 2048)
+    n_gpu_layers: 99, // GPU layers (default: 99)
+    n_parallel: 8, // Parallel embeddings (default: 8)
+  },
+})
 ```
 
 ### Options
@@ -90,5 +86,4 @@ Release resources when done:
 
 ```typescript
 await model.unload() // Release from memory
-await model.remove() // Delete from disk (optional)
 ```

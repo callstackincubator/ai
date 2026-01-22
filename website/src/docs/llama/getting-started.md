@@ -63,16 +63,14 @@ The Llama provider supports multiple model types:
 Import the Llama provider and use it with the AI SDK:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { streamText } from 'ai'
 
-// Create model instance (Model ID format: "owner/repo/filename.gguf")
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
-)
+// Download model from HuggingFace - returns the file path
+const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
 
-// Download from HuggingFace
-await model.download()
+// Create model instance with the path
+const model = llama.languageModel(modelPath)
 
 // Initialize model (loads into memory)
 await model.prepare()
