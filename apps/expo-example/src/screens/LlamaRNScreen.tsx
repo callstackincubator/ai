@@ -135,7 +135,7 @@ export default function LlamaRNScreen() {
     setIsInitializing(true)
     try {
       const newModel = llama.languageModel(modelId, {
-        contextOptions: {
+        contextParams: {
           n_ctx: 2048,
           n_gpu_layers: 99,
         },
