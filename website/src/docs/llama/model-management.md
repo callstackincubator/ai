@@ -134,7 +134,16 @@ for await (const delta of textStream) {
 For advanced usage, you can access the underlying `LlamaContext`:
 
 ```typescript
+// Ensure the model is prepared before accessing the context
+await model.prepare()
+
 const context = model.getContext()
+
+if (!context) {
+  throw new Error(
+    'Model context is not available. Make sure prepare() has completed and the model has not been unloaded.',
+  )
+}
 ```
 
 ### Unloading Models
