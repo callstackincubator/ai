@@ -318,6 +318,13 @@ export class LlamaLanguageModel implements LanguageModelV2 {
             warnings: [],
           })
 
+          // Emit text-start upfront to match MLC/Apple pattern
+          controller.enqueue({
+            type: 'text-start',
+            id: textId,
+          })
+          state = 'text'
+
           const result = await context.completion(
             completionOptions,
             (tokenData: TokenData) => {
@@ -360,7 +367,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
 
                   switch (state) {
                     case 'none':
-                      // start text block
+                      // start new text block after reasoning
                       state = 'text'
                       textId = generateId()
                       controller.enqueue({
