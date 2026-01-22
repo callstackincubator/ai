@@ -53,7 +53,7 @@ for await (const delta of textStream) {
 }
 ```
 
-## Multimodal (Vision andnd Audio)
+## Multimodal (Vision and Audio)
 
 The Llama provider supports multimodal models that can process images and audio. To enable multimodal capabilities, provide a `projectorPath` when creating the model:
 
