@@ -203,7 +203,9 @@ class AppleTextEmbeddingModel implements EmbeddingModelV3 {
     this.prepared = true
   }
 
-  async doEmbed(options: EmbeddingModelV3CallOptions): Promise<EmbeddingModelV3Result> {
+  async doEmbed(
+    options: EmbeddingModelV3CallOptions
+  ): Promise<EmbeddingModelV3Result> {
     if (!this.prepared) {
       console.warn(
         '[apple-llm] Model not prepared. Call prepare() ahead of time to optimize performance.'
