@@ -364,6 +364,10 @@ export class LlamaLanguageModel implements LanguageModelV2 {
 
                 default:
                   // process regular token
+                  // Skip empty tokens
+                  if (!token) {
+                    break
+                  }
 
                   switch (state) {
                     case 'none':
