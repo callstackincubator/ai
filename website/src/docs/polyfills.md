@@ -1,7 +1,5 @@
 # Polyfills
 
-import { PackageManagerTabs } from '@theme'
-
 Several functions that are internally used by the AI SDK might not be available in the React Native runtime depending on your configuration and the target platform.
 
 ## Expo
