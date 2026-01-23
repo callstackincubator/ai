@@ -72,7 +72,7 @@ export default function ChatUI({ model, tools = {} }: ChatUIProps) {
       const result = streamText({
         model,
         messages: updatedMessages,
-        tools: tools ?? undefined,
+        tools,
         stopWhen: stepCountIs(5),
       })
 
