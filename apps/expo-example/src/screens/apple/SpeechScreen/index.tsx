@@ -64,9 +64,7 @@ export default function SpeechScreen() {
       return
     }
 
-    const currentModel = isAppleProvider
-      ? apple.speechModel()
-      : activeProvider.model
+    const currentModel = activeProvider.model
 
     setIsGenerating(true)
     setGeneratedSpeech(null)
