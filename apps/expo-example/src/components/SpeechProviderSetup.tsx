@@ -18,11 +18,7 @@ interface SpeechProviderSetupProps {
   onBack?: () => void
 }
 
-const getModelId = (model: SpeechModelOption) =>
-  `${model.repo}/${model.filename}`
-
-const getVocoderId = (model: SpeechModelOption) =>
-  `${model.vocoder.repo}/${model.vocoder.filename}`
+const getFilename = (modelId: string) => modelId.split('/').pop() ?? modelId
 
 export default function SpeechProviderSetup({
   models,
@@ -43,12 +39,12 @@ export default function SpeechProviderSetup({
   >(null)
   const [isInitializing, setIsInitializing] = useState(false)
 
-  const modelId = getModelId(selectedModel)
-  const vocoderId = getVocoderId(selectedModel)
-  const isModelDownloaded = downloadedModels.has(selectedModel.filename)
-  const isVocoderDownloaded = downloadedModels.has(
-    selectedModel.vocoder.filename
-  )
+  const modelId = selectedModel.modelId
+  const vocoderId = selectedModel.vocoderId
+  const modelFilename = getFilename(modelId)
+  const vocoderFilename = getFilename(vocoderId)
+  const isModelDownloaded = downloadedModels.has(modelFilename)
+  const isVocoderDownloaded = downloadedModels.has(vocoderFilename)
   const isReady = isModelDownloaded && isVocoderDownloaded
 
   useEffect(() => {
@@ -60,8 +56,8 @@ export default function SpeechProviderSetup({
 
       const firstReadyModel = models.find(
         (m) =>
-          downloadedFilenames.has(m.filename) &&
-          downloadedFilenames.has(m.vocoder.filename)
+          downloadedFilenames.has(getFilename(m.modelId)) &&
+          downloadedFilenames.has(getFilename(m.vocoderId))
       )
 
       if (firstReadyModel) {
@@ -84,7 +80,7 @@ export default function SpeechProviderSetup({
 
       setDownloadedModels((prev) => {
         const next = new Set(prev)
-        next.add(selectedModel.filename)
+        next.add(modelFilename)
         return next
       })
     } catch (error) {
@@ -108,7 +104,7 @@ export default function SpeechProviderSetup({
 
       setDownloadedModels((prev) => {
         const next = new Set(prev)
-        next.add(selectedModel.vocoder.filename)
+        next.add(vocoderFilename)
         return next
       })
     } catch (error) {
@@ -151,7 +147,7 @@ export default function SpeechProviderSetup({
 
       setDownloadedModels((prev) => {
         const next = new Set(prev)
-        next.delete(selectedModel.filename)
+        next.delete(modelFilename)
         return next
       })
     } catch (error) {
@@ -168,7 +164,7 @@ export default function SpeechProviderSetup({
 
       setDownloadedModels((prev) => {
         const next = new Set(prev)
-        next.delete(selectedModel.vocoder.filename)
+        next.delete(vocoderFilename)
         return next
       })
     } catch (error) {
@@ -209,18 +205,18 @@ export default function SpeechProviderSetup({
         </Text>
         <View className="border border-gray-300 rounded-lg overflow-hidden">
           <Picker
-            selectedValue={`${selectedModel.repo}/${selectedModel.filename}`}
+            selectedValue={selectedModel.modelId}
             onValueChange={(itemValue) => {
-              const model = models.find(
-                (m) => `${m.repo}/${m.filename}` === itemValue
-              )
+              const model = models.find((m) => m.modelId === itemValue)
               if (model) setSelectedModel(model)
             }}
             enabled={!isDownloading && !isInitializing}
           >
             {models.map((model) => {
-              const isModelDL = downloadedModels.has(model.filename)
-              const isVocoderDL = downloadedModels.has(model.vocoder.filename)
+              const isModelDL = downloadedModels.has(getFilename(model.modelId))
+              const isVocoderDL = downloadedModels.has(
+                getFilename(model.vocoderId)
+              )
               const status =
                 isModelDL && isVocoderDL
                   ? '✓ '
@@ -231,9 +227,9 @@ export default function SpeechProviderSetup({
                       : ''
               return (
                 <Picker.Item
-                  key={`${model.repo}/${model.filename}`}
+                  key={model.modelId}
                   label={`${status}${model.name} - ${model.size}`}
-                  value={`${model.repo}/${model.filename}`}
+                  value={model.modelId}
                 />
               )
             })}
@@ -247,7 +243,7 @@ export default function SpeechProviderSetup({
             onPress={downloadModelFile}
           >
             <Text className="text-white text-center font-semibold">
-              Download Model ({selectedModel.filename})
+              Download Model ({modelFilename})
             </Text>
           </TouchableOpacity>
         )}
@@ -259,7 +255,7 @@ export default function SpeechProviderSetup({
             onPress={downloadVocoderFile}
           >
             <Text className="text-white text-center font-semibold">
-              Download Vocoder ({selectedModel.vocoder.filename})
+              Download Vocoder ({vocoderFilename})
             </Text>
           </TouchableOpacity>
         )}

@@ -25,28 +25,16 @@ export const LLAMA_MODELS: ModelOption[] = [
 
 export interface SpeechModelOption {
   name: string
-  repo: string
-  filename: string
-  mmproj?: string
+  modelId: string
+  vocoderId: string
   size: string
-  vocoder: {
-    repo: string
-    filename: string
-    size: string
-  }
 }
 
 export const SPEECH_LLAMA_MODELS: SpeechModelOption[] = [
   {
     name: 'OuteTTS 0.3 500M (Q4_K_M) + WavTokenizer (Q5_1)',
-    repo: 'OuteAI/OuteTTS-0.3-500M-GGUF',
-    filename: 'OuteTTS-0.3-500M-Q4_K_M.gguf',
-    mmproj: undefined,
-    size: '454MB (model) + 70MB (vocoder)',
-    vocoder: {
-      repo: 'ggml-org/WavTokenizer',
-      filename: 'WavTokenizer-Large-75-Q5_1.gguf',
-      size: '70MB',
-    },
+    modelId: 'OuteAI/OuteTTS-0.3-500M-GGUF/OuteTTS-0.3-500M-Q4_K_M.gguf',
+    vocoderId: 'ggml-org/WavTokenizer/WavTokenizer-Large-75-Q5_1.gguf',
+    size: '454MB + 70MB',
   },
 ]
