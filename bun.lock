@@ -34,7 +34,6 @@
         "@bottom-tabs/react-navigation": "^0.10.2",
         "@react-native-ai/apple": "workspace:*",
         "@react-native-ai/llama": "workspace:*",
-        "@react-native-ai/mlc": "workspace:*",
         "@react-native-picker/picker": "^2.11.4",
         "@react-native-vector-icons/get-image": "^12.3.0",
         "@react-native-vector-icons/material-icons": "^12.4.0",
@@ -50,7 +49,7 @@
         "expo-clipboard": "~8.0.7",
         "expo-document-picker": "~14.0.7",
         "expo-status-bar": "~3.0.8",
-        "llama.rn": "^0.10.0-rc.0",
+        "llama.rn": "^0.10.1",
         "nativewind": "^4.1.23",
         "react": "19.1.0",
         "react-native": "0.81.4",
@@ -96,11 +95,11 @@
         "zod": "^4.0.0",
       },
       "devDependencies": {
-        "llama.rn": "^0.10.0-rc.0",
+        "llama.rn": "^0.10.1",
         "react-native": "0.81.4",
       },
       "peerDependencies": {
-        "llama.rn": "^0.10.0-rc.0",
+        "llama.rn": "^0.10.1",
         "react-native": ">=0.76.0",
       },
     },
@@ -1685,7 +1684,7 @@
 
     "lines-and-columns": ["lines-and-columns@1.2.4", "", {}, "sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg=="],
 
-    "llama.rn": ["llama.rn@0.10.0-rc.0", "", { "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-vmrpKtYxZuikDK2/skMCjsuQPPbhSreDQKtuAkyNxk5cJCg8seJS7/btUBgQT9Jr5Ag9IR0av+Mnfv/d+TpXsg=="],
+    "llama.rn": ["llama.rn@0.10.1", "", { "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-l4EJ5+gOAgKYcqzG9M3ORfA9AaiXT/qYtTGkdUxs9Djy+DhjmDir5wMuLxnEjxzzOc8oIsuhlF+peI1zEn8BZw=="],
 
     "load-json-file": ["load-json-file@4.0.0", "", { "dependencies": { "graceful-fs": "^4.1.2", "parse-json": "^4.0.0", "pify": "^3.0.0", "strip-bom": "^3.0.0" } }, "sha512-Kx8hMakjX03tiGTLAIdJ+lL0htKnXjEZN6hk/tozf/WOuYGdZBJrZ+rCJRbVCugsjB3jMLn9746NsQIf5VjBMw=="],
 
