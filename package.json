@@ -1,17 +1,34 @@
 {
   "name": "@react-native-ai/monorepo",
-  "private": true,
+  "version": "0.11.0",
+  "description": "react-native-ai brings on-device LLMs capabilities to mobile React Native apps.",
+  "private": false,
+  "license": "MIT",
+  "author": "Callstack (https://callstack.com/)",
   "scripts": {
     "typecheck": "bun run --filter='*' typecheck",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "release": "release-it",
     "build": "bun run --filter='@react-native-ai/*' prepare"
   },
+  "keywords": [
+    "react-native",
+    "ai",
+    "llm",
+    "llama",
+    "mlc",
+    "apple",
+    "ios",
+    "android"
+  ],
+  "homepage": "https://react-native-ai.dev",
+  "bugs": {
+    "url": "https://github.com/callstackincubator/ai/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/callstackincubator/ai.git"
   },
-  "license": "MIT",
   "devDependencies": {
     "@babel/plugin-transform-strict-mode": "^7.27.1",
     "@commitlint/config-conventional": "^20.2.0",
@@ -58,6 +75,5 @@
         ]
       }
     }
-  },
-  "version": "0.11.0"
+  }
 }
