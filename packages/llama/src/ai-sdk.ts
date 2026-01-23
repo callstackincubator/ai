@@ -178,7 +178,7 @@ function prepareMessagesWithMedia(prompt: LanguageModelV3Prompt): LLMMessage[] {
           (part) => part.type === 'tool-call'
         )
         const content = message.content.filter(
-          (message) => message.type === 'text'
+          (part) => part.type === 'text'
         )
         messages.push({
           role: 'assistant',
