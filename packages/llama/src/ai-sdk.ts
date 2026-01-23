@@ -707,7 +707,6 @@ export class LlamaRerankModel implements RerankingModelV3 {
     this.modelPath = modelPath
     this.modelId = modelPath
     this.options = {
-      normalize: options.normalize,
       ...options,
       contextParams: {
         n_ctx: 2048,
