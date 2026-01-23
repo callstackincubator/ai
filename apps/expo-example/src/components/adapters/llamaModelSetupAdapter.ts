@@ -1,5 +1,6 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { llama } from '@react-native-ai/llama'
+import { ToolSet } from 'ai'
 
 import {
   downloadModel,
@@ -8,10 +9,10 @@ import {
   removeModel,
 } from '../../../../../packages/llama/src/storage'
 import type { Availability, SetupAdapter } from '../../config/providers'
-import { getCurrentTime } from '../../tools'
 
 export const createLlamaLanguageSetupAdapter = (
-  modelId: string
+  modelId: string,
+  tools: ToolSet = {}
 ): SetupAdapter<LanguageModelV3> => {
   const modelPath = getModelPath(modelId)
   const model = llama.languageModel(modelPath, {
@@ -22,9 +23,7 @@ export const createLlamaLanguageSetupAdapter = (
   })
   return {
     model,
-    tools: {
-      getCurrentTime,
-    },
+    tools,
     label: `Llama (${modelId})`,
     async isAvailable(): Promise<Availability> {
       const downloaded = await isModelDownloaded(modelId)

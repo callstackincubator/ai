@@ -1,6 +1,6 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import type { Tool as ToolDefinition } from '@ai-sdk/provider-utils'
-import { generateText, type ModelMessage, stepCountIs } from 'ai'
+import { type ModelMessage, stepCountIs, streamText } from 'ai'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -66,21 +66,27 @@ export default function ChatUI({ model, tools = {} }: ChatUIProps) {
       },
     ])
 
+    let accumulatedContent = ''
+
     try {
-      const result = await generateText({
+      const result = streamText({
         model,
         messages: updatedMessages,
         tools: tools ?? undefined,
         stopWhen: stepCountIs(5),
       })
-      setMessages((prev) => {
-        const newMessages = [...prev]
-        newMessages[messageIdx] = {
-          role: 'assistant',
-          content: result.text,
-        }
-        return newMessages
-      })
+
+      for await (const chunk of result.textStream) {
+        accumulatedContent += chunk
+        setMessages((prev) => {
+          const newMessages = [...prev]
+          newMessages[messageIdx] = {
+            role: 'assistant',
+            content: accumulatedContent,
+          }
+          return newMessages
+        })
+      }
     } catch (error) {
       const errorMessage = `Error: ${error instanceof Error ? error.message : 'Failed to generate response'}`
       setMessages((prev) => {
@@ -125,6 +131,11 @@ export default function ChatUI({ model, tools = {} }: ChatUIProps) {
         {messages.length === 0 && (
           <View className="items-center justify-center py-8">
             <Text className="text-gray-400 text-center">Start chatting!</Text>
+            {Object.keys(tools).length > 0 && (
+              <Text className="text-gray-400 text-center">
+                Available tools: {Object.keys(tools).join(', ')}
+              </Text>
+            )}
           </View>
         )}
         {messages.map((message, index) => (
