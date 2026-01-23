@@ -15,7 +15,6 @@ export default function ProviderSetup<TModel>({
   const [availability, setAvailability] = useState<Availability | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
-  console.log(adapter, Object.keys(adapter))
   useEffect(() => {
     adapter.isAvailable().then((result) => {
       setAvailability(result)
