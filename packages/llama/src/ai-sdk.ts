@@ -612,6 +612,11 @@ export class LlamaLanguageModel implements LanguageModelV3 {
                       })
                       break
                     }
+                    case 'tool-call': {
+                      // Ignore tokens while in tool-call state; tool call data
+                      // is handled via tokenData.tool_calls at the end marker.
+                      break
+                    }
                   }
               }
             }
