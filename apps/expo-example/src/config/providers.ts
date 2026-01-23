@@ -1,7 +1,9 @@
 import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
+import { ToolSet } from 'ai'
 
 import {
   createAppleLanguageSetupAdapter,
+  createAppleLanguageSetupWithToolsAdapter,
   createAppleSpeechSetupAdapter,
 } from '../components/adapters/appleSetupAdapter'
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
@@ -11,6 +13,7 @@ export type Availability = 'yes' | 'no' | 'availableForDownload'
 
 export interface SetupAdapter<TModel> {
   model: TModel
+  tools?: ToolSet
   label: string
   isAvailable: () => Promise<Availability>
   download: (onProgress: (percentage: number) => void) => Promise<void>
@@ -21,6 +24,7 @@ export interface SetupAdapter<TModel> {
 
 export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
   createAppleLanguageSetupAdapter(),
+  createAppleLanguageSetupWithToolsAdapter(),
   createLlamaLanguageSetupAdapter(
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),

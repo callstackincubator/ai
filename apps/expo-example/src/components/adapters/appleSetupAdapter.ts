@@ -1,5 +1,5 @@
 import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
-import { createAppleProvider } from '@react-native-ai/apple'
+import { apple, createAppleProvider } from '@react-native-ai/apple'
 
 import type { SetupAdapter } from '../../config/providers'
 import {
@@ -14,16 +14,34 @@ export const availableTools = {
   checkCalendarEvents,
 } as const
 
-const apple = createAppleProvider({
-  availableTools,
-})
+export const createAppleLanguageSetupWithToolsAdapter =
+  (): SetupAdapter<LanguageModelV3> => {
+    const apple = createAppleProvider({
+      availableTools,
+    })
+    const model = apple.languageModel()
+    return {
+      model,
+      tools: availableTools,
+      label: 'Apple (with tool calling)',
+      async isAvailable() {
+        return apple.isAvailable() ? 'yes' : 'no'
+      },
+      async download() {},
+      async delete() {},
+      async unload() {},
+      async prepare() {
+        await model.prepare()
+      },
+    }
+  }
 
 export const createAppleLanguageSetupAdapter =
   (): SetupAdapter<LanguageModelV3> => {
     const model = apple.languageModel()
     return {
       model,
-      label: 'Apple Foundation Model',
+      label: 'Apple',
       async isAvailable() {
         return apple.isAvailable() ? 'yes' : 'no'
       },

@@ -38,7 +38,7 @@ export default function ChatScreen() {
         onProviderChange={handleProviderChange}
       />
       {isModelAvailable ? (
-        <ChatUI model={activeProvider.model} />
+        <ChatUI model={activeProvider.model} tools={activeProvider.tools} />
       ) : (
         <ProviderSetup
           adapter={activeProvider}

@@ -21,7 +21,7 @@ export const createLlamaLanguageSetupAdapter = (
   })
   return {
     model,
-    label: modelId,
+    label: `Llama (${modelId})`,
     async isAvailable(): Promise<Availability> {
       const downloaded = await isModelDownloaded(modelId)
       return downloaded ? 'yes' : 'availableForDownload'

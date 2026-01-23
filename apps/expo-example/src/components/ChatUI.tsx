@@ -22,7 +22,7 @@ interface ChatUIProps {
   tools?: ToolSet
 }
 
-export default function ChatUI({ model, tools }: ChatUIProps) {
+export default function ChatUI({ model, tools = {} }: ChatUIProps) {
   const [messages, setMessages] = useState<ModelMessage[]>([])
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -72,7 +72,7 @@ export default function ChatUI({ model, tools }: ChatUIProps) {
       const result = streamText({
         model,
         messages: updatedMessages,
-        ...(tools ? { tools } : {}),
+        tools: tools ?? undefined,
       })
 
       for await (const chunk of result.textStream) {
