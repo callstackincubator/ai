@@ -1,6 +1,6 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { generateObject, generateText, streamText } from 'ai'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,7 @@ import { z } from 'zod'
 
 import ProviderSelector from '../../../components/ProviderSelector'
 import ProviderSetup from '../../../components/ProviderSetup'
-import { languageAdapters, type SetupAdapter } from '../../../config/providers'
+import { languageAdapters } from '../../../config/providers'
 
 async function basicStringDemo(model: LanguageModelV3) {
   const response = await generateText({
@@ -119,15 +119,16 @@ const playgroundDemos = {
 }
 
 export default function PlaygroundScreen() {
-  const [activeProvider, setActiveProvider] =
-    useState<SetupAdapter<LanguageModelV3> | null>(null)
+  const [activeIndex, setActiveIndex] = useState<number>(0)
   const [isModelAvailable, setIsModelAvailable] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
+
+  const activeProvider = languageAdapters[activeIndex]
 
   const runDemo = async (key: string) => {
     if (loading) return
 
-    if (!activeProvider || !isModelAvailable) return
+    if (!isModelAvailable) return
 
     setLoading(key)
 
@@ -160,40 +161,40 @@ export default function PlaygroundScreen() {
     return colors[index % colors.length]
   }
 
-  const providerOptions = languageAdapters.map((adapter) => ({
+  const providerOptions = languageAdapters.map((adapter, index) => ({
     label: adapter.label,
-    value: adapter,
+    value: index,
   }))
 
-  const handleProviderChange = async (
-    nextAdapter: SetupAdapter<LanguageModelV3>
-  ) => {
-    if (nextAdapter === activeProvider) return
+  const handleProviderChange = (nextIndex: number) => {
+    if (nextIndex === activeIndex) return
     void activeProvider?.unload()
-    setActiveProvider(nextAdapter)
+    setActiveIndex(nextIndex)
     setIsModelAvailable(false)
-
-    const availability = await nextAdapter.isAvailable()
-    setIsModelAvailable(availability === 'yes')
   }
+
+  useEffect(() => {
+    languageAdapters[activeIndex].isAvailable().then((availability) => {
+      setIsModelAvailable(availability === 'yes')
+    })
+  }, [activeIndex])
 
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1">
       <ProviderSelector
         options={providerOptions}
-        value={activeProvider}
+        value={activeIndex}
         onProviderChange={handleProviderChange}
-        disabled={loading !== null}
       />
 
-      {activeProvider && !isModelAvailable && (
+      {!isModelAvailable && (
         <ProviderSetup
           adapter={activeProvider}
           onAvailable={() => setIsModelAvailable(true)}
         />
       )}
 
-      {activeProvider && isModelAvailable && (
+      {isModelAvailable && (
         <View className="p-4">
           <View className="flex-row flex-wrap justify-between">
             {Object.entries(playgroundDemos).map(([key, demo], index) => {

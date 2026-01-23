@@ -129,9 +129,7 @@ export default function ChatUI({ model, tools }: ChatUIProps) {
       >
         {messages.length === 0 && (
           <View className="items-center justify-center py-8">
-            <Text className="text-gray-400 text-center">
-              Model is ready. Start chatting!
-            </Text>
+            <Text className="text-gray-400 text-center">Start chatting!</Text>
           </View>
         )}
         {messages.map((message, index) => (

@@ -1,4 +1,3 @@
-import type { SpeechModelV3 } from '@ai-sdk/provider'
 import { apple, AppleSpeech, VoiceInfo } from '@react-native-ai/apple'
 import { Picker } from '@react-native-picker/picker'
 import { experimental_generateSpeech } from 'ai'
@@ -16,7 +15,7 @@ import { AudioContext } from 'react-native-audio-api'
 
 import ProviderSelector from '../../../components/ProviderSelector'
 import ProviderSetup from '../../../components/ProviderSetup'
-import { type SetupAdapter, speechAdapters } from '../../../config/providers'
+import { speechAdapters } from '../../../config/providers'
 
 const play = async (arrayBuffer: ArrayBufferLike) => {
   const context = new AudioContext()
@@ -29,8 +28,7 @@ const play = async (arrayBuffer: ArrayBufferLike) => {
 }
 
 export default function SpeechScreen() {
-  const [activeProvider, setActiveProvider] =
-    useState<SetupAdapter<SpeechModelV3> | null>(null)
+  const [activeIndex, setActiveIndex] = useState<number>(0)
   const [isModelAvailable, setIsModelAvailable] = useState(false)
   const [inputText, setInputText] = useState(
     'On-device text to speech is awesome'
@@ -42,6 +40,8 @@ export default function SpeechScreen() {
   } | null>(null)
   const [voices, setVoices] = useState<VoiceInfo[]>([])
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null)
+
+  const activeProvider = speechAdapters[activeIndex]
 
   useEffect(() => {
     const loadVoices = async () => {
@@ -57,17 +57,16 @@ export default function SpeechScreen() {
   }, [])
 
   const generateSpeech = async () => {
-    if (!inputText.trim() || isGenerating || !activeProvider) return
+    if (!inputText.trim() || isGenerating) return
 
     if (!isModelAvailable) {
       Alert.alert('Error', 'Please download the speech model first')
       return
     }
 
-    const currentModel =
-      activeProvider === speechAdapters[0]
-        ? apple.speechModel()
-        : activeProvider.model
+    const currentModel = isAppleProvider
+      ? apple.speechModel()
+      : activeProvider.model
 
     setIsGenerating(true)
     setGeneratedSpeech(null)
@@ -98,24 +97,26 @@ export default function SpeechScreen() {
     }
   }
 
-  const providerOptions = speechAdapters.map((adapter) => ({
+  const providerOptions = speechAdapters.map((adapter, index) => ({
     label: adapter.label,
-    value: adapter,
+    value: index,
   }))
 
-  const handleProviderChange = async (
-    nextAdapter: SetupAdapter<SpeechModelV3>
-  ) => {
-    if (nextAdapter === activeProvider) return
+  const handleProviderChange = (nextIndex: number) => {
+    if (nextIndex === activeIndex) return
     void activeProvider?.unload()
-    setActiveProvider(nextAdapter)
+    setActiveIndex(nextIndex)
     setGeneratedSpeech(null)
-
-    const availability = await nextAdapter.isAvailable()
-    setIsModelAvailable(availability === 'yes')
+    setIsModelAvailable(false)
   }
 
-  const isAppleProvider = activeProvider === speechAdapters[0]
+  const isAppleProvider = activeIndex === 0
+
+  useEffect(() => {
+    speechAdapters[activeIndex].isAvailable().then((availability) => {
+      setIsModelAvailable(availability === 'yes')
+    })
+  }, [activeIndex])
 
   return (
     <ScrollView
@@ -124,19 +125,19 @@ export default function SpeechScreen() {
     >
       <ProviderSelector
         options={providerOptions}
-        value={activeProvider}
+        value={activeIndex}
         onProviderChange={handleProviderChange}
         disabled={isGenerating}
       />
 
-      {activeProvider && !isModelAvailable && (
+      {!isModelAvailable && (
         <ProviderSetup
           adapter={activeProvider}
           onAvailable={() => setIsModelAvailable(true)}
         />
       )}
 
-      {activeProvider && isModelAvailable && (
+      {isModelAvailable && (
         <View className="p-4">
           <View className="bg-white rounded-xl p-4">
             <Text className="text-lg font-semibold mb-4">Enter Your Text</Text>

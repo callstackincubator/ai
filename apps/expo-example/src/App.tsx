@@ -14,7 +14,7 @@ import React from 'react'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
-import ChatScreen from './screens/apple/AppleLLMScreen'
+import ChatScreen from './screens/apple/ChatScreen'
 import PlaygroundScreen from './screens/apple/PlaygroundScreen'
 import SpeechScreen from './screens/apple/SpeechScreen'
 import TranscribeScreen from './screens/apple/TranscribeScreen'
