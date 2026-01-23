@@ -14,7 +14,9 @@ import { llama, downloadModel } from '@react-native-ai/llama'
 import { rerank } from 'ai'
 
 // Download reranker model - returns the file path
-const modelPath = await downloadModel('jinaai/jina-reranker-v2-base-multilingual-GGUF')
+const modelPath = await downloadModel(
+  'jinaai/jina-reranker-v2-base-multilingual-GGUF/jina-reranker-v2-base-multilingual-Q4_K_M.gguf',
+)
 
 // Create rerank model with the path
 const model = llama.rerankModel(modelPath)
