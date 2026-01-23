@@ -428,7 +428,6 @@ export class LlamaLanguageModel implements LanguageModelV3 {
     }
 
     if (response.tool_calls) {
-      console.log(response.tool_calls)
       content.push(
         ...response.tool_calls.map((toolCall) => ({
           type: 'tool-call' as const,
@@ -438,8 +437,6 @@ export class LlamaLanguageModel implements LanguageModelV3 {
         }))
       )
     }
-
-    console.log(content)
 
     return {
       content,
