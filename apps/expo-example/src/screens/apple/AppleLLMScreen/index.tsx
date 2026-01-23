@@ -1,43 +1,49 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import React, { useState } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
 
 import ChatUI from '../../../components/ChatUI'
+import ProviderSelector from '../../../components/ProviderSelector'
 import ProviderSetup from '../../../components/ProviderSetup'
-import { LLAMA_MODELS } from '../../../config/models'
+import { languageAdapters, type SetupAdapter } from '../../../config/providers'
 
-export default function AppleLLMScreen() {
-  const [model, setModel] = useState<LanguageModelV3 | null>(null)
+const providerOptions = languageAdapters.map((adapter) => ({
+  label: adapter.label,
+  value: adapter,
+}))
 
-  // Apple provider not available on Android, use Llama only
-  if (!model) {
-    return (
-      <View className="flex-1">
-        <View className="bg-white border-b border-gray-200 p-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">
-            Provider: Llama (Android)
-          </Text>
-          <Text className="text-xs text-gray-500">
-            Apple Intelligence is only available on iOS
-          </Text>
-        </View>
-        <ProviderSetup
-          models={LLAMA_MODELS}
-          onReady={(llamaModel) => setModel(llamaModel)}
-        />
-      </View>
-    )
+export default function ChatScreen() {
+  const [activeProvider, setActiveProvider] =
+    useState<SetupAdapter<LanguageModelV3> | null>(null)
+  const [isModelAvailable, setIsModelAvailable] = useState(false)
+
+  const handleProviderChange = async (
+    nextAdapter: SetupAdapter<LanguageModelV3>
+  ) => {
+    if (nextAdapter === activeProvider) return
+    void activeProvider?.unload()
+    setActiveProvider(nextAdapter)
+
+    const availability = await nextAdapter.isAvailable()
+    setIsModelAvailable(availability === 'yes')
   }
 
   return (
     <View className="flex-1">
-      <View className="bg-white border-b border-gray-200 p-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">
-          Provider: Llama
-        </Text>
-        <Text className="text-xs text-gray-500">Model is ready</Text>
-      </View>
-      <ChatUI model={model} />
+      <ProviderSelector
+        options={providerOptions}
+        value={activeProvider}
+        onProviderChange={handleProviderChange}
+      />
+      {activeProvider && (
+        <ProviderSetup
+          adapter={activeProvider}
+          onAvailable={() => setIsModelAvailable(true)}
+        />
+      )}
+      {activeProvider && isModelAvailable && (
+        <ChatUI model={activeProvider.model} />
+      )}
     </View>
   )
 }

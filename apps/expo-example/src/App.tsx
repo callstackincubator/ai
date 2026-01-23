@@ -14,7 +14,7 @@ import React from 'react'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
-import AppleLLMScreen from './screens/apple/AppleLLMScreen'
+import ChatScreen from './screens/apple/AppleLLMScreen'
 import PlaygroundScreen from './screens/apple/PlaygroundScreen'
 import SpeechScreen from './screens/apple/SpeechScreen'
 import TranscribeScreen from './screens/apple/TranscribeScreen'
@@ -27,7 +27,7 @@ type ScreenProto = {
   routeName: string
   screenOptions?: NativeStackNavigatorProps['screenOptions']
   tabScreenOptions: NativeBottomTabNavigationOptions
-  Component: null | (() => React.JSX.Element)
+  Component: () => React.JSX.Element
 }
 
 const screens = (
@@ -40,7 +40,7 @@ const screens = (
           sfSymbol: 'brain.head.profile',
         }),
       },
-      Component: AppleLLMScreen,
+      Component: ChatScreen,
     },
     {
       routeName: 'Playground',
@@ -70,14 +70,7 @@ const screens = (
     },
   ] as ScreenProto[]
 )
-  // filter only components available on the current platform; non-available components have platform-specific entrypoints exporting null
-  .filter(
-    (
-      screen
-    ): screen is ScreenProto & {
-      Component: NonNullable<ScreenProto['Component']>
-    } => screen.Component !== null
-  )
+
   // initialize stack navigators
   .map((screen) => ({
     ...screen,

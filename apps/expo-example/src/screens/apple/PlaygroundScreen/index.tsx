@@ -11,8 +11,9 @@ import {
 } from 'react-native'
 import { z } from 'zod'
 
+import ProviderSelector from '../../../components/ProviderSelector'
 import ProviderSetup from '../../../components/ProviderSetup'
-import { LLAMA_MODELS } from '../../../config/models'
+import { languageAdapters, type SetupAdapter } from '../../../config/providers'
 
 async function basicStringDemo(model: LanguageModelV3) {
   const response = await generateText({
@@ -118,16 +119,20 @@ const playgroundDemos = {
 }
 
 export default function PlaygroundScreen() {
-  const [model, setModel] = useState<LanguageModelV3 | null>(null)
+  const [activeProvider, setActiveProvider] =
+    useState<SetupAdapter<LanguageModelV3> | null>(null)
+  const [isModelAvailable, setIsModelAvailable] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
 
   const runDemo = async (key: string) => {
-    if (loading || !model) return
+    if (loading) return
+
+    if (!activeProvider || !isModelAvailable) return
 
     setLoading(key)
 
     try {
-      const result = await playgroundDemos[key].func(model)
+      const result = await playgroundDemos[key].func(activeProvider.model)
       Alert.alert('Success', JSON.stringify(result, null, 2))
     } catch (error) {
       Alert.alert(
@@ -155,65 +160,67 @@ export default function PlaygroundScreen() {
     return colors[index % colors.length]
   }
 
-  // Llama provider needs setup (Apple not available on Android)
-  if (!model) {
-    return (
-      <View className="flex-1">
-        <View className="bg-white border-b border-gray-200 p-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">
-            Provider: Llama (Android)
-          </Text>
-          <Text className="text-xs text-gray-500">
-            Apple Intelligence is only available on iOS
-          </Text>
-        </View>
-        <ProviderSetup
-          models={LLAMA_MODELS}
-          onReady={(llamaModel) => setModel(llamaModel)}
-        />
-      </View>
-    )
+  const providerOptions = languageAdapters.map((adapter) => ({
+    label: adapter.label,
+    value: adapter,
+  }))
+
+  const handleProviderChange = async (
+    nextAdapter: SetupAdapter<LanguageModelV3>
+  ) => {
+    if (nextAdapter === activeProvider) return
+    void activeProvider?.unload()
+    setActiveProvider(nextAdapter)
+    setIsModelAvailable(false)
+
+    const availability = await nextAdapter.isAvailable()
+    setIsModelAvailable(availability === 'yes')
   }
 
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1">
-      <View className="bg-white border-b border-gray-200 p-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">
-          Provider: Llama
-        </Text>
-        <Text className="text-xs text-gray-500">Model is ready</Text>
-      </View>
+      <ProviderSelector
+        options={providerOptions}
+        value={activeProvider}
+        onProviderChange={handleProviderChange}
+        disabled={loading !== null}
+      />
 
-      <View className="p-4">
-        <Text className="text-center my-4 text-gray-500">
-          Provider: Llama (Android)
-        </Text>
+      {activeProvider && !isModelAvailable && (
+        <ProviderSetup
+          adapter={activeProvider}
+          onAvailable={() => setIsModelAvailable(true)}
+        />
+      )}
 
-        <View className="flex-row flex-wrap justify-between">
-          {Object.entries(playgroundDemos).map(([key, demo], index) => {
-            const isLoading = loading === key
-            const isDisabled = loading !== null && !isLoading
-            const backgroundClass = getBackgroundClass(index, isLoading)
+      {activeProvider && isModelAvailable && (
+        <View className="p-4">
+          <View className="flex-row flex-wrap justify-between">
+            {Object.entries(playgroundDemos).map(([key, demo], index) => {
+              const isLoading = loading === key
+              const isDisabled = loading !== null && !isLoading
+              const backgroundClass = getBackgroundClass(index, isLoading)
 
-            return (
-              <TouchableOpacity
-                key={key}
-                className={`w-[48%] aspect-square mb-4 rounded-lg justify-center items-center ${backgroundClass} ${
-                  isDisabled ? 'opacity-50' : ''
-                }`}
-                onPress={() => runDemo(key)}
-                disabled={loading !== null}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#3b82f6" />
-                ) : (
-                  <Text className="text-white font-bold">{demo.name}</Text>
-                )}
-              </TouchableOpacity>
-            )
-          })}
+              return (
+                <TouchableOpacity
+                  key={key}
+                  className={`w-[48%] aspect-square mb-4 rounded-lg justify-center items-center ${backgroundClass} ${
+                    isDisabled ? 'opacity-50' : ''
+                  }`}
+                  onPress={() => runDemo(key)}
+                  disabled={loading !== null}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#3b82f6" />
+                  ) : (
+                    <Text className="text-white font-bold">{demo.name}</Text>
+                  )}
+                </TouchableOpacity>
+              )
+            })}
+          </View>
         </View>
-      </View>
+      )}
     </ScrollView>
   )
 }

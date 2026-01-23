@@ -29,6 +29,10 @@ export default function ChatUI({ model, tools }: ChatUIProps) {
   const scrollViewRef = useRef<ScrollView>(null)
 
   useEffect(() => {
+    setMessages([])
+  }, [model])
+
+  useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
       'keyboardWillShow',
       () => {
@@ -49,7 +53,6 @@ export default function ChatUI({ model, tools }: ChatUIProps) {
     }
 
     const updatedMessages = [...messages, userMessage]
-    setMessages(updatedMessages)
     setInputText('')
     setIsGenerating(true)
 

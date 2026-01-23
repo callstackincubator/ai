@@ -943,34 +943,31 @@ export class LlamaSpeechModel implements SpeechModelV3 {
       )
     }
 
-    // Get formatted audio completion prompt
-    const speaker = null // Can be extended to support different speakers
+    const speaker = null // todo: extend to support different speakers and settings
     const formatted = await context.getFormattedAudioCompletion(
       speaker,
       options.text
     )
 
-    // Generate audio tokens via completion
+    const guideTokens: number[] = await context.getAudioCompletionGuideTokens(
+      options.text
+    )
+
     const completionResult = await context.completion({
       prompt: formatted.prompt,
       grammar: formatted.grammar,
+      guide_tokens: guideTokens,
       temperature: 0.8,
-      n_predict: -1,
     })
 
-    if (
-      !completionResult.audio_tokens ||
-      completionResult.audio_tokens.length === 0
-    ) {
+    if (!completionResult.audio_tokens) {
       throw new Error('No audio tokens generated')
     }
 
-    // Decode audio tokens to PCM
     const audioData = await context.decodeAudioTokens(
       completionResult.audio_tokens
     )
 
-    // Convert to Uint8Array
     const audio = new Uint8Array(audioData)
 
     return {

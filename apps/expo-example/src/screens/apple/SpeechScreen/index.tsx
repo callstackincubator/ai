@@ -1,6 +1,8 @@
 import type { SpeechModelV3 } from '@ai-sdk/provider'
+import { apple, AppleSpeech, VoiceInfo } from '@react-native-ai/apple'
+import { Picker } from '@react-native-picker/picker'
 import { experimental_generateSpeech } from 'ai'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -12,8 +14,9 @@ import {
 } from 'react-native'
 import { AudioContext } from 'react-native-audio-api'
 
-import SpeechProviderSetup from '../../../components/SpeechProviderSetup'
-import { SPEECH_LLAMA_MODELS } from '../../../config/models'
+import ProviderSelector from '../../../components/ProviderSelector'
+import ProviderSetup from '../../../components/ProviderSetup'
+import { type SetupAdapter, speechAdapters } from '../../../config/providers'
 
 const play = async (arrayBuffer: ArrayBufferLike) => {
   const context = new AudioContext()
@@ -26,7 +29,9 @@ const play = async (arrayBuffer: ArrayBufferLike) => {
 }
 
 export default function SpeechScreen() {
-  const [speechModel, setSpeechModel] = useState<SpeechModelV3 | null>(null)
+  const [activeProvider, setActiveProvider] =
+    useState<SetupAdapter<SpeechModelV3> | null>(null)
+  const [isModelAvailable, setIsModelAvailable] = useState(false)
   const [inputText, setInputText] = useState(
     'On-device text to speech is awesome'
   )
@@ -35,9 +40,34 @@ export default function SpeechScreen() {
     arrayBuffer: ArrayBufferLike
     time: number
   } | null>(null)
+  const [voices, setVoices] = useState<VoiceInfo[]>([])
+  const [selectedVoice, setSelectedVoice] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadVoices = async () => {
+      try {
+        const voiceList = await AppleSpeech.getVoices()
+        setVoices(voiceList)
+      } catch (error) {
+        console.error('Failed to load voices:', error)
+      }
+    }
+
+    loadVoices()
+  }, [])
 
   const generateSpeech = async () => {
-    if (!inputText.trim() || isGenerating || !speechModel) return
+    if (!inputText.trim() || isGenerating || !activeProvider) return
+
+    if (!isModelAvailable) {
+      Alert.alert('Error', 'Please download the speech model first')
+      return
+    }
+
+    const currentModel =
+      activeProvider === speechAdapters[0]
+        ? apple.speechModel()
+        : activeProvider.model
 
     setIsGenerating(true)
     setGeneratedSpeech(null)
@@ -46,8 +76,9 @@ export default function SpeechScreen() {
 
     try {
       const result = await experimental_generateSpeech({
-        model: speechModel,
+        model: currentModel,
         text: inputText,
+        voice: selectedVoice ?? undefined,
       })
 
       const endTime = Date.now()
@@ -67,97 +98,127 @@ export default function SpeechScreen() {
     }
   }
 
-  // Llama provider needs setup
-  if (!speechModel) {
-    return (
-      <View className="flex-1">
-        <View className="bg-white border-b border-gray-200 p-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">
-            Provider: Llama (Android)
-          </Text>
-          <Text className="text-xs text-gray-500">
-            Apple Intelligence is only available on iOS. Llama speech works on
-            Android.
-          </Text>
-        </View>
-        <SpeechProviderSetup
-          models={SPEECH_LLAMA_MODELS}
-          onReady={(llamaSpeechModel) => setSpeechModel(llamaSpeechModel)}
-        />
-      </View>
-    )
+  const providerOptions = speechAdapters.map((adapter) => ({
+    label: adapter.label,
+    value: adapter,
+  }))
+
+  const handleProviderChange = async (
+    nextAdapter: SetupAdapter<SpeechModelV3>
+  ) => {
+    if (nextAdapter === activeProvider) return
+    void activeProvider?.unload()
+    setActiveProvider(nextAdapter)
+    setGeneratedSpeech(null)
+
+    const availability = await nextAdapter.isAvailable()
+    setIsModelAvailable(availability === 'yes')
   }
+
+  const isAppleProvider = activeProvider === speechAdapters[0]
 
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       className="flex-1 bg-gray-50"
     >
-      <View className="bg-white border-b border-gray-200 p-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-2">
-          Provider: Llama
-        </Text>
-        <Text className="text-xs text-gray-500">Speech model is ready</Text>
-      </View>
+      <ProviderSelector
+        options={providerOptions}
+        value={activeProvider}
+        onProviderChange={handleProviderChange}
+        disabled={isGenerating}
+      />
 
-      <View className="p-4">
-        <View className="bg-white rounded-xl p-4">
-          <Text className="text-lg font-semibold mb-4">Enter Your Text</Text>
-          <TextInput
-            className="border border-gray-200 rounded-lg p-3 text-gray-900 bg-gray-50 mb-4 min-h-[100px]"
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type something to convert to speech..."
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
+      {activeProvider && !isModelAvailable && (
+        <ProviderSetup
+          adapter={activeProvider}
+          onAvailable={() => setIsModelAvailable(true)}
+        />
+      )}
 
-          <TouchableOpacity
-            className={`rounded-lg py-3 ${
-              isGenerating ? 'bg-gray-400' : 'bg-blue-500'
-            }`}
-            onPress={generateSpeech}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <View className="flex-row justify-center items-center">
-                <ActivityIndicator color="#FFFFFF" />
-                <Text className="text-white font-semibold ml-2">
-                  Generating...
-                </Text>
-              </View>
-            ) : (
-              <Text className="text-white font-semibold text-center">
-                Generate Speech
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {generatedSpeech && (
-          <View className="bg-white rounded-xl p-4 mt-4">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-lg font-semibold">Generated Speech</Text>
-              <Text className="text-green-600 text-sm">Ready</Text>
-            </View>
-
-            <Text className="text-gray-500 text-sm mb-3">
-              Generated in {generatedSpeech.time}ms
-            </Text>
+      {activeProvider && isModelAvailable && (
+        <View className="p-4">
+          <View className="bg-white rounded-xl p-4">
+            <Text className="text-lg font-semibold mb-4">Enter Your Text</Text>
+            <TextInput
+              className="border border-gray-200 rounded-lg p-3 text-gray-900 bg-gray-50 mb-4 min-h-[100px]"
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Type something to convert to speech..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
 
             <TouchableOpacity
-              className="bg-green-500 rounded-lg py-3"
-              onPress={() => play(generatedSpeech.arrayBuffer)}
+              className={`rounded-lg py-3 ${
+                isGenerating ? 'bg-gray-400' : 'bg-blue-500'
+              }`}
+              onPress={generateSpeech}
+              disabled={isGenerating}
             >
-              <Text className="text-white font-semibold text-center">
-                ▶️ Play Audio
-              </Text>
+              {isGenerating ? (
+                <View className="flex-row justify-center items-center">
+                  <ActivityIndicator color="#FFFFFF" />
+                  <Text className="text-white font-semibold ml-2">
+                    Generating...
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-white font-semibold text-center">
+                  Generate Speech
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
-        )}
-      </View>
+
+          {isAppleProvider && voices.length > 0 && (
+            <View className="bg-white rounded-xl p-4 mt-4">
+              <Text className="text-lg font-semibold mb-3">
+                Voice Selection
+              </Text>
+              <View className="border border-gray-200 rounded-lg bg-gray-50">
+                <Picker
+                  selectedValue={selectedVoice}
+                  onValueChange={setSelectedVoice}
+                >
+                  <Picker.Item label="System Default Voice" value={null} />
+                  {voices.map((voice) => (
+                    <Picker.Item
+                      key={voice.identifier}
+                      label={`${voice.name} (${voice.language})`}
+                      value={voice.identifier}
+                    />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          )}
+
+          {generatedSpeech && (
+            <View className="bg-white rounded-xl p-4 mt-4">
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-lg font-semibold">Generated Speech</Text>
+                <Text className="text-green-600 text-sm">Ready</Text>
+              </View>
+
+              <Text className="text-gray-500 text-sm mb-3">
+                Generated in {generatedSpeech.time}ms
+              </Text>
+
+              <TouchableOpacity
+                className="bg-green-500 rounded-lg py-3"
+                onPress={() => play(generatedSpeech.arrayBuffer)}
+              >
+                <Text className="text-white font-semibold text-center">
+                  ▶️ Play Audio
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
     </ScrollView>
   )
 }
