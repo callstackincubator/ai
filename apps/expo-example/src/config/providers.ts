@@ -29,9 +29,6 @@ export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),
   createLlamaLanguageSetupAdapter(
-    'unsloth/functiongemma-270m-it-GGUF/functiongemma-270m-it-Q4_K_M.gguf'
-  ),
-  createLlamaLanguageSetupAdapter(
     'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf'
   ),
 ]
