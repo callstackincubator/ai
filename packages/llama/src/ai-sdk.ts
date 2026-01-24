@@ -25,7 +25,7 @@ import {
   type TokenData,
 } from 'llama.rn'
 
-type LLMState = 'text' | 'reasoning' | 'none'
+type LLMState = 'text' | 'reasoning' | 'tool-call' | 'none'
 
 interface LLMMessagePart {
   type: 'text' | 'image_url' | 'input_audio'
@@ -249,6 +249,9 @@ export interface LlamaModelOptions {
 
 const START_OF_THINKING_PLACEHOLDER = '<think>'
 const END_OF_THINKING_PLACEHOLDER = '</think>'
+
+const START_OF_TOOL_CALL_PLACEHOLDER = '<tool_call>'
+const END_OF_TOOL_CALL_PLACEHOLDER = '</tool_call>'
 
 /**
  * llama.rn Language Model for AI SDK
@@ -500,7 +503,11 @@ export class LlamaLanguageModel implements LanguageModelV3 {
     }
 
     if (options.tools) {
-      console.warn('Tools are not supported for streaming yet.')
+      completionOptions.tools = options.tools.map(({ type, ...tool }) => ({
+        type,
+        function: tool,
+      }))
+      completionOptions.tool_choice = options.toolChoice?.type ?? 'auto'
     }
 
     if (options.responseFormat?.type === 'json') {
@@ -513,7 +520,7 @@ export class LlamaLanguageModel implements LanguageModelV3 {
     const stream = new ReadableStream<LanguageModelV3StreamPart>({
       start: async (controller) => {
         try {
-          let textId = generateId()
+          let currentChunkId = generateId()
 
           let state: LLMState = 'none' as LLMState
 
@@ -522,102 +529,109 @@ export class LlamaLanguageModel implements LanguageModelV3 {
             warnings: [],
           })
 
+          const finishCurrentBlock = () => {
+            if (state === 'text') {
+              controller.enqueue({
+                type: 'text-end',
+                id: currentChunkId,
+              })
+            }
+            if (state === 'reasoning') {
+              controller.enqueue({
+                type: 'reasoning-end',
+                id: currentChunkId,
+              })
+            }
+            state = 'none'
+          }
+
           const result = await context.completion(
             completionOptions,
             (tokenData: TokenData) => {
               const { token } = tokenData
 
               switch (token) {
-                case START_OF_THINKING_PLACEHOLDER:
-                  // start reasoning block
-                  if (state === 'text') {
-                    // finish text block
-                    controller.enqueue({
-                      type: 'text-end',
-                      id: textId,
-                    })
-                  }
-
+                case START_OF_THINKING_PLACEHOLDER: {
+                  finishCurrentBlock()
                   state = 'reasoning'
-                  textId = generateId()
-
+                  currentChunkId = generateId()
                   controller.enqueue({
                     type: 'reasoning-start',
-                    id: textId,
+                    id: currentChunkId,
                   })
                   break
-
-                case END_OF_THINKING_PLACEHOLDER:
-                  // finish reasoning block
-                  if (state === 'reasoning') {
+                }
+                case START_OF_TOOL_CALL_PLACEHOLDER: {
+                  finishCurrentBlock()
+                  state = 'tool-call'
+                  break
+                }
+                case END_OF_TOOL_CALL_PLACEHOLDER: {
+                  finishCurrentBlock()
+                  for (const toolCall of tokenData.tool_calls ?? []) {
                     controller.enqueue({
-                      type: 'reasoning-end',
-                      id: textId,
+                      type: 'tool-call',
+                      toolCallId: toolCall.id ?? generateId(),
+                      toolName: toolCall.function.name,
+                      input: toolCall.function.arguments,
                     })
                   }
-
-                  state = 'none'
                   break
-
+                }
+                case END_OF_THINKING_PLACEHOLDER: {
+                  finishCurrentBlock()
+                  break
+                }
                 default:
-                  // process regular token
                   switch (state) {
-                    case 'none':
-                      // start text block
+                    case 'none': {
                       state = 'text'
-                      textId = generateId()
+                      currentChunkId = generateId()
                       controller.enqueue({
                         type: 'text-start',
-                        id: textId,
+                        id: currentChunkId,
                       })
                       controller.enqueue({
                         type: 'text-delta',
-                        id: textId,
+                        id: currentChunkId,
                         delta: token,
                       })
                       break
-
-                    case 'text':
-                      // continue text block
+                    }
+                    case 'text': {
                       controller.enqueue({
                         type: 'text-delta',
-                        id: textId,
+                        id: currentChunkId,
                         delta: token,
                       })
                       break
-
-                    case 'reasoning':
-                      // continue reasoning block
+                    }
+                    case 'reasoning': {
                       controller.enqueue({
                         type: 'reasoning-delta',
-                        id: textId,
+                        id: currentChunkId,
                         delta: token,
                       })
                       break
+                    }
+                    case 'tool-call': {
+                      // Ignore tokens while in tool-call state; tool call data
+                      // is handled via tokenData.tool_calls at the end marker.
+                      break
+                    }
                   }
               }
             }
           )
 
-          if (state === 'text') {
-            // finish text block
-            controller.enqueue({
-              type: 'text-end',
-              id: textId,
-            })
-          }
-
-          if (state === 'reasoning') {
-            // finish reasoning block
-            controller.enqueue({
-              type: 'reasoning-end',
-              id: textId,
-            })
-          }
+          finishCurrentBlock()
 
           controller.enqueue({
             type: 'finish',
-            finishReason: convertFinishReason(result),
+            finishReason:
+              result.tool_calls?.length > 0
+                ? { unified: 'tool-calls' as const, raw: 'tool-calls' }
+                : convertFinishReason(result),
             usage: {
               inputTokens: {
                 total: result.timings?.prompt_n || 0,
