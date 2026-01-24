@@ -177,9 +177,7 @@ function prepareMessagesWithMedia(prompt: LanguageModelV3Prompt): LLMMessage[] {
         const toolCalls = message.content.filter(
           (part) => part.type === 'tool-call'
         )
-        const content = message.content.filter(
-          (part) => part.type === 'text'
-        )
+        const content = message.content.filter((part) => part.type === 'text')
         messages.push({
           role: 'assistant',
           content,
@@ -440,9 +438,10 @@ export class LlamaLanguageModel implements LanguageModelV3 {
 
     return {
       content,
-      finishReason: response.tool_calls
-        ? { unified: 'tool-calls' as const, raw: 'tool-calls' }
-        : convertFinishReason(response),
+      finishReason:
+        response.tool_calls?.length > 0
+          ? { unified: 'tool-calls' as const, raw: 'tool-calls' }
+          : convertFinishReason(response),
       usage: {
         inputTokens: {
           total: response.timings?.prompt_n || 0,

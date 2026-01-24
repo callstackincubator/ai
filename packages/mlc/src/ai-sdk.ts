@@ -67,7 +67,7 @@ const convertFinishReason = (
   finishReason: GeneratedMessage['finish_reason']
 ): LanguageModelV3FinishReason => {
   let unified: LanguageModelV3FinishReason['unified'] = 'other'
-  
+
   if (finishReason === 'tool_calls') {
     unified = 'tool-calls'
   } else if (finishReason === 'stop') {
@@ -75,10 +75,10 @@ const convertFinishReason = (
   } else if (finishReason === 'length') {
     unified = 'length'
   }
-  
+
   return {
     unified,
-    raw: finishReason
+    raw: finishReason,
   }
 }
 
