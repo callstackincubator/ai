@@ -26,20 +26,20 @@ export interface SetupAdapter<TModel> {
   prepare: () => Promise<void>
 }
 
-const defultTools = {
+const defaultTools = {
   getCurrentTime,
   createCalendarEvent,
   checkCalendarEvents,
 }
 
 export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
-  createAppleLanguageSetupAdapter(defultTools),
+  createAppleLanguageSetupAdapter(defaultTools),
   createLlamaLanguageSetupAdapter(
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),
   createLlamaLanguageSetupAdapter(
     'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf',
-    defultTools
+    defaultTools
   ),
 ]
 
