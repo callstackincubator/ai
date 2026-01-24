@@ -1,15 +1,17 @@
 import type {
-  EmbeddingModelV2,
-  LanguageModelV2,
-  LanguageModelV2CallOptions,
-  LanguageModelV2FunctionTool,
-  LanguageModelV2Prompt,
-  LanguageModelV2ProviderDefinedTool,
-  LanguageModelV2StreamPart,
-  SpeechModelV2,
-  SpeechModelV2CallOptions,
-  TranscriptionModelV2,
-  TranscriptionModelV2CallOptions,
+  EmbeddingModelV3,
+  EmbeddingModelV3CallOptions,
+  EmbeddingModelV3Result,
+  LanguageModelV3,
+  LanguageModelV3CallOptions,
+  LanguageModelV3FunctionTool,
+  LanguageModelV3Prompt,
+  LanguageModelV3ProviderTool,
+  LanguageModelV3StreamPart,
+  SpeechModelV3,
+  SpeechModelV3CallOptions,
+  TranscriptionModelV3,
+  TranscriptionModelV3CallOptions,
 } from '@ai-sdk/provider'
 import {
   generateId,
@@ -25,7 +27,7 @@ import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
-type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
+type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 type ToolSet = Record<string, ToolDefinition>
 
 export function createAppleProvider({
@@ -62,8 +64,8 @@ export interface AppleTranscriptionOptions {
   language?: string
 }
 
-class AppleTranscriptionModel implements TranscriptionModelV2 {
-  readonly specificationVersion = 'v2'
+class AppleTranscriptionModel implements TranscriptionModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'apple'
 
   readonly modelId = 'SpeechTranscriber'
@@ -80,7 +82,7 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
     this.prepared = true
   }
 
-  async doGenerate(options: TranscriptionModelV2CallOptions) {
+  async doGenerate(options: TranscriptionModelV3CallOptions) {
     try {
       let audio = options.audio
       if (typeof audio === 'string') {
@@ -135,8 +137,8 @@ export interface AppleSpeechOptions {
   language?: string
 }
 
-class AppleSpeechModel implements SpeechModelV2 {
-  readonly specificationVersion = 'v2'
+class AppleSpeechModel implements SpeechModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'apple'
 
   readonly modelId = 'AVSpeechSynthesizer'
@@ -149,7 +151,7 @@ class AppleSpeechModel implements SpeechModelV2 {
 
   async prepare(): Promise<void> {}
 
-  async doGenerate(options: SpeechModelV2CallOptions) {
+  async doGenerate(options: SpeechModelV3CallOptions) {
     const speechOptions = {
       language: this.language,
       voice: options.voice,
@@ -181,8 +183,8 @@ export interface AppleEmbeddingOptions {
   language?: string
 }
 
-class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
-  readonly specificationVersion = 'v2'
+class AppleTextEmbeddingModel implements EmbeddingModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'apple'
 
   readonly modelId: string = 'NLContextualEmbedding'
@@ -201,7 +203,9 @@ class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
     this.prepared = true
   }
 
-  async doEmbed(options: { values: string[] }) {
+  async doEmbed(
+    options: EmbeddingModelV3CallOptions
+  ): Promise<EmbeddingModelV3Result> {
     if (!this.prepared) {
       console.warn(
         '[apple-llm] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -215,12 +219,13 @@ class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
     )
     return {
       embeddings,
+      warnings: [],
     }
   }
 }
 
-class AppleLLMChatLanguageModel implements LanguageModelV2 {
-  readonly specificationVersion = 'v2'
+class AppleLLMChatLanguageModel implements LanguageModelV3 {
+  readonly specificationVersion = 'v3'
   readonly supportedUrls = {}
 
   readonly provider = 'apple'
@@ -234,7 +239,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
 
   async prepare(): Promise<void> {}
 
-  private prepareMessages(messages: LanguageModelV2Prompt): AppleMessage[] {
+  private prepareMessages(messages: LanguageModelV3Prompt): AppleMessage[] {
     return messages.map((message): AppleMessage => {
       const content = Array.isArray(message.content)
         ? message.content.reduce((acc, part) => {
@@ -277,7 +282,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     })
   }
 
-  async doGenerate(options: LanguageModelV2CallOptions) {
+  async doGenerate(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -324,17 +329,25 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
             }
         }
       }),
-      finishReason: 'stop' as const,
+      finishReason: { unified: 'stop' as const, raw: 'stop' },
       usage: {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
+        inputTokens: {
+          total: 0,
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: {
+          total: 0,
+          text: undefined,
+          reasoning: undefined,
+        },
       },
       warnings: [],
     }
   }
 
-  async doStream(options: LanguageModelV2CallOptions) {
+  async doStream(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -369,7 +382,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
       }
     }
 
-    const stream = new ReadableStream<LanguageModelV2StreamPart>({
+    const stream = new ReadableStream<LanguageModelV3StreamPart>({
       async start(controller) {
         try {
           streamId = NativeAppleLLM.generateStream(messages, {
@@ -408,11 +421,19 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
               })
               controller.enqueue({
                 type: 'finish',
-                finishReason: 'stop',
+                finishReason: { unified: 'stop' as const, raw: 'stop' },
                 usage: {
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  totalTokens: 0,
+                  inputTokens: {
+                    total: 0,
+                    noCache: undefined,
+                    cacheRead: undefined,
+                    cacheWrite: undefined,
+                  },
+                  outputTokens: {
+                    total: 0,
+                    text: undefined,
+                    reasoning: undefined,
+                  },
                 },
               })
               cleanup()
