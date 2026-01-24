@@ -195,7 +195,10 @@ function prepareMessagesWithMedia(prompt: LanguageModelV3Prompt): LLMMessage[] {
           (part) => part.type === 'tool-result'
         )
         if (toolResults.length > 0) {
-          throw new Error('Model executed tools are not supported.')
+          console.warn(
+            '[llama] Model executed tools are not supported. Skipping:',
+            toolResults
+          )
         }
         break
       }
