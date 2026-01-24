@@ -220,10 +220,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
           })
 
           const updateListener = NativeMLCEngine.onChatUpdate((data) => {
-            if (data.delta) {
-              if (typeof data.delta?.content !== 'string') {
-                return
-              }
+            if (data.delta?.content) {
               controller.enqueue({
                 type: 'text-delta',
                 delta: data.delta.content,
