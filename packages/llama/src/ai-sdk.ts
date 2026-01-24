@@ -426,11 +426,16 @@ export class LlamaLanguageModel implements LanguageModelV3 {
         try {
           let textId = generateId()
 
-          let state: LLMState = 'none' as LLMState
+          let state: LLMState = 'text' as LLMState
 
           controller.enqueue({
             type: 'stream-start',
             warnings: [],
+          })
+
+          controller.enqueue({
+            type: 'text-start',
+            id: textId,
           })
 
           const result = await context.completion(
@@ -467,28 +472,16 @@ export class LlamaLanguageModel implements LanguageModelV3 {
                     })
                   }
 
-                  state = 'none'
+                  state = 'text'
+                  textId = generateId()
+                  controller.enqueue({
+                    type: 'text-start',
+                    id: textId,
+                  })
                   break
 
                 default:
-                  // process regular token
-
                   switch (state) {
-                    case 'none':
-                      // start text block
-                      state = 'text'
-                      textId = generateId()
-                      controller.enqueue({
-                        type: 'text-start',
-                        id: textId,
-                      })
-                      controller.enqueue({
-                        type: 'text-delta',
-                        id: textId,
-                        delta: token,
-                      })
-                      break
-
                     case 'text':
                       // continue text block
                       controller.enqueue({
