@@ -22,19 +22,6 @@ import {
   type TokenData,
 } from 'llama.rn'
 
-import {
-  downloadModel,
-  type DownloadProgress,
-  getDownloadedModels,
-  getModelPath,
-  isModelDownloaded,
-  type ModelInfo,
-  removeModel as removeModelFromStorage,
-  setStoragePath,
-} from './storage'
-
-export type { DownloadProgress, ModelInfo }
-
 type LLMState = 'text' | 'reasoning' | 'none'
 
 function convertFinishReason(
@@ -171,33 +158,6 @@ export interface LlamaModelOptions {
   contextParams?: Partial<ContextParams>
 }
 
-/**
- * Engine for managing llama.rn models (similar to MLCEngine)
- */
-export const LlamaEngine = {
-  /**
-   * Get all downloaded models
-   */
-  getModels: (): Promise<ModelInfo[]> => {
-    return getDownloadedModels()
-  },
-
-  /**
-   * Check if a specific model is downloaded
-   */
-  isDownloaded: (modelId: string): Promise<boolean> => {
-    return isModelDownloaded(modelId)
-  },
-
-  /**
-   * Set custom storage path for models
-   * Default: ${DocumentDir}/llama-models/
-   */
-  setStoragePath: (path: string): void => {
-    setStoragePath(path)
-  },
-}
-
 const START_OF_THINKING_PLACEHOLDER = '<think>'
 const END_OF_THINKING_PLACEHOLDER = '</think>'
 
@@ -213,6 +173,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
   readonly provider = 'llama'
   readonly modelId: string
 
+  private modelPath: string
   private options: LlamaModelOptions
   private context: LlamaContext | null = null
   private multimodalInitialized: boolean = false
@@ -231,8 +192,13 @@ export class LlamaLanguageModel implements LanguageModelV2 {
     return {}
   }
 
-  constructor(modelId: string, options: LlamaModelOptions = {}) {
-    this.modelId = modelId
+  /**
+   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
+  constructor(modelPath: string, options: LlamaModelOptions = {}) {
+    this.modelPath = modelPath
+    this.modelId = modelPath
 
     this.options = {
       projectorUseGpu: true,
@@ -246,40 +212,16 @@ export class LlamaLanguageModel implements LanguageModelV2 {
   }
 
   /**
-   * Check if model is downloaded
-   */
-  async isDownloaded(): Promise<boolean> {
-    return isModelDownloaded(this.modelId)
-  }
-
-  /**
-   * Download model from HuggingFace
-   */
-  async download(
-    progressCallback?: (progress: DownloadProgress) => void
-  ): Promise<void> {
-    await downloadModel(this.modelId, progressCallback)
-  }
-
-  /**
    * Initialize the model (load LlamaContext)
+   * @returns The initialized LlamaContext
    */
-  async prepare(): Promise<void> {
+  async prepare(): Promise<LlamaContext> {
     if (this.context) {
-      return
-    }
-
-    const modelPath = getModelPath(this.modelId)
-    const exists = await isModelDownloaded(this.modelId)
-
-    if (!exists) {
-      throw new Error(
-        `Model not downloaded. Call download() first. Model ID: ${this.modelId}`
-      )
+      return this.context
     }
 
     this.context = await initLlama({
-      model: modelPath,
+      model: this.modelPath,
       // Important: ctx_shift must be false for multimodal (required per docs)
       ...(this.options.projectorPath ? { ctx_shift: false } : {}),
       ...this.options.contextParams,
@@ -289,6 +231,8 @@ export class LlamaLanguageModel implements LanguageModelV2 {
     if (this.options.projectorPath) {
       await this.initializeMultimodal()
     }
+
+    return this.context
   }
 
   /**
@@ -337,20 +281,16 @@ export class LlamaLanguageModel implements LanguageModelV2 {
   }
 
   /**
-   * Remove model from disk
-   */
-  async remove(): Promise<void> {
-    await this.unload()
-    await removeModelFromStorage(this.modelId)
-  }
-
-  /**
    * Non-streaming text generation (AI SDK LanguageModelV2)
    */
   async doGenerate(options: LanguageModelV2CallOptions) {
     if (!this.context) {
-      throw new Error('Model not prepared. Call prepare() first.')
+      console.warn(
+        '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
+      )
     }
+
+    const context = this.context ?? (await this.prepare())
 
     const { messages } = prepareMessagesWithMedia(options.prompt)
 
@@ -373,7 +313,7 @@ export class LlamaLanguageModel implements LanguageModelV2 {
       }
     }
 
-    const response = await this.context.completion(completionOptions)
+    const response = await context.completion(completionOptions)
     let textContent = response.content
 
     // filter out thinking tags from content
@@ -424,7 +364,9 @@ export class LlamaLanguageModel implements LanguageModelV2 {
    */
   async doStream(options: LanguageModelV2CallOptions) {
     if (!this.context) {
-      throw new Error('Model not prepared. Call prepare() first.')
+      console.warn(
+        '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
+      )
     }
 
     if (typeof ReadableStream === 'undefined') {
@@ -432,6 +374,8 @@ export class LlamaLanguageModel implements LanguageModelV2 {
         'ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.'
       )
     }
+
+    const context = this.context ?? (await this.prepare())
 
     const { messages } = prepareMessagesWithMedia(options.prompt)
 
@@ -453,8 +397,6 @@ export class LlamaLanguageModel implements LanguageModelV2 {
         schema: options.responseFormat.schema,
       }
     }
-
-    const context = this.context
 
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       start: async (controller) => {
@@ -625,11 +567,17 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
     return this.maxEmbeddingsPerCall > 0
   }
 
+  private modelPath: string
   private options: LlamaEmbeddingOptions
   private context: LlamaContext | null = null
 
-  constructor(modelId: string, options: LlamaEmbeddingOptions = {}) {
-    this.modelId = modelId
+  /**
+   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
+  constructor(modelPath: string, options: LlamaEmbeddingOptions = {}) {
+    this.modelPath = modelPath
+    this.modelId = modelPath
     this.options = {
       normalize: -1,
       ...options,
@@ -645,42 +593,20 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
   }
 
   /**
-   * Check if model is downloaded
-   */
-  async isDownloaded(): Promise<boolean> {
-    return isModelDownloaded(this.modelId)
-  }
-
-  /**
-   * Download model from HuggingFace
-   */
-  async download(
-    progressCallback?: (progress: DownloadProgress) => void
-  ): Promise<void> {
-    await downloadModel(this.modelId, progressCallback)
-  }
-
-  /**
    * Initialize the model (load LlamaContext with embedding enabled)
+   * @returns The initialized LlamaContext
    */
-  async prepare(): Promise<void> {
+  async prepare(): Promise<LlamaContext> {
     if (this.context) {
-      return
-    }
-
-    const modelPath = getModelPath(this.modelId)
-    const exists = await isModelDownloaded(this.modelId)
-
-    if (!exists) {
-      throw new Error(
-        `Model not downloaded. Call download() first. Model ID: ${this.modelId}`
-      )
+      return this.context
     }
 
     this.context = await initLlama({
-      model: modelPath,
+      model: this.modelPath,
       ...this.options.contextParams,
     })
+
+    return this.context
   }
 
   /**
@@ -701,14 +627,6 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
   }
 
   /**
-   * Remove model from disk
-   */
-  async remove(): Promise<void> {
-    await this.unload()
-    await removeModelFromStorage(this.modelId)
-  }
-
-  /**
    * Generate embeddings (AI SDK EmbeddingModelV2)
    */
   async doEmbed(options: {
@@ -717,8 +635,12 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
     headers?: Record<string, string | undefined>
   }) {
     if (!this.context) {
-      throw new Error('Model not prepared. Call prepare() first.')
+      console.warn(
+        '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
+      )
     }
+
+    const context = this.context ?? (await this.prepare())
 
     const embeddings: number[][] = []
     const embeddingParams: EmbeddingParams = {
@@ -731,7 +653,7 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
         throw new Error('Embedding generation was aborted')
       }
 
-      const result: NativeEmbeddingResult = await this.context.embedding(
+      const result: NativeEmbeddingResult = await context.embedding(
         value,
         embeddingParams
       )
@@ -767,12 +689,18 @@ export class LlamaSpeechModel implements SpeechModelV2 {
   readonly provider = 'llama'
   readonly modelId: string
 
+  private modelPath: string
   private options: LlamaSpeechOptions
   private context: LlamaContext | null = null
   private vocoderInitialized: boolean = false
 
-  constructor(modelId: string, options: LlamaSpeechOptions = {}) {
-    this.modelId = modelId
+  /**
+   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
+  constructor(modelPath: string, options: LlamaSpeechOptions = {}) {
+    this.modelPath = modelPath
+    this.modelId = modelPath
     this.options = {
       ...options,
       contextParams: {
@@ -784,40 +712,16 @@ export class LlamaSpeechModel implements SpeechModelV2 {
   }
 
   /**
-   * Check if model is downloaded
-   */
-  async isDownloaded(): Promise<boolean> {
-    return isModelDownloaded(this.modelId)
-  }
-
-  /**
-   * Download model from HuggingFace
-   */
-  async download(
-    progressCallback?: (progress: DownloadProgress) => void
-  ): Promise<void> {
-    await downloadModel(this.modelId, progressCallback)
-  }
-
-  /**
    * Initialize the model and vocoder
+   * @returns The initialized LlamaContext
    */
-  async prepare(): Promise<void> {
+  async prepare(): Promise<LlamaContext> {
     if (this.context) {
-      return
-    }
-
-    const modelPath = getModelPath(this.modelId)
-    const exists = await isModelDownloaded(this.modelId)
-
-    if (!exists) {
-      throw new Error(
-        `Model not downloaded. Call download() first. Model ID: ${this.modelId}`
-      )
+      return this.context
     }
 
     this.context = await initLlama({
-      model: modelPath,
+      model: this.modelPath,
       ...this.options.contextParams,
     })
 
@@ -825,6 +729,8 @@ export class LlamaSpeechModel implements SpeechModelV2 {
     if (this.options.vocoderPath) {
       await this.initializeVocoder()
     }
+
+    return this.context
   }
 
   /**
@@ -871,20 +777,16 @@ export class LlamaSpeechModel implements SpeechModelV2 {
   }
 
   /**
-   * Remove model from disk
-   */
-  async remove(): Promise<void> {
-    await this.unload()
-    await removeModelFromStorage(this.modelId)
-  }
-
-  /**
    * Generate speech audio (AI SDK SpeechModelV2)
    */
   async doGenerate(options: SpeechModelV2CallOptions) {
     if (!this.context) {
-      throw new Error('Model not prepared. Call prepare() first.')
+      console.warn(
+        '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
+      )
     }
+
+    const context = this.context ?? (await this.prepare())
 
     if (!this.vocoderInitialized) {
       throw new Error(
@@ -894,13 +796,13 @@ export class LlamaSpeechModel implements SpeechModelV2 {
 
     // Get formatted audio completion prompt
     const speaker = null // Can be extended to support different speakers
-    const formatted = await this.context.getFormattedAudioCompletion(
+    const formatted = await context.getFormattedAudioCompletion(
       speaker,
       options.text
     )
 
     // Generate audio tokens via completion
-    const completionResult = await this.context.completion({
+    const completionResult = await context.completion({
       prompt: formatted.prompt,
       grammar: formatted.grammar,
       temperature: 0.8,
@@ -915,7 +817,7 @@ export class LlamaSpeechModel implements SpeechModelV2 {
     }
 
     // Decode audio tokens to PCM
-    const audioData = await this.context.decodeAudioTokens(
+    const audioData = await context.decodeAudioTokens(
       completionResult.audio_tokens
     )
 
@@ -934,42 +836,44 @@ export class LlamaSpeechModel implements SpeechModelV2 {
 }
 
 /**
- * Configuration options for llama.rn provider
- */
-export interface LlamaProviderOptions {
-  /** Custom storage path for downloaded models */
-  storagePath?: string
-}
-
-/**
  * Create a llama.rn provider with all model types
  */
-export function createLlamaProvider(providerOptions?: LlamaProviderOptions) {
-  // Set custom storage path if provided
-  if (providerOptions?.storagePath) {
-    setStoragePath(providerOptions.storagePath)
+export function createLlamaProvider() {
+  const provider = function (modelPath: string, options?: LlamaModelOptions) {
+    return provider.languageModel(modelPath, options)
   }
 
-  const provider = function (modelId: string, options?: LlamaModelOptions) {
-    return provider.languageModel(modelId, options)
-  }
-
+  /**
+   * Create a language model instance
+   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
   provider.languageModel = (
-    modelId: string,
+    modelPath: string,
     options: LlamaModelOptions = {}
   ): LlamaLanguageModel => {
-    return new LlamaLanguageModel(modelId, options)
+    return new LlamaLanguageModel(modelPath, options)
   }
 
+  /**
+   * Create an embedding model instance
+   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
   provider.textEmbeddingModel = (
-    modelId: string,
+    modelPath: string,
     options: LlamaEmbeddingOptions = {}
   ): LlamaEmbeddingModel => {
-    return new LlamaEmbeddingModel(modelId, options)
+    return new LlamaEmbeddingModel(modelPath, options)
   }
 
+  /**
+   * Create a speech model instance
+   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options (vocoderPath required)
+   */
   provider.speechModel = (
-    modelId: string,
+    modelPath: string,
     options: LlamaSpeechOptions = {}
   ): LlamaSpeechModel => {
     if (!options.vocoderPath) {
@@ -978,7 +882,7 @@ export function createLlamaProvider(providerOptions?: LlamaProviderOptions) {
           'Provide the path to a vocoder model file.'
       )
     }
-    return new LlamaSpeechModel(modelId, options)
+    return new LlamaSpeechModel(modelPath, options)
   }
 
   provider.imageModel = () => {

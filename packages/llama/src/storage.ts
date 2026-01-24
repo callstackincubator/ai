@@ -1,6 +1,6 @@
 import RNBlobUtil from 'react-native-blob-util'
 
-let storagePath = `${RNBlobUtil.fs.dirs.DocumentDir}/llama-models`
+const DEFAULT_STORAGE_PATH = `${RNBlobUtil.fs.dirs.DocumentDir}/llama-models`
 
 export interface DownloadProgress {
   percentage: number
@@ -11,14 +11,6 @@ export interface ModelInfo {
   path: string
   filename: string
   sizeBytes?: number
-}
-
-export function setStoragePath(path: string): void {
-  storagePath = path
-}
-
-export function getStoragePath(): string {
-  return storagePath
 }
 
 export function parseModelId(modelId: string): {
@@ -38,7 +30,7 @@ export function parseModelId(modelId: string): {
 
 export function getModelPath(modelId: string): string {
   const { filename } = parseModelId(modelId)
-  return `${storagePath}/${filename}`
+  return `${DEFAULT_STORAGE_PATH}/${filename}`
 }
 
 export async function isModelDownloaded(modelId: string): Promise<boolean> {
@@ -48,17 +40,17 @@ export async function isModelDownloaded(modelId: string): Promise<boolean> {
 
 export async function getDownloadedModels(): Promise<ModelInfo[]> {
   try {
-    const exists = await RNBlobUtil.fs.exists(storagePath)
+    const exists = await RNBlobUtil.fs.exists(DEFAULT_STORAGE_PATH)
     if (!exists) {
       return []
     }
 
-    const files = await RNBlobUtil.fs.ls(storagePath)
+    const files = await RNBlobUtil.fs.ls(DEFAULT_STORAGE_PATH)
     const models: ModelInfo[] = []
 
     for (const filename of files) {
       if (filename.endsWith('.gguf')) {
-        const path = `${storagePath}/${filename}`
+        const path = `${DEFAULT_STORAGE_PATH}/${filename}`
         const stat = await RNBlobUtil.fs.stat(path)
 
         models.push({
@@ -83,11 +75,11 @@ export async function downloadModel(
 ): Promise<string> {
   const { repo, filename } = parseModelId(modelId)
   const url = `https://huggingface.co/${repo}/resolve/main/${filename}?download=true`
-  const destPath = `${storagePath}/${filename}`
+  const destPath = `${DEFAULT_STORAGE_PATH}/${filename}`
 
-  const dirExists = await RNBlobUtil.fs.exists(storagePath)
+  const dirExists = await RNBlobUtil.fs.exists(DEFAULT_STORAGE_PATH)
   if (!dirExists) {
-    await RNBlobUtil.fs.mkdir(storagePath)
+    await RNBlobUtil.fs.mkdir(DEFAULT_STORAGE_PATH)
   }
 
   const fileExists = await RNBlobUtil.fs.exists(destPath)

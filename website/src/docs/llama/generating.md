@@ -10,14 +10,13 @@ You can generate responses using Llama models with the Vercel AI SDK's `generate
 ## Text Generation
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
-// Create and prepare model
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
-)
-await model.download()
+// Download model - returns the file path
+const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+
+const model = llama.languageModel(modelPath)
 await model.prepare()
 
 const result = await generateText({
@@ -33,14 +32,13 @@ console.log(result.text)
 Stream responses for real-time output:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { streamText } from 'ai'
 
-// Create and prepare model
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
-)
-await model.download()
+// Download model - returns the file path
+const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+
+const model = llama.languageModel(modelPath)
 await model.prepare()
 
 const { textStream } = streamText({
@@ -58,17 +56,15 @@ for await (const delta of textStream) {
 The Llama provider supports multimodal models that can process images and audio. To enable multimodal capabilities, provide a `projectorPath` when creating the model:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
-const model = llama.languageModel(
-  'owner/repo/vision-model.gguf',
-  {
-    projectorPath: '/path/to/mmproj-model.gguf',
-  }
-)
+const modelPath = await downloadModel('owner/repo/vision-model.gguf')
 
-await model.download()
+const model = llama.languageModel(modelPath, {
+  projectorPath: '/path/to/mmproj-model.gguf',
+})
+
 await model.prepare()
 
 // Use with images
@@ -107,13 +103,12 @@ const result = await generateText({
 Models that support reasoning (like DeepSeek-R1) automatically handle `<think>` tags. The reasoning content is separated from the main response:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
-const model = llama.languageModel(
-  'owner/repo/deepseek-r1.gguf'
-)
-await model.download()
+const modelPath = await downloadModel('owner/repo/deepseek-r1.gguf')
+
+const model = llama.languageModel(modelPath)
 await model.prepare()
 
 const result = await generateText({
@@ -135,14 +130,13 @@ When streaming, reasoning tokens are emitted separately via `reasoning-start`, `
 Generate structured JSON responses:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
-)
-await model.download()
+const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+
+const model = llama.languageModel(modelPath)
 await model.prepare()
 
 const { object } = await generateObject({
@@ -177,13 +171,12 @@ Configure model behavior with generation options:
 Example with all options:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
-)
-await model.download()
+const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+
+const model = llama.languageModel(modelPath)
 await model.prepare()
 
 const result = await generateText({
@@ -205,29 +198,23 @@ const result = await generateText({
 When creating a model instance, you can configure llama.rn specific options via `contextParams`:
 
 ```typescript
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf',
-  {
-    contextParams: {
-      n_ctx: 4096, // Context size (default: 2048, or 4096 for multimodal)
-      n_gpu_layers: 99, // Number of GPU layers (default: 99)
-    },
-  }
-)
+const model = llama.languageModel(modelPath, {
+  contextParams: {
+    n_ctx: 4096, // Context size (default: 2048, or 4096 for multimodal)
+    n_gpu_layers: 99, // Number of GPU layers (default: 99)
+  },
+})
 ```
 
 For multimodal models:
 
 ```typescript
-const model = llama.languageModel(
-  'owner/repo/vision-model.gguf',
-  {
-    projectorPath: '/path/to/mmproj.gguf', // Required for multimodal
-    projectorUseGpu: true, // Use GPU for multimodal (default: true)
-    contextParams: {
-      n_ctx: 4096,
-      n_gpu_layers: 99,
-    },
-  }
-)
+const model = llama.languageModel(modelPath, {
+  projectorPath: '/path/to/mmproj.gguf', // Required for multimodal
+  projectorUseGpu: true, // Use GPU for multimodal (default: true)
+  contextParams: {
+    n_ctx: 4096,
+    n_gpu_layers: 99,
+  },
+})
 ```

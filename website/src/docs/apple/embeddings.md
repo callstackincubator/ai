@@ -52,17 +52,14 @@ console.log(embeddings)
 
 ## Language Support
 
-The embeddings model supports multiple languages. You can specify the language using [ISO 639-1 codes](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) or full names:
+The embeddings model supports multiple languages. You can specify the language using [ISO 639-1 codes](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) or full names when creating the model:
 
 ```tsx
+const model = apple.textEmbeddingModel({ language: 'fr' })
+
 await embed({
-  model: apple.textEmbeddingModel(), 
+  model,
   value: 'Bonjour',
-  providerOptions: {
-    apple: {
-      language: 'fr',
-    }
-  }
 })
 ```
 
@@ -71,17 +68,24 @@ For list of all supported languages, [check Apple documentation](https://develop
 > [!NOTE]
 > By default, the embeddings model will use device language.
 
-## Asset Management
+## Preparing the Model
 
-Apple's NLContextualEmbedding requires downloading language-specific assets to the device. The provider automatically requests assets when needed, but you can also prepare them manually:
+Apple's NLContextualEmbedding requires downloading language-specific assets to the device. While the provider automatically prepares assets when needed, you can call `prepare()` ahead of time for better performance:
 
 ```tsx
-import { NativeAppleEmbeddings } from '@react-native-ai/apple'
+const model = apple.textEmbeddingModel({ language: 'en' })
 
-await NativeAppleEmbeddings.prepare('en')
+// Call prepare() ahead of time to optimize first inference latency
+await model.prepare()
+
+// Now embeddings will be faster on first use
+const { embedding } = await embed({ model, value: 'Hello world' })
 ```
 
-When you call `prepare()` for a language, the system first checks if the required assets are already present on the device. If they are, the method resolves immediately without any network activity, making subsequent embedding operations instant.
+> [!TIP]
+> Calling `prepare()` ahead of time is recommended to avoid delays on first use. If not called, the model will auto-prepare when first used, but a warning will be logged.
+
+When you call `prepare()`, the system first checks if the required assets are already present on the device. If they are, the method resolves immediately without any network activity.
 
 > [!NOTE]
 > All language models and assets are stored in Apple's system-wide assets catalog, separate from your app bundle. This means zero impact on your app's size. Assets may already be available if the user has previously used other apps, or if system features have requested them.
