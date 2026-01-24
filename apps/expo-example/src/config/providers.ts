@@ -3,11 +3,15 @@ import { ToolSet } from 'ai'
 
 import {
   createAppleLanguageSetupAdapter,
-  createAppleLanguageSetupWithToolsAdapter,
   createAppleSpeechSetupAdapter,
 } from '../components/adapters/appleSetupAdapter'
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { createLlamaSpeechSetupAdapter } from '../components/adapters/llamaSpeechSetupAdapter'
+import {
+  checkCalendarEvents,
+  createCalendarEvent,
+  getCurrentTime,
+} from '../tools'
 
 export type Availability = 'yes' | 'no' | 'availableForDownload'
 
@@ -22,14 +26,20 @@ export interface SetupAdapter<TModel> {
   prepare: () => Promise<void>
 }
 
+const defaultTools = {
+  getCurrentTime,
+  createCalendarEvent,
+  checkCalendarEvents,
+}
+
 export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
-  createAppleLanguageSetupAdapter(),
-  createAppleLanguageSetupWithToolsAdapter(),
+  createAppleLanguageSetupAdapter(defaultTools),
   createLlamaLanguageSetupAdapter(
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),
   createLlamaLanguageSetupAdapter(
-    'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf'
+    'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf',
+    defaultTools
   ),
 ]
 

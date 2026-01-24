@@ -51,7 +51,50 @@ for await (const delta of textStream) {
 }
 ```
 
-## Multimodal (Vision and Audio)
+## Tool Calling
+
+You can enable tool calling for both `generateText` and `streamText` by passing tools to the AI SDK.
+
+### Setup
+
+Define tools using the AI SDK `tool` helper:
+
+```typescript
+import { tool } from 'ai'
+import { z } from 'zod'
+
+const getWeather = tool({
+  description: 'Get current weather information',
+  inputSchema: z.object({
+    city: z.string(),
+  }),
+  execute: async ({ city }) => {
+    return `Weather in ${city}: Sunny, 25°C`
+  },
+})
+```
+
+### Basic Tool Usage
+
+```typescript
+import { llama, downloadModel } from '@react-native-ai/llama'
+import { generateText } from 'ai'
+
+const modelPath = await downloadModel('Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf')
+
+const model = llama.languageModel(modelPath)
+await model.prepare()
+
+const result = await generateText({
+  model,
+  prompt: 'What is the weather in Paris?',
+  tools: {
+    getWeather,
+  },
+})
+```
+
+## Multimodal (Vision & Audio)
 
 The Llama provider supports multimodal models that can process images and audio. To enable multimodal capabilities, provide a `projectorPath` when creating the model:
 
