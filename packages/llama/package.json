@@ -37,8 +37,8 @@
     "prepare": "bob build"
   },
   "dependencies": {
-    "@ai-sdk/provider": "^2.0.0",
-    "@ai-sdk/provider-utils": "^3.0.10",
+    "@ai-sdk/provider": "^3.0.5",
+    "@ai-sdk/provider-utils": "^4.0.1",
     "react-native-blob-util": "^0.24.5",
     "zod": "^4.0.0"
   },

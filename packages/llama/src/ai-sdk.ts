@@ -6,6 +6,8 @@ import type {
   LanguageModelV2FinishReason,
   LanguageModelV2Prompt,
   LanguageModelV2StreamPart,
+  RerankingModelV3,
+  RerankingModelV3CallOptions,
   SpeechModelV2,
   SpeechModelV2CallOptions,
 } from '@ai-sdk/provider'
@@ -669,6 +671,126 @@ export class LlamaEmbeddingModel implements EmbeddingModelV2<string> {
   }
 }
 
+export interface LlamaRerankOptions {
+  /**
+   * Normalize scores (default: from model config)
+   */
+  normalize?: number
+  /**
+   * llama.rn context params passed to initLlama()
+   */
+  contextParams?: Partial<ContextParams>
+}
+
+/**
+ * llama.rn Rerank Model for AI SDK
+ *
+ * Ranks documents based on their relevance to a query.
+ * Useful for improving search results and implementing RAG systems.
+ *
+ * @see https://github.com/mybigday/llama.rn
+ */
+export class LlamaRerankModel implements RerankingModelV3 {
+  readonly specificationVersion = 'v3'
+  readonly provider = 'llama'
+  readonly modelId: string
+
+  private modelPath: string
+  private options: LlamaRerankOptions
+  private context: LlamaContext | null = null
+
+  /**
+   * @param modelPath - Path to the reranker model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
+  constructor(modelPath: string, options: LlamaRerankOptions = {}) {
+    this.modelPath = modelPath
+    this.modelId = modelPath
+    this.options = {
+      ...options,
+      contextParams: {
+        n_ctx: 2048,
+        n_gpu_layers: 99,
+        embedding: true,
+        pooling_type: 'rank',
+        ...options.contextParams,
+      },
+    }
+  }
+
+  /**
+   * Initialize the model (load LlamaContext with rank pooling enabled)
+   * @returns The initialized LlamaContext
+   */
+  async prepare(): Promise<LlamaContext> {
+    if (this.context) {
+      return this.context
+    }
+
+    this.context = await initLlama({
+      model: this.modelPath,
+      ...this.options.contextParams,
+    })
+
+    return this.context
+  }
+
+  /**
+   * Get the underlying LlamaContext (for advanced usage)
+   */
+  getContext(): LlamaContext | null {
+    return this.context
+  }
+
+  /**
+   * Unload model from memory
+   */
+  async unload(): Promise<void> {
+    if (this.context) {
+      await this.context.release()
+      this.context = null
+    }
+  }
+
+  /**
+   * Rerank documents based on relevance to query (AI SDK RerankingModelV3)
+   */
+  async doRerank(options: RerankingModelV3CallOptions) {
+    if (!this.context) {
+      console.warn(
+        '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
+      )
+    }
+
+    const context = this.context ?? (await this.prepare())
+
+    // Convert documents to string array for llama.rn
+    const documentStrings =
+      options.documents.type === 'text'
+        ? options.documents.values
+        : options.documents.values.map((doc) => JSON.stringify(doc))
+
+    const results = await context.rerank(options.query, documentStrings, {
+      normalize: this.options.normalize,
+    })
+
+    // Map to AI SDK V3 format
+    let ranking = results.map((result) => ({
+      index: result.index,
+      relevanceScore: result.score,
+    }))
+
+    // Apply topN filter if specified
+    if (options.topN !== undefined && options.topN > 0) {
+      ranking = ranking.slice(0, options.topN)
+    }
+
+    return {
+      ranking,
+    }
+  }
+}
+
 /**
  * Configuration options for llama.rn speech model (vocoder-based TTS)
  */
@@ -865,6 +987,18 @@ export function createLlamaProvider() {
     options: LlamaEmbeddingOptions = {}
   ): LlamaEmbeddingModel => {
     return new LlamaEmbeddingModel(modelPath, options)
+  }
+
+  /**
+   * Create a rerank model instance for document ranking
+   * @param modelPath - Path to a reranker model file (from downloadModel() or getModelPath())
+   * @param options - Model configuration options
+   */
+  provider.rerankModel = (
+    modelPath: string,
+    options: LlamaRerankOptions = {}
+  ): LlamaRerankModel => {
+    return new LlamaRerankModel(modelPath, options)
   }
 
   /**
