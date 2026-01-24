@@ -22,5 +22,11 @@ export type {
   TokenData,
 } from 'llama.rn'
 // Storage APIs for model management
-export type { DownloadProgress } from './storage'
-export { downloadModel, getModelPath, isModelDownloaded } from './storage'
+export type { DownloadProgress, ModelInfo } from './storage'
+export {
+  downloadModel,
+  getDownloadedModels,
+  getModelPath,
+  isModelDownloaded,
+  removeModel,
+} from './storage'

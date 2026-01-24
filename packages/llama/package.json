@@ -44,11 +44,11 @@
   },
   "peerDependencies": {
     "react-native": ">=0.76.0",
-    "llama.rn": "^0.10.0-rc.0"
+    "llama.rn": "^0.10.1"
   },
   "devDependencies": {
     "react-native": "0.81.4",
-    "llama.rn": "^0.10.0-rc.0"
+    "llama.rn": "^0.10.1"
   },
   "react-native-builder-bob": {
     "source": "src",
