@@ -1,6 +1,7 @@
 export type {
   LlamaEmbeddingOptions,
   LlamaModelOptions,
+  LlamaRerankOptions,
   LlamaSpeechOptions,
 } from './ai-sdk'
 export {
@@ -8,6 +9,7 @@ export {
   llama,
   LlamaEmbeddingModel,
   LlamaLanguageModel,
+  LlamaRerankModel,
   LlamaSpeechModel,
 } from './ai-sdk'
 export type {
