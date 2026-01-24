@@ -108,8 +108,6 @@ export default function SpeechScreen() {
     setIsModelAvailable(false)
   }
 
-  const isAppleProvider = activeIndex === 0
-
   useEffect(() => {
     speechAdapters[activeIndex].isAvailable().then((availability) => {
       setIsModelAvailable(availability === 'yes')
@@ -172,7 +170,7 @@ export default function SpeechScreen() {
             </TouchableOpacity>
           </View>
 
-          {isAppleProvider && voices.length > 0 && (
+          {activeProvider.model.provider === 'apple' && voices.length > 0 && (
             <View className="bg-white rounded-xl p-4 mt-4">
               <Text className="text-lg font-semibold mb-3">
                 Voice Selection
