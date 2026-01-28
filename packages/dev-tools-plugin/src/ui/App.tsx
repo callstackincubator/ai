@@ -1,30 +1,31 @@
-import { useEffect, useMemo, useState } from 'react';
-import { JSONTree } from 'react-json-tree';
-import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge';
-import { AiSdkProfilerEventMap } from '../shared/client';
-import { AI_SDK_PROFILER_PLUGIN_ID } from '../shared/constants';
-import { AiSdkSpan } from '../shared/types';
+import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge'
+import { useEffect, useMemo, useState } from 'react'
+import { JSONTree } from 'react-json-tree'
+
+import { AiSdkProfilerEventMap } from '../shared/client'
+import { AI_SDK_PROFILER_PLUGIN_ID } from '../shared/constants'
+import { AiSdkSpan } from '../shared/types'
 
 const getAttributeString = (
   attributes: Record<string, unknown>,
   key: string
 ) => {
-  const value = attributes[key];
+  const value = attributes[key]
   if (typeof value === 'string') {
-    return value;
+    return value
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
+    return String(value)
   }
-  return undefined;
-};
+  return undefined
+}
 
 const formatDuration = (durationMs: number) => {
   if (durationMs < 1000) {
-    return `${durationMs}ms`;
+    return `${durationMs}ms`
   }
-  return `${(durationMs / 1000).toFixed(2)}s`;
-};
+  return `${(durationMs / 1000).toFixed(2)}s`
+}
 
 const OPERATION_OPTIONS = [
   'generateText',
@@ -33,7 +34,7 @@ const OPERATION_OPTIONS = [
   'streamObject',
   'embed',
   'embedMany',
-] as const;
+] as const
 
 const STRINGIFIED_JSON_KEYS = [
   'ai.response.toolCalls',
@@ -47,7 +48,7 @@ const STRINGIFIED_JSON_KEYS = [
   'ai.schema',
   'ai.embedding',
   'ai.embeddings',
-] as const;
+] as const
 
 const JSON_TREE_THEME = {
   base00: 'transparent',
@@ -66,28 +67,28 @@ const JSON_TREE_THEME = {
   base0D: '#8b5cf6', // text-purple-500
   base0E: '#ec4899', // text-pink-500
   base0F: '#f97316', // text-orange-500
-};
+}
 
 const parseStringifiedJsonValue = (value: unknown): unknown => {
   if (Array.isArray(value)) {
-    return value.map((item) => parseStringifiedJsonValue(item));
+    return value.map((item) => parseStringifiedJsonValue(item))
   }
   if (typeof value !== 'string') {
-    return value;
+    return value
   }
   try {
-    return JSON.parse(value);
+    return JSON.parse(value)
   } catch {
-    return value;
+    return value
   }
-};
+}
 
 const parseStringifiedJsonKeys = (value: unknown): unknown => {
   if (Array.isArray(value)) {
-    return value.map((item) => parseStringifiedJsonKeys(item));
+    return value.map((item) => parseStringifiedJsonKeys(item))
   }
   if (!value || typeof value !== 'object') {
-    return value;
+    return value
   }
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
@@ -95,109 +96,109 @@ const parseStringifiedJsonKeys = (value: unknown): unknown => {
         key as (typeof STRINGIFIED_JSON_KEYS)[number]
       )
         ? parseStringifiedJsonValue(entry)
-        : entry;
-      return [key, parseStringifiedJsonKeys(nextValue)];
+        : entry
+      return [key, parseStringifiedJsonKeys(nextValue)]
     })
-  );
-};
+  )
+}
 
 export default function AiSdkProfilerPanel() {
   const client = useRozeniteDevToolsClient<AiSdkProfilerEventMap>({
     pluginId: AI_SDK_PROFILER_PLUGIN_ID,
-  });
-  const [spans, setSpans] = useState<AiSdkSpan[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [selectedSpanId, setSelectedSpanId] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(true);
-  const [filterOperation, setFilterOperation] = useState('');
-  const [filterProvider, setFilterProvider] = useState('');
-  const [filterModel, setFilterModel] = useState('');
+  })
+  const [spans, setSpans] = useState<AiSdkSpan[]>([])
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const [selectedSpanId, setSelectedSpanId] = useState<string | null>(null)
+  const [isRecording, setIsRecording] = useState(true)
+  const [filterOperation, setFilterOperation] = useState('')
+  const [filterProvider, setFilterProvider] = useState('')
+  const [filterModel, setFilterModel] = useState('')
 
   useEffect(() => {
     if (!client) {
-      return;
+      return
     }
 
     const subscriptions = [
       client.onMessage('ai-sdk-span', (data) => {
-        setSpans((current) => [data.span, ...current].slice(0, 500));
+        setSpans((current) => [data.span, ...current].slice(0, 500))
       }),
-    ];
+    ]
 
-    client.send('ai-sdk-enable', {});
+    client.send('ai-sdk-enable', {})
 
     return () => {
-      subscriptions.forEach((subscription) => subscription.remove());
-      client.send('ai-sdk-disable', {});
-    };
-  }, [client]);
+      subscriptions.forEach((subscription) => subscription.remove())
+      client.send('ai-sdk-disable', {})
+    }
+  }, [client])
 
   const getOperationName = (span: AiSdkSpan) => {
-    const attributes = span.attributes;
+    const attributes = span.attributes
     return (
       getAttributeString(attributes, 'ai.operationId') ||
       getAttributeString(attributes, 'operation.name') ||
       span.name
-    );
-  };
+    )
+  }
 
   const getProviderName = (span: AiSdkSpan) => {
     return (
       getAttributeString(span.attributes, 'ai.model.provider') ||
       getAttributeString(span.attributes, 'gen_ai.system')
-    );
-  };
+    )
+  }
 
   const normalizeProviderName = (provider?: string) => {
     if (!provider) {
-      return provider;
+      return provider
     }
-    return provider.replace(/\.responses$/, '');
-  };
+    return provider.replace(/\.responses$/, '')
+  }
 
   const getModelName = (span: AiSdkSpan) => {
     return (
       getAttributeString(span.attributes, 'ai.model.id') ||
       getAttributeString(span.attributes, 'gen_ai.request.model') ||
       getAttributeString(span.attributes, 'ai.response.model')
-    );
-  };
+    )
+  }
 
   const getResourceName = (span: AiSdkSpan) => {
-    const resource = (span.resource ?? {}) as Record<string, unknown>;
+    const resource = (span.resource ?? {}) as Record<string, unknown>
     return (
       getAttributeString(resource, 'name') ||
       getAttributeString(resource, 'resource.name') ||
       getAttributeString(resource, 'service.name') ||
       'unknown'
-    );
-  };
+    )
+  }
 
   const getOperationDisplayName = (span: AiSdkSpan) => {
-    const operation = getOperationName(span);
-    const match = /^ai\.([^.]+)/.exec(operation);
-    return match?.[1] ?? operation;
-  };
+    const operation = getOperationName(span)
+    const match = /^ai\.([^.]+)/.exec(operation)
+    return match?.[1] ?? operation
+  }
 
   const getToolCallName = (span: AiSdkSpan) => {
-    const attributes = span.attributes;
+    const attributes = span.attributes
     return getAttributeString(attributes, 'ai.toolCall.name')
-  };
+  }
 
   const matchesFilters = (span: AiSdkSpan) => {
-    const provider = getProviderName(span);
-    const model = getModelName(span);
+    const provider = getProviderName(span)
+    const model = getModelName(span)
 
     const matchOperation = filterOperation
       ? getOperationDisplayName(span) === filterOperation
-      : true;
+      : true
     const matchProvider = filterProvider
       ? normalizeProviderName(provider) === filterProvider
-      : true;
-    const matchModel = filterModel ? model === filterModel : true;
+      : true
+    const matchModel = filterModel ? model === filterModel : true
 
-    return matchOperation && matchProvider && matchModel;
-  };
+    return matchOperation && matchProvider && matchModel
+  }
 
   const resourceGroups = useMemo(() => {
     const terminalOperations = new Set([
@@ -207,25 +208,25 @@ export default function AiSdkProfilerPanel() {
       'ai.streamObject',
       'ai.embed',
       'ai.embedMany',
-    ]);
-    const groups: Array<{
-      id: string;
-      resourceName: string;
-      occurrence: number;
-      spans: AiSdkSpan[];
-      latestStartTime: number;
-      isPending: boolean;
-    }> = [];
-    const activeByResource = new Map<string, number>();
-    const occurrenceByResource = new Map<string, number>();
+    ])
+    const groups: {
+      id: string
+      resourceName: string
+      occurrence: number
+      spans: AiSdkSpan[]
+      latestStartTime: number
+      isPending: boolean
+    }[] = []
+    const activeByResource = new Map<string, number>()
+    const occurrenceByResource = new Map<string, number>()
 
-    const orderedSpans = spans.slice().reverse();
+    const orderedSpans = spans.slice().reverse()
     orderedSpans.forEach((span) => {
-      const resourceName = getResourceName(span);
-      let groupIndex = activeByResource.get(resourceName);
+      const resourceName = getResourceName(span)
+      let groupIndex = activeByResource.get(resourceName)
       if (groupIndex === undefined) {
-        const occurrence = (occurrenceByResource.get(resourceName) ?? 0) + 1;
-        occurrenceByResource.set(resourceName, occurrence);
+        const occurrence = (occurrenceByResource.get(resourceName) ?? 0) + 1
+        occurrenceByResource.set(resourceName, occurrence)
         const group = {
           id: `${resourceName}-${occurrence}-${span.spanId}`,
           resourceName,
@@ -233,126 +234,124 @@ export default function AiSdkProfilerPanel() {
           spans: [span],
           latestStartTime: span.startTime,
           isPending: true,
-        };
-        groups.push(group);
-        groupIndex = groups.length - 1;
-        activeByResource.set(resourceName, groupIndex);
+        }
+        groups.push(group)
+        groupIndex = groups.length - 1
+        activeByResource.set(resourceName, groupIndex)
       } else {
-        groups[groupIndex].spans.push(span);
+        groups[groupIndex].spans.push(span)
       }
 
       if (terminalOperations.has(span.name)) {
-        groups[groupIndex].isPending = false;
-        activeByResource.delete(resourceName);
+        groups[groupIndex].isPending = false
+        activeByResource.delete(resourceName)
       }
-    });
+    })
 
-    return groups;
-  }, [spans]);
+    return groups
+  }, [spans])
 
   const filteredResourceGroups = useMemo(() => {
     if (!filterOperation && !filterProvider && !filterModel) {
-      return resourceGroups;
+      return resourceGroups
     }
-    return resourceGroups.filter((group) =>
-      group.spans.some(matchesFilters)
-    );
-  }, [resourceGroups, filterOperation, filterProvider, filterModel]);
+    return resourceGroups.filter((group) => group.spans.some(matchesFilters))
+  }, [resourceGroups, filterOperation, filterProvider, filterModel])
 
   const selectedResource = useMemo(() => {
     if (!selectedGroupId) {
-      return null;
+      return null
     }
     return (
       filteredResourceGroups.find((group) => group.id === selectedGroupId) ||
       null
-    );
-  }, [filteredResourceGroups, selectedGroupId]);
+    )
+  }, [filteredResourceGroups, selectedGroupId])
 
   const filteredSteps = useMemo(() => {
     if (!selectedResource) {
-      return [];
+      return []
     }
-    return selectedResource.spans;
-  }, [selectedResource]);
+    return selectedResource.spans
+  }, [selectedResource])
 
   const selectedSpan = useMemo(
     () => filteredSteps.find((span) => span.spanId === selectedSpanId) || null,
     [filteredSteps, selectedSpanId]
-  );
+  )
 
   const providerOptions = useMemo(() => {
-    const providers = new Set<string>();
+    const providers = new Set<string>()
     spans.forEach((span) => {
-      const provider = normalizeProviderName(getProviderName(span));
+      const provider = normalizeProviderName(getProviderName(span))
       if (provider) {
-        providers.add(provider);
+        providers.add(provider)
       }
-    });
-    return Array.from(providers);
-  }, [spans]);
+    })
+    return Array.from(providers)
+  }, [spans])
 
   const modelOptions = useMemo(() => {
-    const models = new Set<string>();
+    const models = new Set<string>()
     spans.forEach((span) => {
-      const model = getModelName(span);
+      const model = getModelName(span)
       if (model) {
-        models.add(model);
+        models.add(model)
       }
-    });
-    return Array.from(models);
-  }, [spans]);
+    })
+    return Array.from(models)
+  }, [spans])
 
   useEffect(() => {
     if (filteredResourceGroups.length === 0) {
-      setSelectedGroupId(null);
-      setSelectedSpanId(null);
-      return;
+      setSelectedGroupId(null)
+      setSelectedSpanId(null)
+      return
     }
     const hasSelected = selectedGroupId
       ? filteredResourceGroups.some((group) => group.id === selectedGroupId)
-      : false;
+      : false
     if (!hasSelected) {
-      setSelectedGroupId(filteredResourceGroups[0].id);
+      setSelectedGroupId(filteredResourceGroups[0].id)
     }
-  }, [filteredResourceGroups, selectedGroupId]);
+  }, [filteredResourceGroups, selectedGroupId])
 
   useEffect(() => {
     if (filteredSteps.length === 0) {
-      setSelectedSpanId(null);
-      return;
+      setSelectedSpanId(null)
+      return
     }
     const hasSelected = selectedSpanId
       ? filteredSteps.some((span) => span.spanId === selectedSpanId)
-      : false;
+      : false
     if (!hasSelected) {
-      setSelectedSpanId(filteredSteps[0].spanId);
+      setSelectedSpanId(filteredSteps[0].spanId)
     }
-  }, [filteredSteps, selectedSpanId]);
+  }, [filteredSteps, selectedSpanId])
 
   const handleToggleRecording = () => {
     if (!client) {
-      return;
+      return
     }
     if (isRecording) {
-      client.send('ai-sdk-disable', {});
-      setIsRecording(false);
+      client.send('ai-sdk-disable', {})
+      setIsRecording(false)
     } else {
-      client.send('ai-sdk-enable', {});
-      setIsRecording(true);
+      client.send('ai-sdk-enable', {})
+      setIsRecording(true)
     }
-  };
+  }
 
   const visibleAttributes = (span: AiSdkSpan) => {
-    return Object.entries(span.attributes);
-  };
+    return Object.entries(span.attributes)
+  }
 
   if (!client) {
     return (
       <div style={styles.loading}>
         <div>Connecting to React Native...</div>
       </div>
-    );
+    )
   }
 
   return (
@@ -371,9 +370,9 @@ export default function AiSdkProfilerPanel() {
           <button
             style={styles.button}
             onClick={() => {
-              setSpans([]);
-              setSelectedGroupId(null);
-              setSelectedSpanId(null);
+              setSpans([])
+              setSelectedGroupId(null)
+              setSelectedSpanId(null)
             }}
             disabled={spans.length === 0}
           >
@@ -432,14 +431,14 @@ export default function AiSdkProfilerPanel() {
                   key={group.id}
                   style={{
                     ...styles.row,
-                    ...(selectedGroupId === group.id
-                      ? styles.rowSelected
-                      : {}),
+                    ...(selectedGroupId === group.id ? styles.rowSelected : {}),
                   }}
                   onClick={() => setSelectedGroupId(group.id)}
                 >
                   <div style={styles.rowTitle}>
-                    {group.spans[0] ? getOperationDisplayName(group.spans[0]) : 'unknown'}
+                    {group.spans[0]
+                      ? getOperationDisplayName(group.spans[0])
+                      : 'unknown'}
                     {group.occurrence > 1 ? ` #${group.occurrence}` : ''}
                   </div>
                   <div style={styles.rowMeta}>
@@ -447,7 +446,7 @@ export default function AiSdkProfilerPanel() {
                     {group.isPending ? 'pending' : 'complete'}
                   </div>
                 </button>
-              );
+              )
             })
           )}
         </div>
@@ -458,7 +457,7 @@ export default function AiSdkProfilerPanel() {
             <div style={styles.empty}>No spans match the filters.</div>
           ) : (
             filteredSteps.map((span) => {
-              const operation = getOperationName(span);
+              const operation = getOperationName(span)
               return (
                 <button
                   key={`${span.traceId}-${span.spanId}`}
@@ -477,7 +476,7 @@ export default function AiSdkProfilerPanel() {
                       : `${normalizeProviderName(getProviderName(span))} · ${getModelName(span)} · ${formatDuration(span.durationMs)}`}
                   </div>
                 </button>
-              );
+              )
             })
           )}
         </div>
@@ -536,7 +535,7 @@ export default function AiSdkProfilerPanel() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -692,4 +691,4 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#777',
     padding: 20,
   },
-};
+}
