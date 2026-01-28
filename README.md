@@ -11,6 +11,21 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 - 🎯 **Vercel AI SDK compatible** - Drop-in replacement with familiar APIs
 - 🎨 **Complete toolkit** - Text generation, embeddings, transcription, speech synthesis
 
+## DevTools
+
+![AI SDK Profiler preview](website/src/public/dev-tools-preview.png)
+
+The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
+requests and surfaces them in Rozenite DevTools. DevTools are runtime
+agnostic, so they work with on-device and remote runtimes.
+
+```bash
+npm install @react-native-ai/dev-tools-plugin
+```
+
+Rozenite must be installed and enabled in your app. See the
+[Rozenite getting started guide](https://www.rozenite.dev/docs/getting-started).
+
 ## Available Providers
 
 | Provider | Built-in | Platforms | Runtime | Description |
