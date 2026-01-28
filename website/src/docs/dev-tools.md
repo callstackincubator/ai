@@ -11,7 +11,7 @@ DevTools are runtime agnostic, so they work with on-device and remote runtimes.
 ## Installation
 
 ```bash
-npm install @react-native-ai/dev-tools-plugin
+npm install @react-native-ai/dev-tools
 ```
 
 ## Rozenite setup
@@ -28,7 +28,7 @@ https://www.rozenite.dev/docs/getting-started
 import {
   getAiSdkTracer,
   useAiSdkDevTools,
-} from '@react-native-ai/dev-tools-plugin';
+} from '@react-native-ai/dev-tools';
 
 export function App() {
   useAiSdkDevTools();
@@ -41,7 +41,7 @@ export function App() {
 ```ts
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { getAiSdkTracer } from '@react-native-ai/dev-tools-plugin';
+import { getAiSdkTracer } from '@react-native-ai/dev-tools';
 
 const tracer = getAiSdkTracer({
   serviceName: 'my-app',

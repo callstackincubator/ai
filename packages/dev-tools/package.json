@@ -1,5 +1,5 @@
 {
-  "name": "@react-native-ai/dev-tools-plugin",
+  "name": "@react-native-ai/dev-tools",
   "version": "0.12.0",
   "description": "DevTools plugin for AI SDK profiling.",
   "type": "module",
@@ -50,6 +50,7 @@
     "url": "https://github.com/callstackincubator/ai/issues"
   },
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   }
 }

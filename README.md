@@ -20,7 +20,7 @@ requests and surfaces them in Rozenite DevTools. DevTools are runtime
 agnostic, so they work with on-device and remote runtimes.
 
 ```bash
-npm install @react-native-ai/dev-tools-plugin
+npm install @react-native-ai/dev-tools
 ```
 
 Rozenite must be installed and enabled in your app. See the
