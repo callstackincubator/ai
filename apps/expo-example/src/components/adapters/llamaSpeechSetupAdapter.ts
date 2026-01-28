@@ -1,12 +1,12 @@
 import type { SpeechModelV3 } from '@ai-sdk/provider'
-import { llama } from '@react-native-ai/llama'
-
 import {
   downloadModel,
   getModelPath,
   isModelDownloaded,
+  llama,
   removeModel,
 } from '@react-native-ai/llama'
+
 import type { Availability, SetupAdapter } from '../../config/providers'
 
 interface LlamaSpeechSetupOptions {

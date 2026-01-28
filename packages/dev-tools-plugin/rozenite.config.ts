@@ -5,4 +5,4 @@ export default {
       source: './src/ui/App.tsx',
     },
   ],
-};
+}

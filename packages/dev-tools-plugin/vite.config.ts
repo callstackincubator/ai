@@ -1,6 +1,5 @@
-/// <reference types='vitest' />
-import { defineConfig } from 'vite';
-import { rozenitePlugin } from '@rozenite/vite-plugin';
+import { rozenitePlugin } from '@rozenite/vite-plugin'
+import { defineConfig } from 'vite'
 
 export default defineConfig({
   root: __dirname,
@@ -17,4 +16,4 @@ export default defineConfig({
     port: 3002,
     open: true,
   },
-});
+})
