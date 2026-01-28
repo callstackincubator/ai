@@ -7,11 +7,7 @@ import {
 } from '../components/adapters/appleSetupAdapter'
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { createLlamaSpeechSetupAdapter } from '../components/adapters/llamaSpeechSetupAdapter'
-import {
-  checkCalendarEvents,
-  createCalendarEvent,
-  getCurrentTime,
-} from '../tools'
+import { codeInterpreter, imageGeneration, webSearch } from '../tools'
 
 export type Availability = 'yes' | 'no' | 'availableForDownload'
 
@@ -27,10 +23,12 @@ export interface SetupAdapter<TModel> {
 }
 
 const defaultTools = {
-  getCurrentTime,
-  createCalendarEvent,
-  checkCalendarEvents,
+  webSearch,
+  codeInterpreter,
+  imageGeneration,
 }
+
+export const toolDefinitions = defaultTools
 
 export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
   createAppleLanguageSetupAdapter(defaultTools),

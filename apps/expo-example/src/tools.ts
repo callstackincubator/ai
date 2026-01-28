@@ -1,79 +1,38 @@
 import { tool } from 'ai'
-import * as Calendar from 'expo-calendar'
 import { z } from 'zod'
 
-/**
- * Creates a new calendar event with specified title, date, time and duration
- */
-export const createCalendarEvent = tool({
-  description: 'Create a new calendar event',
+export const webSearch = tool({
+  description: 'Search the web for current information',
   inputSchema: z.object({
-    title: z.string().describe('Event title'),
-    date: z.string().describe('Event date (YYYY-MM-DD)'),
-    time: z.string().optional().describe('Event time (HH:MM)'),
-    duration: z.number().optional().describe('Duration in minutes'),
+    query: z.string().describe('Search query'),
   }),
-  execute: async ({ title, date, time, duration = 60 }) => {
-    await Calendar.requestCalendarPermissionsAsync()
-
-    const calendars = await Calendar.getCalendarsAsync(
-      Calendar.EntityTypes.EVENT
-    )
-
-    const eventDate = new Date(date)
-    if (time) {
-      const [hours, minutes] = time.split(':').map(Number)
-      eventDate.setHours(hours, minutes)
+  execute: async ({ query }) => {
+    return {
+      message: `Web search is not enabled in this demo. Query was: "${query}".`,
     }
-
-    await Calendar.createEventAsync(calendars[0].id, {
-      title,
-      startDate: eventDate,
-      endDate: new Date(eventDate.getTime() + duration * 60 * 1000),
-    })
-
-    return { message: `Created "${title}"` }
   },
 })
 
-/**
- * Retrieves upcoming calendar events for a specified number of days
- */
-export const checkCalendarEvents = tool({
-  description: 'Check upcoming calendar events',
+export const codeInterpreter = tool({
+  description: 'Run code and analyze data',
   inputSchema: z.object({
-    days: z.number().optional().describe('Number of days to look ahead'),
+    code: z.string().describe('Code to execute'),
   }),
-  execute: async ({ days = 7 }) => {
-    await Calendar.requestCalendarPermissionsAsync()
-
-    const calendars = await Calendar.getCalendarsAsync(
-      Calendar.EntityTypes.EVENT
-    )
-
-    const startDate = new Date()
-    const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000)
-
-    const events = await Calendar.getEventsAsync(
-      calendars.map((cal) => cal.id),
-      startDate,
-      endDate
-    )
-
-    return events.map((event) => ({
-      title: event.title,
-      date: event.startDate,
-    }))
+  execute: async () => {
+    return {
+      message: 'Code Interpreter is not enabled in this demo.',
+    }
   },
 })
 
-/**
- * Get current time
- */
-export const getCurrentTime = tool({
-  description: 'Get current time and date',
-  inputSchema: z.object({}),
-  execute: async () => {
-    return `Current time is: ${new Date().toUTCString()}`
+export const imageGeneration = tool({
+  description: 'Create images from descriptions',
+  inputSchema: z.object({
+    prompt: z.string().describe('Image prompt'),
+  }),
+  execute: async ({ prompt }) => {
+    return {
+      message: `Image generation is not enabled in this demo. Prompt was: "${prompt}".`,
+    }
   },
 })
