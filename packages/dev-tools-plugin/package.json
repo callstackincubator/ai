@@ -1,0 +1,32 @@
+{
+  "name": "@react-native-ai/dev-tools-plugin",
+  "version": "0.1.0",
+  "description": "DevTools plugin for AI SDK profiling.",
+  "type": "module",
+  "main": "./dist/react-native.cjs",
+  "module": "./dist/react-native.js",
+  "types": "./dist/react-native.d.ts",
+  "scripts": {
+    "build": "rozenite build",
+    "dev": "rozenite dev"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/core": "^1.30.1",
+    "@opentelemetry/resources": "^1.30.1",
+    "@opentelemetry/sdk-trace-base": "^1.30.1",
+    "@rozenite/plugin-bridge": "^1.2.0"
+  },
+  "devDependencies": {
+    "@rozenite/vite-plugin": "^1.2.0",
+    "@types/react": "~18.3.23",
+    "@types/react-dom": "~18.3.1",
+    "react": "*",
+    "react-json-tree": "^0.20.0",
+    "rozenite": "^1.2.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.0"
+  },
+  "author": "Mike Grabowski <grabbou@gmail.com>",
+  "license": "MIT"
+}

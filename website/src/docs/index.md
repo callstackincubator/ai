@@ -9,6 +9,14 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 - **Offline-ready:** Works anywhere, even without internet
 - **Zero server costs:** No API fees or infrastructure to maintain
 
+## DevTools
+
+The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
+requests and surfaces them in Rozenite DevTools. DevTools are runtime
+agnostic, so they work with on-device and remote runtimes.
+
+Learn more in the [DevTools documentation](./dev-tools).
+
 ## Available Providers
 
 ### Apple Intelligence

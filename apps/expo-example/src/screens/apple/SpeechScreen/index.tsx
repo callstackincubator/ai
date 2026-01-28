@@ -1,4 +1,4 @@
-import { apple, AppleSpeech, VoiceInfo } from '@react-native-ai/apple'
+import { AppleSpeech, VoiceInfo } from '@react-native-ai/apple'
 import { Picker } from '@react-native-picker/picker'
 import { experimental_generateSpeech } from 'ai'
 import React, { useEffect, useState } from 'react'
