@@ -1,12 +1,12 @@
 ![rozenite-banner](https://www.rozenite.dev/rozenite-banner.jpg)
 
-![AI SDK Profiler preview](../../website/src/public/dev-tools-preview.png)
-
 ### A Rozenite plugin that captures Vercel AI SDK spans in Rozenite
 
 The AI SDK Profiler plugin captures OpenTelemetry spans emitted by the Vercel AI
 SDK and shows them in Rozenite DevTools. It helps you inspect requests,
 inputs, outputs, provider metadata, and latency.
+
+![AI SDK Profiler preview](../../website/src/public/dev-tools-preview.png)
 
 DevTools are runtime agnostic, so they work with on-device and remote runtimes.
 

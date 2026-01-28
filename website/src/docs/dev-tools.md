@@ -1,10 +1,10 @@
-![AI SDK Profiler preview](/dev-tools-preview.png)
-
 # AI SDK Profiler DevTools
 
 A Rozenite plugin that captures Vercel AI SDK spans and surfaces them in
 Rozenite DevTools. Inspect requests, inputs, outputs, provider metadata, and
 latency.
+
+![AI SDK Profiler preview](/dev-tools-preview.png)
 
 DevTools are runtime agnostic, so they work with on-device and remote runtimes.
 
