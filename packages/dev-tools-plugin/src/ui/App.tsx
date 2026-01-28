@@ -1,11 +1,10 @@
-import { HrTime } from '@opentelemetry/api'
-import { ReadableSpan } from '@opentelemetry/sdk-trace-base'
 import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge'
 import { useEffect, useMemo, useState } from 'react'
 import { JSONTree } from 'react-json-tree'
 
 import { AiSdkProfilerEventMap } from '../shared/client'
 import { AI_SDK_PROFILER_PLUGIN_ID } from '../shared/constants'
+import { AiSdkSpan } from '../shared/types'
 
 const getAttributeString = (
   attributes: Record<string, unknown>,
@@ -18,7 +17,7 @@ const getAttributeString = (
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value)
   }
-  return undefined
+  return 'unknown'
 }
 
 const formatDuration = (durationMs: number) => {
@@ -28,67 +27,35 @@ const formatDuration = (durationMs: number) => {
   return `${(durationMs / 1000).toFixed(2)}s`
 }
 
-const hrTimeToMs = (time: HrTime) =>
-  Math.round(time[0] * 1000 + time[1] / 1_000_000)
-
-const getOperationName = (span: ReadableSpan) => {
-  const attributes = span.attributes
-  return (
-    getAttributeString(attributes, 'ai.operationId') ||
-    getAttributeString(attributes, 'operation.name') ||
-    span.name
-  )
+const getOperationName = (span: AiSdkSpan) => {
+  return getAttributeString(span.attributes, 'ai.operationId')
 }
 
-const getProviderName = (span: ReadableSpan) => {
-  return (
-    getAttributeString(span.attributes, 'ai.model.provider') ||
-    getAttributeString(span.attributes, 'gen_ai.system')
-  )
+const getProviderName = (span: AiSdkSpan) => {
+  return getAttributeString(span.attributes, 'ai.model.provider')
 }
 
-const normalizeProviderName = (provider?: string) => {
-  if (!provider) {
-    return provider
-  }
+const normalizeProviderName = (provider: string) => {
   return provider.replace(/\.responses$/, '')
 }
 
-const getModelName = (span: ReadableSpan) => {
-  return (
-    getAttributeString(span.attributes, 'ai.model.id') ||
-    getAttributeString(span.attributes, 'gen_ai.request.model') ||
-    getAttributeString(span.attributes, 'ai.response.model')
-  )
+const getModelName = (span: AiSdkSpan) => {
+  return getAttributeString(span.attributes, 'ai.model.id')
 }
 
-const getResourceName = (span: ReadableSpan) => {
-  const resource = span.resource?.attributes ?? {}
-  return (
-    getAttributeString(resource, 'name') ||
-    getAttributeString(resource, 'resource.name') ||
-    getAttributeString(resource, 'service.name') ||
-    'unknown'
-  )
+const getResourceName = (span: AiSdkSpan) => {
+  return getAttributeString(span.attributes, 'resource.name')
 }
 
-const getOperationDisplayName = (span: ReadableSpan) => {
+const getOperationDisplayName = (span: AiSdkSpan) => {
   const operation = getOperationName(span)
   const match = /^ai\.([^.]+)/.exec(operation)
   return match?.[1] ?? operation
 }
 
-const getToolCallName = (span: ReadableSpan) => {
-  const attributes = span.attributes
-  return getAttributeString(attributes, 'ai.toolCall.name')
+const getToolCallName = (span: AiSdkSpan) => {
+  return getAttributeString(span.attributes, 'ai.toolCall.name')
 }
-
-const visibleAttributes = (span: ReadableSpan) => {
-  return Object.entries(span.attributes)
-}
-
-const getSpanId = (span: ReadableSpan) => span.spanContext().spanId
-const getTraceId = (span: ReadableSpan) => span.spanContext().traceId
 
 const OPERATION_OPTIONS = [
   'generateText',
@@ -165,11 +132,27 @@ const parseStringifiedJsonKeys = (value: unknown): unknown => {
   )
 }
 
+const terminalOperations = new Set([
+  'ai.generateText',
+  'ai.streamText',
+  'ai.generateObject',
+  'ai.streamObject',
+  'ai.embed',
+  'ai.embedMany',
+])
+
+type AiSdkSpanGroup = {
+  id: string
+  resourceName: string
+  spans: AiSdkSpan[]
+  isPending: boolean
+}
+
 export default function AiSdkProfilerPanel() {
   const client = useRozeniteDevToolsClient<AiSdkProfilerEventMap>({
     pluginId: AI_SDK_PROFILER_PLUGIN_ID,
   })
-  const [spans, setSpans] = useState<ReadableSpan[]>([])
+  const [spans, setSpans] = useState<AiSdkSpan[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [selectedSpanId, setSelectedSpanId] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(true)
@@ -197,38 +180,20 @@ export default function AiSdkProfilerPanel() {
   }, [client])
 
   const resourceGroups = useMemo(() => {
-    const terminalOperations = new Set([
-      'ai.generateText',
-      'ai.streamText',
-      'ai.generateObject',
-      'ai.streamObject',
-      'ai.embed',
-      'ai.embedMany',
-    ])
-    const groups: {
-      id: string
-      resourceName: string
-      occurrence: number
-      spans: ReadableSpan[]
-      latestStartTime: number
-      isPending: boolean
-    }[] = []
+    const groups: AiSdkSpanGroup[] = []
     const activeByResource = new Map<string, number>()
-    const occurrenceByResource = new Map<string, number>()
 
     const orderedSpans = spans.slice().reverse()
     orderedSpans.forEach((span) => {
       const resourceName = getResourceName(span)
+
+      // There can only be one active group per resourceName at a time.
       let groupIndex = activeByResource.get(resourceName)
       if (groupIndex === undefined) {
-        const occurrence = (occurrenceByResource.get(resourceName) ?? 0) + 1
-        occurrenceByResource.set(resourceName, occurrence)
         const group = {
-          id: `${resourceName}-${occurrence}-${getSpanId(span)}`,
+          id: `${resourceName}-${span.spanId}`,
           resourceName,
-          occurrence,
           spans: [span],
-          latestStartTime: hrTimeToMs(span.startTime),
           isPending: true,
         }
         groups.push(group)
@@ -238,6 +203,7 @@ export default function AiSdkProfilerPanel() {
         groups[groupIndex].spans.push(span)
       }
 
+      // Mark group as closed when terminal span arrives
       if (terminalOperations.has(span.name)) {
         groups[groupIndex].isPending = false
         activeByResource.delete(resourceName)
@@ -248,7 +214,7 @@ export default function AiSdkProfilerPanel() {
   }, [spans])
 
   const filteredResourceGroups = useMemo(() => {
-    const matchesFilters = (span: ReadableSpan) => {
+    const matchesFilters = (span: AiSdkSpan) => {
       const provider = getProviderName(span)
       const model = getModelName(span)
 
@@ -287,8 +253,7 @@ export default function AiSdkProfilerPanel() {
   }, [selectedResource])
 
   const selectedSpan = useMemo(
-    () =>
-      filteredSteps.find((span) => getSpanId(span) === selectedSpanId) || null,
+    () => filteredSteps.find((span) => span.spanId === selectedSpanId) || null,
     [filteredSteps, selectedSpanId]
   )
 
@@ -334,10 +299,10 @@ export default function AiSdkProfilerPanel() {
       return
     }
     const hasSelected = selectedSpanId
-      ? filteredSteps.some((span) => getSpanId(span) === selectedSpanId)
+      ? filteredSteps.some((span) => span.spanId === selectedSpanId)
       : false
     if (!hasSelected) {
-      setSelectedSpanId(getSpanId(filteredSteps[0]))
+      setSelectedSpanId(filteredSteps[0].spanId)
     }
   }, [filteredSteps, selectedSpanId])
 
@@ -447,7 +412,6 @@ export default function AiSdkProfilerPanel() {
                     {group.spans[0]
                       ? getOperationDisplayName(group.spans[0])
                       : 'unknown'}
-                    {group.occurrence > 1 ? ` #${group.occurrence}` : ''}
                   </div>
                   <div style={styles.rowMeta}>
                     {group.resourceName} · {group.spans.length} steps ·{' '}
@@ -468,20 +432,20 @@ export default function AiSdkProfilerPanel() {
               const operation = getOperationName(span)
               return (
                 <button
-                  key={`${getTraceId(span)}-${getSpanId(span)}`}
+                  key={`${span.traceId}-${span.spanId}`}
                   style={{
                     ...styles.row,
-                    ...(selectedSpanId === getSpanId(span)
+                    ...(selectedSpanId === span.spanId
                       ? styles.rowSelected
                       : {}),
                   }}
-                  onClick={() => setSelectedSpanId(getSpanId(span))}
+                  onClick={() => setSelectedSpanId(span.spanId)}
                 >
                   <div style={styles.rowTitle}>{operation}</div>
                   <div style={styles.rowMeta}>
                     {operation === 'ai.toolCall'
                       ? getToolCallName(span)
-                      : `${normalizeProviderName(getProviderName(span))} · ${getModelName(span)} · ${formatDuration(hrTimeToMs(span.duration))}`}
+                      : `${normalizeProviderName(getProviderName(span))} · ${getModelName(span)} · ${formatDuration(span.duration)}`}
                   </div>
                 </button>
               )
@@ -497,26 +461,22 @@ export default function AiSdkProfilerPanel() {
                 <div>
                   <div style={styles.detailsTitle}>{selectedSpan.name}</div>
                   <div style={styles.detailsSubtitle}>
-                    {formatDuration(hrTimeToMs(selectedSpan.duration))} ·{' '}
-                    {new Date(
-                      hrTimeToMs(selectedSpan.startTime)
-                    ).toLocaleTimeString()}
+                    {formatDuration(selectedSpan.duration)} ·{' '}
+                    {new Date(selectedSpan.startTime).toLocaleTimeString()}
                   </div>
                 </div>
                 <div style={styles.tag}>
                   {getAttributeString(
                     selectedSpan.attributes,
                     'ai.operationId'
-                  ) || 'ai-span'}
+                  )}
                 </div>
               </div>
               <div style={styles.section}>
                 <div style={styles.sectionTitle}>Attributes</div>
                 <div style={styles.code}>
                   <JSONTree
-                    data={parseStringifiedJsonKeys(
-                      Object.fromEntries(visibleAttributes(selectedSpan))
-                    )}
+                    data={parseStringifiedJsonKeys(selectedSpan.attributes)}
                     theme={JSON_TREE_THEME}
                     invertTheme={false}
                     shouldExpandNodeInitially={(
@@ -525,7 +485,7 @@ export default function AiSdkProfilerPanel() {
                   />
                 </div>
               </div>
-              {selectedSpan.events?.length ? (
+              {selectedSpan.events.length ? (
                 <div style={styles.section}>
                   <div style={styles.sectionTitle}>Events</div>
                   <div style={styles.code}>

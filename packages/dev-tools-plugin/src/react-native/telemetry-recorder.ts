@@ -1,5 +1,7 @@
+import { HrTime } from '@opentelemetry/api'
 import { ReadableSpan } from '@opentelemetry/sdk-trace-base'
 
+import { AiSdkSpan } from '../shared/types'
 import { DEFAULT_DEVTOOLS_CONFIG } from './config'
 
 type RecorderConfig = {
@@ -7,7 +9,7 @@ type RecorderConfig = {
   maxQueueSize: number
 }
 
-type SendSpan = (span: ReadableSpan) => void
+type SendSpan = (span: AiSdkSpan) => void
 
 const defaultConfig: RecorderConfig = {
   isEnabled: DEFAULT_DEVTOOLS_CONFIG.isEnabled,
@@ -16,7 +18,7 @@ const defaultConfig: RecorderConfig = {
 
 export class AiSdkTelemetryRecorder {
   private config: RecorderConfig = { ...defaultConfig }
-  private queue: ReadableSpan[] = []
+  private queue: AiSdkSpan[] = []
   private sender?: SendSpan
 
   setSender(sender?: SendSpan) {
@@ -52,15 +54,17 @@ export class AiSdkTelemetryRecorder {
       return
     }
 
+    const payload = toAiSdkSpan(span)
+
     if (!this.sender) {
       if (this.queue.length >= this.config.maxQueueSize) {
         this.queue.shift()
       }
-      this.queue.push(span)
+      this.queue.push(payload)
       return
     }
 
-    this.sender(span)
+    this.sender(payload)
   }
 
   private flush() {
@@ -91,4 +95,24 @@ const isAiSdkSpan = (span: ReadableSpan) => {
     typeof span.attributes['ai.operationId'] === 'string' ||
     Object.keys(span.attributes).some((key) => key.startsWith('gen_ai.'))
   )
+}
+
+const hrTimeToMs = (time: HrTime) =>
+  Math.round(time[0] * 1000 + time[1] / 1_000_000)
+
+const toAiSdkSpan = (span: ReadableSpan): AiSdkSpan => {
+  return {
+    spanId: span.spanContext().spanId,
+    traceId: span.spanContext().traceId,
+    name: span.name,
+    startTime: hrTimeToMs(span.startTime),
+    duration: hrTimeToMs(span.duration),
+    attributes: span.attributes,
+    resource: span.resource.attributes,
+    events: span.events.map((event) => ({
+      name: event.name,
+      time: hrTimeToMs(event.time),
+      attributes: event.attributes ?? {},
+    })),
+  }
 }
