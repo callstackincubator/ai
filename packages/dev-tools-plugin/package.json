@@ -1,6 +1,6 @@
 {
   "name": "@react-native-ai/dev-tools-plugin",
-  "version": "0.1.0",
+  "version": "0.12.0",
   "description": "DevTools plugin for AI SDK profiling.",
   "type": "module",
   "main": "./dist/react-native.cjs",
