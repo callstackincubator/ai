@@ -37,6 +37,13 @@ export const getAiSdkTracer = (config: AiSdkDevToolsConfig = {}) => {
       new SimpleSpanProcessor(new AiSdkDevToolsSpanExporter(recorder))
     )
     trace.setGlobalTracerProvider(tracerProviderInstance)
+  } else if (
+    config.tracerProvider &&
+    config.tracerProvider !== tracerProviderInstance
+  ) {
+    console.warn(
+      '[ai-sdk-dev-tools] getAiSdkTracer was called with a new tracerProvider after initialization. This is ignored. Provide tracerProvider on the first call or restart the app to reconfigure.'
+    )
   }
 
   if (!tracerInstance) {

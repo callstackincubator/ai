@@ -12,11 +12,12 @@ export type AiSdkDevToolsConfig = {
    */
   maxQueueSize?: number
   /**
-   * Optional service name for OTel resource.
+   * Optional service name for OTEL resource.
    */
   serviceName?: string
   /**
    * Optional tracer provider to reuse instead of creating one.
+   * Must be provided on the first call to getAiSdkTracer.
    */
   tracerProvider?: BasicTracerProvider
 }

@@ -1,10 +1,11 @@
+import { HrTime } from '@opentelemetry/api'
+import { ReadableSpan } from '@opentelemetry/sdk-trace-base'
 import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge'
 import { useEffect, useMemo, useState } from 'react'
 import { JSONTree } from 'react-json-tree'
 
 import { AiSdkProfilerEventMap } from '../shared/client'
 import { AI_SDK_PROFILER_PLUGIN_ID } from '../shared/constants'
-import { AiSdkSpan } from '../shared/types'
 
 const getAttributeString = (
   attributes: Record<string, unknown>,
@@ -26,6 +27,68 @@ const formatDuration = (durationMs: number) => {
   }
   return `${(durationMs / 1000).toFixed(2)}s`
 }
+
+const hrTimeToMs = (time: HrTime) =>
+  Math.round(time[0] * 1000 + time[1] / 1_000_000)
+
+const getOperationName = (span: ReadableSpan) => {
+  const attributes = span.attributes
+  return (
+    getAttributeString(attributes, 'ai.operationId') ||
+    getAttributeString(attributes, 'operation.name') ||
+    span.name
+  )
+}
+
+const getProviderName = (span: ReadableSpan) => {
+  return (
+    getAttributeString(span.attributes, 'ai.model.provider') ||
+    getAttributeString(span.attributes, 'gen_ai.system')
+  )
+}
+
+const normalizeProviderName = (provider?: string) => {
+  if (!provider) {
+    return provider
+  }
+  return provider.replace(/\.responses$/, '')
+}
+
+const getModelName = (span: ReadableSpan) => {
+  return (
+    getAttributeString(span.attributes, 'ai.model.id') ||
+    getAttributeString(span.attributes, 'gen_ai.request.model') ||
+    getAttributeString(span.attributes, 'ai.response.model')
+  )
+}
+
+const getResourceName = (span: ReadableSpan) => {
+  const resource = span.resource?.attributes ?? {}
+  return (
+    getAttributeString(resource, 'name') ||
+    getAttributeString(resource, 'resource.name') ||
+    getAttributeString(resource, 'service.name') ||
+    'unknown'
+  )
+}
+
+const getOperationDisplayName = (span: ReadableSpan) => {
+  const operation = getOperationName(span)
+  const match = /^ai\.([^.]+)/.exec(operation)
+  return match?.[1] ?? operation
+}
+
+const getToolCallName = (span: ReadableSpan) => {
+  const attributes = span.attributes
+  return getAttributeString(attributes, 'ai.toolCall.name')
+}
+
+const visibleAttributes = (span: ReadableSpan) => {
+  return Object.entries(span.attributes)
+}
+
+const getSpanId = (span: ReadableSpan) => span.spanContext().spanId
+const getTraceId = (span: ReadableSpan) => span.spanContext().traceId
 
 const OPERATION_OPTIONS = [
   'generateText',
@@ -106,7 +169,7 @@ export default function AiSdkProfilerPanel() {
   const client = useRozeniteDevToolsClient<AiSdkProfilerEventMap>({
     pluginId: AI_SDK_PROFILER_PLUGIN_ID,
   })
-  const [spans, setSpans] = useState<AiSdkSpan[]>([])
+  const [spans, setSpans] = useState<ReadableSpan[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [selectedSpanId, setSelectedSpanId] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(true)
@@ -133,73 +196,6 @@ export default function AiSdkProfilerPanel() {
     }
   }, [client])
 
-  const getOperationName = (span: AiSdkSpan) => {
-    const attributes = span.attributes
-    return (
-      getAttributeString(attributes, 'ai.operationId') ||
-      getAttributeString(attributes, 'operation.name') ||
-      span.name
-    )
-  }
-
-  const getProviderName = (span: AiSdkSpan) => {
-    return (
-      getAttributeString(span.attributes, 'ai.model.provider') ||
-      getAttributeString(span.attributes, 'gen_ai.system')
-    )
-  }
-
-  const normalizeProviderName = (provider?: string) => {
-    if (!provider) {
-      return provider
-    }
-    return provider.replace(/\.responses$/, '')
-  }
-
-  const getModelName = (span: AiSdkSpan) => {
-    return (
-      getAttributeString(span.attributes, 'ai.model.id') ||
-      getAttributeString(span.attributes, 'gen_ai.request.model') ||
-      getAttributeString(span.attributes, 'ai.response.model')
-    )
-  }
-
-  const getResourceName = (span: AiSdkSpan) => {
-    const resource = (span.resource ?? {}) as Record<string, unknown>
-    return (
-      getAttributeString(resource, 'name') ||
-      getAttributeString(resource, 'resource.name') ||
-      getAttributeString(resource, 'service.name') ||
-      'unknown'
-    )
-  }
-
-  const getOperationDisplayName = (span: AiSdkSpan) => {
-    const operation = getOperationName(span)
-    const match = /^ai\.([^.]+)/.exec(operation)
-    return match?.[1] ?? operation
-  }
-
-  const getToolCallName = (span: AiSdkSpan) => {
-    const attributes = span.attributes
-    return getAttributeString(attributes, 'ai.toolCall.name')
-  }
-
-  const matchesFilters = (span: AiSdkSpan) => {
-    const provider = getProviderName(span)
-    const model = getModelName(span)
-
-    const matchOperation = filterOperation
-      ? getOperationDisplayName(span) === filterOperation
-      : true
-    const matchProvider = filterProvider
-      ? normalizeProviderName(provider) === filterProvider
-      : true
-    const matchModel = filterModel ? model === filterModel : true
-
-    return matchOperation && matchProvider && matchModel
-  }
-
   const resourceGroups = useMemo(() => {
     const terminalOperations = new Set([
       'ai.generateText',
@@ -213,7 +209,7 @@ export default function AiSdkProfilerPanel() {
       id: string
       resourceName: string
       occurrence: number
-      spans: AiSdkSpan[]
+      spans: ReadableSpan[]
       latestStartTime: number
       isPending: boolean
     }[] = []
@@ -228,11 +224,11 @@ export default function AiSdkProfilerPanel() {
         const occurrence = (occurrenceByResource.get(resourceName) ?? 0) + 1
         occurrenceByResource.set(resourceName, occurrence)
         const group = {
-          id: `${resourceName}-${occurrence}-${span.spanId}`,
+          id: `${resourceName}-${occurrence}-${getSpanId(span)}`,
           resourceName,
           occurrence,
           spans: [span],
-          latestStartTime: span.startTime,
+          latestStartTime: hrTimeToMs(span.startTime),
           isPending: true,
         }
         groups.push(group)
@@ -252,6 +248,21 @@ export default function AiSdkProfilerPanel() {
   }, [spans])
 
   const filteredResourceGroups = useMemo(() => {
+    const matchesFilters = (span: ReadableSpan) => {
+      const provider = getProviderName(span)
+      const model = getModelName(span)
+
+      const matchOperation = filterOperation
+        ? getOperationDisplayName(span) === filterOperation
+        : true
+      const matchProvider = filterProvider
+        ? normalizeProviderName(provider) === filterProvider
+        : true
+      const matchModel = filterModel ? model === filterModel : true
+
+      return matchOperation && matchProvider && matchModel
+    }
+
     if (!filterOperation && !filterProvider && !filterModel) {
       return resourceGroups
     }
@@ -276,7 +287,8 @@ export default function AiSdkProfilerPanel() {
   }, [selectedResource])
 
   const selectedSpan = useMemo(
-    () => filteredSteps.find((span) => span.spanId === selectedSpanId) || null,
+    () =>
+      filteredSteps.find((span) => getSpanId(span) === selectedSpanId) || null,
     [filteredSteps, selectedSpanId]
   )
 
@@ -322,10 +334,10 @@ export default function AiSdkProfilerPanel() {
       return
     }
     const hasSelected = selectedSpanId
-      ? filteredSteps.some((span) => span.spanId === selectedSpanId)
+      ? filteredSteps.some((span) => getSpanId(span) === selectedSpanId)
       : false
     if (!hasSelected) {
-      setSelectedSpanId(filteredSteps[0].spanId)
+      setSelectedSpanId(getSpanId(filteredSteps[0]))
     }
   }, [filteredSteps, selectedSpanId])
 
@@ -340,10 +352,6 @@ export default function AiSdkProfilerPanel() {
       client.send('ai-sdk-enable', {})
       setIsRecording(true)
     }
-  }
-
-  const visibleAttributes = (span: AiSdkSpan) => {
-    return Object.entries(span.attributes)
   }
 
   if (!client) {
@@ -460,20 +468,20 @@ export default function AiSdkProfilerPanel() {
               const operation = getOperationName(span)
               return (
                 <button
-                  key={`${span.traceId}-${span.spanId}`}
+                  key={`${getTraceId(span)}-${getSpanId(span)}`}
                   style={{
                     ...styles.row,
-                    ...(selectedSpanId === span.spanId
+                    ...(selectedSpanId === getSpanId(span)
                       ? styles.rowSelected
                       : {}),
                   }}
-                  onClick={() => setSelectedSpanId(span.spanId)}
+                  onClick={() => setSelectedSpanId(getSpanId(span))}
                 >
                   <div style={styles.rowTitle}>{operation}</div>
                   <div style={styles.rowMeta}>
                     {operation === 'ai.toolCall'
                       ? getToolCallName(span)
-                      : `${normalizeProviderName(getProviderName(span))} · ${getModelName(span)} · ${formatDuration(span.durationMs)}`}
+                      : `${normalizeProviderName(getProviderName(span))} · ${getModelName(span)} · ${formatDuration(hrTimeToMs(span.duration))}`}
                   </div>
                 </button>
               )
@@ -489,8 +497,10 @@ export default function AiSdkProfilerPanel() {
                 <div>
                   <div style={styles.detailsTitle}>{selectedSpan.name}</div>
                   <div style={styles.detailsSubtitle}>
-                    {formatDuration(selectedSpan.durationMs)} ·{' '}
-                    {new Date(selectedSpan.startTime).toLocaleTimeString()}
+                    {formatDuration(hrTimeToMs(selectedSpan.duration))} ·{' '}
+                    {new Date(
+                      hrTimeToMs(selectedSpan.startTime)
+                    ).toLocaleTimeString()}
                   </div>
                 </div>
                 <div style={styles.tag}>

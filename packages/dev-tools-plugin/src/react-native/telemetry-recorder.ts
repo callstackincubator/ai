@@ -1,7 +1,5 @@
-import { HrTime } from '@opentelemetry/api'
 import { ReadableSpan } from '@opentelemetry/sdk-trace-base'
 
-import { AiSdkSpan } from '../shared/types'
 import { DEFAULT_DEVTOOLS_CONFIG } from './config'
 
 type RecorderConfig = {
@@ -9,7 +7,7 @@ type RecorderConfig = {
   maxQueueSize: number
 }
 
-type SendSpan = (span: AiSdkSpan) => void
+type SendSpan = (span: ReadableSpan) => void
 
 const defaultConfig: RecorderConfig = {
   isEnabled: DEFAULT_DEVTOOLS_CONFIG.isEnabled,
@@ -18,7 +16,7 @@ const defaultConfig: RecorderConfig = {
 
 export class AiSdkTelemetryRecorder {
   private config: RecorderConfig = { ...defaultConfig }
-  private queue: AiSdkSpan[] = []
+  private queue: ReadableSpan[] = []
   private sender?: SendSpan
 
   setSender(sender?: SendSpan) {
@@ -44,23 +42,25 @@ export class AiSdkTelemetryRecorder {
     }
 
     if (!isAiSdkSpan(span)) {
-      return
-    }
-
-    const payload = toAiSdkSpan(span)
-    if (!payload) {
+      console.warn(
+        '[ai-sdk-dev-tools] Ignoring non-AI SDK span. This recorder only supports AI SDK spans.',
+        {
+          name: span.name,
+          attributes: span.attributes,
+        }
+      )
       return
     }
 
     if (!this.sender) {
-      this.queue.push(payload)
-      if (this.queue.length > this.config.maxQueueSize) {
+      if (this.queue.length >= this.config.maxQueueSize) {
         this.queue.shift()
       }
+      this.queue.push(span)
       return
     }
 
-    this.sender(payload)
+    this.sender(span)
   }
 
   private flush() {
@@ -83,52 +83,12 @@ export const getAiSdkTelemetryRecorder = () => {
   return recorderInstance
 }
 
-const hrTimeToMs = (time: HrTime) =>
-  Math.round(time[0] * 1000 + time[1] / 1_000_000)
-
-const toAiSdkSpan = (span: ReadableSpan): AiSdkSpan | null => {
-  const spanContext = span.spanContext()
-  if (!spanContext?.spanId || !spanContext?.traceId) {
-    return null
-  }
-
-  const startTime = hrTimeToMs(span.startTime)
-  const endTime = hrTimeToMs(span.endTime)
-
-  const attributes = span.attributes as Record<string, unknown>
-
-  const events = span.events?.map((event) => ({
-    name: event.name,
-    time: hrTimeToMs(event.time),
-    attributes: event.attributes as Record<string, unknown> | undefined,
-  }))
-
-  const payload: AiSdkSpan = {
-    spanId: spanContext.spanId,
-    traceId: spanContext.traceId,
-    parentSpanId: span.parentSpanId || undefined,
-    name: span.name,
-    kind: span.kind,
-    status: span.status ? { ...span.status } : undefined,
-    startTime,
-    endTime,
-    durationMs: Math.max(0, endTime - startTime),
-    attributes,
-    resource: span.resource?.attributes as Record<string, unknown> | undefined,
-    events,
-  }
-
-  return payload
-}
-
 const isAiSdkSpan = (span: ReadableSpan) => {
   if (span.name.startsWith('ai.')) {
     return true
   }
-
-  const attributes = span.attributes as Record<string, unknown>
   return (
-    typeof attributes['ai.operationId'] === 'string' ||
-    Object.keys(attributes).some((key) => key.startsWith('gen_ai.'))
+    typeof span.attributes['ai.operationId'] === 'string' ||
+    Object.keys(span.attributes).some((key) => key.startsWith('gen_ai.'))
   )
 }

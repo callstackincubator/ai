@@ -32,10 +32,6 @@ import {
   useAiSdkDevTools,
 } from '@react-native-ai/dev-tools-plugin';
 
-const tracer = getAiSdkTracer({
-  serviceName: 'my-app',
-});
-
 export function App() {
   useAiSdkDevTools();
   return <RootNavigator />;
