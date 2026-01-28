@@ -7,8 +7,9 @@
   "module": "./dist/react-native.js",
   "types": "./dist/react-native.d.ts",
   "scripts": {
-    "build": "rozenite build",
-    "dev": "rozenite dev"
+    "clean": "del-cli dist",
+    "dev": "rozenite dev",
+    "prepare": "rozenite build"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -18,15 +19,37 @@
     "@rozenite/plugin-bridge": "^1.2.0"
   },
   "devDependencies": {
+    "vite": "^7.3.1",
     "@rozenite/vite-plugin": "^1.2.0",
-    "@types/react": "~18.3.23",
-    "@types/react-dom": "~18.3.1",
-    "react": "*",
-    "react-json-tree": "^0.20.0",
     "rozenite": "^1.2.0",
-    "typescript": "^5.7.3",
-    "vite": "^6.0.0"
+    "react-native-web": "^0.21.2",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.4",
+    "@types/react": "~19.1.10"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
   },
   "author": "Mike Grabowski <grabbou@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": [
+    "react-native",
+    "ai",
+    "sdk",
+    "profiler",
+    "dev-tools"
+  ],
+  "homepage": "https://github.com/callstackincubator/ai#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/callstackincubator/ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/callstackincubator/ai/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  }
 }
