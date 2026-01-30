@@ -11,6 +11,13 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 - 🎯 **Vercel AI SDK compatible** - Drop-in replacement with familiar APIs
 - 🎨 **Complete toolkit** - Text generation, embeddings, transcription, speech synthesis
 
+## AI SDK Compatibility
+
+| React Native AI | AI SDK |
+|-----------------|--------|
+| 0.11 and below  | v5     |
+| 0.12 and above  | v6     |
+
 ## DevTools
 
 ![AI SDK Profiler preview](website/src/public/dev-tools-preview.png)
