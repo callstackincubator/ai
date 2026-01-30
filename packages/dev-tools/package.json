@@ -16,7 +16,8 @@
     "@opentelemetry/core": "^1.30.1",
     "@opentelemetry/resources": "^1.30.1",
     "@opentelemetry/sdk-trace-base": "^1.30.1",
-    "@rozenite/plugin-bridge": "^1.2.0"
+    "@rozenite/plugin-bridge": "^1.2.0",
+    "react-json-tree": "^0.20.0"
   },
   "devDependencies": {
     "@rozenite/vite-plugin": "^1.2.0",
