@@ -15,6 +15,7 @@ export type Message = {
 export type ChatSettings = {
   modelId: string
   temperature: number
+  maxSteps: number
   enabledToolIds: string[]
 }
 
@@ -35,6 +36,7 @@ export type CustomModel = {
 const DEFAULT_SETTINGS: ChatSettings = {
   modelId: languageAdapters[0].modelId,
   temperature: 0.7,
+  maxSteps: 5,
   enabledToolIds: Object.keys(toolDefinitions),
 }
 

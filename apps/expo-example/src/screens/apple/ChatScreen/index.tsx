@@ -235,7 +235,12 @@ export default function ChatScreen() {
     addCustomModel,
   } = useChatStore()
 
-  const { modelId: selectedModelId, temperature, enabledToolIds } = chatSettings
+  const {
+    modelId: selectedModelId,
+    temperature,
+    maxSteps,
+    enabledToolIds,
+  } = chatSettings
 
   const [input, setInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -315,7 +320,7 @@ export default function ChatScreen() {
         ],
         tools: enabledTools,
         temperature,
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(maxSteps),
       })
 
       let accumulated = ''
@@ -666,7 +671,7 @@ export default function ChatScreen() {
               <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Model Settings
               </Text>
-              <View className="mt-3 rounded-2xl bg-slate-100 p-4">
+              <View className="mt-3 gap-3 rounded-2xl bg-slate-100 p-4">
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1">
                     <Text className="text-sm font-semibold text-slate-900">
@@ -685,6 +690,27 @@ export default function ChatScreen() {
                       }
                     }}
                     keyboardType="decimal-pad"
+                    className="w-20 rounded-xl bg-white px-3 py-2 text-center text-base font-semibold text-blue-600"
+                  />
+                </View>
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-slate-900">
+                      Max Steps
+                    </Text>
+                    <Text className="text-xs text-slate-500">
+                      Tool call iterations (1-20)
+                    </Text>
+                  </View>
+                  <TextInput
+                    value={String(maxSteps)}
+                    onChangeText={(text) => {
+                      const num = Number(text)
+                      if (!isNaN(num) && num >= 1 && num <= 20) {
+                        updateChatSettings({ maxSteps: num })
+                      }
+                    }}
+                    keyboardType="number-pad"
                     className="w-20 rounded-xl bg-white px-3 py-2 text-center text-base font-semibold text-blue-600"
                   />
                 </View>
