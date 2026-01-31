@@ -13,8 +13,13 @@ export const createAppleLanguageSetupAdapter = (
   const model = apple.languageModel()
   return {
     model,
-    tools,
-    label: 'Apple Foundation Model',
+    modelId: model.modelId,
+    display: {
+      label: 'Apple Intelligence',
+      accentColor: '#2563EB',
+      icon: 'auto-awesome',
+    },
+    builtIn: true,
     async isAvailable() {
       return apple.isAvailable() ? 'yes' : 'no'
     },
@@ -32,7 +37,13 @@ export const createAppleSpeechSetupAdapter =
     const model = apple.speechModel()
     return {
       model,
-      label: 'Apple Speech Model',
+      modelId: model.modelId,
+      display: {
+        label: 'Apple Speech',
+        accentColor: '#2563EB',
+        icon: 'auto-awesome',
+      },
+      builtIn: true,
       async isAvailable() {
         return apple.isAvailable() ? 'yes' : 'no'
       },

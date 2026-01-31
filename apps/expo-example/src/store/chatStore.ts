@@ -1,5 +1,7 @@
-import { atom, useAtom, useSetAtom } from 'jotai'
-import { useCallback } from 'react'
+import { atom, useAtom } from 'jotai'
+
+import { languageAdapters } from '../config/providers'
+import { toolDefinitions } from '../tools'
 
 export type MessageRole = 'user' | 'assistant'
 
@@ -10,11 +12,18 @@ export type Message = {
   createdAt: Date
 }
 
+export type ChatSettings = {
+  modelId: string
+  temperature: number
+  enabledToolIds: string[]
+}
+
 export type Chat = {
   id: string
   title: string
   messages: Message[]
   createdAt: Date
+  settings: ChatSettings
 }
 
 export type CustomModel = {
@@ -23,153 +32,194 @@ export type CustomModel = {
   url: string
 }
 
+const DEFAULT_SETTINGS: ChatSettings = {
+  modelId: languageAdapters[0].modelId,
+  temperature: 0.7,
+  enabledToolIds: Object.keys(toolDefinitions),
+}
+
 const chatsAtom = atom<Chat[]>([])
 const currentChatIdAtom = atom<string | null>(null)
-const selectedModelIdAtom = atom<string>('builtin-0')
 const customModelsAtom = atom<CustomModel[]>([])
+const downloadProgressAtom = atom<Record<string, number>>({})
+const pendingSettingsAtom = atom<ChatSettings>({ ...DEFAULT_SETTINGS })
 
 const createId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`
 
+const truncateTitle = (content: string) =>
+  content.length > 30 ? `${content.slice(0, 30)}...` : content
+
 export function useChatStore() {
   const [chats, setChats] = useAtom(chatsAtom)
   const [currentChatId, setCurrentChatId] = useAtom(currentChatIdAtom)
-  const [selectedModelId, setSelectedModelId] = useAtom(selectedModelIdAtom)
   const [customModels, setCustomModels] = useAtom(customModelsAtom)
+  const [pendingSettings, setPendingSettings] = useAtom(pendingSettingsAtom)
 
-  const createNewChat = useCallback(() => {
-    const newChat: Chat = {
-      id: createId(),
-      title: 'New Chat',
-      messages: [],
-      createdAt: new Date(),
-    }
-    setChats((prev) => [newChat, ...prev])
-    setCurrentChatId(newChat.id)
-    return newChat.id
-  }, [setChats, setCurrentChatId])
+  const currentChat = chats.find((chat) => chat.id === currentChatId)
 
-  const selectChat = useCallback(
-    (id: string) => {
-      setCurrentChatId(id)
-    },
-    [setCurrentChatId]
-  )
+  const resetPendingSettings = () => {
+    setPendingSettings({ ...DEFAULT_SETTINGS })
+  }
 
-  const deleteChat = useCallback(
-    (id: string) => {
-      setChats((prev) => {
-        const next = prev.filter((chat) => chat.id !== id)
-        if (currentChatId === id) {
-          setCurrentChatId(next[0]?.id ?? null)
-        }
-        return next
-      })
-    },
-    [currentChatId, setChats, setCurrentChatId]
-  )
-
-  const addMessage = useCallback(
-    (message: Omit<Message, 'id' | 'createdAt'>) => {
-      const chatId = currentChatId ?? createId()
-      const newMessage: Message = {
-        ...message,
-        id: createId(),
+  const createNewChat = () => {
+    const id = createId()
+    setChats((prev) => [
+      {
+        id,
+        title: 'New Chat',
+        messages: [],
         createdAt: new Date(),
-      }
+        settings: { ...pendingSettings },
+      },
+      ...prev,
+    ])
+    setCurrentChatId(id)
+    resetPendingSettings()
+    return id
+  }
 
-      setChats((prev) => {
-        if (!currentChatId) {
-          const newChat: Chat = {
-            id: chatId,
-            title:
-              message.role === 'user'
-                ? `${message.content.slice(0, 30)}${
-                    message.content.length > 30 ? '...' : ''
-                  }`
-                : 'New Chat',
-            messages: [newMessage],
-            createdAt: new Date(),
-          }
-          return [newChat, ...prev]
-        }
+  const deleteChat = (id: string) => {
+    setChats((prev) => {
+      const next = prev.filter((chat) => chat.id !== id)
+      if (currentChatId === id) setCurrentChatId(next[0]?.id ?? null)
+      return next
+    })
+  }
 
-        return prev.map((chat) =>
-          chat.id === chatId
-            ? {
-                ...chat,
-                messages: [...chat.messages, newMessage],
-                title:
-                  chat.messages.length === 0 && message.role === 'user'
-                    ? `${message.content.slice(0, 30)}${
-                        message.content.length > 30 ? '...' : ''
-                      }`
-                    : chat.title,
-              }
-            : chat
-        )
-      })
+  const addMessages = (messages: Omit<Message, 'id' | 'createdAt'>[]) => {
+    const chatId = currentChatId ?? createId()
+    const newMessages = messages.map((message) => ({
+      ...message,
+      id: createId(),
+      createdAt: new Date(),
+    }))
 
-      if (!currentChatId) {
-        setCurrentChatId(chatId)
-      }
-
-      return { chatId, messageId: newMessage.id }
-    },
-    [currentChatId, setChats, setCurrentChatId]
-  )
-
-  const updateMessageContent = useCallback(
-    (chatId: string, messageId: string, content: string) => {
+    const isNewChat = !currentChatId
+    if (isNewChat) {
+      const firstUserMessage = messages.find((m) => m.role === 'user')
+      setChats((prev) => [
+        {
+          id: chatId,
+          title: firstUserMessage
+            ? truncateTitle(firstUserMessage.content)
+            : 'New Chat',
+          messages: newMessages,
+          createdAt: new Date(),
+          settings: { ...pendingSettings },
+        },
+        ...prev,
+      ])
+      setCurrentChatId(chatId)
+      resetPendingSettings()
+    } else {
       setChats((prev) =>
         prev.map((chat) =>
           chat.id === chatId
             ? {
                 ...chat,
-                messages: chat.messages.map((msg) =>
-                  msg.id === messageId ? { ...msg, content } : msg
-                ),
+                messages: [...chat.messages, ...newMessages],
               }
             : chat
         )
       )
-    },
-    [setChats]
-  )
+    }
 
-  const addCustomModel = useCallback(
-    (url: string) => {
-      const trimmedUrl = url.trim()
-      if (!trimmedUrl) return null
-      const name = trimmedUrl.split('/').pop() || 'Custom Model'
-      const model: CustomModel = {
-        id: `custom-${createId()}`,
-        name,
+    return { chatId, messageIds: newMessages.map((m) => m.id) }
+  }
+
+  const updateMessageContent = (
+    chatId: string,
+    messageId: string,
+    content: string
+  ) => {
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId
+          ? {
+              ...chat,
+              messages: chat.messages.map((msg) =>
+                msg.id === messageId ? { ...msg, content } : msg
+              ),
+            }
+          : chat
+      )
+    )
+  }
+
+  const addCustomModel = (url: string) => {
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl) return null
+    const id = `custom-${createId()}`
+    setCustomModels((prev) => [
+      ...prev,
+      {
+        id,
+        name: trimmedUrl.split('/').pop() || 'Custom Model',
         url: trimmedUrl,
-      }
-      setCustomModels((prev) => [...prev, model])
-      return model.id
-    },
-    [setCustomModels]
-  )
+      },
+    ])
+    return id
+  }
+
+  const updateChatSettings = (updates: Partial<ChatSettings>) => {
+    if (!currentChatId) {
+      setPendingSettings((prev) => ({ ...prev, ...updates }))
+      return
+    }
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === currentChatId
+          ? { ...chat, settings: { ...chat.settings, ...updates } }
+          : chat
+      )
+    )
+  }
+
+  const chatSettings = currentChat?.settings ?? pendingSettings
+
+  const toggleTool = (toolId: string) => {
+    const tools = chatSettings.enabledToolIds
+    updateChatSettings({
+      enabledToolIds: tools.includes(toolId)
+        ? tools.filter((id) => id !== toolId)
+        : [...tools, toolId],
+    })
+  }
 
   return {
     chats,
     currentChatId,
-    selectedModelId,
+    currentChat,
+    chatSettings,
     customModels,
-    setSelectedModelId,
     createNewChat,
-    selectChat,
+    selectChat: setCurrentChatId,
     deleteChat,
-    addMessage,
+    addMessages,
     updateMessageContent,
     addCustomModel,
+    updateChatSettings,
+    toggleTool,
   }
 }
 
-export function useChatModelSelection() {
-  const [selectedModelId] = useAtom(selectedModelIdAtom)
-  const setSelectedModelId = useSetAtom(selectedModelIdAtom)
-  return { selectedModelId, setSelectedModelId }
+export function useDownloadStore() {
+  const [downloadProgress, setDownloadProgress] = useAtom(downloadProgressAtom)
+
+  return {
+    downloadProgress,
+    startDownload: (modelId: string) =>
+      setDownloadProgress((prev) => ({ ...prev, [modelId]: 0 })),
+    updateProgress: (modelId: string, progress: number) =>
+      setDownloadProgress((prev) => ({ ...prev, [modelId]: progress })),
+    completeDownload: (modelId: string) =>
+      setDownloadProgress((prev) => {
+        const next = { ...prev }
+        delete next[modelId]
+        return next
+      }),
+    isDownloading: (modelId: string) => downloadProgress[modelId] !== undefined,
+    getProgress: (modelId: string) => downloadProgress[modelId],
+  }
 }

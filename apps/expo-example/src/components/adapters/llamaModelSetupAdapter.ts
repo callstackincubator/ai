@@ -11,31 +11,39 @@ import {
 import type { Availability, SetupAdapter } from '../../config/providers'
 
 export const createLlamaLanguageSetupAdapter = (
-  modelId: string,
+  hfModelId: string,
   tools: ToolSet = {}
 ): SetupAdapter<LanguageModelV3> => {
-  const modelPath = getModelPath(modelId)
+  const modelPath = getModelPath(hfModelId)
   const model = llama.languageModel(modelPath, {
     contextParams: {
       n_ctx: 2048,
       n_gpu_layers: 99,
     },
   })
+  // Extract friendly name from HuggingFace model ID (e.g., "ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf" -> "SmolLM3-Q4_K_M")
+  const filename = hfModelId.split('/').pop() ?? hfModelId
+  const friendlyName = filename.replace(/\.gguf$/, '')
   return {
     model,
-    tools,
-    label: `Llama (${modelId})`,
+    modelId: model.modelId,
+    display: {
+      label: friendlyName,
+      accentColor: '#F97316',
+      icon: 'memory',
+    },
+    builtIn: false,
     async isAvailable(): Promise<Availability> {
-      const downloaded = await isModelDownloaded(modelId)
+      const downloaded = await isModelDownloaded(hfModelId)
       return downloaded ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
-      await downloadModel(modelId, (progress) => {
+      await downloadModel(hfModelId, (progress) => {
         onProgress(progress.percentage)
       })
     },
     async delete() {
-      await removeModel(modelId)
+      await removeModel(hfModelId)
     },
     async unload() {
       await model.unload()
