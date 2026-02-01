@@ -4,7 +4,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { DrawerActions, useNavigation } from '@react-navigation/native'
 import { stepCountIs, streamText } from 'ai'
 import { SymbolView } from 'expo-symbols'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -127,7 +127,7 @@ function ModelItem({
     }
   }
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = async () => {
     if (isModelDownloading) return
     try {
       await adapter.delete()
@@ -136,16 +136,13 @@ function ModelItem({
     } catch (error) {
       console.error('Delete failed', error)
     }
-  }, [adapter, isModelDownloading])
+  }
 
-  const renderRightActions = useCallback(
-    (
-      prog: SharedValue<number>,
-      drag: SharedValue<number>,
-      swipeableMethods: SwipeableMethods
-    ) => DeleteAction(prog, drag, swipeableMethods, handleDelete),
-    [handleDelete]
-  )
+  const renderRightActions = (
+    prog: SharedValue<number>,
+    drag: SharedValue<number>,
+    swipeableMethods: SwipeableMethods
+  ) => DeleteAction(prog, drag, swipeableMethods, handleDelete)
 
   const content = (
     <Pressable
@@ -278,9 +275,9 @@ export default function ChatScreen() {
   // Animated keyboard height for smooth animations
   const keyboardHeight = useSharedValue(insets.bottom)
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = () => {
     scrollRef.current?.scrollToEnd({ animated: true })
-  }, [])
+  }
 
   useKeyboardHandler(
     {
@@ -300,20 +297,17 @@ export default function ChatScreen() {
     paddingBottom: keyboardHeight.value,
   }))
 
-  const adaptersByProvider = useMemo(() => {
-    const customAdapters = customModels.map((model) =>
-      createLlamaLanguageSetupAdapter(model.url, toolDefinitions)
-    )
-    const all = [...languageAdapters, ...customAdapters]
-    const grouped = new Map<string, SetupAdapter<LanguageModelV3>[]>()
-    for (const adapter of all) {
-      const key = adapter.model.provider
-      const group = grouped.get(key) ?? []
-      group.push(adapter)
-      grouped.set(key, group)
-    }
-    return grouped
-  }, [customModels])
+  const customAdapters = customModels.map((model) =>
+    createLlamaLanguageSetupAdapter(model.url, toolDefinitions)
+  )
+  const allAdaptersArray = [...languageAdapters, ...customAdapters]
+  const adaptersByProvider = new Map<string, SetupAdapter<LanguageModelV3>[]>()
+  for (const adapter of allAdaptersArray) {
+    const key = adapter.model.provider
+    const group = adaptersByProvider.get(key) ?? []
+    group.push(adapter)
+    adaptersByProvider.set(key, group)
+  }
 
   const allAdapters = [...adaptersByProvider.values()].flat()
 
@@ -329,14 +323,10 @@ export default function ChatScreen() {
   }, [currentChat?.messages.length])
 
   // Filter tool definitions to only enabled ones
-  const enabledTools = useMemo(
-    () =>
-      Object.fromEntries(
-        enabledToolIds
-          .filter((id) => toolDefinitions[id])
-          .map((id) => [id, toolDefinitions[id]])
-      ),
-    [enabledToolIds]
+  const enabledTools = Object.fromEntries(
+    enabledToolIds
+      .filter((id) => toolDefinitions[id])
+      .map((id) => [id, toolDefinitions[id]])
   )
 
   // Cleanup streaming on unmount

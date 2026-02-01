@@ -32,17 +32,15 @@ function formatChatDate(dateStr: string) {
 function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
   const { chats, currentChatId, selectChat, deleteChat } = useChatStore()
 
-  const groupedChats = React.useMemo(() => {
-    return chats.reduce(
-      (groups, chat) => {
-        const key = formatChatDate(chat.createdAt)
-        if (!groups[key]) groups[key] = []
-        groups[key].push(chat)
-        return groups
-      },
-      {} as Record<string, typeof chats>
-    )
-  }, [chats])
+  const groupedChats = chats.reduce(
+    (groups, chat) => {
+      const key = formatChatDate(chat.createdAt)
+      if (!groups[key]) groups[key] = []
+      groups[key].push(chat)
+      return groups
+    },
+    {} as Record<string, typeof chats>
+  )
 
   return (
     <DrawerContentScrollView style={styles.drawerScroll}>
