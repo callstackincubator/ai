@@ -1,14 +1,15 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
+import { Button, ContextMenu, Host, Slider } from '@expo/ui/swift-ui'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
-import MaterialIcons from '@react-native-vector-icons/material-icons'
 import { DrawerActions, useNavigation } from '@react-navigation/native'
 import { stepCountIs, streamText } from 'ai'
+import { SymbolView } from 'expo-symbols'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -16,17 +17,23 @@ import {
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable'
+import { useKeyboardHandler } from 'react-native-keyboard-controller'
 import Reanimated, {
   type SharedValue,
   useAnimatedStyle,
+  useSharedValue,
 } from 'react-native-reanimated'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { createLlamaLanguageSetupAdapter } from '../../../components/adapters/llamaModelSetupAdapter'
+import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
 import { ModelLifecycleManager } from '../../../components/ModelLifecycleManager'
+import { RecordButton } from '../../../components/RecordButton'
 import type { Availability, SetupAdapter } from '../../../config/providers'
 import { languageAdapters } from '../../../config/providers'
 import { useChatStore, useDownloadStore } from '../../../store/chatStore'
+import { colors } from '../../../theme/colors'
 import { toolDefinitions } from '../../../tools'
 
 // Delete action for swipeable model items
@@ -46,15 +53,14 @@ function DeleteAction(
   }
 
   return (
-    <Reanimated.View
-      style={animatedStyle}
-      className="h-full w-[72px] items-center justify-center"
-    >
-      <Pressable
-        onPress={handleDelete}
-        className="h-10 w-10 items-center justify-center rounded-full bg-red-500"
-      >
-        <MaterialIcons name="delete" size={18} color="#fff" />
+    <Reanimated.View style={[animatedStyle, styles.deleteActionContainer]}>
+      <Pressable onPress={handleDelete} style={styles.deleteButton}>
+        <SymbolView
+          name="trash"
+          size={18}
+          tintColor="#fff"
+          resizeMode="scaleAspectFit"
+        />
       </Pressable>
     </Reanimated.View>
   )
@@ -64,10 +70,14 @@ function ModelItem({
   adapter,
   isSelected,
   onSelect,
+  isFirst,
+  isLast,
 }: {
   adapter: SetupAdapter<LanguageModelV3>
   isSelected: boolean
   onSelect: (id: string) => void
+  isFirst: boolean
+  isLast: boolean
 }) {
   const {
     startDownload,
@@ -82,7 +92,8 @@ function ModelItem({
   const isModelDownloading = isDownloading(adapter.modelId)
   const downloadProgress = getProgress(adapter.modelId) ?? 0
   const isAvailable = availability === 'yes'
-  const { accentColor, icon } = adapter.display
+  const isUnavailable = availability === 'no'
+  const { accentColor } = adapter.display
 
   useEffect(() => {
     let mounted = true
@@ -139,67 +150,78 @@ function ModelItem({
   const content = (
     <Pressable
       onPress={handlePress}
-      className={`w-full flex-row items-center gap-3 rounded-2xl p-3 ${
-        isSelected ? 'bg-blue-50' : 'bg-white'
-      }`}
+      disabled={isUnavailable}
+      style={[
+        styles.modelItemContent,
+        isFirst && styles.modelItemFirst,
+        isLast && styles.modelItemLast,
+      ]}
     >
       <View
-        className="h-10 w-10 items-center justify-center rounded-2xl"
-        style={{ backgroundColor: accentColor }}
+        style={[
+          styles.modelIcon,
+          {
+            backgroundColor: isUnavailable ? colors.tertiaryLabel : accentColor,
+          },
+        ]}
       >
-        <MaterialIcons
-          name={icon as React.ComponentProps<typeof MaterialIcons>['name']}
+        <SymbolView
+          name="cpu"
           size={20}
-          color="#fff"
+          tintColor="#fff"
+          resizeMode="scaleAspectFit"
         />
       </View>
-      <View className="flex-1">
-        <View className="flex-row items-center gap-2">
-          <Text className="text-base font-semibold text-slate-900">
+      <View
+        style={[styles.modelItemInfo, !isLast && styles.modelItemInfoBorder]}
+      >
+        <View style={styles.modelItemTextContainer}>
+          <Text
+            style={[
+              styles.modelItemLabel,
+              isUnavailable && styles.modelItemLabelUnavailable,
+            ]}
+          >
             {adapter.display.label}
           </Text>
-          <View
-            className="rounded-full px-2 py-0.5"
-            style={{ backgroundColor: `${accentColor}20` }}
-          >
-            <Text
-              className="text-[10px] font-semibold"
-              style={{ color: accentColor }}
-            >
-              {adapter.model.provider}
-            </Text>
-          </View>
-        </View>
-        {isModelDownloading ? (
-          <View className="mt-2">
-            <View className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <View
-                className="h-full rounded-full bg-blue-500"
-                style={{ width: `${downloadProgress}%` }}
-              />
+          {isModelDownloading ? (
+            <View style={styles.downloadProgressContainer}>
+              <View style={styles.downloadProgressTrack}>
+                <View
+                  style={[
+                    styles.downloadProgressFill,
+                    { width: `${downloadProgress}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.downloadProgressText}>
+                Downloading... {downloadProgress}%
+              </Text>
             </View>
-            <Text className="mt-1 text-xs text-slate-500">
-              Downloading... {downloadProgress}%
+          ) : null}
+          {isAvailable && !isModelDownloading ? (
+            <Text style={styles.modelStatusText}>Downloaded</Text>
+          ) : null}
+          {!isAvailable && !isModelDownloading ? (
+            <Text style={styles.modelStatusText}>
+              {availability === 'no'
+                ? 'Not available on this device'
+                : 'Tap to download'}
             </Text>
-          </View>
-        ) : null}
-        {isAvailable && !isModelDownloading ? (
-          <Text className="mt-1 text-xs text-slate-500">Downloaded</Text>
-        ) : null}
-        {!isAvailable && !isModelDownloading ? (
-          <Text className="mt-1 text-xs text-slate-500">
-            {availability === 'no'
-              ? 'Not available on this device'
-              : 'Tap to download'}
-          </Text>
-        ) : null}
-      </View>
-      <View className="items-center justify-center">
-        {isModelDownloading ? (
-          <ActivityIndicator size="small" color="#2563EB" />
-        ) : isSelected ? (
-          <MaterialIcons name="check" size={20} color="#2563EB" />
-        ) : null}
+          ) : null}
+        </View>
+        <View style={styles.modelItemTrailing}>
+          {isModelDownloading ? (
+            <ActivityIndicator size="small" color={colors.systemBlue as any} />
+          ) : isSelected ? (
+            <SymbolView
+              name="checkmark"
+              size={20}
+              tintColor={colors.systemBlue}
+              resizeMode="scaleAspectFit"
+            />
+          ) : null}
+        </View>
       </View>
     </Pressable>
   )
@@ -244,8 +266,6 @@ export default function ChatScreen() {
 
   const [input, setInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
-  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false)
   const [customUrl, setCustomUrl] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
 
@@ -253,6 +273,31 @@ export default function ChatScreen() {
   const settingsSheetRef = useRef<TrueSheet>(null)
 
   const { getProgress } = useDownloadStore()
+
+  // Animated keyboard height for smooth animations
+  const keyboardHeight = useSharedValue(insets.bottom)
+
+  const scrollToBottom = useCallback(() => {
+    scrollRef.current?.scrollToEnd({ animated: true })
+  }, [])
+
+  useKeyboardHandler(
+    {
+      onMove: (event) => {
+        'worklet'
+        keyboardHeight.value = Math.max(event.height, insets.bottom)
+      },
+      onEnd: () => {
+        'worklet'
+        scheduleOnRN(scrollToBottom)
+      },
+    },
+    [insets.bottom, scrollToBottom]
+  )
+
+  const inputBarBottomPadding = useAnimatedStyle(() => ({
+    paddingBottom: keyboardHeight.value,
+  }))
 
   const adaptersByProvider = useMemo(() => {
     const customAdapters = customModels.map((model) =>
@@ -271,10 +316,9 @@ export default function ChatScreen() {
 
   const allAdapters = [...adaptersByProvider.values()].flat()
 
-  // todo: what if this is null (typically corrupted data)
   const selectedAdapter = allAdapters.find(
     (adapter) => adapter.modelId === selectedModelId
-  )!
+  )
 
   const selectedModelDownloadProgress = getProgress(selectedModelId)
 
@@ -296,7 +340,7 @@ export default function ChatScreen() {
 
   // Send message and stream AI response
   const handleSend = async () => {
-    if (!input.trim() || isGenerating) return
+    if (!input.trim() || isGenerating || !selectedAdapter) return
     const userInput = input.trim()
     setInput('')
 
@@ -310,7 +354,7 @@ export default function ChatScreen() {
 
     try {
       const result = streamText({
-        model: selectedAdapter.model,
+        model: selectedAdapter!.model,
         messages: [
           ...baseMessages.map((message) => ({
             role: message.role,
@@ -354,271 +398,326 @@ export default function ChatScreen() {
     }
   }
 
-  const inputPaddingBottom = Math.max(8, insets.bottom + 8)
+  // Track model availability (e.g. Apple Intelligence not enabled)
+  const [availability, setAvailability] = useState<Availability | null>(null)
+  useEffect(() => {
+    if (!selectedAdapter) {
+      setAvailability('no')
+      return
+    }
+    let mounted = true
+    selectedAdapter.isAvailable().then((result) => {
+      if (mounted) setAvailability(result)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [selectedAdapter])
+
+  const isModelUnavailable = !selectedAdapter || availability === 'no'
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-      <ModelLifecycleManager adapter={selectedAdapter} />
-      <KeyboardAvoidingView behavior="padding" className="flex-1">
-        <View className="flex-1 bg-white">
-          <View className="flex-row items-center justify-between border-b border-slate-200 bg-white/80 px-4 py-3">
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {selectedAdapter && !isModelUnavailable && (
+        <ModelLifecycleManager adapter={selectedAdapter} />
+      )}
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <AdaptiveGlass isInteractive style={styles.headerButton}>
             <Pressable
               onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-              className="h-9 w-9 items-center justify-center rounded-full bg-slate-100"
+              style={styles.headerButtonPressable}
             >
-              <MaterialIcons name="menu" size={20} color="#475569" />
+              <SymbolView
+                name="line.3.horizontal"
+                size={20}
+                tintColor={colors.label}
+                resizeMode="scaleAspectFit"
+              />
             </Pressable>
+          </AdaptiveGlass>
+
+          <Pressable
+            onPress={() => modelSheetRef.current?.present()}
+            style={styles.headerTitleContainer}
+          >
+            <Text style={styles.headerTitle}>
+              {currentChat?.title ?? 'New Chat'}
+            </Text>
+            <View style={styles.headerSubtitleRow}>
+              <Text style={styles.headerSubtitle}>
+                {selectedModelDownloadProgress !== undefined
+                  ? `Downloading... ${selectedModelDownloadProgress}%`
+                  : (selectedAdapter?.display.label ?? 'No model')}
+              </Text>
+              <SymbolView
+                name="chevron.down"
+                size={12}
+                tintColor={colors.secondaryLabel}
+                resizeMode="scaleAspectFit"
+              />
+            </View>
+          </Pressable>
+
+          <AdaptiveGlass isInteractive style={styles.headerButton}>
+            <Pressable
+              onPress={() => settingsSheetRef.current?.present()}
+              style={styles.headerButtonPressable}
+            >
+              <SymbolView
+                name="slider.horizontal.3"
+                size={20}
+                tintColor={colors.label}
+                resizeMode="scaleAspectFit"
+              />
+            </Pressable>
+          </AdaptiveGlass>
+        </View>
+
+        {/* Model Unavailable State */}
+        {isModelUnavailable ? (
+          <View style={styles.unavailableContainer}>
+            <AdaptiveGlass style={styles.emptyStateIcon}>
+              <View style={styles.emptyStateIconInner}>
+                <SymbolView
+                  name="exclamationmark.triangle"
+                  size={32}
+                  tintColor={colors.systemYellow}
+                  resizeMode="scaleAspectFit"
+                />
+              </View>
+            </AdaptiveGlass>
+            <Text style={styles.emptyStateTitle}>Model Not Available</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              {selectedAdapter?.display.label ?? 'The selected model'} is not
+              available on this device. Please choose a different model.
+            </Text>
             <Pressable
               onPress={() => modelSheetRef.current?.present()}
-              className="items-center"
+              style={styles.chooseModelButton}
             >
-              <Text className="text-base font-semibold text-slate-900">
-                {currentChat?.title ?? 'New Chat'}
-              </Text>
-              <View className="flex-row items-center">
-                <Text className="text-xs text-slate-500">
-                  {selectedModelDownloadProgress !== undefined
-                    ? `Downloading... ${selectedModelDownloadProgress}%`
-                    : selectedAdapter.display.label}
-                </Text>
-                <MaterialIcons
-                  name="arrow-drop-down"
-                  size={16}
-                  color="#64748B"
-                />
-              </View>
+              <Text style={styles.chooseModelText}>Choose Model</Text>
             </Pressable>
-            <View className="flex-row items-center gap-2">
-              <Pressable
-                onPress={() => settingsSheetRef.current?.present()}
-                className="h-9 w-9 items-center justify-center rounded-full bg-slate-100"
-              >
-                <MaterialIcons name="tune" size={20} color="#475569" />
-              </Pressable>
-            </View>
           </View>
-
-          <ScrollView
-            ref={scrollRef}
-            className="flex-1 px-4 py-4"
-            contentContainerStyle={{
-              flexGrow: 1,
-              paddingBottom: 32,
-            }}
-          >
-            {(currentChat?.messages.length ?? 0) === 0 ? (
-              <View className="flex-1 items-center justify-center py-16">
-                <View className="h-20 w-20 items-center justify-center rounded-full bg-blue-100">
-                  <MaterialIcons
-                    name="auto-awesome"
-                    size={32}
-                    color="#2563EB"
-                  />
-                </View>
-                <Text className="mt-6 text-xl font-semibold text-slate-900">
-                  What can I help you with?
-                </Text>
-                <Text className="mt-2 max-w-[280px] text-center text-sm text-slate-500">
-                  {`Start a conversation with ${
-                    selectedAdapter.display.label
-                  }. Ask questions, get creative, or explore ideas.`}
-                </Text>
-              </View>
-            ) : (
-              currentChat?.messages.map((message) => {
-                const isUser = message.role === 'user'
-                return (
-                  <View
-                    key={message.id}
-                    className={`mb-3 flex-row ${
-                      isUser ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    {!isUser ? (
-                      <View className="mr-2 h-8 w-8 items-center justify-center rounded-full bg-blue-600">
-                        <MaterialIcons
-                          name="auto-awesome"
-                          size={16}
-                          color="#fff"
-                        />
-                      </View>
-                    ) : null}
-                    <View
-                      className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                        isUser ? 'bg-blue-600' : 'bg-slate-100'
-                      }`}
-                    >
-                      <Text
-                        className={`text-[15px] leading-relaxed ${
-                          isUser ? 'text-white' : 'text-slate-900'
-                        }`}
-                      >
-                        {message.content}
-                      </Text>
+        ) : (
+          <>
+            {/* Messages */}
+            <ScrollView
+              ref={scrollRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+            >
+              {(currentChat?.messages.length ?? 0) === 0 ? (
+                <View style={styles.emptyState}>
+                  <AdaptiveGlass style={styles.emptyStateIcon}>
+                    <View style={styles.emptyStateIconInner}>
+                      <SymbolView
+                        name="sparkles"
+                        size={32}
+                        tintColor={colors.systemBlue}
+                        resizeMode="scaleAspectFit"
+                      />
                     </View>
+                  </AdaptiveGlass>
+                  <Text style={styles.emptyStateTitle}>
+                    What can I help you with?
+                  </Text>
+                  <Text style={styles.emptyStateSubtitle}>
+                    {`Start a conversation with ${selectedAdapter.display.label}. Ask questions, get creative, or explore ideas.`}
+                  </Text>
+                </View>
+              ) : (
+                currentChat?.messages.map((message) => {
+                  const isUser = message.role === 'user'
+                  return (
+                    <View
+                      key={message.id}
+                      style={[
+                        styles.messageRow,
+                        isUser
+                          ? styles.messageRowUser
+                          : styles.messageRowAssistant,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.messageBubble,
+                          isUser
+                            ? styles.messageBubbleUser
+                            : styles.messageBubbleAssistant,
+                        ]}
+                      >
+                        <Text
+                          selectable
+                          style={[
+                            styles.messageText,
+                            isUser
+                              ? styles.messageTextUser
+                              : styles.messageTextAssistant,
+                          ]}
+                        >
+                          {message.content}
+                        </Text>
+                      </View>
+                    </View>
+                  )
+                })
+              )}
+            </ScrollView>
+
+            {/* Input Bar */}
+            <AdaptiveGlass style={styles.inputBar}>
+              <Reanimated.View
+                style={[styles.inputBarInner, inputBarBottomPadding]}
+              >
+                <View style={styles.inputRow}>
+                  <AdaptiveGlass isInteractive style={styles.plusButton}>
+                    <Host matchContents>
+                      <ContextMenu activationMethod="singlePress">
+                        <ContextMenu.Items>
+                          <Button
+                            systemImage="camera"
+                            onPress={() => console.log('Take Photo')}
+                          >
+                            Take Photo
+                          </Button>
+                          <Button
+                            systemImage="photo.on.rectangle"
+                            onPress={() => console.log('Photo Library')}
+                          >
+                            Photo Library
+                          </Button>
+                        </ContextMenu.Items>
+                        <ContextMenu.Trigger>
+                          <Button
+                            systemImage="plus"
+                            variant="borderless"
+                            color="#000"
+                          />
+                        </ContextMenu.Trigger>
+                      </ContextMenu>
+                    </Host>
+                  </AdaptiveGlass>
+
+                  <View style={styles.textInputContainer}>
+                    <TextInput
+                      value={input}
+                      onChangeText={setInput}
+                      placeholder="Message"
+                      placeholderTextColor={colors.placeholderText as any}
+                      multiline
+                      blurOnSubmit={false}
+                      style={styles.textInput}
+                      editable={!isGenerating}
+                    />
                   </View>
-                )
-              })
-            )}
-          </ScrollView>
 
-          <View
-            className="border-t border-slate-200 bg-white/90 px-4 pb-6 pt-3"
-            style={{ paddingBottom: inputPaddingBottom }}
-          >
-            {isRecording ? (
-              <View className="mb-3 flex-row items-center justify-center gap-2 rounded-full bg-red-50 px-4 py-2">
-                <View className="h-2 w-2 rounded-full bg-red-500" />
-                <Text className="text-sm font-semibold text-red-500">
-                  Recording...
-                </Text>
-                <Pressable onPress={() => setIsRecording(false)}>
-                  <MaterialIcons name="close" size={16} color="#EF4444" />
-                </Pressable>
-              </View>
-            ) : null}
+                  {input.trim() ? (
+                    <Pressable
+                      onPress={handleSend}
+                      disabled={isGenerating}
+                      style={styles.sendButton}
+                    >
+                      <SymbolView
+                        name="arrow.up"
+                        size={20}
+                        tintColor="#fff"
+                        resizeMode="scaleAspectFit"
+                      />
+                    </Pressable>
+                  ) : (
+                    <RecordButton
+                      onTranscriptionComplete={(text) =>
+                        setInput((prev) => (prev ? `${prev} ${text}` : text))
+                      }
+                      disabled={isGenerating}
+                    />
+                  )}
+                </View>
+              </Reanimated.View>
+            </AdaptiveGlass>
+          </>
+        )}
+      </View>
 
-            {attachmentMenuOpen ? (
-              <View className="mb-3 flex-row gap-3">
-                <Pressable className="flex-1 flex-row items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3">
-                  <MaterialIcons
-                    name="photo-camera"
-                    size={20}
-                    color="#2563EB"
-                  />
-                  <Text className="text-sm font-semibold text-slate-700">
-                    Take Photo
-                  </Text>
-                </Pressable>
-                <Pressable className="flex-1 flex-row items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3">
-                  <MaterialIcons
-                    name="photo-library"
-                    size={20}
-                    color="#2563EB"
-                  />
-                  <Text className="text-sm font-semibold text-slate-700">
-                    Photo Library
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            <View className="flex-row items-center gap-2">
-              <Pressable
-                onPress={() => setAttachmentMenuOpen((prev) => !prev)}
-                className="h-10 w-10 items-center justify-center rounded-full bg-slate-100"
-              >
-                <MaterialIcons name="add" size={22} color="#64748B" />
-              </Pressable>
-              <View className="flex-1 rounded-3xl bg-slate-100 px-4 py-1.5">
-                <TextInput
-                  value={input}
-                  onChangeText={setInput}
-                  onSubmitEditing={handleSend}
-                  placeholder="Message"
-                  placeholderTextColor="#94A3B8"
-                  returnKeyType="send"
-                  multiline={false}
-                  blurOnSubmit={false}
-                  className="text-[15px] text-slate-900"
-                  style={{ minHeight: 34 }}
-                  editable={!isGenerating}
-                />
-              </View>
-              <Pressable
-                onPress={input.trim() ? handleSend : () => setIsRecording(true)}
-                className={`h-10 w-10 items-center justify-center rounded-full ${
-                  input.trim() ? 'bg-blue-600' : 'bg-slate-100'
-                }`}
-                disabled={isGenerating}
-              >
-                <MaterialIcons
-                  name={
-                    input.trim() ? 'north' : isRecording ? 'mic-off' : 'mic'
-                  }
-                  size={20}
-                  color={input.trim() ? '#fff' : '#64748B'}
-                />
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-
+      {/* Model Picker Sheet */}
       <TrueSheet ref={modelSheetRef} scrollable>
-        <View className="rounded-t-3xl px-4 pb-8 pt-3">
-          <View className="mx-auto h-1.5 w-12 rounded-full bg-slate-200" />
+        <View style={styles.sheetContainer}>
           <ScrollView nestedScrollEnabled>
-            <View className="py-4">
-              <Text className="text-lg font-semibold text-slate-900">
-                Choose Model
-              </Text>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Choose Model</Text>
             </View>
             {Array.from(adaptersByProvider.entries()).map(
               ([providerLabel, adapters], index) => (
-                <View key={providerLabel}>
-                  <Text
-                    className={`px-1 text-xs font-semibold uppercase tracking-wider text-slate-400 ${index > 0 ? 'mt-6' : ''}`}
-                  >
-                    {providerLabel}
-                  </Text>
-                  <View className="mt-2 gap-2">
-                    {adapters.map((adapter) => (
+                <View
+                  key={providerLabel}
+                  style={index > 0 && styles.modelListSpacing}
+                >
+                  <View style={styles.modelList}>
+                    {adapters.map((adapter, adapterIndex) => (
                       <ModelItem
                         key={adapter.modelId}
                         adapter={adapter}
                         isSelected={selectedModelId === adapter.modelId}
                         onSelect={handleModelSelect}
+                        isFirst={adapterIndex === 0}
+                        isLast={adapterIndex === adapters.length - 1}
                       />
                     ))}
                   </View>
                 </View>
               )
             )}
-            <View className="mt-6">
+            <View style={styles.customModelSection}>
               {showCustomInput ? (
-                <View className="rounded-2xl bg-slate-100 p-4">
-                  <Text className="text-sm font-semibold text-slate-700">
+                <>
+                  <Text style={styles.customModelInputTitle}>
                     Add from Hugging Face
                   </Text>
-                  <TextInput
-                    value={customUrl}
-                    onChangeText={setCustomUrl}
-                    placeholder="Enter Hugging Face model URL"
-                    placeholderTextColor="#94A3B8"
-                    className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm text-slate-700"
-                  />
-                  <View className="mt-3 flex-row gap-2">
+                  <View style={styles.customModelInput}>
+                    <TextInput
+                      value={customUrl}
+                      onChangeText={setCustomUrl}
+                      placeholder="Enter Hugging Face model URL"
+                      placeholderTextColor={colors.placeholderText as any}
+                      style={styles.customModelUrlInput}
+                    />
+                  </View>
+                  <View style={styles.customModelButtons}>
                     <Pressable
                       onPress={() => setShowCustomInput(false)}
-                      className="flex-1 rounded-full border border-slate-200 px-4 py-2"
+                      style={styles.customModelCancelButton}
                     >
-                      <Text className="text-center text-sm font-semibold text-slate-700">
-                        Cancel
-                      </Text>
+                      <Text style={styles.customModelCancelText}>Cancel</Text>
                     </Pressable>
                     <Pressable
                       onPress={handleAddCustomModel}
                       disabled={!customUrl.trim()}
-                      className={`flex-1 rounded-full px-4 py-2 ${
-                        customUrl.trim() ? 'bg-blue-600' : 'bg-slate-200'
-                      }`}
+                      style={[
+                        styles.customModelAddButton,
+                        !customUrl.trim() &&
+                          styles.customModelAddButtonDisabled,
+                      ]}
                     >
-                      <Text className="text-center text-sm font-semibold text-white">
-                        Add Model
-                      </Text>
+                      <Text style={styles.customModelAddText}>Add Model</Text>
                     </Pressable>
                   </View>
-                </View>
+                </>
               ) : (
                 <Pressable
                   onPress={() => setShowCustomInput(true)}
-                  className="flex-row items-center gap-3 rounded-2xl border border-slate-200 px-4 py-4"
+                  style={styles.addCustomModelButton}
                 >
-                  <View className="h-10 w-10 items-center justify-center rounded-2xl bg-slate-100">
-                    <MaterialIcons name="link" size={20} color="#64748B" />
+                  <View style={styles.addCustomModelIcon}>
+                    <SymbolView
+                      name="link"
+                      size={18}
+                      tintColor={colors.secondaryLabel}
+                      resizeMode="scaleAspectFit"
+                    />
                   </View>
-                  <Text className="text-sm font-semibold text-slate-700">
+                  <Text style={styles.addCustomModelText}>
                     Add Custom Model from Hugging Face
                   </Text>
                 </Pressable>
@@ -628,93 +727,100 @@ export default function ChatScreen() {
         </View>
       </TrueSheet>
 
+      {/* Settings Sheet */}
       <TrueSheet ref={settingsSheetRef} scrollable>
-        <View className="rounded-t-3xl px-4 pb-8 pt-3">
-          <View className="mx-auto h-1.5 w-12 rounded-full bg-slate-200" />
+        <View style={styles.sheetContainer}>
           <ScrollView nestedScrollEnabled>
-            <View className="py-4">
-              <Text className="text-lg font-semibold text-slate-900">
-                Tools & Settings
-              </Text>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Tools & Settings</Text>
             </View>
-            <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Tools
-            </Text>
-            <View className="mt-3 gap-3">
-              {Object.entries(toolDefinitions).map(([id, tool]) => {
+            <Text style={styles.sectionLabel}>Tools</Text>
+            <View style={styles.toolsList}>
+              {Object.entries(toolDefinitions).map(([id, tool], index, arr) => {
                 const enabled = enabledToolIds.includes(id)
+                const isFirst = index === 0
+                const isLast = index === arr.length - 1
                 return (
                   <Pressable
                     key={id}
                     onPress={() => toggleTool(id)}
-                    className={`flex-row items-center gap-3 rounded-2xl p-4 ${
-                      enabled ? 'bg-blue-50' : 'bg-slate-100'
-                    }`}
+                    style={[
+                      styles.toolItem,
+                      isFirst && styles.toolItemFirst,
+                      isLast && styles.toolItemLast,
+                    ]}
                   >
-                    <View className="flex-1">
-                      <Text className="text-sm font-semibold text-slate-900">
-                        {tool.title}
-                      </Text>
-                      <Text className="text-xs text-slate-500">
-                        {tool.description}
-                      </Text>
+                    <View
+                      style={[
+                        styles.toolItemContent,
+                        !isLast && styles.toolItemContentBorder,
+                      ]}
+                    >
+                      <View style={styles.toolItemTextContainer}>
+                        <Text style={styles.toolItemTitle}>{tool.title}</Text>
+                        <Text style={styles.toolItemDescription}>
+                          {tool.description}
+                        </Text>
+                      </View>
+                      {enabled && (
+                        <SymbolView
+                          name="checkmark"
+                          size={20}
+                          tintColor={colors.systemBlue}
+                          resizeMode="scaleAspectFit"
+                        />
+                      )}
                     </View>
-                    {enabled && (
-                      <MaterialIcons name="check" size={20} color="#2563EB" />
-                    )}
                   </Pressable>
                 )
               })}
             </View>
 
-            <View className="mt-6">
-              <Text className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Model Settings
-              </Text>
-              <View className="mt-3 gap-3 rounded-2xl bg-slate-100 p-4">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-slate-900">
-                      Temperature
-                    </Text>
-                    <Text className="text-xs text-slate-500">
-                      Controls randomness (0-2)
+            <View style={styles.settingsSection}>
+              <Text style={styles.sectionLabel}>Model Settings</Text>
+              <View style={styles.settingsCard}>
+                <View style={styles.settingRowSlider}>
+                  <View style={styles.settingSliderHeader}>
+                    <Text style={styles.settingTitle}>Temperature</Text>
+                    <Text style={styles.settingValue}>
+                      {temperature.toFixed(1)}
                     </Text>
                   </View>
-                  <TextInput
-                    value={String(temperature)}
-                    onChangeText={(text) => {
-                      const num = parseFloat(text)
-                      if (!isNaN(num) && num >= 0 && num <= 2) {
-                        updateChatSettings({ temperature: num })
+                  <Host style={styles.sliderHost}>
+                    <Slider
+                      value={temperature}
+                      min={0}
+                      max={2}
+                      onValueChange={(value) =>
+                        updateChatSettings({
+                          temperature: Math.round(value * 10) / 10,
+                        })
                       }
-                    }}
-                    keyboardType="decimal-pad"
-                    className="w-20 rounded-xl bg-white px-3 py-2 text-center text-base font-semibold text-blue-600"
-                  />
+                    />
+                  </Host>
                 </View>
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-slate-900">
-                      Max Steps
-                    </Text>
-                    <Text className="text-xs text-slate-500">
-                      Tool call iterations (1-20)
-                    </Text>
+                <View style={styles.settingRowSliderWithBorder}>
+                  <View style={styles.settingSliderHeader}>
+                    <Text style={styles.settingTitle}>Max Steps</Text>
+                    <Text style={styles.settingValue}>{maxSteps}</Text>
                   </View>
-                  <TextInput
-                    value={String(maxSteps)}
-                    onChangeText={(text) => {
-                      const num = Number(text)
-                      if (!isNaN(num) && num >= 1 && num <= 20) {
-                        updateChatSettings({ maxSteps: num })
+                  <Host style={styles.sliderHost}>
+                    <Slider
+                      value={maxSteps}
+                      min={1}
+                      max={20}
+                      steps={19}
+                      onValueChange={(value) =>
+                        updateChatSettings({ maxSteps: Math.round(value) })
                       }
-                    }}
-                    keyboardType="number-pad"
-                    className="w-20 rounded-xl bg-white px-3 py-2 text-center text-base font-semibold text-blue-600"
-                  />
+                    />
+                  </Host>
                 </View>
               </View>
+              <Text style={styles.settingsFooter}>
+                Temperature controls response randomness. Max steps limits tool
+                call iterations.
+              </Text>
             </View>
           </ScrollView>
         </View>
@@ -722,3 +828,517 @@ export default function ChatScreen() {
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.systemBackground as any,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator as any,
+  },
+  headerButton: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  headerButtonPressable: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleContainer: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.label as any,
+  },
+  headerSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: colors.secondaryLabel as any,
+  },
+
+  // Messages
+  messagesContainer: {
+    flex: 1,
+  },
+  messagesContent: {
+    flexGrow: 1,
+    padding: 16,
+    gap: 12,
+  },
+  messageRow: {
+    flexDirection: 'row',
+  },
+  messageRowUser: {
+    justifyContent: 'flex-end',
+  },
+  messageRowAssistant: {
+    justifyContent: 'flex-start',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+  },
+  messageBubbleUser: {
+    backgroundColor: colors.systemBlue as any,
+  },
+  messageBubbleAssistant: {
+    backgroundColor: colors.secondarySystemBackground as any,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  messageTextUser: {
+    color: '#fff',
+  },
+  messageTextAssistant: {
+    color: colors.label as any,
+  },
+
+  // Empty State
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 64,
+  },
+  emptyStateIcon: {
+    borderRadius: 40,
+    overflow: 'hidden',
+  },
+  emptyStateIconInner: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateTitle: {
+    marginTop: 24,
+    fontSize: 22,
+    fontWeight: '600',
+    color: colors.label as any,
+  },
+  emptyStateSubtitle: {
+    marginTop: 8,
+    maxWidth: 280,
+    textAlign: 'center',
+    fontSize: 15,
+    color: colors.secondaryLabel as any,
+  },
+
+  // Unavailable State
+  unavailableContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  chooseModelButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: colors.systemBlue as any,
+  },
+  chooseModelText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  // Input Bar
+  inputBar: {},
+  inputBarInner: {
+    padding: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  plusButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: colors.tertiarySystemFill as any,
+    paddingHorizontal: 16,
+    minHeight: 40,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 17,
+    color: colors.label as any,
+    paddingTop: 10,
+    paddingBottom: 10,
+    maxHeight: 120,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginBottom: 2,
+    backgroundColor: colors.systemBlue as any,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Sheet Common
+  sheetContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 8,
+  },
+  sheetHeader: {
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  sheetTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.label as any,
+    letterSpacing: 0.34,
+  },
+  sectionLabel: {
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+    fontSize: 13,
+    fontWeight: '400',
+    textTransform: 'uppercase',
+    letterSpacing: -0.08,
+    color: colors.secondaryLabel as any,
+  },
+  sectionLabelSpacing: {
+    marginTop: 32,
+  },
+
+  // Model Picker
+  modelList: {
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: colors.secondarySystemBackground as any,
+    overflow: 'hidden',
+  },
+  modelListSpacing: {
+    marginTop: 16,
+  },
+  modelItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 16,
+    backgroundColor: colors.secondarySystemBackground as any,
+  },
+  modelItemFirst: {
+    // First item styling (handled by parent container border radius)
+  },
+  modelItemLast: {
+    // Last item styling (handled by parent container border radius)
+  },
+  modelIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modelItemInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+    paddingRight: 16,
+    paddingVertical: 12,
+    minHeight: 56,
+  },
+  modelItemInfoBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator as any,
+  },
+  modelItemTextContainer: {
+    flex: 1,
+  },
+  modelItemLabel: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.label as any,
+  },
+  modelItemLabelUnavailable: {
+    color: colors.tertiaryLabel as any,
+  },
+  downloadProgressContainer: {
+    marginTop: 6,
+  },
+  downloadProgressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.tertiarySystemFill as any,
+    overflow: 'hidden',
+  },
+  downloadProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: colors.systemBlue as any,
+  },
+  downloadProgressText: {
+    marginTop: 4,
+    fontSize: 13,
+    color: colors.secondaryLabel as any,
+  },
+  modelStatusText: {
+    marginTop: 2,
+    fontSize: 13,
+    color: colors.secondaryLabel as any,
+  },
+  modelItemTrailing: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+
+  // Delete Action
+  deleteActionContainer: {
+    width: 72,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.systemRed as any,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Custom Model
+  customModelSection: {
+    marginTop: 32,
+  },
+  customModelInput: {
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: colors.secondarySystemBackground as any,
+    overflow: 'hidden',
+  },
+  customModelInputTitle: {
+    fontSize: 13,
+    fontWeight: '400',
+    textTransform: 'uppercase',
+    letterSpacing: -0.08,
+    color: colors.secondaryLabel as any,
+    paddingHorizontal: 16,
+    marginBottom: 6,
+  },
+  customModelUrlInput: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 17,
+    color: colors.label as any,
+  },
+  customModelButtons: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  customModelCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.tertiarySystemFill as any,
+    alignItems: 'center',
+  },
+  customModelCancelText: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.label as any,
+  },
+  customModelAddButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.systemBlue as any,
+    alignItems: 'center',
+  },
+  customModelAddButtonDisabled: {
+    backgroundColor: colors.tertiarySystemFill as any,
+  },
+  customModelAddText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  addCustomModelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 16,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: colors.secondarySystemBackground as any,
+  },
+  addCustomModelIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors.tertiarySystemFill as any,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addCustomModelText: {
+    flex: 1,
+    marginLeft: 12,
+    paddingVertical: 16,
+    paddingRight: 16,
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.label as any,
+  },
+
+  // Settings
+  toolsList: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: colors.secondarySystemBackground as any,
+    overflow: 'hidden',
+  },
+  toolItem: {
+    paddingLeft: 16,
+    backgroundColor: colors.secondarySystemBackground as any,
+  },
+  toolItemFirst: {
+    // First item styling (handled by parent container border radius)
+  },
+  toolItemLast: {
+    // Last item styling (handled by parent container border radius)
+  },
+  toolItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingRight: 16,
+    minHeight: 56,
+  },
+  toolItemContentBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator as any,
+  },
+  toolItemTextContainer: {
+    flex: 1,
+  },
+  toolItemTitle: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.label as any,
+  },
+  toolItemDescription: {
+    marginTop: 2,
+    fontSize: 13,
+    color: colors.secondaryLabel as any,
+  },
+  settingsSection: {
+    marginTop: 32,
+  },
+  settingsCard: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: colors.secondarySystemBackground as any,
+    overflow: 'hidden',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 44,
+  },
+  settingRowWithBorder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 44,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.separator as any,
+  },
+  settingRowSlider: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  settingRowSliderWithBorder: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.separator as any,
+  },
+  settingSliderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  settingTitle: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.label as any,
+  },
+  settingValue: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.secondaryLabel as any,
+  },
+  sliderHost: {
+    height: 30,
+  },
+  settingInput: {
+    width: 70,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: colors.tertiarySystemFill as any,
+    fontSize: 17,
+    fontWeight: '400',
+    textAlign: 'center',
+    color: colors.label as any,
+  },
+  settingsFooter: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    fontSize: 13,
+    color: colors.secondaryLabel as any,
+    lineHeight: 18,
+  },
+})

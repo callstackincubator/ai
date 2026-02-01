@@ -1,5 +1,3 @@
-import './global.css'
-
 import {
   createDrawerNavigator,
   DrawerContentComponentProps,
@@ -7,16 +5,18 @@ import {
 } from '@react-navigation/drawer'
 import { NavigationContainer } from '@react-navigation/native'
 import { StatusBar } from 'expo-status-bar'
+import { SymbolView } from 'expo-symbols'
 import { Provider as JotaiProvider } from 'jotai'
 import React from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import MaterialIcons from '@react-native-vector-icons/material-icons'
 
+import { AdaptiveGlass } from './components/AdaptiveGlass'
 import ChatScreen from './screens/apple/ChatScreen'
 import { useChatStore } from './store/chatStore'
+import { colors } from './theme/colors'
 
 function formatChatDate(date: Date) {
   const now = new Date()
@@ -30,8 +30,7 @@ function formatChatDate(date: Date) {
 }
 
 function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
-  const { chats, currentChatId, createNewChat, selectChat, deleteChat } =
-    useChatStore()
+  const { chats, currentChatId, selectChat, deleteChat } = useChatStore()
 
   const groupedChats = React.useMemo(() => {
     return chats.reduce(
@@ -46,52 +45,56 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
   }, [chats])
 
   return (
-    <DrawerContentScrollView>
-      <View className="border-b border-slate-200 px-4 py-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-lg font-semibold text-slate-900">Chats</Text>
-          <Pressable
-            onPress={() => {
-              createNewChat()
-              navigation.closeDrawer()
-            }}
-            className="h-8 w-8 items-center justify-center rounded-full bg-slate-100"
-          >
-            <MaterialIcons name="add" size={18} color="#475569" />
-          </Pressable>
+    <DrawerContentScrollView style={styles.drawerScroll}>
+      <View style={styles.drawerHeader}>
+        <View style={styles.drawerHeaderRow}>
+          <Text style={styles.drawerTitle}>Chats</Text>
+          <AdaptiveGlass isInteractive style={styles.newChatButton}>
+            <Pressable
+              onPress={() => {
+                selectChat(null)
+                navigation.closeDrawer()
+              }}
+              style={styles.newChatButtonPressable}
+            >
+              <SymbolView
+                name="plus"
+                size={18}
+                tintColor={colors.label}
+                resizeMode="scaleAspectFit"
+              />
+            </Pressable>
+          </AdaptiveGlass>
         </View>
       </View>
       {chats.length === 0 ? (
-        <View className="items-center justify-center px-6 py-10">
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-            <MaterialIcons
-              name="chat-bubble-outline"
-              size={22}
-              color="#64748B"
-            />
-          </View>
-          <Text className="mt-3 text-sm text-slate-500">
-            No conversations yet
-          </Text>
+        <View style={styles.emptyState}>
+          <AdaptiveGlass style={styles.emptyStateIcon}>
+            <View style={styles.emptyStateIconInner}>
+              <SymbolView
+                name="bubble.left"
+                size={22}
+                tintColor={colors.secondaryLabel}
+                resizeMode="scaleAspectFit"
+              />
+            </View>
+          </AdaptiveGlass>
+          <Text style={styles.emptyStateText}>No conversations yet</Text>
           <Pressable
             onPress={() => {
-              createNewChat()
+              selectChat(null)
               navigation.closeDrawer()
             }}
-            className="mt-4 rounded-full border border-slate-200 px-4 py-2"
+            style={styles.startChatButton}
           >
-            <Text className="text-sm font-semibold text-slate-700">
-              Start a new chat
-            </Text>
+            <Text style={styles.startChatButtonText}>Start a new chat</Text>
           </Pressable>
         </View>
       ) : (
-        <View className="py-3">
+        <View style={styles.chatList}>
           {Object.entries(groupedChats).map(([key, group]) => (
-            <View key={key} className="mb-2">
-              <Text className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                {key}
-              </Text>
+            <View key={key} style={styles.chatGroup}>
+              <Text style={styles.chatGroupLabel}>{key}</Text>
               {group.map((chat) => (
                 <Pressable
                   key={chat.id}
@@ -99,16 +102,18 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
                     selectChat(chat.id)
                     navigation.closeDrawer()
                   }}
-                  className={`mx-3 flex-row items-center gap-3 rounded-2xl px-3 py-3 ${
-                    currentChatId === chat.id ? 'bg-slate-100' : 'bg-white'
-                  }`}
+                  style={[
+                    styles.chatItem,
+                    currentChatId === chat.id && styles.chatItemSelected,
+                  ]}
                 >
-                  <MaterialIcons
-                    name="chat-bubble-outline"
+                  <SymbolView
+                    name="bubble.left"
                     size={18}
-                    color="#94A3B8"
+                    tintColor={colors.tertiaryLabel}
+                    resizeMode="scaleAspectFit"
                   />
-                  <Text className="flex-1 text-sm text-slate-700">
+                  <Text style={styles.chatItemTitle} numberOfLines={1}>
                     {chat.title}
                   </Text>
                   <Pressable
@@ -116,8 +121,14 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
                       e.stopPropagation()
                       deleteChat(chat.id)
                     }}
+                    hitSlop={8}
                   >
-                    <MaterialIcons name="delete" size={18} color="#EF4444" />
+                    <SymbolView
+                      name="trash"
+                      size={16}
+                      tintColor={colors.systemRed}
+                      resizeMode="scaleAspectFit"
+                    />
                   </Pressable>
                 </Pressable>
               ))}
@@ -133,7 +144,7 @@ const Drawer = createDrawerNavigator()
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <KeyboardProvider>
         <SafeAreaProvider>
           <JotaiProvider>
@@ -142,9 +153,7 @@ export default function App() {
                 drawerContent={(props) => <CustomDrawerContent {...props} />}
                 screenOptions={{
                   headerShown: false,
-                  drawerStyle: {
-                    width: 280,
-                  },
+                  drawerStyle: styles.drawer,
                 }}
               >
                 <Drawer.Screen name="Chat" component={ChatScreen} />
@@ -157,3 +166,109 @@ export default function App() {
     </GestureHandlerRootView>
   )
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  drawer: {
+    width: 280,
+    backgroundColor: colors.systemBackground as any,
+  },
+  drawerScroll: {
+    flex: 1,
+  },
+  drawerHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator as any,
+  },
+  drawerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  drawerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.label as any,
+  },
+  newChatButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  newChatButtonPressable: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+  emptyStateIcon: {
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  emptyStateIconInner: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.secondaryLabel as any,
+  },
+  startChatButton: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.separator as any,
+  },
+  startChatButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.label as any,
+  },
+  chatList: {
+    paddingVertical: 12,
+  },
+  chatGroup: {
+    marginBottom: 8,
+  },
+  chatGroupLabel: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: colors.secondaryLabel as any,
+  },
+  chatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+  },
+  chatItemSelected: {
+    backgroundColor: colors.secondarySystemBackground as any,
+  },
+  chatItemTitle: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.label as any,
+  },
+})

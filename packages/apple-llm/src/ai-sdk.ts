@@ -77,6 +77,10 @@ class AppleTranscriptionModel implements TranscriptionModelV3 {
     this.language = options.language ?? NativeAppleUtils.getCurrentLocale()
   }
 
+  isAvailable(): boolean {
+    return NativeAppleTranscription.isAvailable(this.language)
+  }
+
   async prepare(): Promise<void> {
     await NativeAppleTranscription.prepare(this.language)
     this.prepared = true

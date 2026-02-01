@@ -1,7 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { atom, useAtom } from 'jotai'
+import { atomWithStorage, createJSONStorage } from 'jotai/utils'
 
 import { languageAdapters } from '../config/providers'
 import { toolDefinitions } from '../tools'
+
+const storage = createJSONStorage<any>(() => AsyncStorage)
 
 export type MessageRole = 'user' | 'assistant'
 
@@ -40,9 +44,17 @@ const DEFAULT_SETTINGS: ChatSettings = {
   enabledToolIds: Object.keys(toolDefinitions),
 }
 
-const chatsAtom = atom<Chat[]>([])
-const currentChatIdAtom = atom<string | null>(null)
-const customModelsAtom = atom<CustomModel[]>([])
+const chatsAtom = atomWithStorage<Chat[]>('chats', [], storage)
+const currentChatIdAtom = atomWithStorage<string | null>(
+  'currentChatId',
+  null,
+  storage
+)
+const customModelsAtom = atomWithStorage<CustomModel[]>(
+  'customModels',
+  [],
+  storage
+)
 const downloadProgressAtom = atom<Record<string, number>>({})
 const pendingSettingsAtom = atom<ChatSettings>({ ...DEFAULT_SETTINGS })
 
@@ -53,10 +65,14 @@ const truncateTitle = (content: string) =>
   content.length > 30 ? `${content.slice(0, 30)}...` : content
 
 export function useChatStore() {
-  const [chats, setChats] = useAtom(chatsAtom)
+  const [chatsRaw, setChats] = useAtom(chatsAtom)
   const [currentChatId, setCurrentChatId] = useAtom(currentChatIdAtom)
-  const [customModels, setCustomModels] = useAtom(customModelsAtom)
+  const [customModelsRaw, setCustomModels] = useAtom(customModelsAtom)
   const [pendingSettings, setPendingSettings] = useAtom(pendingSettingsAtom)
+
+  // Ensure arrays are resolved (atomWithStorage returns arrays directly after hydration)
+  const chats = Array.isArray(chatsRaw) ? chatsRaw : []
+  const customModels = Array.isArray(customModelsRaw) ? customModelsRaw : []
 
   const currentChat = chats.find((chat) => chat.id === currentChatId)
 
@@ -64,26 +80,10 @@ export function useChatStore() {
     setPendingSettings({ ...DEFAULT_SETTINGS })
   }
 
-  const createNewChat = () => {
-    const id = createId()
-    setChats((prev) => [
-      {
-        id,
-        title: 'New Chat',
-        messages: [],
-        createdAt: new Date(),
-        settings: { ...pendingSettings },
-      },
-      ...prev,
-    ])
-    setCurrentChatId(id)
-    resetPendingSettings()
-    return id
-  }
-
   const deleteChat = (id: string) => {
     setChats((prev) => {
-      const next = prev.filter((chat) => chat.id !== id)
+      const arr = Array.isArray(prev) ? prev : []
+      const next = arr.filter((chat) => chat.id !== id)
       if (currentChatId === id) setCurrentChatId(next[0]?.id ?? null)
       return next
     })
@@ -100,23 +100,27 @@ export function useChatStore() {
     const isNewChat = !currentChatId
     if (isNewChat) {
       const firstUserMessage = messages.find((m) => m.role === 'user')
-      setChats((prev) => [
-        {
-          id: chatId,
-          title: firstUserMessage
-            ? truncateTitle(firstUserMessage.content)
-            : 'New Chat',
-          messages: newMessages,
-          createdAt: new Date(),
-          settings: { ...pendingSettings },
-        },
-        ...prev,
-      ])
+      setChats((prev) => {
+        const arr = Array.isArray(prev) ? prev : []
+        return [
+          {
+            id: chatId,
+            title: firstUserMessage
+              ? truncateTitle(firstUserMessage.content)
+              : 'New Chat',
+            messages: newMessages,
+            createdAt: new Date(),
+            settings: { ...pendingSettings },
+          },
+          ...arr,
+        ]
+      })
       setCurrentChatId(chatId)
       resetPendingSettings()
     } else {
-      setChats((prev) =>
-        prev.map((chat) =>
+      setChats((prev) => {
+        const arr = Array.isArray(prev) ? prev : []
+        return arr.map((chat) =>
           chat.id === chatId
             ? {
                 ...chat,
@@ -124,7 +128,7 @@ export function useChatStore() {
               }
             : chat
         )
-      )
+      })
     }
 
     return { chatId, messageIds: newMessages.map((m) => m.id) }
@@ -135,8 +139,9 @@ export function useChatStore() {
     messageId: string,
     content: string
   ) => {
-    setChats((prev) =>
-      prev.map((chat) =>
+    setChats((prev) => {
+      const arr = Array.isArray(prev) ? prev : []
+      return arr.map((chat) =>
         chat.id === chatId
           ? {
               ...chat,
@@ -146,21 +151,24 @@ export function useChatStore() {
             }
           : chat
       )
-    )
+    })
   }
 
   const addCustomModel = (url: string) => {
     const trimmedUrl = url.trim()
     if (!trimmedUrl) return null
     const id = `custom-${createId()}`
-    setCustomModels((prev) => [
-      ...prev,
-      {
-        id,
-        name: trimmedUrl.split('/').pop() || 'Custom Model',
-        url: trimmedUrl,
-      },
-    ])
+    setCustomModels((prev) => {
+      const arr = Array.isArray(prev) ? prev : []
+      return [
+        ...arr,
+        {
+          id,
+          name: trimmedUrl.split('/').pop() || 'Custom Model',
+          url: trimmedUrl,
+        },
+      ]
+    })
     return id
   }
 
@@ -169,13 +177,14 @@ export function useChatStore() {
       setPendingSettings((prev) => ({ ...prev, ...updates }))
       return
     }
-    setChats((prev) =>
-      prev.map((chat) =>
+    setChats((prev) => {
+      const arr = Array.isArray(prev) ? prev : []
+      return arr.map((chat) =>
         chat.id === currentChatId
           ? { ...chat, settings: { ...chat.settings, ...updates } }
           : chat
       )
-    )
+    })
   }
 
   const chatSettings = currentChat?.settings ?? pendingSettings
@@ -195,7 +204,6 @@ export function useChatStore() {
     currentChat,
     chatSettings,
     customModels,
-    createNewChat,
     selectChat: setCurrentChatId,
     deleteChat,
     addMessages,
