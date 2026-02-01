@@ -654,6 +654,7 @@ export default function ChatScreen() {
                   key={providerLabel}
                   style={index > 0 && styles.modelListSpacing}
                 >
+                  <Text style={styles.sectionLabel}>{providerLabel}</Text>
                   <View style={styles.modelList}>
                     {adapters.map((adapter, adapterIndex) => (
                       <ModelItem
