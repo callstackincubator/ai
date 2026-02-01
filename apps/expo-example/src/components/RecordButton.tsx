@@ -41,18 +41,17 @@ export function RecordButton({
   const audioBuffersRef = useRef<AudioBuffer[]>([])
 
   const initializeRecorder = () => {
-    if (!recorderRef.current) {
-      AudioManager.setAudioSessionOptions({
-        iosCategory: 'playAndRecord',
-        iosMode: 'voiceChat',
-        iosOptions: ['defaultToSpeaker', 'allowBluetooth'],
-      })
+    AudioManager.setAudioSessionOptions({
+      iosCategory: 'playAndRecord',
+      iosMode: 'voiceChat',
+      iosOptions: ['defaultToSpeaker', 'allowBluetooth'],
+    })
 
-      recorderRef.current = new AudioRecorder({
-        sampleRate: SAMPLE_RATE,
-        bufferLengthInSamples: SAMPLE_RATE,
-      })
-    }
+    // Always create a fresh recorder to avoid accumulating listeners
+    recorderRef.current = new AudioRecorder({
+      sampleRate: SAMPLE_RATE,
+      bufferLengthInSamples: SAMPLE_RATE,
+    })
   }
 
   const requestPermissionIfNeeded = async (): Promise<boolean> => {
@@ -153,11 +152,11 @@ export function RecordButton({
     recorderAdapterRef.current = null
   }
 
-  const handlePress = () => {
+  const handlePress = async () => {
     if (isRecording) {
-      stopRecording()
+      await stopRecording()
     } else {
-      startRecording()
+      await startRecording()
     }
   }
 

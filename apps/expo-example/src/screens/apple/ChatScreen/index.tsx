@@ -271,6 +271,7 @@ export default function ChatScreen() {
 
   const modelSheetRef = useRef<TrueSheet>(null)
   const settingsSheetRef = useRef<TrueSheet>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const { getProgress } = useDownloadStore()
 
@@ -338,9 +339,22 @@ export default function ChatScreen() {
     [enabledToolIds]
   )
 
+  // Cleanup streaming on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
+
   // Send message and stream AI response
   const handleSend = async () => {
     if (!input.trim() || isGenerating || !selectedAdapter) return
+
+    // Cancel any previous generation
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = new AbortController()
+    const { signal } = abortControllerRef.current
+
     const userInput = input.trim()
     setInput('')
 
@@ -365,14 +379,18 @@ export default function ChatScreen() {
         tools: enabledTools,
         temperature,
         stopWhen: stepCountIs(maxSteps),
+        abortSignal: signal,
       })
 
       let accumulated = ''
       for await (const chunk of result.textStream) {
+        if (signal.aborted) break
         accumulated += chunk
         updateMessageContent(chatId, assistantMessageId, accumulated)
       }
     } catch (error) {
+      // Don't show error if user cancelled
+      if (signal.aborted) return
       const message =
         error instanceof Error ? error.message : 'Failed to generate response'
       updateMessageContent(chatId, assistantMessageId, `Error: ${message}`)

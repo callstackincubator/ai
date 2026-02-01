@@ -13,7 +13,7 @@ export type Message = {
   id: string
   role: MessageRole
   content: string
-  createdAt: Date
+  createdAt: string
 }
 
 export type ChatSettings = {
@@ -27,7 +27,7 @@ export type Chat = {
   id: string
   title: string
   messages: Message[]
-  createdAt: Date
+  createdAt: string
   settings: ChatSettings
 }
 
@@ -81,12 +81,14 @@ export function useChatStore() {
   }
 
   const deleteChat = (id: string) => {
-    setChats((prev) => {
-      const arr = Array.isArray(prev) ? prev : []
-      const next = arr.filter((chat) => chat.id !== id)
-      if (currentChatId === id) setCurrentChatId(next[0]?.id ?? null)
-      return next
-    })
+    const shouldUpdateCurrentChat = currentChatId === id
+    const remainingChats = chats.filter((chat) => chat.id !== id)
+
+    setChats(remainingChats)
+
+    if (shouldUpdateCurrentChat) {
+      setCurrentChatId(remainingChats[0]?.id ?? null)
+    }
   }
 
   const addMessages = (messages: Omit<Message, 'id' | 'createdAt'>[]) => {
@@ -94,7 +96,7 @@ export function useChatStore() {
     const newMessages = messages.map((message) => ({
       ...message,
       id: createId(),
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     }))
 
     const isNewChat = !currentChatId
@@ -109,7 +111,7 @@ export function useChatStore() {
               ? truncateTitle(firstUserMessage.content)
               : 'New Chat',
             messages: newMessages,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             settings: { ...pendingSettings },
           },
           ...arr,
@@ -156,7 +158,7 @@ export function useChatStore() {
 
   const addCustomModel = (url: string) => {
     const trimmedUrl = url.trim()
-    if (!trimmedUrl) return null
+    if (!trimmedUrl || !trimmedUrl.endsWith('.gguf')) return null
     const id = `custom-${createId()}`
     setCustomModels((prev) => {
       const arr = Array.isArray(prev) ? prev : []

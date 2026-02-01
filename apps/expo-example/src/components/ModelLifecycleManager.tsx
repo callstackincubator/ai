@@ -15,10 +15,13 @@ export function ModelLifecycleManager({
 
   useEffect(() => {
     if (previousAdapter.current && previousAdapter.current !== adapter) {
-      void previousAdapter.current.unload()
+      previousAdapter.current.unload()
     }
     previousAdapter.current = adapter
-    void adapter.prepare()
+    adapter.prepare()
+    return () => {
+      adapter.unload()
+    }
   }, [adapter])
 
   return null
