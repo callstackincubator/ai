@@ -28,7 +28,6 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { createLlamaLanguageSetupAdapter } from '../../../components/adapters/llamaModelSetupAdapter'
 import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
-import { ModelLifecycleManager } from '../../../components/ModelLifecycleManager'
 import { RecordButton } from '../../../components/RecordButton'
 import type { Availability, SetupAdapter } from '../../../config/providers'
 import { languageAdapters } from '../../../config/providers'
@@ -293,6 +292,11 @@ export default function ChatScreen() {
     [insets.bottom, scrollToBottom]
   )
 
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    scrollRef.current?.scrollToEnd({ animated: true })
+  }, [currentChat?.messages.length])
+
   const inputBarBottomPadding = useAnimatedStyle(() => ({
     paddingBottom: keyboardHeight.value,
   }))
@@ -300,27 +304,22 @@ export default function ChatScreen() {
   const customAdapters = customModels.map((model) =>
     createLlamaLanguageSetupAdapter(model.url, toolDefinitions)
   )
-  const allAdaptersArray = [...languageAdapters, ...customAdapters]
+
+  const adapters = [...languageAdapters, ...customAdapters]
+
   const adaptersByProvider = new Map<string, SetupAdapter<LanguageModelV3>[]>()
-  for (const adapter of allAdaptersArray) {
+  for (const adapter of adapters) {
     const key = adapter.model.provider
     const group = adaptersByProvider.get(key) ?? []
     group.push(adapter)
     adaptersByProvider.set(key, group)
   }
 
-  const allAdapters = [...adaptersByProvider.values()].flat()
-
-  const selectedAdapter = allAdapters.find(
+  const selectedAdapter = adapters.find(
     (adapter) => adapter.modelId === selectedModelId
   )
 
   const selectedModelDownloadProgress = getProgress(selectedModelId)
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true })
-  }, [currentChat?.messages.length])
 
   // Filter tool definitions to only enabled ones
   const enabledTools = Object.fromEntries(
@@ -397,17 +396,13 @@ export default function ChatScreen() {
 
   // Add custom HuggingFace model and select it
   const handleAddCustomModel = () => {
-    const newId = addCustomModel(customUrl)
-    if (newId) {
-      updateChatSettings({ modelId: newId })
-      setCustomUrl('')
-      setShowCustomInput(false)
-      modelSheetRef.current?.dismiss()
-    }
+    addCustomModel(customUrl)
+    setCustomUrl('')
+    setShowCustomInput(false)
   }
 
   // Track model availability (e.g. Apple Intelligence not enabled)
-  const [availability, setAvailability] = useState<Availability | null>(null)
+  const [availability, setAvailability] = useState<Availability>('no')
   useEffect(() => {
     if (!selectedAdapter) {
       setAvailability('no')
@@ -424,11 +419,17 @@ export default function ChatScreen() {
 
   const isModelUnavailable = !selectedAdapter || availability === 'no'
 
+  // Prepare and unload model when selected
+  useEffect(() => {
+    if (!selectedAdapter || availability !== 'yes') return
+    selectedAdapter.prepare()
+    return () => {
+      selectedAdapter.unload()
+    }
+  }, [selectedAdapter, availability])
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {selectedAdapter && !isModelUnavailable && (
-        <ModelLifecycleManager adapter={selectedAdapter} />
-      )}
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

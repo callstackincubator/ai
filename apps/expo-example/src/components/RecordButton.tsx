@@ -152,20 +152,15 @@ export function RecordButton({
     recorderAdapterRef.current = null
   }
 
-  const handlePress = async () => {
+  const handlePress = () => {
     if (isRecording) {
-      await stopRecording()
+      stopRecording()
     } else {
-      await startRecording()
+      startRecording()
     }
   }
 
   const isProcessing = isStopping || isTranscribing
-
-  // Hide the button if transcription is not available
-  if (!apple.transcriptionModel().isAvailable()) {
-    return null
-  }
 
   if (isRecording) {
     return (

@@ -158,7 +158,9 @@ export function useChatStore() {
 
   const addCustomModel = (url: string) => {
     const trimmedUrl = url.trim()
-    if (!trimmedUrl || !trimmedUrl.endsWith('.gguf')) return null
+    if (!trimmedUrl || !trimmedUrl.endsWith('.gguf')) {
+      throw new Error('Invalid model URL')
+    }
     const id = `custom-${createId()}`
     setCustomModels((prev) => {
       const arr = Array.isArray(prev) ? prev : []
