@@ -31,12 +31,6 @@ export type Chat = {
   settings: ChatSettings
 }
 
-export type CustomModel = {
-  id: string
-  name: string
-  url: string
-}
-
 const DEFAULT_SETTINGS: ChatSettings = {
   modelId: languageAdapters[0].modelId,
   temperature: 0.7,
@@ -50,12 +44,7 @@ const currentChatIdAtom = atomWithStorage<string | null>(
   null,
   storage
 )
-const customModelsAtom = atomWithStorage<CustomModel[]>(
-  'customModels',
-  [],
-  storage
-)
-const downloadProgressAtom = atom<Record<string, number>>({})
+
 const pendingSettingsAtom = atom<ChatSettings>({ ...DEFAULT_SETTINGS })
 
 const createId = () =>
@@ -65,14 +54,9 @@ const truncateTitle = (content: string) =>
   content.length > 30 ? `${content.slice(0, 30)}...` : content
 
 export function useChatStore() {
-  const [chatsRaw, setChats] = useAtom(chatsAtom)
+  const [chats, setChats] = useAtom(chatsAtom)
   const [currentChatId, setCurrentChatId] = useAtom(currentChatIdAtom)
-  const [customModelsRaw, setCustomModels] = useAtom(customModelsAtom)
   const [pendingSettings, setPendingSettings] = useAtom(pendingSettingsAtom)
-
-  // Ensure arrays are resolved (atomWithStorage returns arrays directly after hydration)
-  const chats = Array.isArray(chatsRaw) ? chatsRaw : []
-  const customModels = Array.isArray(customModelsRaw) ? customModelsRaw : []
 
   const currentChat = chats.find((chat) => chat.id === currentChatId)
 
@@ -156,26 +140,6 @@ export function useChatStore() {
     })
   }
 
-  const addCustomModel = (url: string) => {
-    const trimmedUrl = url.trim()
-    if (!trimmedUrl || !trimmedUrl.endsWith('.gguf')) {
-      throw new Error('Invalid model URL')
-    }
-    const id = `custom-${createId()}`
-    setCustomModels((prev) => {
-      const arr = Array.isArray(prev) ? prev : []
-      return [
-        ...arr,
-        {
-          id,
-          name: trimmedUrl.split('/').pop() || 'Custom Model',
-          url: trimmedUrl,
-        },
-      ]
-    })
-    return id
-  }
-
   const updateChatSettings = (updates: Partial<ChatSettings>) => {
     if (!currentChatId) {
       setPendingSettings((prev) => ({ ...prev, ...updates }))
@@ -207,33 +171,11 @@ export function useChatStore() {
     currentChatId,
     currentChat,
     chatSettings,
-    customModels,
     selectChat: setCurrentChatId,
     deleteChat,
     addMessages,
     updateMessageContent,
-    addCustomModel,
     updateChatSettings,
     toggleTool,
-  }
-}
-
-export function useDownloadStore() {
-  const [downloadProgress, setDownloadProgress] = useAtom(downloadProgressAtom)
-
-  return {
-    downloadProgress,
-    startDownload: (modelId: string) =>
-      setDownloadProgress((prev) => ({ ...prev, [modelId]: 0 })),
-    updateProgress: (modelId: string, progress: number) =>
-      setDownloadProgress((prev) => ({ ...prev, [modelId]: progress })),
-    completeDownload: (modelId: string) =>
-      setDownloadProgress((prev) => {
-        const next = { ...prev }
-        delete next[modelId]
-        return next
-      }),
-    isDownloading: (modelId: string) => downloadProgress[modelId] !== undefined,
-    getProgress: (modelId: string) => downloadProgress[modelId],
   }
 }

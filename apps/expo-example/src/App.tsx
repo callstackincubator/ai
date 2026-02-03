@@ -7,7 +7,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { StatusBar } from 'expo-status-bar'
 import { SymbolView } from 'expo-symbols'
 import { Provider as JotaiProvider } from 'jotai'
-import React from 'react'
+import React, { Suspense } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { AdaptiveGlass } from './components/AdaptiveGlass'
 import ChatScreen from './screens/apple/ChatScreen'
+import { ChatScreenFallback } from './screens/apple/ChatScreen/ChatScreenFallback'
 import { useChatStore } from './store/chatStore'
 import { colors } from './theme/colors'
 
@@ -148,7 +149,13 @@ export default function App() {
                   drawerStyle: styles.drawer,
                 }}
               >
-                <Drawer.Screen name="Chat" component={ChatScreen} />
+                <Drawer.Screen name="Chat">
+                  {() => (
+                    <Suspense fallback={<ChatScreenFallback />}>
+                      <ChatScreen />
+                    </Suspense>
+                  )}
+                </Drawer.Screen>
               </Drawer.Navigator>
             </NavigationContainer>
             <StatusBar style="auto" />

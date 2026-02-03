@@ -1,5 +1,4 @@
 import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
-import { ToolSet } from 'ai'
 
 import {
   createAppleLanguageSetupAdapter,
@@ -29,7 +28,7 @@ export interface SetupAdapter<TModel> {
   // Whether the model is built-in (true) or downloadable (false)
   builtIn: boolean
   // Check if model is ready, unavailable, or downloadable
-  isAvailable: () => Promise<Availability>
+  isAvailable: () => Availability
   // Download the model with progress callback
   download: (onProgress: (percentage: number) => void) => Promise<void>
   // Remove the downloaded model from storage

@@ -5,10 +5,10 @@ import { ToolSet } from 'ai'
 import {
   downloadModel,
   getModelPath,
-  isModelDownloaded,
   removeModel,
 } from '../../../../../packages/llama/src/storage'
 import type { Availability, SetupAdapter } from '../../config/providers'
+import { isModelDownloaded } from '../../utils/storage'
 
 export const createLlamaLanguageSetupAdapter = (
   hfModelId: string,
@@ -21,7 +21,7 @@ export const createLlamaLanguageSetupAdapter = (
       n_gpu_layers: 99,
     },
   })
-  // Extract friendly name from HuggingFace model ID (e.g., "ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf" -> "SmolLM3-Q4_K_M")
+  // Extract friendly name from HuggingFace model ID
   const filename = hfModelId.split('/').pop() ?? hfModelId
   const friendlyName = filename.replace(/\.gguf$/, '')
   return {
@@ -33,8 +33,8 @@ export const createLlamaLanguageSetupAdapter = (
       icon: 'memory',
     },
     builtIn: false,
-    async isAvailable(): Promise<Availability> {
-      const downloaded = await isModelDownloaded(hfModelId)
+    isAvailable(): Availability {
+      const downloaded = isModelDownloaded(hfModelId)
       return downloaded ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {

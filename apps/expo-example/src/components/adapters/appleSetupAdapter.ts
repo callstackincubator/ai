@@ -20,7 +20,7 @@ export const createAppleLanguageSetupAdapter = (
       icon: 'auto-awesome',
     },
     builtIn: true,
-    async isAvailable() {
+    isAvailable() {
       return apple.isAvailable() ? 'yes' : 'no'
     },
     async download() {},
@@ -44,7 +44,7 @@ export const createAppleSpeechSetupAdapter =
         icon: 'auto-awesome',
       },
       builtIn: true,
-      async isAvailable() {
+      isAvailable() {
         return apple.isAvailable() ? 'yes' : 'no'
       },
       async download() {},

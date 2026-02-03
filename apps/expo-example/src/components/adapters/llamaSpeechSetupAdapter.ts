@@ -2,12 +2,12 @@ import type { SpeechModelV3 } from '@ai-sdk/provider'
 import {
   downloadModel,
   getModelPath,
-  isModelDownloaded,
   llama,
   removeModel,
 } from '@react-native-ai/llama'
 
 import type { Availability, SetupAdapter } from '../../config/providers'
+import { isModelDownloaded } from '../../utils/storage'
 
 interface LlamaSpeechSetupOptions {
   modelId: string
@@ -40,18 +40,18 @@ export const createLlamaSpeechSetupAdapter = ({
       icon: 'memory',
     },
     builtIn: false,
-    async isAvailable(): Promise<Availability> {
-      const [modelReady, vocoderReady] = await Promise.all([
+    isAvailable(): Availability {
+      const [modelReady, vocoderReady] = [
         isModelDownloaded(hfModelId),
         isModelDownloaded(vocoderId),
-      ])
+      ]
       return modelReady && vocoderReady ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
-      const [modelReady, vocoderReady] = await Promise.all([
+      const [modelReady, vocoderReady] = [
         isModelDownloaded(hfModelId),
         isModelDownloaded(vocoderId),
-      ])
+      ]
       if (!modelReady || !vocoderReady) {
         await downloadModel(hfModelId, (progress) => {
           onProgress(Math.round(progress.percentage * 0.5))

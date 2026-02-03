@@ -54,6 +54,7 @@
         "expo-calendar": "~15.0.8",
         "expo-clipboard": "~8.0.8",
         "expo-document-picker": "~14.0.8",
+        "expo-file-system": "~19.0.21",
         "expo-glass-effect": "~0.1.8",
         "expo-status-bar": "~3.0.9",
         "expo-symbols": "~1.0.8",
