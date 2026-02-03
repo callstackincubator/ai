@@ -1,12 +1,12 @@
 import type {
-  LanguageModelV2,
-  LanguageModelV2CallOptions,
-  LanguageModelV2FinishReason,
-  LanguageModelV2FunctionTool,
-  LanguageModelV2Prompt,
-  LanguageModelV2ProviderDefinedTool,
-  LanguageModelV2StreamPart,
-  LanguageModelV2ToolChoice,
+  LanguageModelV3,
+  LanguageModelV3CallOptions,
+  LanguageModelV3FinishReason,
+  LanguageModelV3FunctionTool,
+  LanguageModelV3Prompt,
+  LanguageModelV3ProviderTool,
+  LanguageModelV3StreamPart,
+  LanguageModelV3ToolChoice,
 } from '@ai-sdk/provider'
 
 import NativeMLCEngine, {
@@ -23,7 +23,7 @@ export const mlc = {
 }
 
 const convertToolsToNativeFormat = (
-  tools: (LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool)[]
+  tools: (LanguageModelV3FunctionTool | LanguageModelV3ProviderTool)[]
 ) => {
   return tools
     .filter((tool) => tool.type === 'function')
@@ -49,7 +49,7 @@ const convertToolsToNativeFormat = (
 }
 
 const convertToolChoice = (
-  toolChoice?: LanguageModelV2ToolChoice
+  toolChoice?: LanguageModelV3ToolChoice
 ): 'none' | 'auto' | undefined => {
   if (!toolChoice) {
     return 'none'
@@ -65,15 +65,25 @@ const convertToolChoice = (
 
 const convertFinishReason = (
   finishReason: GeneratedMessage['finish_reason']
-): LanguageModelV2FinishReason => {
+): LanguageModelV3FinishReason => {
+  let unified: LanguageModelV3FinishReason['unified'] = 'other'
+
   if (finishReason === 'tool_calls') {
-    return 'tool-calls'
+    unified = 'tool-calls'
+  } else if (finishReason === 'stop') {
+    unified = 'stop'
+  } else if (finishReason === 'length') {
+    unified = 'length'
   }
-  return finishReason
+
+  return {
+    unified,
+    raw: finishReason,
+  }
 }
 
-class MlcChatLanguageModel implements LanguageModelV2 {
-  readonly specificationVersion = 'v2'
+class MlcChatLanguageModel implements LanguageModelV3 {
+  readonly specificationVersion = 'v3'
   readonly supportedUrls = {}
 
   readonly provider = 'mlc'
@@ -103,7 +113,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
     return NativeMLCEngine.removeModel(this.modelId)
   }
 
-  private prepareMessages(messages: LanguageModelV2Prompt): Message[] {
+  private prepareMessages(messages: LanguageModelV3Prompt): Message[] {
     return messages.map((message): Message => {
       const content = Array.isArray(message.content)
         ? message.content.reduce((acc, part) => {
@@ -122,7 +132,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
     })
   }
 
-  async doGenerate(options: LanguageModelV2CallOptions) {
+  async doGenerate(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
 
     const generationOptions: GenerationOptions = {
@@ -158,9 +168,17 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       ],
       finishReason: convertFinishReason(response.finish_reason),
       usage: {
-        inputTokens: response.usage.prompt_tokens,
-        outputTokens: response.usage.completion_tokens,
-        totalTokens: response.usage.total_tokens,
+        inputTokens: {
+          total: response.usage.prompt_tokens,
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: {
+          total: response.usage.completion_tokens,
+          text: undefined,
+          reasoning: undefined,
+        },
       },
       providerMetadata: {
         mlc: {
@@ -173,7 +191,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
     }
   }
 
-  async doStream(options: LanguageModelV2CallOptions) {
+  async doStream(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
 
     if (typeof ReadableStream === 'undefined') {
@@ -206,7 +224,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
       listeners = []
     }
 
-    const stream = new ReadableStream<LanguageModelV2StreamPart>({
+    const stream = new ReadableStream<LanguageModelV3StreamPart>({
       async start(controller) {
         try {
           const id = (streamId = await NativeMLCEngine.streamText(
@@ -220,7 +238,7 @@ class MlcChatLanguageModel implements LanguageModelV2 {
           })
 
           const updateListener = NativeMLCEngine.onChatUpdate((data) => {
-            if (data.delta) {
+            if (data.delta?.content) {
               controller.enqueue({
                 type: 'text-delta',
                 delta: data.delta.content,
@@ -238,9 +256,17 @@ class MlcChatLanguageModel implements LanguageModelV2 {
               type: 'finish',
               finishReason: convertFinishReason(data.finish_reason),
               usage: {
-                inputTokens: data.usage.prompt_tokens,
-                outputTokens: data.usage.completion_tokens,
-                totalTokens: data.usage.total_tokens,
+                inputTokens: {
+                  total: data.usage.prompt_tokens,
+                  noCache: undefined,
+                  cacheRead: undefined,
+                  cacheWrite: undefined,
+                },
+                outputTokens: {
+                  total: data.usage.completion_tokens,
+                  text: undefined,
+                  reasoning: undefined,
+                },
               },
               providerMetadata: {
                 mlc: {

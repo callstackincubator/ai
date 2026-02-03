@@ -7,10 +7,10 @@ The Llama provider enables you to run GGUF models directly on-device in React Na
 Install the Llama provider and its peer dependencies:
 
 ```bash
-npm install @react-native-ai/llama llama.rn react-native-blob-util
+npm install @react-native-ai/llama llama.rn
 ```
 
-While you can use the Llama provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](https://v5.ai-sdk.dev/docs/getting-started/expo#polyfills):
+While you can use the Llama provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](../polyfills.md):
 
 ```bash
 npm install ai
@@ -21,21 +21,56 @@ npm install ai
 - **React Native >= 0.76.0** - Required for native module functionality
 - **llama.rn >= 0.10.0** - The underlying llama.cpp bindings
 
+## Expo Setup
+
+For use with the Expo framework and CNG builds, you will need `expo-build-properties` to utilize iOS and OpenCL features. Simply add the following to your `app.json` or `app.config.js` file:
+
+```javascript
+module.exports = {
+  expo: {
+    // ...
+    plugins: [
+      // ...
+      [
+        'llama.rn',
+        // optional fields, below are the default values
+        {
+          enableEntitlements: true,
+          entitlementsProfile: 'production',
+          forceCxx20: true,
+          enableOpenCL: true,
+        },
+      ],
+    ],
+  },
+}
+```
+
+For all other installation tips and tricks, refer to the [llama.rn Expo documentation](https://github.com/mybigday/llama.rn?tab=readme-ov-file#expo).
+
+## Available Model Types
+
+The Llama provider supports multiple model types:
+
+| Model Type | Method | Use Case |
+| --- | --- | --- |
+| Language Model | `llama.languageModel()` | Text generation, chat, reasoning |
+| Embedding Model | `llama.textEmbeddingModel()` | Text embeddings for RAG, similarity |
+| Speech Model | `llama.speechModel()` | Text-to-speech with vocoder |
+
 ## Basic Usage
 
 Import the Llama provider and use it with the AI SDK:
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
+import { llama, downloadModel } from '@react-native-ai/llama'
 import { streamText } from 'ai'
 
-// Create model instance (Model ID format: "owner/repo/filename.gguf")
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
-)
+// Download model from HuggingFace - returns the file path
+const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
 
-// Download from HuggingFace
-await model.download()
+// Create model instance with the path
+const model = llama.languageModel(modelPath)
 
 // Initialize model (loads into memory)
 await model.prepare()
@@ -68,4 +103,5 @@ You can find GGUF models on [HuggingFace](https://huggingface.co/models?library=
 ## Next Steps
 
 - **[Model Management](./model-management.md)** - Complete guide to model lifecycle, downloading, and API reference
-- **[Generating](./generating.md)** - Learn how to generate text and stream responses
+- **[Generating](./generating.md)** - Learn how to generate text, use multimodal inputs, and stream responses
+- **[Embeddings](./embeddings.md)** - Generate text embeddings for RAG and similarity search

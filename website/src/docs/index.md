@@ -9,6 +9,14 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 - **Offline-ready:** Works anywhere, even without internet
 - **Zero server costs:** No API fees or infrastructure to maintain
 
+## DevTools
+
+The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
+requests and surfaces them in Rozenite DevTools. DevTools are runtime
+agnostic, so they work with on-device and remote runtimes.
+
+Learn more in the [DevTools documentation](./dev-tools).
+
 ## Available Providers
 
 ### Apple Intelligence
@@ -21,6 +29,16 @@ Native integration with Apple's on-device AI capabilities through `@react-native
 - **Speech Synthesis** - AVSpeechSynthesizer for natural text-to-speech
 
 Production-ready with instant availability on supported iOS devices.
+
+### Llama Engine
+
+Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-native-ai/llama`:
+
+- **Text Generation** - High-performance GGUF inference with full streaming support
+- **Model Management** - Automatic downloading and caching from HuggingFace
+- **Customizable** - Support for context size, threads, and GGUF-specific parameters
+
+Cross-platform parity with optimized performance on both iOS and Android.
 
 ### MLC Engine (Work in Progress)
 

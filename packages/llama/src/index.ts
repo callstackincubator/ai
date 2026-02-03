@@ -1,8 +1,32 @@
-export type { DownloadProgress, LlamaModelOptions, ModelInfo } from './ai-sdk'
-export { llama, LlamaEngine, LlamaLanguageModel } from './ai-sdk'
+export type {
+  LlamaEmbeddingOptions,
+  LlamaModelOptions,
+  LlamaRerankOptions,
+  LlamaSpeechOptions,
+} from './ai-sdk'
+export {
+  createLlamaProvider,
+  llama,
+  LlamaEmbeddingModel,
+  LlamaLanguageModel,
+  LlamaRerankModel,
+  LlamaSpeechModel,
+} from './ai-sdk'
 export type {
   CompletionParams,
   ContextParams,
+  EmbeddingParams,
   LlamaContext,
+  RerankParams,
+  RerankResult,
   TokenData,
 } from 'llama.rn'
+// Storage APIs for model management
+export type { DownloadProgress, ModelInfo } from './storage'
+export {
+  downloadModel,
+  getDownloadedModels,
+  getModelPath,
+  isModelDownloaded,
+  removeModel,
+} from './storage'

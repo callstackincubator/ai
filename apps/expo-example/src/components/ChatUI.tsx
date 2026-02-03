@@ -1,7 +1,9 @@
-import { createAppleProvider } from '@react-native-ai/apple'
-import { ModelMessage, streamText } from 'ai'
+import type { LanguageModelV3 } from '@ai-sdk/provider'
+import type { Tool as ToolDefinition } from '@ai-sdk/provider-utils'
+import { type ModelMessage, stepCountIs, streamText } from 'ai'
 import React, { useEffect, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
   Keyboard,
   ScrollView,
   Text,
@@ -13,25 +15,22 @@ import { useBottomTabBarHeight } from 'react-native-bottom-tabs'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 
-import {
-  checkCalendarEvents,
-  createCalendarEvent,
-  getCurrentTime,
-} from '../../../tools'
+type ToolSet = Record<string, ToolDefinition>
 
-const apple = createAppleProvider({
-  availableTools: {
-    getCurrentTime,
-    createCalendarEvent,
-    checkCalendarEvents,
-  },
-})
+interface ChatUIProps {
+  model: LanguageModelV3
+  tools?: ToolSet
+}
 
-export default function AppleLLMScreen() {
+export default function ChatUI({ model, tools = {} }: ChatUIProps) {
   const [messages, setMessages] = useState<ModelMessage[]>([])
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const scrollViewRef = useRef<ScrollView>(null)
+
+  useEffect(() => {
+    setMessages([])
+  }, [model])
 
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
@@ -54,7 +53,6 @@ export default function AppleLLMScreen() {
     }
 
     const updatedMessages = [...messages, userMessage]
-    setMessages(updatedMessages)
     setInputText('')
     setIsGenerating(true)
 
@@ -72,13 +70,10 @@ export default function AppleLLMScreen() {
 
     try {
       const result = streamText({
-        model: apple(),
+        model,
         messages: updatedMessages,
-        tools: {
-          getCurrentTime,
-          createCalendarEvent,
-          checkCalendarEvents,
-        },
+        tools,
+        stopWhen: stepCountIs(5),
       })
 
       for await (const chunk of result.textStream) {
@@ -133,6 +128,16 @@ export default function AppleLLMScreen() {
           scrollViewRef.current?.scrollToEnd({ animated: true })
         }}
       >
+        {messages.length === 0 && (
+          <View className="items-center justify-center py-8">
+            <Text className="text-gray-400 text-center">Start chatting!</Text>
+            {Object.keys(tools).length > 0 && (
+              <Text className="text-gray-400 text-center">
+                Available tools: {Object.keys(tools).join(', ')}
+              </Text>
+            )}
+          </View>
+        )}
         {messages.map((message, index) => (
           <View
             key={index}
@@ -172,15 +177,19 @@ export default function AppleLLMScreen() {
           onPress={sendMessage}
           disabled={!inputText.trim() || isGenerating}
         >
-          <Text
-            className={
-              inputText.trim() && !isGenerating
-                ? 'text-white font-bold'
-                : 'text-gray-500 font-bold'
-            }
-          >
-            ↑
-          </Text>
+          {isGenerating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text
+              className={
+                inputText.trim()
+                  ? 'text-white font-bold'
+                  : 'text-gray-500 font-bold'
+              }
+            >
+              ↑
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </Animated.View>

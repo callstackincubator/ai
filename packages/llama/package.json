@@ -1,12 +1,20 @@
 {
   "name": "@react-native-ai/llama",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "llama.rn provider for Vercel AI SDK",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
   "types": "lib/typescript/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
+  "files": [
+    "src",
+    "lib",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
   "license": "MIT",
   "homepage": "https://github.com/callstackincubator/ai#readme",
   "repository": {
@@ -16,25 +24,31 @@
   "bugs": {
     "url": "https://github.com/callstackincubator/ai/issues"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "author": "Szymon Rybczak <szymon.rybczak@gmail.com> (https://github.com/szymonrybczak)",
+  "contributors": [
+    "Mike Grabowski <grabbou@gmail.com> (https://github.com/grabbou)"
+  ],
   "scripts": {
     "clean": "del-cli lib",
     "typecheck": "tsc --noEmit",
     "prepare": "bob build"
   },
   "dependencies": {
-    "@ai-sdk/provider": "^2.0.0",
-    "@ai-sdk/provider-utils": "^3.0.10",
+    "@ai-sdk/provider": "^3.0.5",
+    "@ai-sdk/provider-utils": "^4.0.1",
     "react-native-blob-util": "^0.24.5",
     "zod": "^4.0.0"
   },
   "peerDependencies": {
     "react-native": ">=0.76.0",
-    "llama.rn": "^0.10.0-rc.0"
+    "llama.rn": "^0.10.1"
   },
   "devDependencies": {
     "react-native": "0.81.4",
-    "llama.rn": "^0.10.0-rc.0"
+    "llama.rn": "^0.10.1"
   },
   "react-native-builder-bob": {
     "source": "src",

@@ -5,6 +5,16 @@
     "label": "Introduction"
   },
   {
+    "type": "file",
+    "name": "polyfills",
+    "label": "Polyfills"
+  },
+  {
+    "type": "file",
+    "name": "dev-tools",
+    "label": "DevTools"
+  },
+  {
     "type": "dir",
     "name": "apple",
     "label": "Apple",

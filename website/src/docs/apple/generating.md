@@ -87,7 +87,7 @@ import { z } from 'zod';
 
 const getWeather = tool({
   description: 'Get current weather information',
-  parameters: z.object({
+  inputSchema: z.object({
     city: z.string()
   }),
   execute: async ({ city }) => {

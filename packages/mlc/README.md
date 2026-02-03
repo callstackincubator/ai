@@ -12,8 +12,16 @@ A Vercel AI SDK provider for MLC (Machine Learning Compilation) models, enabling
 import { mlc } from '@react-native-ai/mlc'
 import { generateText } from 'ai'
 
-const answer = await generateText({
-  model: mlc('Llama-3.2-3B-Instruct'),
+// Create model
+const model = mlc.languageModel('Llama-3.2-3B-Instruct')
+
+// Download and prepare
+await model.download()
+await model.prepare()
+
+// Generate
+const { text } = await generateText({
+  model,
   prompt: 'What is the meaning of life?'
 })
 ```
@@ -33,6 +41,9 @@ For complete installation instructions and API documentation, visit our [documen
 ## License
 
 MIT
+
+This package includes third-party components licensed under their own terms.
+See `NOTICE` and `ATTRIBUTIONS.md`.
 
 ---
 

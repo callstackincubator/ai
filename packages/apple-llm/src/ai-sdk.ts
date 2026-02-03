@@ -1,15 +1,17 @@
 import type {
-  EmbeddingModelV2,
-  LanguageModelV2,
-  LanguageModelV2CallOptions,
-  LanguageModelV2FunctionTool,
-  LanguageModelV2Prompt,
-  LanguageModelV2ProviderDefinedTool,
-  LanguageModelV2StreamPart,
-  SpeechModelV2,
-  SpeechModelV2CallOptions,
-  TranscriptionModelV2,
-  TranscriptionModelV2CallOptions,
+  EmbeddingModelV3,
+  EmbeddingModelV3CallOptions,
+  EmbeddingModelV3Result,
+  LanguageModelV3,
+  LanguageModelV3CallOptions,
+  LanguageModelV3FunctionTool,
+  LanguageModelV3Prompt,
+  LanguageModelV3ProviderTool,
+  LanguageModelV3StreamPart,
+  SpeechModelV3,
+  SpeechModelV3CallOptions,
+  TranscriptionModelV3,
+  TranscriptionModelV3CallOptions,
 } from '@ai-sdk/provider'
 import {
   generateId,
@@ -25,7 +27,7 @@ import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
-type Tool = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool
+type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 type ToolSet = Record<string, ToolDefinition>
 
 export function createAppleProvider({
@@ -41,55 +43,62 @@ export function createAppleProvider({
   }
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
   provider.languageModel = createLanguageModel
-  provider.textEmbeddingModel = (modelId: string = 'NLContextualEmbedding') => {
-    if (modelId !== 'NLContextualEmbedding') {
-      throw new Error('Only the default model is supported')
-    }
-    return new AppleTextEmbeddingModel()
+  provider.textEmbeddingModel = (options: AppleEmbeddingOptions = {}) => {
+    return new AppleTextEmbeddingModel(options)
   }
   provider.imageModel = () => {
     throw new Error('Image generation models are not supported by Apple LLM')
   }
-  provider.transcriptionModel = (modelId: string = 'SpeechTranscriber') => {
-    if (modelId !== 'SpeechTranscriber') {
-      throw new Error('Only the default model is supported')
-    }
-    return new AppleTranscriptionModel()
+  provider.transcriptionModel = (options: AppleTranscriptionOptions = {}) => {
+    return new AppleTranscriptionModel(options)
   }
-  provider.speechModel = (modelId: string = 'AVSpeechSynthesizer') => {
-    if (modelId !== 'AVSpeechSynthesizer') {
-      throw new Error('Only the default model is supported')
-    }
-    return new AppleSpeechModel()
+  provider.speechModel = (options: AppleSpeechOptions = {}) => {
+    return new AppleSpeechModel(options)
   }
   return provider
 }
 
 export const apple = createAppleProvider()
 
-class AppleTranscriptionModel implements TranscriptionModelV2 {
-  readonly specificationVersion = 'v2'
+export interface AppleTranscriptionOptions {
+  language?: string
+}
+
+class AppleTranscriptionModel implements TranscriptionModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'apple'
 
   readonly modelId = 'SpeechTranscriber'
 
-  async doGenerate(options: TranscriptionModelV2CallOptions) {
+  private prepared = false
+  private language: string
+
+  constructor(options: AppleTranscriptionOptions = {}) {
+    this.language = options.language ?? NativeAppleUtils.getCurrentLocale()
+  }
+
+  async prepare(): Promise<void> {
+    await NativeAppleTranscription.prepare(this.language)
+    this.prepared = true
+  }
+
+  async doGenerate(options: TranscriptionModelV3CallOptions) {
     try {
       let audio = options.audio
       if (typeof audio === 'string') {
         audio = this.base64ToArrayBuffer(audio)
       }
 
-      const language = String(
-        options.providerOptions?.apple?.language ??
-          NativeAppleUtils.getCurrentLocale()
-      )
-
-      await NativeAppleTranscription.prepare(language)
+      if (!this.prepared) {
+        console.warn(
+          '[apple-llm] Model not prepared. Call prepare() ahead of time to optimize performance.'
+        )
+        await this.prepare()
+      }
 
       const transcriptionResult = await NativeAppleTranscription.transcribe(
         audio.buffer,
-        language
+        this.language
       )
 
       const transcriptionText = transcriptionResult.segments
@@ -99,7 +108,7 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
       return {
         text: transcriptionText,
         segments: transcriptionResult.segments,
-        language,
+        language: this.language,
         durationInSeconds: transcriptionResult.duration,
         warnings: [],
         response: {
@@ -124,19 +133,27 @@ class AppleTranscriptionModel implements TranscriptionModelV2 {
   }
 }
 
-class AppleSpeechModel implements SpeechModelV2 {
-  readonly specificationVersion = 'v2'
+export interface AppleSpeechOptions {
+  language?: string
+}
+
+class AppleSpeechModel implements SpeechModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'apple'
 
   readonly modelId = 'AVSpeechSynthesizer'
 
-  async doGenerate(options: SpeechModelV2CallOptions) {
-    const language = String(
-      options.language ?? NativeAppleUtils.getCurrentLocale()
-    )
+  private language: string
 
+  constructor(options: AppleSpeechOptions = {}) {
+    this.language = options.language ?? NativeAppleUtils.getCurrentLocale()
+  }
+
+  async prepare(): Promise<void> {}
+
+  async doGenerate(options: SpeechModelV3CallOptions) {
     const speechOptions = {
-      language,
+      language: this.language,
       voice: options.voice,
     }
 
@@ -162,39 +179,53 @@ class AppleSpeechModel implements SpeechModelV2 {
   }
 }
 
-class AppleTextEmbeddingModel implements EmbeddingModelV2<string> {
-  readonly specificationVersion = 'v2'
+export interface AppleEmbeddingOptions {
+  language?: string
+}
+
+class AppleTextEmbeddingModel implements EmbeddingModelV3 {
+  readonly specificationVersion = 'v3'
   readonly provider = 'apple'
 
   readonly modelId: string = 'NLContextualEmbedding'
   readonly maxEmbeddingsPerCall = Infinity
   readonly supportsParallelCalls = false
 
-  async doEmbed(options: {
-    values: string[]
-    providerOptions?: {
-      apple?: {
-        language?: string
-      }
+  private prepared = false
+  private language: string
+
+  constructor(options: AppleEmbeddingOptions = {}) {
+    this.language = options.language ?? NativeAppleUtils.getCurrentLocale()
+  }
+
+  async prepare(): Promise<void> {
+    await NativeAppleEmbeddings.prepare(this.language)
+    this.prepared = true
+  }
+
+  async doEmbed(
+    options: EmbeddingModelV3CallOptions
+  ): Promise<EmbeddingModelV3Result> {
+    if (!this.prepared) {
+      console.warn(
+        '[apple-llm] Model not prepared. Call prepare() ahead of time to optimize performance.'
+      )
+      await this.prepare()
     }
-  }) {
-    const language = String(
-      options.providerOptions?.apple?.language ??
-        NativeAppleUtils.getCurrentLocale()
-    )
-    await NativeAppleEmbeddings.prepare(language)
+
     const embeddings = await NativeAppleEmbeddings.generateEmbeddings(
       options.values,
-      language
+      this.language
     )
     return {
       embeddings,
+      warnings: [],
     }
   }
 }
 
-class AppleLLMChatLanguageModel implements LanguageModelV2 {
-  readonly specificationVersion = 'v2'
+class AppleLLMChatLanguageModel implements LanguageModelV3 {
+  readonly specificationVersion = 'v3'
   readonly supportedUrls = {}
 
   readonly provider = 'apple'
@@ -206,7 +237,9 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     this.tools = tools
   }
 
-  private prepareMessages(messages: LanguageModelV2Prompt): AppleMessage[] {
+  async prepare(): Promise<void> {}
+
+  private prepareMessages(messages: LanguageModelV3Prompt): AppleMessage[] {
     return messages.map((message): AppleMessage => {
       const content = Array.isArray(message.content)
         ? message.content.reduce((acc, part) => {
@@ -249,7 +282,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
     })
   }
 
-  async doGenerate(options: LanguageModelV2CallOptions) {
+  async doGenerate(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -296,17 +329,25 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
             }
         }
       }),
-      finishReason: 'stop' as const,
+      finishReason: { unified: 'stop' as const, raw: 'stop' },
       usage: {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
+        inputTokens: {
+          total: 0,
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: {
+          total: 0,
+          text: undefined,
+          reasoning: undefined,
+        },
       },
       warnings: [],
     }
   }
 
-  async doStream(options: LanguageModelV2CallOptions) {
+  async doStream(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -341,7 +382,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
       }
     }
 
-    const stream = new ReadableStream<LanguageModelV2StreamPart>({
+    const stream = new ReadableStream<LanguageModelV3StreamPart>({
       async start(controller) {
         try {
           streamId = NativeAppleLLM.generateStream(messages, {
@@ -380,11 +421,19 @@ class AppleLLMChatLanguageModel implements LanguageModelV2 {
               })
               controller.enqueue({
                 type: 'finish',
-                finishReason: 'stop',
+                finishReason: { unified: 'stop' as const, raw: 'stop' },
                 usage: {
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  totalTokens: 0,
+                  inputTokens: {
+                    total: 0,
+                    noCache: undefined,
+                    cacheRead: undefined,
+                    cacheWrite: undefined,
+                  },
+                  outputTokens: {
+                    total: 0,
+                    text: undefined,
+                    reasoning: undefined,
+                  },
                 },
               })
               cleanup()
