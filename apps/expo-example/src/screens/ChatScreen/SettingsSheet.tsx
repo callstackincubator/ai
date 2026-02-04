@@ -1,12 +1,13 @@
-import { Host, Slider } from '@expo/ui/swift-ui'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { SymbolView } from 'expo-symbols'
 import React, { RefObject } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { useChatStore } from '../../../store/chatStore'
-import { colors } from '../../../theme/colors'
-import { toolDefinitions } from '../../../tools'
+import { Host, Slider } from '../../components/expo-ui'
+import { useChatStore } from '../../store/chatStore'
+import { colors } from '../../theme/colors'
+import { toolDefinitions } from '../../tools'
 
 type SettingsSheetProps = {
   ref: RefObject<TrueSheet | null>
@@ -57,6 +58,13 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                         size={20}
                         tintColor={colors.systemBlue}
                         resizeMode="scaleAspectFit"
+                        fallback={
+                          <Ionicons
+                            name="checkmark"
+                            size={20}
+                            color={colors.systemBlue}
+                          />
+                        }
                       />
                     )}
                   </View>
@@ -122,6 +130,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
     paddingTop: 8,
+    backgroundColor: '#fff',
   },
   sheetHeader: {
     paddingTop: 16,
@@ -169,7 +178,7 @@ const styles = StyleSheet.create({
   },
   toolItemContentBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator as any,
+    borderBottomColor: colors.separator,
   },
   toolItemTextContainer: {
     flex: 1,

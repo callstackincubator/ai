@@ -1,10 +1,11 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { DrawerActions, useNavigation } from '@react-navigation/native'
 import { SymbolView } from 'expo-symbols'
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
-import { colors } from '../../../theme/colors'
+import { AdaptiveGlass } from '../../components/AdaptiveGlass'
+import { colors } from '../../theme/colors'
 
 type ChatHeaderProps = {
   title: string
@@ -33,6 +34,7 @@ export function ChatHeader({
             size={20}
             tintColor={colors.label}
             resizeMode="scaleAspectFit"
+            fallback={<Ionicons name="menu" size={20} color={colors.label} />}
           />
         </Pressable>
       </AdaptiveGlass>
@@ -46,6 +48,13 @@ export function ChatHeader({
             size={12}
             tintColor={colors.secondaryLabel}
             resizeMode="scaleAspectFit"
+            fallback={
+              <Ionicons
+                name="chevron-down"
+                size={12}
+                color={colors.secondaryLabel}
+              />
+            }
           />
         </View>
       </Pressable>
@@ -60,6 +69,13 @@ export function ChatHeader({
             size={20}
             tintColor={colors.label}
             resizeMode="scaleAspectFit"
+            fallback={
+              <Ionicons
+                name="settings-outline"
+                size={20}
+                color={colors.label}
+              />
+            }
           />
         </Pressable>
       </AdaptiveGlass>
@@ -75,7 +91,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator as any,
+    borderBottomColor: colors.separator,
   },
   headerButton: {
     borderRadius: 18,

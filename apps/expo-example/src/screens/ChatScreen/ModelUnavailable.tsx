@@ -1,9 +1,10 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
-import { colors } from '../../../theme/colors'
+import { AdaptiveGlass } from '../../components/AdaptiveGlass'
+import { colors } from '../../theme/colors'
 
 type ModelUnavailableProps = {
   onChooseModel: () => void
@@ -19,6 +20,9 @@ export function ModelUnavailable({ onChooseModel }: ModelUnavailableProps) {
             size={32}
             tintColor={colors.systemYellow}
             resizeMode="scaleAspectFit"
+            fallback={
+              <Ionicons name="warning" size={32} color={colors.systemYellow} />
+            }
           />
         </View>
       </AdaptiveGlass>

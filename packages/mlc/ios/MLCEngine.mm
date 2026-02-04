@@ -340,7 +340,7 @@ using namespace facebook;
   // Check if config already exists
   NSURL* modelDirURL = [self.bundleURL URLByAppendingPathComponent:modelId];
   NSURL* modelConfigURL = [modelDirURL URLByAppendingPathComponent:@"mlc-chat-config.json"];
-  NSURL* ndarrayCacheURL = [modelDirURL URLByAppendingPathComponent:@"ndarray-cache.json"];
+  NSURL* tensorCacheURL = [modelDirURL URLByAppendingPathComponent:@"tensor-cache.json"];
   
   if (!modelDirURL || !modelConfigURL) {
     if (error) {
@@ -357,26 +357,26 @@ using namespace facebook;
     return;
   }
   
-  // Download and save ndarray-cache if it doesn't exist
-  if (![[NSFileManager defaultManager] fileExistsAtPath:[ndarrayCacheURL path]]) {
-    if (![self downloadFile:modelUrl filename:@"ndarray-cache.json" toURL:ndarrayCacheURL error:error]) {
+  // Download and save tensor-cache if it doesn't exist
+  if (![[NSFileManager defaultManager] fileExistsAtPath:[tensorCacheURL path]]) {
+    if (![self downloadFile:modelUrl filename:@"tensor-cache.json" toURL:tensorCacheURL error:error]) {
       return;
     }
   }
   
-  // Read and parse ndarray cache
-  NSData* ndarrayCacheData = [NSData dataWithContentsOfURL:ndarrayCacheURL];
-  if (!ndarrayCacheData) {
+  // Read and parse tensor cache
+  NSData* tensorCacheData = [NSData dataWithContentsOfURL:tensorCacheURL];
+  if (!tensorCacheData) {
     if (error) {
-      *error = [NSError errorWithDomain:@"MLCEngine" code:2 userInfo:@{NSLocalizedDescriptionKey : @"Failed to read ndarray cache"}];
+      *error = [NSError errorWithDomain:@"MLCEngine" code:2 userInfo:@{NSLocalizedDescriptionKey : @"Failed to read tensor cache"}];
     }
     return;
   }
   
-  NSError* ndarrayCacheJsonError;
-  NSDictionary* ndarrayCache = [NSJSONSerialization JSONObjectWithData:ndarrayCacheData options:0 error:&ndarrayCacheJsonError];
-  if (ndarrayCacheJsonError) {
-    *error = ndarrayCacheJsonError;
+  NSError* tensorCacheJsonError;
+  NSDictionary* tensorCache = [NSJSONSerialization JSONObjectWithData:tensorCacheData options:0 error:&tensorCacheJsonError];
+  if (tensorCacheJsonError) {
+    *error = tensorCacheJsonError;
     return;
   }
 
@@ -406,8 +406,8 @@ using namespace facebook;
   // Create unified list of files to download
   NSMutableArray* filesToDownload = [NSMutableArray new];
   
-  // Add parameter files from ndarray cache
-  NSArray* records = ndarrayCache[@"records"];
+  // Add parameter files from tensor cache
+  NSArray* records = tensorCache[@"records"];
   if ([records isKindOfClass:[NSArray class]]) {
     for (NSDictionary* record in records) {
       NSString* dataPath = record[@"dataPath"];

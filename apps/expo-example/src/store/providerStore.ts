@@ -3,7 +3,8 @@ import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithRefresh } from 'jotai/utils'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
-import { type Availability, languageAdapters } from '../config/providers'
+import { languageAdapters } from '../config/providers'
+import { type Availability } from '../config/providers.common'
 import { toolDefinitions } from '../tools'
 
 export type CustomModel = {
@@ -22,11 +23,11 @@ const adaptersAtom = atom((get) => {
   return [...languageAdapters, ...customModels]
 })
 
-const availabilityAtom = atomWithRefresh((get) => {
+const availabilityAtom = atomWithRefresh(async (get) => {
   const adapters = get(adaptersAtom)
   const map = new Map<string, Availability>()
   for (const adapter of adapters) {
-    map.set(adapter.modelId, adapter.isAvailable())
+    map.set(adapter.modelId, await adapter.isAvailable())
   }
   return map
 })
