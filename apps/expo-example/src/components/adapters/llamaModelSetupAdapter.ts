@@ -5,37 +5,45 @@ import { ToolSet } from 'ai'
 import {
   downloadModel,
   getModelPath,
-  isModelDownloaded,
   removeModel,
 } from '../../../../../packages/llama/src/storage'
 import type { Availability, SetupAdapter } from '../../config/providers'
+import { isModelDownloaded } from '../../utils/storage'
 
 export const createLlamaLanguageSetupAdapter = (
-  modelId: string,
+  hfModelId: string,
   tools: ToolSet = {}
 ): SetupAdapter<LanguageModelV3> => {
-  const modelPath = getModelPath(modelId)
+  const modelPath = getModelPath(hfModelId)
   const model = llama.languageModel(modelPath, {
     contextParams: {
       n_ctx: 2048,
       n_gpu_layers: 99,
     },
   })
+  // Extract friendly name from HuggingFace model ID
+  const filename = hfModelId.split('/').pop() ?? hfModelId
+  const friendlyName = filename.replace(/\.gguf$/, '')
   return {
     model,
-    tools,
-    label: `Llama (${modelId})`,
-    async isAvailable(): Promise<Availability> {
-      const downloaded = await isModelDownloaded(modelId)
+    modelId: model.modelId,
+    display: {
+      label: friendlyName,
+      accentColor: '#F97316',
+      icon: 'memory',
+    },
+    builtIn: false,
+    isAvailable(): Availability {
+      const downloaded = isModelDownloaded(hfModelId)
       return downloaded ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
-      await downloadModel(modelId, (progress) => {
+      await downloadModel(hfModelId, (progress) => {
         onProgress(progress.percentage)
       })
     },
     async delete() {
-      await removeModel(modelId)
+      await removeModel(hfModelId)
     },
     async unload() {
       await model.unload()
