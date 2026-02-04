@@ -2,10 +2,8 @@ import { tool } from 'ai'
 import * as Calendar from 'expo-calendar'
 import { z } from 'zod'
 
-/**
- * Creates a new calendar event with specified title, date, time and duration
- */
-export const createCalendarEvent = tool({
+const createCalendarEvent = tool({
+  title: 'createCalendarEvent',
   description: 'Create a new calendar event',
   inputSchema: z.object({
     title: z.string().describe('Event title'),
@@ -36,10 +34,8 @@ export const createCalendarEvent = tool({
   },
 })
 
-/**
- * Retrieves upcoming calendar events for a specified number of days
- */
-export const checkCalendarEvents = tool({
+const checkCalendarEvents = tool({
+  title: 'checkCalendarEvents',
   description: 'Check upcoming calendar events',
   inputSchema: z.object({
     days: z.number().optional().describe('Number of days to look ahead'),
@@ -67,13 +63,17 @@ export const checkCalendarEvents = tool({
   },
 })
 
-/**
- * Get current time
- */
-export const getCurrentTime = tool({
+const getCurrentTime = tool({
+  title: 'getCurrentTime',
   description: 'Get current time and date',
   inputSchema: z.object({}),
   execute: async () => {
     return `Current time is: ${new Date().toUTCString()}`
   },
 })
+
+export const toolDefinitions = {
+  createCalendarEvent,
+  checkCalendarEvents,
+  getCurrentTime,
+}

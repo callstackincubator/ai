@@ -2,12 +2,12 @@ import type { SpeechModelV3 } from '@ai-sdk/provider'
 import {
   downloadModel,
   getModelPath,
-  isModelDownloaded,
   llama,
   removeModel,
 } from '@react-native-ai/llama'
 
 import type { Availability, SetupAdapter } from '../../config/providers'
+import { isModelDownloaded } from '../../utils/storage'
 
 interface LlamaSpeechSetupOptions {
   modelId: string
@@ -15,10 +15,10 @@ interface LlamaSpeechSetupOptions {
 }
 
 export const createLlamaSpeechSetupAdapter = ({
-  modelId,
+  modelId: hfModelId,
   vocoderId,
 }: LlamaSpeechSetupOptions): SetupAdapter<SpeechModelV3> => {
-  const modelPath = getModelPath(modelId)
+  const modelPath = getModelPath(hfModelId)
   const vocoderPath = getModelPath(vocoderId)
   const model = llama.speechModel(modelPath, {
     vocoderPath,
@@ -28,23 +28,32 @@ export const createLlamaSpeechSetupAdapter = ({
       n_gpu_layers: 99,
     },
   })
+  // Extract friendly name from HuggingFace model ID
+  const filename = hfModelId.split('/').pop() ?? hfModelId
+  const friendlyName = filename.replace(/\.gguf$/, '')
   return {
     model,
-    label: modelId,
-    async isAvailable(): Promise<Availability> {
-      const [modelReady, vocoderReady] = await Promise.all([
-        isModelDownloaded(modelId),
+    modelId: model.modelId,
+    display: {
+      label: friendlyName,
+      accentColor: '#F97316',
+      icon: 'memory',
+    },
+    builtIn: false,
+    isAvailable(): Availability {
+      const [modelReady, vocoderReady] = [
+        isModelDownloaded(hfModelId),
         isModelDownloaded(vocoderId),
-      ])
+      ]
       return modelReady && vocoderReady ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
-      const [modelReady, vocoderReady] = await Promise.all([
-        isModelDownloaded(modelId),
+      const [modelReady, vocoderReady] = [
+        isModelDownloaded(hfModelId),
         isModelDownloaded(vocoderId),
-      ])
+      ]
       if (!modelReady || !vocoderReady) {
-        await downloadModel(modelId, (progress) => {
+        await downloadModel(hfModelId, (progress) => {
           onProgress(Math.round(progress.percentage * 0.5))
         })
         await downloadModel(vocoderId, (progress) => {
@@ -53,7 +62,7 @@ export const createLlamaSpeechSetupAdapter = ({
       }
     },
     async delete() {
-      await removeModel(modelId)
+      await removeModel(hfModelId)
       await removeModel(vocoderId)
     },
     async unload() {
