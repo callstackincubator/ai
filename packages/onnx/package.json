@@ -1,0 +1,72 @@
+{
+  "name": "@react-native-ai/onnx-wrapper",
+  "version": "0.11.0",
+  "description": "Wrapper for ONNX runtime - provider for Vercel AI SDK",
+  "main": "lib/commonjs/index",
+  "module": "lib/module/index",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index",
+  "source": "src/index",
+  "license": "MIT",
+  "homepage": "https://github.com/callstackincubator/ai#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/callstackincubator/ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/callstackincubator/ai/issues"
+  },
+  "scripts": {
+    "clean": "del-cli lib",
+    "typecheck": "tsc --noEmit",
+    "prepare": "bob build"
+  },
+  "files": [
+    "src",
+    "lib",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*",
+    "NOTICE",
+    "README.md"
+  ],
+  "dependencies": {
+    "@ai-sdk/provider": "^3.0.5",
+    "@ai-sdk/provider-utils": "^4.0.9",
+    "@huggingface/transformers": "^3.8.1",
+    "react-native-blob-util": "^0.24.6",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.76.0",
+    "onnxruntime-react-native": "^1.23.2"
+  },
+  "devDependencies": {
+    "react-native": "0.81.4",
+    "onnxruntime-react-native": "^1.23.2"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "keywords": [
+    "react-native",
+    "onnx",
+    "llm",
+    "ai",
+    "sdk",
+    "vercel",
+    "on-device"
+  ]
+}

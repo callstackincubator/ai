@@ -17,7 +17,11 @@ import { generateId } from '@ai-sdk/provider-utils'
 import {
   AISDKStorage,
   type DownloadProgress,
+  END_OF_THINKING_PLACEHOLDER,
+  END_OF_TOOL_CALL_PLACEHOLDER,
   type ModelInfo,
+  START_OF_THINKING_PLACEHOLDER,
+  START_OF_TOOL_CALL_PLACEHOLDER,
 } from '@react-native-ai/common'
 import {
   type CompletionParams,
@@ -280,12 +284,6 @@ export class LlamaEngine {
     LlamaEngine.storage.setStoragePath(path)
   }
 }
-
-const START_OF_THINKING_PLACEHOLDER = '<think>'
-const END_OF_THINKING_PLACEHOLDER = '</think>'
-
-const START_OF_TOOL_CALL_PLACEHOLDER = '<tool_call>'
-const END_OF_TOOL_CALL_PLACEHOLDER = '</tool_call>'
 
 /**
  * llama.rn Language Model for AI SDK
