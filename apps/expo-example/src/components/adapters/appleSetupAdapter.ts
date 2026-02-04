@@ -2,20 +2,26 @@ import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
 import { apple, createAppleProvider } from '@react-native-ai/apple'
 import { ToolSet } from 'ai'
 
-import type { SetupAdapter } from '../../config/providers'
+import type { SetupAdapter } from '../../config/providers.common'
 
 export const createAppleLanguageSetupAdapter = (
   tools: ToolSet = {}
 ): SetupAdapter<LanguageModelV3> => {
   const apple = createAppleProvider({
+    // @ts-expect-error
     availableTools: tools,
   })
   const model = apple.languageModel()
   return {
     model,
-    tools,
-    label: 'Apple Foundation Model',
-    async isAvailable() {
+    modelId: model.modelId,
+    display: {
+      label: 'Apple Intelligence',
+      accentColor: '#2563EB',
+      icon: 'auto-awesome',
+    },
+    builtIn: true,
+    isAvailable() {
       return apple.isAvailable() ? 'yes' : 'no'
     },
     async download() {},
@@ -32,8 +38,14 @@ export const createAppleSpeechSetupAdapter =
     const model = apple.speechModel()
     return {
       model,
-      label: 'Apple Speech Model',
-      async isAvailable() {
+      modelId: model.modelId,
+      display: {
+        label: 'Apple Speech',
+        accentColor: '#2563EB',
+        icon: 'auto-awesome',
+      },
+      builtIn: true,
+      isAvailable() {
         return apple.isAvailable() ? 'yes' : 'no'
       },
       async download() {},

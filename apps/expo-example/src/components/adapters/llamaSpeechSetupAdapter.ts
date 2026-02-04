@@ -1,7 +1,7 @@
 import type { SpeechModelV3 } from '@ai-sdk/provider'
 import { llama, LlamaEngine } from '@react-native-ai/llama'
 
-import type { Availability, SetupAdapter } from '../../config/providers'
+import type { Availability, SetupAdapter } from '../../config/providers.common'
 
 interface LlamaSpeechSetupOptions {
   modelId: string
@@ -9,10 +9,10 @@ interface LlamaSpeechSetupOptions {
 }
 
 export const createLlamaSpeechSetupAdapter = ({
-  modelId,
+  modelId: hfModelId,
   vocoderId,
 }: LlamaSpeechSetupOptions): SetupAdapter<SpeechModelV3> => {
-  const modelPath = LlamaEngine.storage.getModelPath(modelId)
+  const modelPath = LlamaEngine.storage.getModelPath(hfModelId)
   const vocoderPath = LlamaEngine.storage.getModelPath(vocoderId)
   const model = llama.speechModel(modelPath, {
     vocoderPath,
@@ -22,23 +22,32 @@ export const createLlamaSpeechSetupAdapter = ({
       n_gpu_layers: 99,
     },
   })
+  // Extract friendly name from HuggingFace model ID
+  const filename = hfModelId.split('/').pop() ?? hfModelId
+  const friendlyName = filename.replace(/\.gguf$/, '')
   return {
     model,
-    label: modelId,
-    async isAvailable(): Promise<Availability> {
-      const [modelReady, vocoderReady] = await Promise.all([
-        LlamaEngine.storage.isModelDownloaded(modelId),
+    modelId: model.modelId,
+    display: {
+      label: friendlyName,
+      accentColor: '#F97316',
+      icon: 'memory',
+    },
+    builtIn: false,
+    isAvailable(): Availability {
+      const [modelReady, vocoderReady] = [
+        LlamaEngine.storage.isModelDownloaded(hfModelId),
         LlamaEngine.storage.isModelDownloaded(vocoderId),
-      ])
+      ]
       return modelReady && vocoderReady ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
-      const [modelReady, vocoderReady] = await Promise.all([
-        LlamaEngine.storage.isModelDownloaded(modelId),
+      const [modelReady, vocoderReady] = [
+        LlamaEngine.storage.isModelDownloaded(hfModelId),
         LlamaEngine.storage.isModelDownloaded(vocoderId),
-      ])
+      ]
       if (!modelReady || !vocoderReady) {
-        await LlamaEngine.storage.downloadModel(modelId, (progress) => {
+        await LlamaEngine.storage.downloadModel(hfModelId, (progress) => {
           onProgress(Math.round(progress.percentage * 0.5))
         })
         await LlamaEngine.storage.downloadModel(vocoderId, (progress) => {
@@ -47,7 +56,7 @@ export const createLlamaSpeechSetupAdapter = ({
       }
     },
     async delete() {
-      await LlamaEngine.storage.removeModel(modelId)
+      await LlamaEngine.storage.removeModel(hfModelId)
       await LlamaEngine.storage.removeModel(vocoderId)
     },
     async unload() {

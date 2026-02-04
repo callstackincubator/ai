@@ -26,7 +26,7 @@ class ModelDownloader(
   private var paramsConfig: ParamsConfig = ParamsConfig(emptyList())
 
   companion object {
-    const val PARAMS_CONFIG_FILENAME = "ndarray-cache.json"
+    const val PARAMS_CONFIG_FILENAME = "tensor-cache.json"
     const val MODEL_CONFIG_FILENAME = "mlc-chat-config.json"
     private val json = Json { ignoreUnknownKeys = true }
   }
