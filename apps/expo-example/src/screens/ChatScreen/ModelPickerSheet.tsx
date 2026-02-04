@@ -1,8 +1,8 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { SymbolView } from 'expo-symbols'
 import React, { RefObject, Suspense, useState } from 'react'
-import Ionicons from '@expo/vector-icons/Ionicons'
 import {
   Pressable,
   ScrollView,
@@ -50,7 +50,7 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
   }
 
   const { modelId: selectedModelId } = chatSettings
-
+  console.log({ selectedModelId })
   return (
     <TrueSheet ref={ref} scrollable style={{ backgroundColor: '#fff' }}>
       <View style={styles.sheetContainer}>
@@ -135,7 +135,13 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
                     size={18}
                     tintColor={colors.secondaryLabel}
                     resizeMode="scaleAspectFit"
-                    fallback={<Ionicons name="link" size={18} color={colors.secondaryLabel} />}
+                    fallback={
+                      <Ionicons
+                        name="link"
+                        size={18}
+                        color={colors.secondaryLabel}
+                      />
+                    }
                   />
                 </View>
                 <Text style={styles.addCustomModelText}>

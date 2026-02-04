@@ -40,6 +40,7 @@
         "@lodev09/react-native-true-sheet": "^3.8.1",
         "@react-native-ai/apple": "workspace:*",
         "@react-native-ai/llama": "workspace:*",
+        "@react-native-ai/mlc": "workspace:*",
         "@react-native-async-storage/async-storage": "^2.2.0",
         "@react-native-picker/picker": "2.11.1",
         "@react-navigation/bottom-tabs": "^7.9.0",
