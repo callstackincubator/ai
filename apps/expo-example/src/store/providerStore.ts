@@ -3,7 +3,8 @@ import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithRefresh } from 'jotai/utils'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
-import { type Availability, languageAdapters } from '../config/providers'
+import { languageAdapters } from '../config/providers'
+import { type Availability } from '../config/providers.common'
 import { toolDefinitions } from '../tools'
 
 export type CustomModel = {

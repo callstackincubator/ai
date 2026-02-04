@@ -7,7 +7,7 @@ import {
   getModelPath,
   removeModel,
 } from '../../../../../packages/llama/src/storage'
-import type { Availability, SetupAdapter } from '../../config/providers'
+import type { Availability, SetupAdapter } from '../../config/providers.common'
 import { isModelDownloaded } from '../../utils/storage'
 
 export const createLlamaLanguageSetupAdapter = (

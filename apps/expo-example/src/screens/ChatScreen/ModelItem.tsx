@@ -1,4 +1,5 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React from 'react'
 import {
@@ -9,12 +10,12 @@ import {
   View,
 } from 'react-native'
 
-import type { SetupAdapter } from '../../../config/providers'
+import type { SetupAdapter } from '../../config/providers.common'
 import {
   useDownloadProgress,
   useProviderStore,
-} from '../../../store/providerStore'
-import { colors } from '../../../theme/colors'
+} from '../../store/providerStore'
+import { colors } from '../../theme/colors'
 
 type ModelItemProps = {
   adapter: SetupAdapter<LanguageModelV3>
@@ -75,6 +76,9 @@ export function ModelItem({
           size={20}
           tintColor="#fff"
           resizeMode="scaleAspectFit"
+          fallback={
+            <Ionicons name="hardware-chip-outline" size={20} color="#fff" />
+          }
         />
       </View>
       <View
@@ -123,6 +127,13 @@ export function ModelItem({
               size={20}
               tintColor={colors.systemBlue}
               resizeMode="scaleAspectFit"
+              fallback={
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={colors.systemBlue}
+                />
+              }
             />
           ) : null}
         </View>
@@ -150,6 +161,9 @@ export function ModelItemFallback({
           size={20}
           tintColor="#fff"
           resizeMode="scaleAspectFit"
+          fallback={
+            <Ionicons name="hardware-chip-outline" size={20} color="#fff" />
+          }
         />
       </View>
       <View
@@ -193,7 +207,7 @@ const styles = StyleSheet.create({
   },
   modelItemInfoBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator as any,
+    borderBottomColor: colors.separator,
   },
   modelItemTextContainer: {
     flex: 1,

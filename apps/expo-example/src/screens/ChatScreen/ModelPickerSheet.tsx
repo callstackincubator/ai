@@ -2,6 +2,7 @@ import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { SymbolView } from 'expo-symbols'
 import React, { RefObject, Suspense, useState } from 'react'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import {
   Pressable,
   ScrollView,
@@ -11,10 +12,10 @@ import {
   View,
 } from 'react-native'
 
-import type { SetupAdapter } from '../../../config/providers'
-import { useChatStore } from '../../../store/chatStore'
-import { useProviderStore } from '../../../store/providerStore'
-import { colors } from '../../../theme/colors'
+import type { SetupAdapter } from '../../config/providers.common'
+import { useChatStore } from '../../store/chatStore'
+import { useProviderStore } from '../../store/providerStore'
+import { colors } from '../../theme/colors'
 import { ModelItem, ModelItemFallback } from './ModelItem'
 
 type ModelPickerSheetProps = {
@@ -51,7 +52,7 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
   const { modelId: selectedModelId } = chatSettings
 
   return (
-    <TrueSheet ref={ref} scrollable>
+    <TrueSheet ref={ref} scrollable style={{ backgroundColor: '#fff' }}>
       <View style={styles.sheetContainer}>
         <ScrollView nestedScrollEnabled>
           <View style={styles.sheetHeader}>
@@ -134,6 +135,7 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
                     size={18}
                     tintColor={colors.secondaryLabel}
                     resizeMode="scaleAspectFit"
+                    fallback={<Ionicons name="link" size={18} color={colors.secondaryLabel} />}
                   />
                 </View>
                 <Text style={styles.addCustomModelText}>
@@ -153,6 +155,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
     paddingTop: 8,
+    backgroundColor: '#fff',
   },
   sheetHeader: {
     paddingTop: 16,

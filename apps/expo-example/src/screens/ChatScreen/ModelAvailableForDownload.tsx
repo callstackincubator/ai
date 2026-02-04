@@ -1,14 +1,15 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
-import { useChatStore } from '../../../store/chatStore'
+import { AdaptiveGlass } from '../../components/AdaptiveGlass'
+import { useChatStore } from '../../store/chatStore'
 import {
   useDownloadProgress,
   useProviderStore,
-} from '../../../store/providerStore'
-import { colors } from '../../../theme/colors'
+} from '../../store/providerStore'
+import { colors } from '../../theme/colors'
 
 export function ModelAvailableForDownload() {
   const {
@@ -32,6 +33,13 @@ export function ModelAvailableForDownload() {
             size={32}
             tintColor={colors.systemBlue}
             resizeMode="scaleAspectFit"
+            fallback={
+              <Ionicons
+                name="download-outline"
+                size={32}
+                color={colors.systemBlue}
+              />
+            }
           />
         </View>
       </AdaptiveGlass>

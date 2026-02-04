@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import {
   createDrawerNavigator,
   DrawerContentComponentProps,
@@ -7,14 +8,14 @@ import { NavigationContainer } from '@react-navigation/native'
 import { StatusBar } from 'expo-status-bar'
 import { SymbolView } from 'expo-symbols'
 import { Provider as JotaiProvider } from 'jotai'
-import React, { Suspense } from 'react'
+import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { AdaptiveGlass } from './components/AdaptiveGlass'
-import ChatScreen from './screens/apple/ChatScreen'
+import ChatScreen from './screens/ChatScreen'
 import { useChatStore } from './store/chatStore'
 import { colors } from './theme/colors'
 
@@ -60,6 +61,9 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
                 size={18}
                 tintColor={colors.label}
                 resizeMode="scaleAspectFit"
+                fallback={
+                  <Ionicons name="add" size={18} color={colors.label} />
+                }
               />
             </Pressable>
           </AdaptiveGlass>
@@ -74,6 +78,13 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
                 size={22}
                 tintColor={colors.secondaryLabel}
                 resizeMode="scaleAspectFit"
+                fallback={
+                  <Ionicons
+                    name="chatbubble-outline"
+                    size={22}
+                    color={colors.secondaryLabel}
+                  />
+                }
               />
             </View>
           </AdaptiveGlass>
@@ -110,6 +121,13 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
                     size={18}
                     tintColor={colors.tertiaryLabel}
                     resizeMode="scaleAspectFit"
+                    fallback={
+                      <Ionicons
+                        name="chatbubble-outline"
+                        size={18}
+                        color={colors.tertiaryLabel}
+                      />
+                    }
                   />
                   <Text style={styles.chatItemTitle} numberOfLines={1}>
                     {chat.title}
@@ -120,6 +138,13 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
                       size={16}
                       tintColor={colors.systemRed}
                       resizeMode="scaleAspectFit"
+                      fallback={
+                        <Ionicons
+                          name="trash-outline"
+                          size={16}
+                          color={colors.systemRed}
+                        />
+                      }
                     />
                   </Pressable>
                 </Pressable>
@@ -151,7 +176,7 @@ export default function App() {
                 <Drawer.Screen name="Chat" component={ChatScreen} />
               </Drawer.Navigator>
             </NavigationContainer>
-            <StatusBar style="auto" />
+            <StatusBar style="dark" />
           </JotaiProvider>
         </SafeAreaProvider>
       </KeyboardProvider>
@@ -165,7 +190,7 @@ const styles = StyleSheet.create({
   },
   drawer: {
     width: 280,
-    backgroundColor: colors.systemBackground as any,
+    backgroundColor: colors.systemBackground,
   },
   drawerScroll: {
     flex: 1,
@@ -174,7 +199,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator as any,
+    borderBottomColor: colors.separator,
   },
   drawerHeaderRow: {
     flexDirection: 'row',

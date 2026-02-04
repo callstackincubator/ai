@@ -1,5 +1,5 @@
-import { apple } from '@react-native-ai/apple'
-import { experimental_transcribe } from 'ai'
+import Ionicons from '@expo/vector-icons/Ionicons'
+import { experimental_transcribe, TranscriptionModel } from 'ai'
 import { SymbolView } from 'expo-symbols'
 import { useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from 'react-native'
@@ -11,25 +11,27 @@ import {
   RecorderAdapterNode,
 } from 'react-native-audio-api'
 
-import { colors } from '../theme/colors'
-import {
-  float32ArrayToWAV,
-  mergeBuffersToFloat32Array,
-} from '../utils/audioUtils'
-import { AdaptiveGlass } from './AdaptiveGlass'
+import { colors } from '../../theme/colors'
+import type { float32ArrayToWAV } from '../../utils/appleAudioUtils'
+import { mergeBuffersToFloat32Array } from '../../utils/audioUtils'
+import { AdaptiveGlass } from '../AdaptiveGlass'
 
 const SAMPLE_RATE = 16000
 const STOP_DELAY_MS = 500
 
-interface RecordButtonProps {
+export interface RecordButtonUIBaseProps {
   onTranscriptionComplete: (text: string) => void
   disabled?: boolean
+  transcriptionModel?: TranscriptionModel
+  float32ArrayToWAV?: typeof float32ArrayToWAV
 }
 
-export function RecordButton({
+export function RecordButtonUIBase({
   onTranscriptionComplete,
   disabled = false,
-}: RecordButtonProps) {
+  transcriptionModel,
+  float32ArrayToWAV,
+}: RecordButtonUIBaseProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -66,11 +68,16 @@ export function RecordButton({
   }
 
   const transcribe = async (audioBuffer: ArrayBuffer) => {
+    if (!transcriptionModel) {
+      console.error('transcriptionModel is not provided')
+      return
+    }
+
     setIsTranscribing(true)
 
     try {
       const result = await experimental_transcribe({
-        model: apple.transcriptionModel(),
+        model: transcriptionModel,
         audio: audioBuffer,
       })
 
@@ -130,6 +137,11 @@ export function RecordButton({
       return
     }
 
+    if (!float32ArrayToWAV) {
+      console.error('float32ArrayToWAV function is not provided')
+      return
+    }
+
     // Immediately update UI to feel snappy
     setIsRecording(false)
     setIsStopping(true)
@@ -166,7 +178,7 @@ export function RecordButton({
     return (
       <Pressable
         onPress={handlePress}
-        disabled={disabled}
+        disabled={disabled || !transcriptionModel}
         style={styles.recordingButton}
       >
         <ActivityIndicator size="small" color="#fff" />
@@ -178,7 +190,7 @@ export function RecordButton({
     <AdaptiveGlass isInteractive style={styles.glassButton}>
       <Pressable
         onPress={handlePress}
-        disabled={disabled || isProcessing}
+        disabled={disabled || isProcessing || !transcriptionModel}
         style={styles.pressable}
       >
         {isProcessing ? (
@@ -192,6 +204,7 @@ export function RecordButton({
             size={20}
             tintColor={colors.label}
             resizeMode="scaleAspectFit"
+            fallback={<Ionicons name="mic" size={20} color={colors.label} />}
           />
         )}
       </Pressable>

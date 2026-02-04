@@ -1,11 +1,12 @@
-import { Button, ContextMenu, Host } from '@expo/ui/swift-ui'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React, { useState } from 'react'
-import { Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native'
 
-import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
-import { RecordButton } from '../../../components/RecordButton'
-import { colors } from '../../../theme/colors'
+import { AdaptiveGlass } from '../../components/AdaptiveGlass'
+import { Button, ContextMenu, Host } from '../../components/expo-ui'
+import { RecordButton } from '../../components/RecordButton'
+import { colors } from '../../theme/colors'
 
 type ChatInputBarProps = {
   onSend: (message: string) => void
@@ -30,20 +31,34 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
             <ContextMenu activationMethod="singlePress">
               <ContextMenu.Items>
                 <Button
-                  systemImage="camera"
+                  systemImage={Platform.select({
+                    ios: 'camera',
+                    android: 'rounded.Contrast',
+                  })}
                   onPress={() => console.log('Take Photo')}
                 >
                   Take Photo
                 </Button>
                 <Button
-                  systemImage="photo.on.rectangle"
+                  systemImage={Platform.select({
+                    ios: 'photo.on.rectangle',
+                    android: 'rounded.Build',
+                  })}
                   onPress={() => console.log('Photo Library')}
                 >
                   Photo Library
                 </Button>
               </ContextMenu.Items>
               <ContextMenu.Trigger>
-                <Button systemImage="plus" variant="borderless" color="#000" />
+                <Button
+                  systemImage={Platform.select({
+                    ios: 'plus',
+                    android: 'rounded.Add',
+                  })}
+                  {...(Platform.select({
+                    ios: { variant: 'borderless', color: '#000' },
+                  }) ?? {})}
+                />
               </ContextMenu.Trigger>
             </ContextMenu>
           </Host>
@@ -72,6 +87,7 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
               size={20}
               tintColor="#fff"
               resizeMode="scaleAspectFit"
+              fallback={<Ionicons name="arrow-up" size={20} color="#fff" />}
             />
           </Pressable>
         ) : (

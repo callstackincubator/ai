@@ -6,7 +6,7 @@ import {
   removeModel,
 } from '@react-native-ai/llama'
 
-import type { Availability, SetupAdapter } from '../../config/providers'
+import type { Availability, SetupAdapter } from '../../config/providers.common'
 import { isModelDownloaded } from '../../utils/storage'
 
 interface LlamaSpeechSetupOptions {

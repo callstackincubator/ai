@@ -1,9 +1,10 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
-import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
-import { colors } from '../../../theme/colors'
+import { AdaptiveGlass } from '../../components/AdaptiveGlass'
+import { colors } from '../../theme/colors'
 
 type ChatEmptyStateProps = {
   title: string
@@ -20,6 +21,9 @@ export function ChatEmptyState({ title, subtitle }: ChatEmptyStateProps) {
             size={32}
             tintColor={colors.systemBlue}
             resizeMode="scaleAspectFit"
+            fallback={
+              <Ionicons name="sparkles" size={32} color={colors.systemBlue} />
+            }
           />
         </View>
       </AdaptiveGlass>
