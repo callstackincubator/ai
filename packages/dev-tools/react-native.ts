@@ -12,7 +12,9 @@ const isServer = typeof window === 'undefined'
 
 if (isDev && !isWeb && !isServer) {
   useAiSdkDevTools =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('./src/react-native/useAiSdkDevTools').useAiSdkDevTools
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   getAiSdkTracer = require('./src/react-native/getAiSdkTracer').getAiSdkTracer
 } else {
   useAiSdkDevTools = () => null
