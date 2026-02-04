@@ -1,11 +1,5 @@
 import type { SpeechModelV3 } from '@ai-sdk/provider'
-import {
-  downloadModel,
-  getModelPath,
-  isModelDownloaded,
-  llama,
-  removeModel,
-} from '@react-native-ai/llama'
+import { llama, LlamaEngine } from '@react-native-ai/llama'
 
 import type { Availability, SetupAdapter } from '../../config/providers'
 
@@ -18,8 +12,8 @@ export const createLlamaSpeechSetupAdapter = ({
   modelId,
   vocoderId,
 }: LlamaSpeechSetupOptions): SetupAdapter<SpeechModelV3> => {
-  const modelPath = getModelPath(modelId)
-  const vocoderPath = getModelPath(vocoderId)
+  const modelPath = LlamaEngine.storage.getModelPath(modelId)
+  const vocoderPath = LlamaEngine.storage.getModelPath(vocoderId)
   const model = llama.speechModel(modelPath, {
     vocoderPath,
     vocoderBatchSize: 4096,
@@ -33,28 +27,28 @@ export const createLlamaSpeechSetupAdapter = ({
     label: modelId,
     async isAvailable(): Promise<Availability> {
       const [modelReady, vocoderReady] = await Promise.all([
-        isModelDownloaded(modelId),
-        isModelDownloaded(vocoderId),
+        LlamaEngine.storage.isModelDownloaded(modelId),
+        LlamaEngine.storage.isModelDownloaded(vocoderId),
       ])
       return modelReady && vocoderReady ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
       const [modelReady, vocoderReady] = await Promise.all([
-        isModelDownloaded(modelId),
-        isModelDownloaded(vocoderId),
+        LlamaEngine.storage.isModelDownloaded(modelId),
+        LlamaEngine.storage.isModelDownloaded(vocoderId),
       ])
       if (!modelReady || !vocoderReady) {
-        await downloadModel(modelId, (progress) => {
+        await LlamaEngine.storage.downloadModel(modelId, (progress) => {
           onProgress(Math.round(progress.percentage * 0.5))
         })
-        await downloadModel(vocoderId, (progress) => {
+        await LlamaEngine.storage.downloadModel(vocoderId, (progress) => {
           onProgress(Math.round(50 + progress.percentage * 0.5))
         })
       }
     },
     async delete() {
-      await removeModel(modelId)
-      await removeModel(vocoderId)
+      await LlamaEngine.storage.removeModel(modelId)
+      await LlamaEngine.storage.removeModel(vocoderId)
     },
     async unload() {
       await model.unload()

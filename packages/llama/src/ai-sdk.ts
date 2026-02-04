@@ -15,6 +15,11 @@ import type {
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
+  AISDKStorage,
+  type DownloadProgress,
+  type ModelInfo,
+} from '@react-native-ai/common'
+import {
   type CompletionParams,
   type ContextParams,
   type EmbeddingParams,
@@ -247,6 +252,35 @@ export interface LlamaModelOptions {
   contextParams?: Partial<ContextParams>
 }
 
+/**
+ * Engine for managing llama.rn models (similar to MLCEngine)
+ */
+export class LlamaEngine {
+  static storage = new AISDKStorage('llama', 'gguf')
+
+  /**
+   * Get all downloaded models
+   */
+  static async getModels(): Promise<ModelInfo[]> {
+    return LlamaEngine.storage.getDownloadedModels()
+  }
+
+  /**
+   * Check if a specific model is downloaded
+   */
+  static async isDownloaded(modelId: string): Promise<boolean> {
+    return LlamaEngine.storage.isModelDownloaded(modelId)
+  }
+
+  /**
+   * Set custom storage path for models
+   * Default: ${DocumentDir}/llama-models/
+   */
+  static setStoragePath(path: string): void {
+    LlamaEngine.storage.setStoragePath(path)
+  }
+}
+
 const START_OF_THINKING_PLACEHOLDER = '<think>'
 const END_OF_THINKING_PLACEHOLDER = '</think>'
 
@@ -270,24 +304,6 @@ export class LlamaLanguageModel implements LanguageModelV3 {
   private context: LlamaContext | null = null
   private multimodalInitialized: boolean = false
 
-  /**
-   * Supported URL patterns
-   * Note: Only file:// and data: URLs supported (HTTP URLs not yet supported)
-   */
-  get supportedUrls(): Record<string, RegExp[]> {
-    if (this.options.projectorPath) {
-      return {
-        'image/*': [/^file:\/\//, /^data:image\//],
-        'audio/*': [/^file:\/\//, /^data:audio\//],
-      }
-    }
-    return {}
-  }
-
-  /**
-   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
-   * @param options - Model configuration options
-   */
   constructor(modelPath: string, options: LlamaModelOptions = {}) {
     this.modelPath = modelPath
     this.modelId = modelPath
@@ -304,12 +320,50 @@ export class LlamaLanguageModel implements LanguageModelV3 {
   }
 
   /**
+   * Supported URL patterns
+   * Note: Only file:// and data: URLs supported (HTTP URLs not yet supported)
+   */
+  get supportedUrls(): Record<string, RegExp[]> {
+    if (this.options.projectorPath) {
+      return {
+        'image/*': [/^file:\/\//, /^data:image\//],
+        'audio/*': [/^file:\/\//, /^data:audio\//],
+      }
+    }
+    return {}
+  }
+
+  /**
+   * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
+   */
+  async isDownloaded(): Promise<boolean> {
+    return LlamaEngine.isDownloaded(this.modelId)
+  }
+
+  /**
+   * Download model from HuggingFace
+   */
+  async download(
+    progressCallback?: (progress: DownloadProgress) => void
+  ): Promise<void> {
+    await LlamaEngine.storage.downloadModel(this.modelId, progressCallback)
+  }
+
+  /**
    * Initialize the model (load LlamaContext)
    * @returns The initialized LlamaContext
    */
   async prepare(): Promise<LlamaContext> {
     if (this.context) {
       return this.context
+    }
+
+    const exists = await LlamaEngine.storage.isModelDownloaded(this.modelId)
+
+    if (!exists) {
+      throw new Error(
+        `Model not downloaded. Call download() first. Model ID: ${this.modelId}`
+      )
     }
 
     this.context = await initLlama({
@@ -755,6 +809,11 @@ export class LlamaEmbeddingModel implements EmbeddingModelV3 {
       await this.context.release()
       this.context = null
     }
+  }
+
+  async remove(): Promise<void> {
+    await this.unload()
+    await LlamaEngine.storage.removeModel(this.modelId)
   }
 
   /**

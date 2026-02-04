@@ -67,7 +67,7 @@ export class AISDKStorage {
       const models: ModelInfo[] = []
 
       for (const filename of files) {
-        if (filename.endsWith('.gguf')) {
+        if (filename.endsWith(`.${this.formatExtension}`)) {
           const path = `${this.storagePath}/${filename}`
           const stat = await RNBlobUtil.fs.stat(path)
 

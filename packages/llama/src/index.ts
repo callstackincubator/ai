@@ -8,6 +8,7 @@ export {
   createLlamaProvider,
   llama,
   LlamaEmbeddingModel,
+  LlamaEngine,
   LlamaLanguageModel,
   LlamaRerankModel,
   LlamaSpeechModel,
@@ -21,12 +22,3 @@ export type {
   RerankResult,
   TokenData,
 } from 'llama.rn'
-// Storage APIs for model management
-export type { DownloadProgress, ModelInfo } from './storage'
-export {
-  downloadModel,
-  getDownloadedModels,
-  getModelPath,
-  isModelDownloaded,
-  removeModel,
-} from './storage'
