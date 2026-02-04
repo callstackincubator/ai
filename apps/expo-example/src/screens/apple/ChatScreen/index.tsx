@@ -10,8 +10,9 @@ import { colors } from '../../../theme/colors'
 import { toolDefinitions } from '../../../tools'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
-import { ChatUnavailable } from './ChatUnavailable'
+import { ModelAvailableForDownload } from './ModelAvailableForDownload'
 import { ModelPickerSheet } from './ModelPickerSheet'
+import { ModelUnavailable } from './ModelUnavailable'
 import { SettingsSheet } from './SettingsSheet'
 
 export default function ChatScreen() {
@@ -120,9 +121,11 @@ export default function ChatScreen() {
           onOpenSettingsSheet={() => settingsSheetRef.current?.present()}
         />
         {!selectedAdapter || selectedModelAvailability === 'no' ? (
-          <ChatUnavailable
+          <ModelUnavailable
             onChooseModel={() => modelSheetRef.current?.present()}
           />
+        ) : selectedModelAvailability === 'availableForDownload' ? (
+          <ModelAvailableForDownload />
         ) : (
           <ChatMessages
             messages={currentChat?.messages ?? []}

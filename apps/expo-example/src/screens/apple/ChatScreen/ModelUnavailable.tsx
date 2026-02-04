@@ -5,11 +5,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { AdaptiveGlass } from '../../../components/AdaptiveGlass'
 import { colors } from '../../../theme/colors'
 
-type ChatUnavailableProps = {
+type ModelUnavailableProps = {
   onChooseModel: () => void
 }
 
-export function ChatUnavailable({ onChooseModel }: ChatUnavailableProps) {
+export function ModelUnavailable({ onChooseModel }: ModelUnavailableProps) {
   return (
     <View style={styles.unavailableContainer}>
       <AdaptiveGlass style={styles.emptyStateIcon}>

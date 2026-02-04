@@ -38,12 +38,12 @@ export function ModelItem({
   const { accentColor } = adapter.display
 
   const handlePress = async () => {
-    if (downloadProgress !== undefined) return
-    if (selectedModelAvailability === 'availableForDownload') {
+    onSelect(adapter.modelId)
+    if (
+      downloadProgress === undefined &&
+      selectedModelAvailability === 'availableForDownload'
+    ) {
       await downloadModel(adapter.modelId)
-    }
-    if (selectedModelAvailability === 'yes') {
-      onSelect(adapter.modelId)
     }
   }
 

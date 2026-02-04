@@ -84,8 +84,8 @@ export function useProviderStore() {
             ? { ...prev, [modelId]: percentage }
             : prev
         )
-        refreshAvailability()
       })
+      .then(() => refreshAvailability())
       .finally(() => {
         setDownloadProgress((prev) => {
           const next = { ...prev }

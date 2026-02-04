@@ -15,7 +15,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { AdaptiveGlass } from './components/AdaptiveGlass'
 import ChatScreen from './screens/apple/ChatScreen'
-import { ChatScreenFallback } from './screens/apple/ChatScreen/ChatScreenFallback'
 import { useChatStore } from './store/chatStore'
 import { colors } from './theme/colors'
 
@@ -149,13 +148,7 @@ export default function App() {
                   drawerStyle: styles.drawer,
                 }}
               >
-                <Drawer.Screen name="Chat">
-                  {() => (
-                    <Suspense fallback={<ChatScreenFallback />}>
-                      <ChatScreen />
-                    </Suspense>
-                  )}
-                </Drawer.Screen>
+                <Drawer.Screen name="Chat" component={ChatScreen} />
               </Drawer.Navigator>
             </NavigationContainer>
             <StatusBar style="auto" />
