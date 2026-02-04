@@ -2,6 +2,7 @@ import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
+  LanguageModelV3FinishReason,
   LanguageModelV3Prompt,
   LanguageModelV3StreamPart,
 } from '@ai-sdk/provider'
@@ -14,17 +15,66 @@ import {
   AISDKStorage,
   type DownloadProgress,
   type ModelInfo,
+  END_OF_THINKING_PLACEHOLDER,
+  START_OF_THINKING_PLACEHOLDER,
 } from '@react-native-ai/common'
-import {
-  InferenceSession,
-  OnnxModelOptions,
-  Tensor,
-} from 'onnxruntime-react-native'
+import { InferenceSession, Tensor } from 'onnxruntime-react-native'
 import { Platform } from 'react-native'
 
 export type { DownloadProgress, ModelInfo }
 
 type LLMState = 'text' | 'reasoning' | 'none'
+
+type CompletionParams = {
+  messages: { role: string; content: string }[]
+  temperature?: number
+  n_predict?: number
+  top_p?: number
+  top_k?: number
+  response_format?: {
+    type: 'json_object'
+    schema?: unknown
+  }
+}
+
+type TokenData = {
+  token?: string
+}
+
+type CompletionContext = {
+  completion: (
+    options: Partial<CompletionParams>,
+    onToken?: (tokenData: TokenData) => void
+  ) => Promise<any>
+  stopCompletion: () => Promise<void>
+}
+
+function convertFinishReason(
+  result: {
+    stopped_eos?: boolean
+    stopped_word?: boolean
+    stopped_limit?: boolean
+  } | null
+): LanguageModelV3FinishReason {
+  let unified: LanguageModelV3FinishReason['unified'] = 'other'
+  let raw: string | undefined
+
+  if (result?.stopped_eos) {
+    unified = 'stop'
+    raw = 'stopped_eos'
+  } else if (result?.stopped_word) {
+    unified = 'stop'
+    raw = 'stopped_word'
+  } else if (result?.stopped_limit) {
+    unified = 'length'
+    raw = 'stopped_limit'
+  }
+
+  return {
+    unified,
+    raw,
+  }
+}
 
 function prepareMessages(
   prompt: LanguageModelV3Prompt
@@ -92,12 +142,13 @@ export class ONNXLanguageModel implements LanguageModelV3 {
   readonly provider = 'onnx'
 
   protected storage = new AISDKStorage('onnx-models', 'onnx')
-  protected session: InferenceSession | null = null
+  public session: InferenceSession | null = null
+  protected context: CompletionContext | null = null
   protected tokenizer!: AutoTokenizer
 
   protected modelConfig: ONNXModelConfig | null = null
 
-  protected KVCacheTensors: { [key: string]: Tensor } = {}
+  public KVCacheTensors: { [key: string]: Tensor } = {}
   protected emptyKVEntryFactory: () => Uint16Array | Uint32Array
 
   protected sessionOptions: Partial<InferenceSession.SessionOptions>
@@ -317,7 +368,12 @@ export class ONNXLanguageModel implements LanguageModelV3 {
 
     console.log('[llama] Generating text (non-streaming)')
 
-    const response = await this.context.completion(completionOptions)
+    const context = this.context
+    if (!context) {
+      throw new Error('Model not prepared. Call prepare() first.')
+    }
+
+    const response = await context.completion(completionOptions)
     let textContent = response.content
 
     // filter out thinking tags from content
@@ -422,6 +478,10 @@ export class ONNXLanguageModel implements LanguageModelV3 {
               try {
                 const { token } = tokenData
 
+                if (!token) {
+                  return
+                }
+
                 switch (token) {
                   case START_OF_THINKING_PLACEHOLDER:
                     // start reasoning block
@@ -523,9 +583,6 @@ export class ONNXLanguageModel implements LanguageModelV3 {
               usage: {
                 inputTokens: result.timings?.prompt_n || 0,
                 outputTokens: result.timings?.predicted_n || 0,
-                totalTokens:
-                  (result.timings?.prompt_n || 0) +
-                  (result.timings?.predicted_n || 0),
               },
               providerMetadata: {
                 llama: {
@@ -606,9 +663,12 @@ export const onnx = {
    */
   languageModel: (
     modelId: string,
-    options: OnnxModelOptions = {},
+    options: ONNXLanguageModelOptions = {
+      sessionOptions: {},
+      tokenizerOptions: {},
+    },
     dtype: DType = 'float16'
   ): ONNXLanguageModel => {
-    return new ONNXLanguageModel(modelId, options, dtype)
+    return new ONNXLanguageModel(modelId, modelId, dtype, options)
   },
 }
