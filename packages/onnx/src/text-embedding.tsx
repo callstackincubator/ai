@@ -1,12 +1,33 @@
 import 'text-encoding-polyfill';
 
-import { Tensor } from 'onnxruntime-react-native';
-import { ONNXLanguageModel } from './ai-sdk';
+import { InferenceSession, Tensor } from 'onnxruntime-react-native';
+import { type LoadOptions, ONNXLanguageModel } from './ai-sdk';
 
 /**
  * Class to handle text embedding model on top of onnxruntime
  */
 export class TextEmbedding extends ONNXLanguageModel {
+  /**
+   * Initialize the embedding model from a local ONNX path.
+   */
+  public async load(
+    _modelName: string,
+    onnxPath: string,
+    options: LoadOptions
+  ): Promise<void> {
+    this.session = await InferenceSession.create(onnxPath, {
+      executionProviders: options.executionProviders,
+      graphOptimizationLevel: 'all',
+    });
+    this.KVCacheTensors = {};
+  }
+
+  /**
+   * Release model resources.
+   */
+  public async release(): Promise<void> {
+    await this.unload();
+  }
   /**
    * Generate embeddings from input tokens
    *

@@ -122,6 +122,20 @@ export interface ONNXModelConfig {
   KVShape: number[]
 }
 
+/** Load Options */
+export interface LoadOptions {
+  /** The maximum number of tokens for text generation.  */
+  max_tokens: number
+  /** Enables verbose logging. */
+  verbose: boolean
+  /** Indicates if external data is used. */
+  externalData: boolean
+  /** Function to fetch external data. */
+  fetch: (url: string) => Promise<string>
+  /** List of execution providers for ONNX runtime. */
+  executionProviders: InferenceSession.ExecutionProviderConfig[]
+}
+
 export type DType = `float${16 | 32}`
 
 export type ONNXLanguageModelCustomOptions = {
