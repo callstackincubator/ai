@@ -141,10 +141,7 @@ export function useChatStore() {
   }
 
   const updateChatSettings = (updates: Partial<ChatSettings>) => {
-    if (!currentChatId) {
-      setPendingSettings((prev) => ({ ...prev, ...updates }))
-      return
-    }
+    setPendingSettings((prev) => ({ ...prev, ...updates }))
     setChats((prev) => {
       const arr = Array.isArray(prev) ? prev : []
       return arr.map((chat) =>
