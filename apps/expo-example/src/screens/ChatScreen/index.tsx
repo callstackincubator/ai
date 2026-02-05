@@ -1,5 +1,5 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
-import { stepCountIs, streamText } from 'ai'
+import { generateText, stepCountIs, streamText } from 'ai'
 import React, { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -57,7 +57,7 @@ export default function ChatScreen() {
     setIsGenerating(true)
 
     try {
-      const result = streamText({
+      const result = await generateText({
         model: selectedAdapter.model,
         messages: [
           ...baseMessages.map((message) => ({
@@ -76,12 +76,13 @@ export default function ChatScreen() {
         abortSignal: signal,
       })
 
-      let accumulated = ''
-      for await (const chunk of result.textStream) {
-        if (signal.aborted) break
-        accumulated += chunk
-        updateMessageContent(chatId, assistantMessageId, accumulated)
-      }
+      // let accumulated = ''
+      // for await (const chunk of result.textStream) {
+      //   if (signal.aborted) break
+      //   accumulated += chunk
+      //   updateMessageContent(chatId, assistantMessageId, accumulated)
+      // }
+      updateMessageContent(chatId, assistantMessageId, result.content.join(' '))
     } catch (error) {
       // Don't show error if user cancelled
       if (signal.aborted) return

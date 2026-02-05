@@ -33,7 +33,7 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
                 <Button
                   systemImage={Platform.select({
                     ios: 'camera',
-                    android: 'rounded.Contrast',
+                    android: 'rounded.ArrowForward',
                   })}
                   onPress={() => console.log('Take Photo')}
                 >
@@ -42,7 +42,7 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
                 <Button
                   systemImage={Platform.select({
                     ios: 'photo.on.rectangle',
-                    android: 'rounded.Build',
+                    android: 'rounded.ArrowBack',
                   })}
                   onPress={() => console.log('Photo Library')}
                 >
@@ -55,9 +55,8 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
                     ios: 'plus',
                     android: 'rounded.Add',
                   })}
-                  {...(Platform.select({
-                    ios: { variant: 'borderless', color: '#000' },
-                  }) ?? {})}
+                  variant="borderless"
+                  color={colors.tertiaryLabel as any}
                 />
               </ContextMenu.Trigger>
             </ContextMenu>
@@ -69,7 +68,7 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
             value={input}
             onChangeText={setInput}
             placeholder="Message"
-            placeholderTextColor={colors.placeholderText as any}
+            placeholderTextColor={colors.secondaryLabel as any}
             multiline
             style={styles.textInput}
             editable={!isGenerating}

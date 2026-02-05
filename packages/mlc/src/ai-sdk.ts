@@ -8,6 +8,7 @@ import type {
   LanguageModelV3StreamPart,
   LanguageModelV3ToolChoice,
 } from '@ai-sdk/provider'
+import RNBlobUtil from 'react-native-blob-util'
 
 import NativeMLCEngine, {
   DownloadProgress,
@@ -91,6 +92,12 @@ class MlcChatLanguageModel implements LanguageModelV3 {
 
   constructor(modelId: string) {
     this.modelId = modelId
+  }
+
+  public async isDownloaded() {
+    return await RNBlobUtil.fs.exists(
+      RNBlobUtil.fs.dirs.SDCardDir + `/${this.modelId}/tensor-cache.json`
+    )
   }
 
   public prepare() {
