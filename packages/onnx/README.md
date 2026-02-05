@@ -11,7 +11,7 @@ npm install @react-native-ai/llama llama.rn react-native-blob-util ai
 ## Usage with AI SDK
 
 ```typescript
-import { onnx } from '@react-native-ai/onnx'
+import { onnx } from '@react-native-ai/onnx-wrapper'
 import { generateText, streamText } from 'ai'
 
 TODO: implement this

@@ -34,9 +34,11 @@
   "dependencies": {
     "@ai-sdk/provider": "^3.0.5",
     "@ai-sdk/provider-utils": "^4.0.9",
-    "@huggingface/transformers": "^3.8.1",
+    "@huggingface/transformers": "github:mybigday/transformers.js-rn#merge",
     "react-native-blob-util": "^0.24.6",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "onnxruntime-react-native": "^1.21.0",
+    "text-encoding-polyfill": "^0.6.7"
   },
   "peerDependencies": {
     "react-native": ">=0.76.0",
