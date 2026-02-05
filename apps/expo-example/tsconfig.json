@@ -6,8 +6,7 @@
     "paths": {
       "@react-native-ai/apple": ["../../packages/apple-llm/src"],
       "@react-native-ai/mlc": ["../../packages/mlc/src"]
-    },
-    "types": ["nativewind/types"]
+    }
   },
   "include": ["src/**/*", "nativewind-env.d.ts"]
 }

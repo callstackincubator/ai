@@ -31,6 +31,7 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
             <ContextMenu activationMethod="singlePress">
               <ContextMenu.Items>
                 <Button
+                  // @ts-expect-error - conditional icons per platform
                   systemImage={Platform.select({
                     ios: 'camera',
                     android: 'rounded.ArrowForward',
@@ -40,6 +41,7 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
                   Take Photo
                 </Button>
                 <Button
+                  // @ts-expect-error - conditional icons per platform
                   systemImage={Platform.select({
                     ios: 'photo.on.rectangle',
                     android: 'rounded.ArrowBack',
@@ -51,6 +53,7 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
               </ContextMenu.Items>
               <ContextMenu.Trigger>
                 <Button
+                  // @ts-expect-error - conditional icons per platform
                   systemImage={Platform.select({
                     ios: 'plus',
                     android: 'rounded.Add',
