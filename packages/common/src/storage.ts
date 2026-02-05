@@ -31,28 +31,29 @@ export class AISDKStorage {
     return this.storagePath
   }
 
-  parseModelId(modelId: string): {
+  parseModelId(repoURI: string): {
     repo: string
     filename: string
   } {
-    const parts = modelId.split('/')
+    const parts = repoURI.split('/')
     if (parts.length < 3) {
       throw new Error(
-        `Invalid model ID format: "${modelId}". Expected format: "owner/repo/filename.${this.formatExtension}"`
+        `Invalid model ID format: "${repoURI}". Expected format: "owner/repo/filename.${this.formatExtension}"`
       )
     }
-    const filename = parts.pop()!
-    const repo = parts.join('/')
+    const [ownerPart, repoPart, ...filenameParts] = parts
+    const filename = filenameParts.join('/')
+    const repo = `${ownerPart}/${repoPart}`
     return { repo, filename }
   }
 
-  getModelPath(modelId: string): string {
-    const { filename } = this.parseModelId(modelId)
+  getModelPath(repoURI: string): string {
+    const { filename } = this.parseModelId(repoURI)
     return `${this.storagePath}/${filename}`
   }
 
-  async isModelDownloaded(modelId: string): Promise<boolean> {
-    const path = this.getModelPath(modelId)
+  async isModelDownloaded(repoURI: string): Promise<boolean> {
+    const path = this.getModelPath(repoURI)
     return RNBlobUtil.fs.exists(path)
   }
 
