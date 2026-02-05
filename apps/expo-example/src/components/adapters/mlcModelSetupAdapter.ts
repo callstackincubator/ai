@@ -1,6 +1,6 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { mlc } from '@react-native-ai/mlc'
-import RNBlobUtil from 'react-native-blob-util'
+import { File, Paths } from 'expo-file-system'
 
 import type { Availability, SetupAdapter } from '../../config/providers.common'
 
@@ -18,10 +18,8 @@ export const createMLCLanguageSetupAdapter = (
       icon: 'cpu',
     },
     builtIn: false,
-    async isAvailable(): Promise<Availability> {
-      return (await RNBlobUtil.fs.exists(
-        RNBlobUtil.fs.dirs.SDCardDir + `/${modelId}/tensor-cache.json`
-      ))
+    isAvailable(): Availability {
+      return new File(Paths.document, model.modelId, 'tensor-cache.json').exists
         ? 'yes'
         : 'availableForDownload'
     },

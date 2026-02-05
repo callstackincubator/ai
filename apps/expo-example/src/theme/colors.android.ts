@@ -4,7 +4,7 @@ export const colors = {
   // Text
   label: PlatformColor('@android:color/primary_text_light'),
   secondaryLabel: PlatformColor('@android:color/secondary_text_light'),
-  tertiaryLabel: PlatformColor('@android:color/tertiary_text_light'),
+  tertiaryLabel: PlatformColor('@android:color/secondary_text_light'),
   placeholderText: PlatformColor('@android:color/background_light'),
 
   // Backgrounds
@@ -13,7 +13,7 @@ export const colors = {
   tertiarySystemBackground: PlatformColor('@android:color/background_light'),
 
   // Fills
-  tertiarySystemFill: PlatformColor('@android:color/darker_gray'),
+  tertiarySystemFill: PlatformColor('@android:color/lighter_gray'),
 
   // Accent colors
   systemBlue: PlatformColor('@android:color/holo_blue_light'),

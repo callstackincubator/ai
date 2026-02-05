@@ -50,7 +50,7 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
   }
 
   const { modelId: selectedModelId } = chatSettings
-  console.log({ selectedModelId })
+
   return (
     <TrueSheet ref={ref} scrollable style={{ backgroundColor: '#fff' }}>
       <View style={styles.sheetContainer}>
