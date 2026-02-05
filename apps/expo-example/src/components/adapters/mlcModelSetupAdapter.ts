@@ -1,5 +1,6 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { mlc } from '@react-native-ai/mlc'
+import { File, Paths } from 'expo-file-system'
 
 import type { Availability, SetupAdapter } from '../../config/providers.common'
 
@@ -17,8 +18,10 @@ export const createMLCLanguageSetupAdapter = (
       icon: 'cpu',
     },
     builtIn: false,
-    async isAvailable(): Promise<Availability> {
-      return (await model.isDownloaded()) ? 'yes' : 'availableForDownload'
+    isAvailable(): Availability {
+      return new File(Paths.document, model.modelId, 'tensor-cache.json').exists
+        ? 'yes'
+        : 'availableForDownload'
     },
     async download(onProgress) {
       await model.download(async (event) => {

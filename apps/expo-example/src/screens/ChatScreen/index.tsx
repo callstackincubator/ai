@@ -57,7 +57,7 @@ export default function ChatScreen() {
     setIsGenerating(true)
 
     try {
-      const result = await streamText({
+      const result = streamText({
         model: selectedAdapter.model,
         messages: [
           ...baseMessages.map((message) => ({

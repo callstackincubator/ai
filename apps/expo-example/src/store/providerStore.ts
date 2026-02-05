@@ -23,11 +23,11 @@ const adaptersAtom = atom((get) => {
   return [...languageAdapters, ...customModels]
 })
 
-const availabilityAtom = atomWithRefresh(async (get) => {
+const availabilityAtom = atomWithRefresh((get) => {
   const adapters = get(adaptersAtom)
   const map = new Map<string, Availability>()
   for (const adapter of adapters) {
-    map.set(adapter.modelId, await adapter.isAvailable())
+    map.set(adapter.modelId, adapter.isAvailable())
   }
   return map
 })

@@ -94,12 +94,6 @@ class MlcChatLanguageModel implements LanguageModelV3 {
     this.modelId = modelId
   }
 
-  public async isDownloaded() {
-    return await RNBlobUtil.fs.exists(
-      RNBlobUtil.fs.dirs.SDCardDir + `/${this.modelId}/tensor-cache.json`
-    )
-  }
-
   public prepare() {
     return NativeMLCEngine.prepareModel(this.modelId)
   }
