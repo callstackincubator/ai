@@ -8,7 +8,6 @@ import type {
   LanguageModelV3StreamPart,
   LanguageModelV3ToolChoice,
 } from '@ai-sdk/provider'
-import RNBlobUtil from 'react-native-blob-util'
 
 import NativeMLCEngine, {
   DownloadProgress,
