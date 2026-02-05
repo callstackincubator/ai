@@ -8,7 +8,6 @@ export const createAppleLanguageSetupAdapter = (
   tools: ToolSet = {}
 ): SetupAdapter<LanguageModelV3> => {
   const apple = createAppleProvider({
-    // @ts-expect-error
     availableTools: tools,
   })
   const model = apple.languageModel()

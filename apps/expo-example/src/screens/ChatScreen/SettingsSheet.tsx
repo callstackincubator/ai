@@ -2,7 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { SymbolView } from 'expo-symbols'
 import React, { RefObject } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 
 import { Host, Slider } from '../../components/expo-ui'
 import { useChatStore } from '../../store/chatStore'
@@ -18,7 +25,7 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
   const { temperature, maxSteps, enabledToolIds } = chatSettings
 
   return (
-    <TrueSheet ref={ref} scrollable>
+    <TrueSheet ref={ref} scrollable style={styles.sheetContainerSlidingWrapper}>
       <View style={styles.sheetContainer}>
         <ScrollView nestedScrollEnabled>
           <View style={styles.sheetHeader}>
@@ -93,6 +100,11 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                         temperature: Math.round(value * 10) / 10,
                       })
                     }
+                    style={
+                      Platform.OS === 'android'
+                        ? styles.androidSlider
+                        : undefined
+                    }
                   />
                 </Host>
               </View>
@@ -110,6 +122,11 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                     onValueChange={(value) =>
                       updateChatSettings({ maxSteps: Math.round(value) })
                     }
+                    style={
+                      Platform.OS === 'android'
+                        ? styles.androidSlider
+                        : undefined
+                    }
                   />
                 </Host>
               </View>
@@ -126,6 +143,9 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
 }
 
 const styles = StyleSheet.create({
+  sheetContainerSlidingWrapper: {
+    backgroundColor: '#fff',
+  },
   sheetContainer: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -238,5 +258,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.secondaryLabel as any,
     lineHeight: 18,
+  },
+  androidSlider: {
+    minHeight: 20,
   },
 })

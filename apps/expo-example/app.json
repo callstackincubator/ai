@@ -17,7 +17,6 @@
       "bundleIdentifier": "com.callstack.ai.example"
     },
     "android": {
-      "forceDarkAllowed": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
