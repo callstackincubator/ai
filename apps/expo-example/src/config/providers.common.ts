@@ -3,6 +3,8 @@ import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { createLlamaSpeechSetupAdapter } from '../components/adapters/llamaSpeechSetupAdapter'
 import { createMLCLanguageSetupAdapter } from '../components/adapters/mlcModelSetupAdapter'
+import { createONNXLanguageSetupAdapter } from '../components/adapters/onnxModelSetupAdapter'
+// import { createONNXLanguageSetupAdapter } from '../components/adapters/onnxModelSetupAdapter'
 import { toolDefinitions } from '../tools'
 
 export type Availability = 'yes' | 'no' | 'availableForDownload'
@@ -38,6 +40,18 @@ export interface SetupAdapter<TModel> {
 
 // Available language model adapters for text generation.
 export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
+  // ONNX
+  createONNXLanguageSetupAdapter(
+    'Xenova/distilgpt2_onnx-quantized/decoder_model.onnx'
+  ),
+
+  // MLC-LLM
+  createMLCLanguageSetupAdapter('Llama-3.2-1B-Instruct'),
+  createMLCLanguageSetupAdapter('Llama-3.2-3B-Instruct'),
+  createMLCLanguageSetupAdapter('Phi-3.5-mini-instruct'),
+  createMLCLanguageSetupAdapter('Qwen2-1.5B-Instruct'),
+
+  // llama.rn
   createLlamaLanguageSetupAdapter(
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),
@@ -45,10 +59,6 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
     'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf',
     toolDefinitions
   ),
-  createMLCLanguageSetupAdapter('Llama-3.2-1B-Instruct'),
-  createMLCLanguageSetupAdapter('Llama-3.2-3B-Instruct'),
-  createMLCLanguageSetupAdapter('Phi-3.5-mini-instruct'),
-  createMLCLanguageSetupAdapter('Qwen2-1.5B-Instruct'),
 ]
 
 // Available speech model adapters for text-to-speech.
