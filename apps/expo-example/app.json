@@ -67,7 +67,8 @@
           "androidFSTypes": ["mediaPlayback"]
         }
       ],
-      "llama.rn"
+      "llama.rn",
+      "onnxruntime-react-native"
     ]
   }
 }
