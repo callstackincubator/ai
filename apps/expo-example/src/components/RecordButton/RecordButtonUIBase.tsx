@@ -186,11 +186,13 @@ export function RecordButtonUIBase({
     )
   }
 
+  const uiDisabled = disabled || isProcessing || !transcriptionModel
+
   return (
     <AdaptiveGlass isInteractive style={styles.glassButton}>
       <Pressable
         onPress={handlePress}
-        disabled={disabled || isProcessing || !transcriptionModel}
+        disabled={uiDisabled}
         style={styles.pressable}
       >
         {isProcessing ? (
@@ -202,9 +204,15 @@ export function RecordButtonUIBase({
           <SymbolView
             name="mic.fill"
             size={20}
-            tintColor={colors.label}
+            tintColor={uiDisabled ? colors.label : colors.placeholderText}
             resizeMode="scaleAspectFit"
-            fallback={<Ionicons name="mic" size={20} color={colors.label} />}
+            fallback={
+              <Ionicons
+                name="mic"
+                size={20}
+                color={uiDisabled ? '#666' : colors.label}
+              />
+            }
           />
         )}
       </Pressable>

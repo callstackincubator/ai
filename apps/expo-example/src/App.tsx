@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   },
   drawer: {
     width: 280,
-    backgroundColor: colors.systemBackground,
+    backgroundColor: '#fff',
   },
   drawerScroll: {
     flex: 1,

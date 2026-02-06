@@ -4,6 +4,7 @@ import { File } from 'expo-file-system'
 export function isModelDownloaded(modelId: string): boolean {
   let path = getModelPath(modelId)
 
+  // expo-file-system requires that this URI starts with the file:// protocol
   if (!path.startsWith('file://')) {
     path = `file://${path}`
   }
