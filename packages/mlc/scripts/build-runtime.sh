@@ -278,10 +278,35 @@ fi
 mkdir -p "$OUTPUT_DIR"
 
 # Run MLC package command
-echo "Building runtime..."
-python3 -m mlc_llm package \
-  --package-config "$CONFIG_FILE" \
-  --output "$OUTPUT_DIR"
+if [ "$PLATFORM" = "ios" ]; then
+  for is_simulator in false true; do
+    echo "Preparing libs (is_simulator=$is_simulator)..."
+    PREPARE_LIBS_PATH="$MLC_LLM_SOURCE_DIR/ios/prepare_libs.sh"
+    if [ -f "$PREPARE_LIBS_PATH" ]; then
+      sed -i '' "s/^is_simulator=.*/is_simulator=\"$is_simulator\"/" "$PREPARE_LIBS_PATH"
+    fi
+
+    echo "Building runtime (is_simulator=$is_simulator)..."
+    python3 -m mlc_llm package \
+      --package-config "$CONFIG_FILE" \
+      --output "$OUTPUT_DIR"
+
+    if [ -d "$OUTPUT_DIR/lib" ]; then
+      if [ "$is_simulator" = "true" ]; then
+        lib_suffix="iphonesim"
+      else
+        lib_suffix="iphone"
+      fi
+      rm -rf "$OUTPUT_DIR/lib_$lib_suffix"
+      mv "$OUTPUT_DIR/lib" "$OUTPUT_DIR/lib_$lib_suffix"
+    fi
+  done
+else
+  echo "Building runtime..."
+  python3 -m mlc_llm package \
+    --package-config "$CONFIG_FILE" \
+    --output "$OUTPUT_DIR"
+fi
 
 # Copy necessary headers for iOS
 if [ "$PLATFORM" = "ios" ]; then
