@@ -6,12 +6,16 @@
 
 #import "LLMEngine.h"
 
+typedef void (^MLCStreamCallback)(NSDictionary* response);
+
 @interface MLCEngine : NativeMLCEngineSpecBase <NativeMLCEngineSpec>
 
-@property(nonatomic, strong) LLMEngine* engine;
+@property(nonatomic, strong) JSONFFIEngine* engine;
 @property(nonatomic, strong) NSURL* bundleURL;
 @property(nonatomic, strong) NSDictionary* cachedAppConfig;
 @property(nonatomic, strong) NSArray* cachedModelList;
+@property(nonatomic, strong) NSMutableDictionary<NSString*, MLCStreamCallback>* pendingRequests;
+@property(nonatomic) dispatch_queue_t streamCallbackQueue;
 
 @end
 
@@ -26,7 +30,9 @@ using namespace facebook;
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _engine = [[LLMEngine alloc] init];
+    _engine = [[JSONFFIEngine alloc] init];
+    _pendingRequests = [NSMutableDictionary new];
+    _streamCallbackQueue = dispatch_queue_create("com.callstack.mlcegine.stream", DISPATCH_QUEUE_SERIAL);
     
     // Get the Documents directory path for downloaded models
     NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
@@ -39,6 +45,16 @@ using namespace facebook;
     if (dirError) {
       NSLog(@"Error creating bundle directory: %@", dirError);
     }
+
+    [self.engine initBackgroundEngine:^(NSString* responseJSON) {
+      [self handleStreamCallback:responseJSON];
+    }];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      [self.engine runBackgroundLoop];
+    });
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      [self.engine runBackgroundStreamBackLoop];
+    });
   }
   return self;
 }
@@ -113,6 +129,7 @@ using namespace facebook;
 // Helper method to build complete request with messages and options
 - (NSDictionary*)buildRequestWithMessages:(NSArray*)messages options:(const JS::NativeMLCEngine::GenerationOptions &)options {
   NSMutableDictionary *request = [@{@"messages": messages, @"stream": @(YES)} mutableCopy];
+  request[@"stream_options"] = @{@"include_usage": @(YES)};
   
   if (options.temperature().has_value()) {
     request[@"temperature"] = @(options.temperature().value());
@@ -147,6 +164,81 @@ using namespace facebook;
   return request;
 }
 
+- (NSString*)jsonStringFromDictionary:(NSDictionary*)dictionary error:(NSError**)error {
+  NSData* jsonData = [NSJSONSerialization dataWithJSONObject:dictionary options:0 error:error];
+  if (!jsonData) {
+    return nil;
+  }
+  return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+}
+
+- (NSString*)requestIdFromResponse:(NSDictionary*)response {
+  NSString* requestId = response[@"request_id"];
+  if (!requestId) {
+    requestId = response[@"requestId"];
+  }
+  if (!requestId) {
+    requestId = response[@"id"];
+  }
+  return requestId;
+}
+
+- (void)handleStreamCallback:(NSString*)responseJSON {
+  dispatch_async(self.streamCallbackQueue, ^{
+    NSData* jsonData = [responseJSON dataUsingEncoding:NSUTF8StringEncoding];
+    if (!jsonData) {
+      NSLog(@"Failed to decode stream response data");
+      return;
+    }
+
+    NSError* parseError;
+    id jsonObject = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&parseError];
+    if (parseError || ![jsonObject isKindOfClass:[NSDictionary class]]) {
+      NSLog(@"Invalid stream response JSON: %@", parseError.localizedDescription);
+      return;
+    }
+
+    NSDictionary* response = (NSDictionary*)jsonObject;
+    NSString* requestId = [self requestIdFromResponse:response];
+    if (!requestId && self.pendingRequests.count == 1) {
+      requestId = self.pendingRequests.allKeys.firstObject;
+    }
+    if (!requestId) {
+      NSLog(@"Missing request id in stream response");
+      return;
+    }
+
+    MLCStreamCallback callback = self.pendingRequests[requestId];
+    if (!callback) {
+      return;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+      callback(response);
+    });
+
+    if (response[@"usage"]) {
+      [self.pendingRequests removeObjectForKey:requestId];
+    }
+  });
+}
+
+- (NSString*)startChatCompletionWithRequest:(NSDictionary*)request
+                                completion:(MLCStreamCallback)completion
+                                     error:(NSError**)error {
+  NSString* requestJSON = [self jsonStringFromDictionary:request error:error];
+  if (!requestJSON) {
+    return nil;
+  }
+
+  NSString* requestId = [NSUUID UUID].UUIDString;
+  if (completion) {
+    self.pendingRequests[requestId] = [completion copy];
+  }
+  [self.engine chatCompletion:requestJSON requestID:requestId];
+  return requestId;
+}
+
 - (void)generateText:(NSArray<NSDictionary*>*)messages
              options:(JS::NativeMLCEngine::GenerationOptions &)options
              resolve:(RCTPromiseResolveBlock)resolve
@@ -159,9 +251,9 @@ using namespace facebook;
   __block NSString* finalFinishReason = nil;
   __block NSString* finalRole = nil;
   
-  [self.engine chatCompletionWithMessages:messages
-                                  options:request
-                               completion:^(NSDictionary* response) {
+  NSError* requestError;
+  NSString* requestId = [self startChatCompletionWithRequest:request
+                                                  completion:^(NSDictionary* response) {
     if (response[@"usage"]) {
       resolve(@{
         @"role": finalRole,
@@ -189,7 +281,11 @@ using namespace facebook;
         finalFinishReason = choice[@"finish_reason"];
       }
     }
-  }];
+  } error:&requestError];
+
+  if (!requestId) {
+    reject(@"MLCEngine", requestError.localizedDescription ?: @"Failed to start generation", nil);
+  }
 }
 
 - (void)streamText:(NSArray<NSDictionary*>*)messages
@@ -202,9 +298,9 @@ using namespace facebook;
   __block NSString* finalFinishReason = nil;
   
   @try {
-    NSString *requestId = [self.engine chatCompletionWithMessages:messages
-                                                          options:request
-                                                       completion:^(NSDictionary* response) {
+    NSError* requestError;
+    NSString *requestId = [self startChatCompletionWithRequest:request
+                                                    completion:^(NSDictionary* response) {
       if (response[@"usage"]) {
         [self emitOnChatComplete:@{
           @"usage": response[@"usage"],
@@ -219,7 +315,13 @@ using namespace facebook;
       }
       
       [self emitOnChatUpdate:choice];
-    }];
+    } error:&requestError];
+
+    if (!requestId) {
+      @throw [NSException exceptionWithName:@"MLCEngine"
+                                     reason:requestError.localizedDescription ?: @"Failed to start generation"
+                                   userInfo:nil];
+    }
     
     resolve(requestId);
   } @catch (NSException* exception) {
@@ -274,7 +376,19 @@ using namespace facebook;
       return;
     }
     
-    [self.engine reloadWithModelPath:modelLocalPath modelLib:modelLib];
+    NSDictionary* modelConfig = [self readModelConfig:modelId error:nil];
+    NSMutableDictionary* engineConfig = modelConfig ? [modelConfig mutableCopy] : [NSMutableDictionary new];
+    engineConfig[@"model"] = modelLocalPath;
+    engineConfig[@"model_lib"] = modelLib;
+
+    NSError* configError;
+    NSString* engineConfigJSON = [self jsonStringFromDictionary:engineConfig error:&configError];
+    if (!engineConfigJSON) {
+      reject(@"MLCEngine", configError.localizedDescription ?: @"Failed to build engine config", nil);
+      return;
+    }
+
+    [self.engine reload:engineConfigJSON];
     
     resolve([NSString stringWithFormat:@"Model prepared: %@", modelId]);
   } @catch (NSException* exception) {
@@ -519,8 +633,13 @@ using namespace facebook;
 }
 
 - (void)cancelStream:(nonnull NSString *)streamId resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject { 
-  [self.engine cancelRequest:streamId];
+  [self.pendingRequests removeObjectForKey:streamId];
+  [self.engine abort:streamId];
   resolve(nil);
+}
+
+- (void)dealloc {
+  [self.engine exitBackgroundLoop];
 }
 
 
