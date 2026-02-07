@@ -7,7 +7,7 @@ import {
 } from '@react-native-ai/llama'
 
 import type { Availability, SetupAdapter } from '../../config/providers.common'
-import { isModelDownloaded } from '../../utils/storage'
+import { isLlamaModelDownloaded } from '../../utils/llamaStorageUtils'
 
 interface LlamaSpeechSetupOptions {
   modelId: string
@@ -42,15 +42,15 @@ export const createLlamaSpeechSetupAdapter = ({
     builtIn: false,
     isAvailable(): Availability {
       const [modelReady, vocoderReady] = [
-        isModelDownloaded(hfModelId),
-        isModelDownloaded(vocoderId),
+        isLlamaModelDownloaded(hfModelId),
+        isLlamaModelDownloaded(vocoderId),
       ]
       return modelReady && vocoderReady ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
       const [modelReady, vocoderReady] = [
-        isModelDownloaded(hfModelId),
-        isModelDownloaded(vocoderId),
+        isLlamaModelDownloaded(hfModelId),
+        isLlamaModelDownloaded(vocoderId),
       ]
       if (!modelReady || !vocoderReady) {
         await downloadModel(hfModelId, (progress) => {
