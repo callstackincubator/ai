@@ -72,7 +72,7 @@ fi
 # Get script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
-BUILD_DIR="$PACKAGE_DIR/build"
+BUILD_DIR="$SCRIPT_DIR/build"
 CONFIG_FILE="$PACKAGE_DIR/mlc-package-config-$PLATFORM.json"
 OUTPUT_DIR="$PACKAGE_DIR/prebuilt/$PLATFORM"
 
@@ -246,32 +246,12 @@ if [ ! -f "$MLC_LLM_SOURCE_DIR/3rdparty/tvm/CMakeLists.txt" ] || [ ! -f "$MLC_LL
 fi
 
 # Check if mlc_llm is available
-if ! python3 -m mlc_llm --help > /dev/null 2>&1; then
+if ! python -m mlc_llm --help > /dev/null 2>&1; then
   echo -e "${RED}Error: mlc_llm not found${NC}"
   echo ""
   echo "Please install MLC:"
   echo "  pip install --pre -U -f https://mlc.ai/wheels mlc-llm-cpu mlc-ai-cpu"
   exit 1
-fi
-
-# Check for conflicting build artifacts from other platforms
-if [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
-  # Check if this is an Xcode/iOS build when building for Android
-  if [ "$PLATFORM" = "android" ] && grep -q "Xcode" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
-    echo -e "${YELLOW}Warning: Detected Xcode/iOS build artifacts in $BUILD_DIR${NC}"
-    echo "This can cause CMake cache conflicts for Android builds."
-    echo "Cleaning build directory..."
-    rm -rf "$BUILD_DIR"
-    echo -e "${GREEN}Build directory cleaned${NC}"
-  fi
-  # Check if this is an Android build when building for iOS
-  if [ "$PLATFORM" = "ios" ] && grep -q "Android" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
-    echo -e "${YELLOW}Warning: Detected Android build artifacts in $BUILD_DIR${NC}"
-    echo "This can cause CMake cache conflicts for iOS builds."
-    echo "Cleaning build directory..."
-    rm -rf "$BUILD_DIR"
-    echo -e "${GREEN}Build directory cleaned${NC}"
-  fi
 fi
 
 # Create output directory
@@ -284,6 +264,11 @@ if [ "$PLATFORM" = "ios" ]; then
     PREPARE_LIBS_PATH="$MLC_LLM_SOURCE_DIR/ios/prepare_libs.sh"
     if [ -f "$PREPARE_LIBS_PATH" ]; then
       sed -i '' "s/^is_simulator=.*/is_simulator=\"$is_simulator\"/" "$PREPARE_LIBS_PATH"
+    fi
+
+    if [ -d "$BUILD_DIR" ]; then
+      echo "Cleaning build directory $BUILD_DIR..."
+      rm -rf "$BUILD_DIR"
     fi
 
     echo "Building runtime (is_simulator=$is_simulator)..."
