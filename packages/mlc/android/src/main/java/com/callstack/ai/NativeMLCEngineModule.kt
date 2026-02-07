@@ -307,7 +307,7 @@ class NativeMLCEngineModule(reactContext: ReactApplicationContext) : NativeMLCEn
 
   private fun getModelConfig(modelId: String): Pair<ModelRecord, File>? {
     val modelRecord = appConfig.model_list.find { it.model_id == modelId } ?: return null
-    val modelDir = File(reactApplicationContext.getExternalFilesDir(""), modelRecord.model_id)
+    val modelDir = File(reactApplicationContext.getFilesDir(), modelRecord.model_id)
     return Pair(modelRecord, modelDir)
   }
 }
