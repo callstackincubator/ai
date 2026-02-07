@@ -1,8 +1,8 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { mlc } from '@react-native-ai/mlc'
 import { File, Paths } from 'expo-file-system'
-
 import { Platform } from 'react-native'
+
 import type { Availability, SetupAdapter } from '../../config/providers.common'
 
 export const createMLCLanguageSetupAdapter = (
