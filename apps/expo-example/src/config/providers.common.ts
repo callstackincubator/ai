@@ -45,6 +45,10 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
     'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf',
     toolDefinitions
   ),
+  createLlamaLanguageSetupAdapter(
+    'speakleash/Bielik-1.5B-v3.0-Instruct-GGUF/Bielik-1.5B-v3.0-Instruct.Q8_0.gguf',
+    toolDefinitions
+  ),
   createMLCLanguageSetupAdapter('Llama-3.2-1B-Instruct'),
   createMLCLanguageSetupAdapter('Llama-3.2-3B-Instruct'),
   createMLCLanguageSetupAdapter('Phi-3.5-mini-instruct'),
