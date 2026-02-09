@@ -83,7 +83,7 @@ export function useChatStore() {
       createdAt: new Date().toISOString(),
     }))
 
-    const isNewChat = !currentChatId
+    const isNewChat = !currentChatId || !currentChat
     if (isNewChat) {
       const firstUserMessage = messages.find((m) => m.role === 'user')
       setChats((prev) => {
