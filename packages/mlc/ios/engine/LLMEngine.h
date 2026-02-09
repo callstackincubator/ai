@@ -17,20 +17,29 @@
  */
 
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
-NS_ASSUME_NONNULL_BEGIN
+/**
+ * This is an internal Raw JSON FFI Engine that redirects request to internal JSON FFI Engine in C++
+ */
+@interface JSONFFIEngine : NSObject
 
-@interface LLMEngine : NSObject
+- (void)initBackgroundEngine:(void (^)(NSString *))streamCallback;
 
-- (instancetype)init;
+- (void)reload:(NSString *)engineConfig;
 
-- (void)reloadWithModelPath:(NSString *)modelPath modelLib:(NSString *)modelLib;
-- (void)reset;
 - (void)unload;
 
-- (NSString*)chatCompletionWithMessages:(NSArray *)messages options:(NSDictionary *)options completion:(void (^)(NSDictionary* response))completion;
-- (void)cancelRequest:(NSString *)requestId;
+- (void)reset;
+
+- (void)chatCompletion:(NSString *)requestJSON requestID:(NSString *)requestID;
+
+- (void)abort:(NSString *)requestID;
+
+- (void)runBackgroundLoop;
+
+- (void)runBackgroundStreamBackLoop;
+
+- (void)exitBackgroundLoop;
 
 @end
-
-NS_ASSUME_NONNULL_END
