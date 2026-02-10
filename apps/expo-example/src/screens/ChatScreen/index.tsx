@@ -1,6 +1,7 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { type createAppleProvider } from '@react-native-ai/apple'
 import { stepCountIs, streamText } from 'ai'
+import { buildGenUISystemPrompt, createGenUITools } from 'json-ui-lite-rn'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -8,12 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
-import {
-  createGenUITools,
-  setToolExecutionReporter,
-  toolDefinitions,
-} from '../../tools'
-import { GEN_UI_STYLES } from '../../ui/genUiNodes'
+import { setToolExecutionReporter, toolDefinitions } from '../../tools'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -76,7 +72,11 @@ export default function ChatScreen() {
     setIsGenerating(true)
 
     try {
-      const genUITools = createGenUITools(getSpec, updateChatUISpec, chatId)
+      const genUITools = createGenUITools({
+        contextId: chatId,
+        getSpec,
+        updateSpec: updateChatUISpec,
+      })
       const tools = {
         ...Object.fromEntries(
           enabledToolIds
@@ -110,22 +110,10 @@ export default function ChatScreen() {
         temperature,
         stopWhen: stepCountIs(maxSteps),
         abortSignal: signal,
-        system: `You are a helpful assistant that talks with the user in this Callstack @react-native-ai demo app. You have many tools to use including dynamic UI creation / modification tools. Remember this is React Native not web, also use simple props. If you set the "style" prop on a UI node, the possible keys are: ${Object.keys(
-          GEN_UI_STYLES
-        )
-          .map((key) => {
-            const entry = GEN_UI_STYLES[key as keyof typeof GEN_UI_STYLES]
-            const description = entry.description
-
-            let text = `${key} [${entry.type}]`
-
-            if (description) text += ` (${description})`
-
-            return text
-          })
-          .join(
-            ', '
-          )}. Remember NEVER use web values. BEFORE ADDING ANY UI ELEMENTS, GET THE WHOLE UI TREE with getGenUILayout. If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).`,
+        system: buildGenUISystemPrompt({
+          additionalInstructions:
+            'If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
+        }),
       })
 
       let accumulated = ''

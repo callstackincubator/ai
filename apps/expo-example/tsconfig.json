@@ -5,7 +5,8 @@
     "moduleSuffixes": [".android", ".ios", ""],
     "paths": {
       "@react-native-ai/apple": ["../../packages/apple-llm/src"],
-      "@react-native-ai/mlc": ["../../packages/mlc/src"]
+      "@react-native-ai/mlc": ["../../packages/mlc/src"],
+      "json-ui-lite-rn": ["../../packages/json-ui-lite-rn/src"]
     }
   },
   "include": ["src/**/*", "nativewind-env.d.ts"]
