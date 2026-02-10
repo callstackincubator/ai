@@ -22,6 +22,7 @@ type ChatMessage = {
   toolExecution?: {
     toolName: string
     payload: unknown
+    result?: unknown
   }
 }
 

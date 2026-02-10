@@ -11,6 +11,7 @@ type ChatMessageBubbleProps = {
   toolExecution?: {
     toolName: string
     payload: unknown
+    result?: unknown
   }
 }
 
@@ -28,7 +29,13 @@ export function ChatMessageBubble({
   const payload = toolExecution?.payload
     ? JSON.stringify(toolExecution.payload, null, 2)
     : ''
-  const hasPayload = payload !== '{}'
+  const result =
+    toolExecution?.result !== undefined
+      ? JSON.stringify(toolExecution.result, null, 2)
+      : ''
+  const hasPayload = payload !== '{}' && payload.length > 0
+  const hasResult = result.length > 0
+  const hasDetails = hasPayload || hasResult
 
   return (
     <View
@@ -43,7 +50,7 @@ export function ChatMessageBubble({
     >
       <Pressable
         disabled={!isToolHint}
-        onPress={() => hasPayload && setExpanded((prev) => !prev)}
+        onPress={() => hasDetails && setExpanded((prev) => !prev)}
         style={[
           styles.messageBubble,
           isToolHint
@@ -61,7 +68,7 @@ export function ChatMessageBubble({
             >
               {toolLabel}
             </Text>
-            {hasPayload && (
+            {hasDetails && (
               <Ionicons
                 name={expanded ? 'chevron-up' : 'chevron-down'}
                 size={16}
@@ -80,10 +87,21 @@ export function ChatMessageBubble({
             {content}
           </Text>
         )}
-        {isToolHint && expanded ? (
-          <Text selectable style={styles.payloadText}>
-            {payload}
-          </Text>
+        {isToolHint && expanded && hasPayload ? (
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailLabel}>args</Text>
+            <Text selectable style={styles.payloadText}>
+              {payload}
+            </Text>
+          </View>
+        ) : null}
+        {isToolHint && expanded && hasResult ? (
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailLabel}>result</Text>
+            <Text selectable style={styles.payloadText}>
+              {result}
+            </Text>
+          </View>
         ) : null}
       </Pressable>
     </View>
@@ -148,5 +166,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: colors.tertiaryLabel as any,
+  },
+  detailBlock: {
+    marginTop: 8,
+  },
+  detailLabel: {
+    fontSize: 11,
+    color: colors.tertiaryLabel as any,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 })

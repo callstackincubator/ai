@@ -78,7 +78,7 @@ Creates a set of tool definitions:
 `reorderUINodes` moves one sibling around another:
 
 - `nodeId`: node to move
-- `anchorId`: sibling anchor
+- `otherId`: sibling anchor
 - `mode`: `'pre' | 'post'`
 
 Options:

@@ -1,8 +1,22 @@
 import { tool } from 'ai'
 import * as Calendar from 'expo-calendar'
+import { setToolExecutionReporter as setGenUIToolExecutionReporter } from 'json-ui-lite-rn'
 import { z } from 'zod'
 
-export { setToolExecutionReporter } from 'json-ui-lite-rn'
+type ToolExecutionReporter = (event: {
+  toolName: string
+  args: unknown
+  result?: unknown
+}) => void
+
+let toolExecutionReporter: ToolExecutionReporter | null = null
+
+export function setToolExecutionReporter(
+  reporter: ToolExecutionReporter | null
+) {
+  toolExecutionReporter = reporter
+  setGenUIToolExecutionReporter(reporter)
+}
 
 /**
  * Wraps a tool execute function: on throw, logs the error and returns { error: message }.
@@ -14,10 +28,21 @@ function withToolErrorHandler<TArgs, TResult>(
   return async (args: TArgs) => {
     try {
       console.log('[tools] Executing tool', toolName, args)
-      return await execute(args)
+      const result = await execute(args)
+      try {
+        toolExecutionReporter?.({ toolName, args, result })
+      } catch (reportError) {
+        console.warn('[tools] Failed to report tool execution', reportError)
+      }
+      return result
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error(`[tool ${toolName}]`, err)
+      try {
+        toolExecutionReporter?.({ toolName, args, result: { error: message } })
+      } catch (reportError) {
+        console.warn('[tools] Failed to report tool execution', reportError)
+      }
       return { error: message }
     }
   }

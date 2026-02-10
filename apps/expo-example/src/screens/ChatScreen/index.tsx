@@ -2,7 +2,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { type createAppleProvider } from '@react-native-ai/apple'
 import { stepCountIs, streamText } from 'ai'
 import { buildGenUISystemPrompt, createGenUITools } from 'json-ui-lite-rn'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
@@ -26,7 +26,6 @@ export default function ChatScreen() {
     addToolExecutionMessage,
     updateMessageContent,
     updateChatUISpec,
-    currentChatId,
   } = useChatStore()
   const chatsRef = useRef(chats)
   chatsRef.current = chats
@@ -55,23 +54,6 @@ export default function ChatScreen() {
 
   const selectedModelAvailability = availability.get(selectedModelId)
 
-  const tools = useMemo(() => {
-    const genUITools = createGenUITools({
-      contextId: currentChatId ?? '-',
-      getSpec,
-      updateSpec: updateChatUISpec,
-    })
-
-    return {
-      ...Object.fromEntries(
-        enabledToolIds
-          .filter((id) => toolDefinitions[id])
-          .map((id) => [id, toolDefinitions[id]])
-      ),
-      ...genUITools,
-    }
-  }, [enabledToolIds, getSpec, updateChatUISpec, currentChatId])
-
   // Send message and stream AI response
   const handleSend = async (userInput: string) => {
     if (isGenerating || !selectedAdapter) return
@@ -90,6 +72,19 @@ export default function ChatScreen() {
     setIsGenerating(true)
 
     try {
+      const genUITools = createGenUITools({
+        contextId: chatId,
+        getSpec,
+        updateSpec: updateChatUISpec,
+      })
+      const tools = {
+        ...Object.fromEntries(
+          enabledToolIds
+            .filter((id) => toolDefinitions[id])
+            .map((id) => [id, toolDefinitions[id]])
+        ),
+        ...genUITools,
+      }
       if ('updateTools' in selectedAdapter.model) {
         ;(
           selectedAdapter.model as ReturnType<

@@ -60,7 +60,7 @@ function withToolErrorHandler<TArgs, TResult>(
 const defaultCreateId = () =>
   `UI-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`
 
-export type CreateUIToolsOptions<TSpec extends JsonUISpec = JsonUISpec> = {
+export type CreateUIGenToolsOptions<TSpec extends JsonUISpec = JsonUISpec> = {
   contextId: string
   getSpec: (contextId: string) => TSpec | null
   updateSpec: (contextId: string, spec: TSpec | null) => void
@@ -70,10 +70,43 @@ export type CreateUIToolsOptions<TSpec extends JsonUISpec = JsonUISpec> = {
   nodeNamesThatSupportChildren?: readonly string[]
 }
 
+const cloneSpec = <TSpec extends JsonUISpec>(spec: TSpec): TSpec =>
+  ({
+    ...spec,
+    elements: Object.fromEntries(
+      Object.entries(spec.elements).map(([id, element]) => [
+        id,
+        {
+          ...element,
+          props: { ...(element.props ?? {}) },
+          children: [...(element.children ?? [])],
+        },
+      ])
+    ),
+  }) as TSpec
+
+let mutationQueue: Promise<void> = Promise.resolve()
+
+const withMutationLock = async <T>(run: () => Promise<T>): Promise<T> => {
+  let release: () => void = () => {}
+  const pending = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const previous = mutationQueue
+  mutationQueue = mutationQueue.then(() => pending)
+
+  await previous
+  try {
+    return await run()
+  } finally {
+    release()
+  }
+}
+
 /**
  * Creates generative UI tools that read/update a JSON UI spec.
  */
-export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
+export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
   contextId,
   getSpec,
   updateSpec,
@@ -81,36 +114,21 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
   rootId = DEFAULT_GEN_UI_ROOT_ID,
   nodeHints = GEN_UI_NODE_HINTS,
   nodeNamesThatSupportChildren = GEN_UI_NODE_NAMES_THAT_SUPPORT_CHILDREN,
-}: CreateUIToolsOptions<TSpec>) {
-  let specCache = getSpec(contextId)
-
-  const readSpec = () => {
-    const latest = getSpec(contextId)
-    if (latest) specCache = latest
-    return specCache
-  }
-
-  const writeSpec = (nextSpec: TSpec) => {
-    specCache = nextSpec
-    updateSpec(contextId, nextSpec)
-  }
-
+}: CreateUIGenToolsOptions<TSpec>) {
   // Serialize mutating tool calls to avoid interleaving writes.
-  let mutationQueue: Promise<void> = Promise.resolve()
-  const withMutationLock = async <T>(run: () => Promise<T>): Promise<T> => {
-    let release: () => void = () => {}
-    const pending = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const previous = mutationQueue
-    mutationQueue = mutationQueue.then(() => pending)
+  let cachedSpec: TSpec | null = null
 
-    await previous
-    try {
-      return await run()
-    } finally {
-      release()
-    }
+  const readSpec = (): TSpec | null => {
+    if (cachedSpec) return cloneSpec(cachedSpec)
+    const spec = getSpec(contextId)
+    if (!spec) return null
+    cachedSpec = cloneSpec(spec)
+    return cloneSpec(cachedSpec)
+  }
+
+  const commitSpec = (spec: TSpec | null) => {
+    cachedSpec = spec ? cloneSpec(spec) : null
+    updateSpec(contextId, spec ? cloneSpec(spec) : null)
   }
 
   const getUIRootNode = tool({
@@ -225,7 +243,7 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
             : parsedProps
           elements[id] = { ...current, props: nextProps }
 
-          writeSpec({ root: spec.root, elements } as TSpec)
+          commitSpec({ root: spec.root, elements } as TSpec)
           return { success: true }
         })
     ),
@@ -255,7 +273,7 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
             }
           }
         }
-        writeSpec({ root: spec.root, elements } as TSpec)
+        commitSpec({ root: spec.root, elements } as TSpec)
         return { success: true }
       })
     ),
@@ -305,7 +323,10 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
           spec.elements[parentId].children ??= []
           spec.elements[parentId].children!.push(newId)
 
-          writeSpec({ root: spec.root, elements: spec.elements } as TSpec)
+          commitSpec({
+            root: spec.root,
+            elements: spec.elements,
+          } as TSpec)
           return { success: true, id: newId }
         })
     ),
@@ -313,24 +334,24 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
   const reorderUINodes = tool({
     description:
-      'Move one node before or after an anchor node among siblings. Call ',
+      'Move one node before or after an anchor node among siblings. ALWAYS CALL getUILayout before and after.',
     inputSchema: z.object({
       nodeId: z.string().describe('Node id to move'),
-      anchorId: z.string().describe('Sibling node id used as anchor'),
+      otherId: z.string().describe('Other node relative to which to move'),
       mode: z
         .enum(['pre', 'post'])
         .describe('Insert mode: pre = before anchor, post = after anchor'),
     }),
     execute: withToolErrorHandler(
       'reorderUINodes',
-      async ({ nodeId, anchorId, mode }) =>
+      async ({ nodeId, otherId, mode }) =>
         withMutationLock(async () => {
           const spec = readSpec()
           if (!spec) return { success: false, message: 'No UI spec' }
-          if (nodeId === anchorId) {
+          if (nodeId === otherId) {
             return {
               success: false,
-              message: 'nodeId and anchorId must be different',
+              message: 'nodeId and otherId must be different',
             }
           }
 
@@ -342,18 +363,18 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
           }
 
           const nodeParentId = findParentId(nodeId)
-          const anchorParentId = findParentId(anchorId)
+          const anchorParentId = findParentId(otherId)
           if (!nodeParentId || !anchorParentId) {
             return {
               success: false,
               message:
-                'Both nodeId and anchorId must exist and have the same parent',
+                'Both nodeId and otherId must exist and have the same parent',
             }
           }
           if (nodeParentId !== anchorParentId) {
             return {
               success: false,
-              message: 'nodeId and anchorId must be siblings',
+              message: 'nodeId and otherId must be siblings',
             }
           }
 
@@ -363,16 +384,16 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
           const currentChildren = [...(parent.children ?? [])]
           const nodeIndex = currentChildren.indexOf(nodeId)
-          const anchorIndex = currentChildren.indexOf(anchorId)
+          const anchorIndex = currentChildren.indexOf(otherId)
           if (nodeIndex === -1 || anchorIndex === -1) {
             return {
               success: false,
-              message: 'nodeId and anchorId must both be direct children',
+              message: 'nodeId and otherId must both be direct children',
             }
           }
 
           currentChildren.splice(nodeIndex, 1)
-          const anchorIndexAfterRemoval = currentChildren.indexOf(anchorId)
+          const anchorIndexAfterRemoval = currentChildren.indexOf(otherId)
           const insertIndex =
             mode === 'pre'
               ? anchorIndexAfterRemoval
@@ -381,13 +402,13 @@ export function createUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
           const elements = { ...spec.elements }
           elements[parentId].children = currentChildren
-          writeSpec({ root: spec.root, elements } as TSpec)
+          commitSpec({ root: spec.root, elements } as TSpec)
 
           return {
             success: true,
             parentId,
             nodeId,
-            anchorId,
+            otherId,
             mode,
             childIds: currentChildren,
           }
