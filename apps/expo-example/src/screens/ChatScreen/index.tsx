@@ -1,13 +1,15 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
+import { type createAppleProvider } from '@react-native-ai/apple'
 import { stepCountIs, streamText } from 'ai'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { useChatStore } from '../../store/chatStore'
+import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
-import { toolDefinitions } from '../../tools'
+import { createGenUITools, toolDefinitions } from '../../tools'
+import { GEN_UI_STYLES } from '../../ui/genUiNodes'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -16,8 +18,21 @@ import { ModelUnavailable } from './ModelUnavailable'
 import { SettingsSheet } from './SettingsSheet'
 
 export default function ChatScreen() {
-  const { currentChat, chatSettings, addMessages, updateMessageContent } =
-    useChatStore()
+  const {
+    chats,
+    currentChat,
+    chatSettings,
+    addMessages,
+    updateMessageContent,
+    updateChatUISpec,
+    hasGenerativeUI,
+  } = useChatStore()
+  const chatsRef = useRef(chats)
+  chatsRef.current = chats
+  const getSpec = useCallback(
+    (chatId: string) => getChatUISpecFromChats(chatsRef.current, chatId),
+    []
+  )
   const { adapters, availability } = useProviderStore()
 
   const {
@@ -57,6 +72,22 @@ export default function ChatScreen() {
     setIsGenerating(true)
 
     try {
+      const genUITools = createGenUITools(getSpec, updateChatUISpec, chatId)
+      const tools = {
+        ...Object.fromEntries(
+          enabledToolIds
+            .filter((id) => toolDefinitions[id])
+            .map((id) => [id, toolDefinitions[id]])
+        ),
+        ...genUITools,
+      }
+      if ('updateTools' in selectedAdapter.model) {
+        ;(
+          selectedAdapter.model as ReturnType<
+            ReturnType<typeof createAppleProvider>['languageModel']
+          >
+        ).updateTools(tools)
+      }
       const result = streamText({
         model: selectedAdapter.model,
         messages: [
@@ -66,21 +97,27 @@ export default function ChatScreen() {
           })),
           { role: 'user', content: userInput },
         ],
-        tools: Object.fromEntries(
-          enabledToolIds
-            .filter((id) => toolDefinitions[id])
-            .map((id) => [id, toolDefinitions[id]])
-        ),
+        tools,
         temperature,
         stopWhen: stepCountIs(maxSteps),
         abortSignal: signal,
+        system: `You are a helpful assistant that talks with the user in this Callstack @react-native-ai demo app. You have many tools to use including dynamic UI creation / modification tools. Remember this is React Native not web, also use simple props. If you set the "style" prop on a UI node, the possible keys are: ${Object.keys(GEN_UI_STYLES).join(', ')}. Remember NEVER use web values.`,
       })
 
       let accumulated = ''
       for await (const chunk of result.textStream) {
         if (signal.aborted) break
+        if (!chunk) continue
         accumulated += chunk
         updateMessageContent(chatId, assistantMessageId, accumulated)
+      }
+
+      if (accumulated.trim().length === 0) {
+        updateMessageContent(
+          chatId,
+          assistantMessageId,
+          'The LLM did not yield a response. Please try again.'
+        )
       }
     } catch (error) {
       // Don't show error if user cancelled
@@ -126,6 +163,13 @@ export default function ChatScreen() {
           />
         ) : selectedModelAvailability === 'availableForDownload' ? (
           <ModelAvailableForDownload />
+        ) : hasGenerativeUI ? (
+          <ChatMessages
+            messages={currentChat?.messages ?? []}
+            onSend={handleSend}
+            isGenerating={isGenerating}
+            selectedModelLabel={selectedAdapter.display.label}
+          />
         ) : (
           <ChatMessages
             messages={currentChat?.messages ?? []}

@@ -17,6 +17,7 @@ import {
   generateId,
   jsonSchema,
   parseJSON,
+  Tool as FullToolDefinition,
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
@@ -27,6 +28,7 @@ import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
+type ToolDefinitionSet = Record<string, FullToolDefinition>
 
 export function createAppleProvider() {
   const createLanguageModel = () => {
@@ -229,6 +231,8 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   readonly provider = 'apple'
   readonly modelId = 'system-default'
 
+  private tools: ToolDefinitionSet = {}
+
   async prepare(): Promise<void> {}
 
   private prepareMessages(messages: LanguageModelV3Prompt): AppleMessage[] {
@@ -254,9 +258,6 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
     return tools.map((tool) => {
       if (tool.type === 'function') {
         const schema = jsonSchema(tool.inputSchema)
-        const toolDef = tool as LanguageModelV3FunctionTool & {
-          execute?: (args: unknown, opts: ToolCallOptions) => unknown
-        }
         return {
           ...tool,
           id: generateId(),
@@ -273,12 +274,16 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
               toolCallId: generateId(),
               messages: [],
             }
-            return toolDef.execute?.(toolCallArguments, opts)
+            return this.tools[tool.name].execute?.(toolCallArguments, opts)
           },
         }
       }
       throw new Error('Unsupported tool type')
     })
+  }
+
+  updateTools(tools: ToolDefinitionSet) {
+    this.tools = tools
   }
 
   async doGenerate(options: LanguageModelV3CallOptions) {

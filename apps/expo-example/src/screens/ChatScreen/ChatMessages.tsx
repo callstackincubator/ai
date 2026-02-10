@@ -8,9 +8,11 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
+import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { ChatEmptyState } from './ChatEmptyState'
 import { ChatInputBar } from './ChatInputBar'
 import { ChatMessageBubble } from './ChatMessageBubble'
+import { GenerativeUIView } from './GenerativeUIView'
 
 type ChatMessage = {
   id: string
@@ -62,6 +64,8 @@ export function ChatMessages({
 
   useEffect(scrollToBottom, [messages.length])
 
+  const { chats, currentChatId } = useChatStore()
+
   return (
     <>
       <ScrollView
@@ -83,6 +87,15 @@ export function ChatMessages({
                 isUser={message.role === 'user'}
               />
             ))}
+
+            <GenerativeUIView
+              spec={
+                currentChatId
+                  ? getChatUISpecFromChats(chats, currentChatId)
+                  : null
+              }
+              loading={isGenerating}
+            />
           </View>
         )}
       </ScrollView>
