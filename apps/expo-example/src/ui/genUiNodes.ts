@@ -9,6 +9,10 @@ export const GEN_UI_NODE_NAMES = {
   Button: 'Button',
 } as const
 
+export const GEN_UI_NODE_NAMES_THAT_SUPPORT_CHILDREN = [
+  GEN_UI_NODE_NAMES.Container,
+]
+
 export const GEN_UI_NODE_HINTS: Record<keyof typeof GEN_UI_NODE_NAMES, string> =
   {
     Container:

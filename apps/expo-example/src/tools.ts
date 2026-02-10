@@ -5,7 +5,10 @@ import { z } from 'zod'
 
 import type { ChatUISpec } from './store/chatStore'
 import { GEN_UI_ROOT_ID } from './store/chatStore'
-import { GEN_UI_NODE_HINTS } from './ui/genUiNodes'
+import {
+  GEN_UI_NODE_HINTS,
+  GEN_UI_NODE_NAMES_THAT_SUPPORT_CHILDREN,
+} from './ui/genUiNodes'
 
 type ToolExecutionReporter = (event: {
   toolName: string
@@ -228,12 +231,26 @@ export function createGenUITools(
         const props = parsedProps ?? {}
         const elements = { ...spec.elements }
         elements[newId] = { type, props, children: [] }
-        const parent = elements[parentId]
+        let parent = elements[parentId]
+
+        // ensure the parent supports children
+        if (
+          !(GEN_UI_NODE_NAMES_THAT_SUPPORT_CHILDREN as string[]).includes(
+            parent.type
+          )
+        ) {
+          // sanitize the parent to be root
+          parent = elements[spec.root]
+          parentId = spec.root
+        }
+
         elements[parentId] = {
           ...parent,
           children: [...(parent.children ?? []), newId],
         }
+
         updateSpec(chatId, { root: spec.root, elements })
+
         return { success: true, id: newId }
       }
     ),

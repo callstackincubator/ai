@@ -62,11 +62,13 @@ function GenUINode({
           ))}
         </View>
       )
+
     case GEN_UI_NODE_NAMES.Text:
     case GEN_UI_NODE_NAMES.Paragraph:
     case GEN_UI_NODE_NAMES.Label:
     case GEN_UI_NODE_NAMES.Heading:
       return <Text style={[styles.text, baseStyle]}>{text ?? label ?? ''}</Text>
+
     case GEN_UI_NODE_NAMES.Button:
       return (
         <Pressable style={[styles.button, baseStyle]}>
@@ -75,6 +77,7 @@ function GenUINode({
           </Text>
         </Pressable>
       )
+
     default:
       return (
         <View style={[styles.container, baseStyle]}>
