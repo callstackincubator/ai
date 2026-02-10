@@ -403,17 +403,24 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
             id: streamId,
           })
 
-          let previousContent = ''
+          let previousRawContent = ''
 
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
             if (data.streamId === streamId) {
-              const delta = data.content.slice(previousContent.length)
+              const nextRawContent = String(data.content ?? '')
+              const rawDelta = nextRawContent.startsWith(previousRawContent)
+                ? nextRawContent.slice(previousRawContent.length)
+                : nextRawContent
+              previousRawContent = nextRawContent
+
+              // Apple native streaming can emit bogus "null" chunks as text.
+              if (rawDelta === 'null') return
+
               controller.enqueue({
                 type: 'text-delta',
-                delta,
+                delta: rawDelta,
                 id: data.streamId,
               })
-              previousContent = data.content
             }
           })
 
