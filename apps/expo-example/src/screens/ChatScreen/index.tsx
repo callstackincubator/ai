@@ -101,7 +101,22 @@ export default function ChatScreen() {
         temperature,
         stopWhen: stepCountIs(maxSteps),
         abortSignal: signal,
-        system: `You are a helpful assistant that talks with the user in this Callstack @react-native-ai demo app. You have many tools to use including dynamic UI creation / modification tools. Remember this is React Native not web, also use simple props. If you set the "style" prop on a UI node, the possible keys are: ${Object.keys(GEN_UI_STYLES).join(', ')}. Remember NEVER use web values.`,
+        system: `You are a helpful assistant that talks with the user in this Callstack @react-native-ai demo app. You have many tools to use including dynamic UI creation / modification tools. Remember this is React Native not web, also use simple props. If you set the "style" prop on a UI node, the possible keys are: ${Object.keys(
+          GEN_UI_STYLES
+        )
+          .map((key) => {
+            const entry = GEN_UI_STYLES[key as keyof typeof GEN_UI_STYLES]
+            const description = entry.description
+
+            let text = `${key} [${entry.type}]`
+
+            if (description) text += ` (${description})`
+
+            return text
+          })
+          .join(
+            ', '
+          )}. Remember NEVER use web values. If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).`,
       })
 
       let accumulated = ''

@@ -42,8 +42,14 @@ function GenUINode({
 
   for (const key of Object.keys(props)) {
     const validator = GEN_UI_STYLES[key as keyof typeof GEN_UI_STYLES]
-    if (validator && validator.safeParse(props[key]).success) {
-      baseStyle[key] = props[key]
+    if (validator) {
+      if (validator.safeParse(props[key]).success) {
+        baseStyle[key] = props[key]
+      } else {
+        console.warn(
+          `Invalid style prop: ${key} for node ${nodeId} of type ${type}: ${props[key]}`
+        )
+      }
     }
   }
 

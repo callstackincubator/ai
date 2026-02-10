@@ -1,5 +1,6 @@
 import { tool } from 'ai'
 import * as Calendar from 'expo-calendar'
+import _ from 'lodash'
 import { z } from 'zod'
 
 import type { ChatUISpec } from './store/chatStore'
@@ -44,8 +45,7 @@ export type UpdateUISpecArg = {
   state?: Record<string, unknown>
 }
 
-const createId = () =>
-  `${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`
+const createId = () => _.uniqueId('UI-')
 
 /**
  * Creates generative UI tools that read/update the chat's UI spec.
