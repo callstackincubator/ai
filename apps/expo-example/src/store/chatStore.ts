@@ -19,6 +19,7 @@ export type Message = {
   toolExecution?: {
     toolName: string
     payload: unknown
+    result?: unknown
   }
 }
 
@@ -56,6 +57,20 @@ export const DEFAULT_GEN_UI_SPEC: ChatUISpec = {
   },
 }
 
+const cloneGenUISpec = (spec: ChatUISpec): ChatUISpec => ({
+  root: spec.root,
+  elements: Object.fromEntries(
+    Object.entries(spec.elements).map(([id, element]) => [
+      id,
+      {
+        ...element,
+        props: { ...(element.props ?? {}) },
+        children: [...(element.children ?? [])],
+      },
+    ])
+  ),
+})
+
 /** Ensures spec has an undeletable root Container with flex: 1. */
 export function normalizeGenUISpec(
   spec: ChatUISpec | null | undefined
@@ -80,7 +95,10 @@ export function getChatUISpecFromChats(
   chatId: string
 ): ChatUISpec {
   const chat = chats.find((c) => c.id === chatId)
-  return normalizeGenUISpec(chat?.uiSpec ?? null) ?? DEFAULT_GEN_UI_SPEC
+  const normalized = normalizeGenUISpec(chat?.uiSpec ?? null)
+  return normalized
+    ? cloneGenUISpec(normalized)
+    : cloneGenUISpec(DEFAULT_GEN_UI_SPEC)
 }
 
 export type Chat = {
@@ -189,7 +207,8 @@ export function useChatStore() {
   const addToolExecutionMessage = (
     chatId: string,
     toolName: string,
-    payload: unknown
+    payload: unknown,
+    result?: unknown
   ) => {
     const toolMessage: Message = {
       id: createId(),
@@ -200,12 +219,12 @@ export function useChatStore() {
       toolExecution: {
         toolName,
         payload,
+        result,
       },
     }
 
     setChats((prev) => {
-      const arr = getSafeChats(prev)
-      return arr.map((chat) =>
+      return (prev as Chat[]).map((chat) =>
         chat.id === chatId
           ? {
               ...chat,
@@ -222,9 +241,9 @@ export function useChatStore() {
 
   const updateChatUISpec = (chatId: string, spec: ChatUISpec | null) => {
     const normalized = normalizeGenUISpec(spec)
+
     setChats((prev) => {
-      const arr = getSafeChats(prev)
-      return arr.map((chat) =>
+      return (prev as Chat[]).map((chat) =>
         chat.id === chatId ? { ...chat, uiSpec: normalized ?? undefined } : chat
       )
     })
@@ -236,8 +255,7 @@ export function useChatStore() {
     content: string
   ) => {
     setChats((prev) => {
-      const arr = getSafeChats(prev)
-      return arr.map((chat) =>
+      return (prev as Chat[]).map((chat) =>
         chat.id === chatId
           ? {
               ...chat,
