@@ -17,7 +17,6 @@ import {
   generateId,
   jsonSchema,
   parseJSON,
-  type Tool as ToolDefinition,
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
@@ -28,15 +27,10 @@ import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
-type ToolSet = Record<string, ToolDefinition>
 
-export function createAppleProvider({
-  availableTools,
-}: {
-  availableTools?: ToolSet
-} = {}) {
+export function createAppleProvider() {
   const createLanguageModel = () => {
-    return new AppleLLMChatLanguageModel(availableTools)
+    return new AppleLLMChatLanguageModel()
   }
   const provider = function () {
     return createLanguageModel()
@@ -235,12 +229,6 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   readonly provider = 'apple'
   readonly modelId = 'system-default'
 
-  private tools: ToolSet
-
-  constructor(tools: ToolSet = {}) {
-    this.tools = tools
-  }
-
   async prepare(): Promise<void> {}
 
   private prepareMessages(messages: LanguageModelV3Prompt): AppleMessage[] {
@@ -265,20 +253,27 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   private prepareTools(tools: Tool[] = []) {
     return tools.map((tool) => {
       if (tool.type === 'function') {
-        const toolDefinition = this.tools[tool.name]
-        if (!toolDefinition) {
-          throw new Error(`Tool ${tool.name} not found`)
-        }
         const schema = jsonSchema(tool.inputSchema)
+        const toolDef = tool as LanguageModelV3FunctionTool & {
+          execute?: (args: unknown, opts: ToolCallOptions) => unknown
+        }
         return {
           ...tool,
           id: generateId(),
-          execute: async (modelInput: any, opts: ToolCallOptions) => {
+          execute: async (modelInput: unknown) => {
+            const text =
+              typeof modelInput === 'string'
+                ? modelInput
+                : JSON.stringify(modelInput ?? '')
             const toolCallArguments = await parseJSON({
-              text: modelInput,
+              text,
               schema,
             })
-            return toolDefinition.execute?.(toolCallArguments, opts)
+            const opts: ToolCallOptions = {
+              toolCallId: generateId(),
+              messages: [],
+            }
+            return toolDef.execute?.(toolCallArguments, opts)
           },
         }
       }

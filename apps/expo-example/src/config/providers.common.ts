@@ -3,7 +3,6 @@ import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { createLlamaSpeechSetupAdapter } from '../components/adapters/llamaSpeechSetupAdapter'
 import { createMLCLanguageSetupAdapter } from '../components/adapters/mlcModelSetupAdapter'
-import { toolDefinitions } from '../tools'
 
 export type Availability = 'yes' | 'no' | 'availableForDownload'
 
@@ -42,8 +41,7 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),
   createLlamaLanguageSetupAdapter(
-    'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf',
-    toolDefinitions
+    'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf'
   ),
   createMLCLanguageSetupAdapter('Llama-3.2-1B-Instruct'),
   createMLCLanguageSetupAdapter('Llama-3.2-3B-Instruct'),
