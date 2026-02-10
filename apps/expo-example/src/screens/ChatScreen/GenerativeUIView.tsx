@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
 import type { ChatUISpec } from '../../store/chatStore'
 import { GEN_UI_NODE_NAMES, GEN_UI_STYLES } from '../../ui/genUiNodes'
@@ -54,7 +54,7 @@ function GenUINode({
   }
 
   switch (type) {
-    case GEN_UI_NODE_NAMES.Container:
+    case 'Container':
       return (
         <View style={[styles.container, baseStyle]}>
           {children.map((id) => (
@@ -76,6 +76,15 @@ function GenUINode({
             {label ?? text ?? ''}
           </Text>
         </Pressable>
+      )
+
+    case GEN_UI_NODE_NAMES.TextInput:
+      return (
+        <TextInput
+          placeholder={props?.placeholder as string}
+          style={[styles.textInput, baseStyle]}
+          onChangeText={() => {}}
+        />
       )
 
     default:
@@ -119,6 +128,8 @@ export function GenerativeUIView({ spec, loading }: GenerativeUIViewProps) {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
+    justifyContent: 'center',
+    gap: 8,
   },
   placeholder: {
     flex: 1,
@@ -131,23 +142,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   container: {
+    gap: 8,
     flex: 1,
   },
   column: {
     flexDirection: 'column',
     gap: 8,
   },
-  row: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  scroll: {
-    flex: 1,
-  },
   text: {
     fontSize: 16,
     color: '#111827',
+    flex: 1,
   },
   button: {
     paddingHorizontal: 16,
@@ -155,9 +160,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6',
     borderRadius: 8,
     alignSelf: 'flex-start',
+    flex: 1,
   },
   buttonText: {
     flex: 1,
     color: 'white',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 16,
+    color: '#111827',
+    flex: 1,
   },
 })

@@ -125,7 +125,7 @@ export default function ChatScreen() {
           })
           .join(
             ', '
-          )}. Remember NEVER use web values. If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).`,
+          )}. Remember NEVER use web values. BEFORE ADDING ANY UI ELEMENTS, GET THE WHOLE UI TREE with getGenUILayout. If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).`,
       })
 
       let accumulated = ''

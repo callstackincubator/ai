@@ -81,7 +81,7 @@ export function ChatMessages({
         {messages.length === 0 ? (
           <ChatEmptyState
             title="What can I help you with?"
-            subtitle={`Start a conversation with ${selectedModelLabel}. Ask questions, get creative, or explore ideas.`}
+            subtitle={`Start a conversation with ${selectedModelLabel}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`}
           />
         ) : (
           <View style={styles.messageList}>

@@ -127,15 +127,29 @@ export function createGenUITools(
     }),
   })
 
-  const getGenUINodeProps = tool({
-    description: 'Get the props object of a node by id.',
-    inputSchema: z.object({
-      id: z.string().describe('Node id'),
-    }),
-    execute: withToolErrorHandler('getGenUINodeProps', async ({ id }) => {
+  const getGenUILayout = tool({
+    description: 'Get compact UI layout.',
+    inputSchema: z.object({}),
+    execute: withToolErrorHandler('getGenUILayout', async () => {
       const spec = getSpec(chatId)
-      if (!spec?.elements[id]) return { props: null }
-      return { props: spec.elements[id].props }
+      if (!spec) return { root: null, nodes: [] }
+
+      const parentByChild: Record<string, string | null> = {}
+      for (const [id, el] of Object.entries(spec.elements)) {
+        for (const childId of el.children ?? []) {
+          parentByChild[childId] = id
+        }
+      }
+
+      const nodes = Object.entries(spec.elements).map(([id, el]) => ({
+        id,
+        type: el.type,
+        parentId: parentByChild[id] ?? null,
+        children: el.children ?? [],
+        props: Object.keys(el.props ?? {}),
+      }))
+
+      return { root: spec.root, nodes }
     }),
   })
 
@@ -259,7 +273,7 @@ export function createGenUITools(
   return {
     getGenUIRootNode,
     getGenUINode,
-    getGenUINodeProps,
+    getGenUILayout,
     getAvailableGenUINodes,
     setGenUINodeProps,
     deleteNode,
