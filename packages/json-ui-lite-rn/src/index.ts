@@ -17,7 +17,7 @@ export {
   GEN_UI_STYLES,
 } from './registry'
 export {
+  type CreateGenTUIoolsOptions,
   createGenUITools,
-  type CreateGenUIToolsOptions,
   setToolExecutionReporter,
 } from './tools'

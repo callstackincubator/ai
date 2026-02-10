@@ -92,8 +92,8 @@ export default function ChatScreen() {
           >
         ).updateTools(tools)
       }
-      setToolExecutionReporter(({ toolName, args }) => {
-        addToolExecutionMessage(chatId, toolName, args)
+      setToolExecutionReporter(({ toolName, args, result }) => {
+        addToolExecutionMessage(chatId, toolName, args, result)
       })
       const result = streamText({
         model: selectedAdapter.model,

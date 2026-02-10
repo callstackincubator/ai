@@ -60,7 +60,7 @@ function withToolErrorHandler<TArgs, TResult>(
 const defaultCreateId = () =>
   `UI-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`
 
-export type CreateUIGenToolsOptions<TSpec extends JsonUISpec = JsonUISpec> = {
+export type CreateGenTUIoolsOptions<TSpec extends JsonUISpec = JsonUISpec> = {
   contextId: string
   getSpec: (contextId: string) => TSpec | null
   updateSpec: (contextId: string, spec: TSpec | null) => void
@@ -114,7 +114,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
   rootId = DEFAULT_GEN_UI_ROOT_ID,
   nodeHints = GEN_UI_NODE_HINTS,
   nodeNamesThatSupportChildren = GEN_UI_NODE_NAMES_THAT_SUPPORT_CHILDREN,
-}: CreateUIGenToolsOptions<TSpec>) {
+}: CreateGenTUIoolsOptions<TSpec>) {
   // Serialize mutating tool calls to avoid interleaving writes.
   let cachedSpec: TSpec | null = null
 
@@ -219,15 +219,15 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
   })
 
   const setUINodeProps = tool({
-    description: 'Set or merge props for a node by id.',
+    description: 'Set or add props for a node by id.',
     inputSchema: z.object({
       id: z.string().describe('Node id'),
       props: z.string().describe('Props object for the node'),
-      merge: z.boolean().optional().describe('Merge with existing props'),
+      replace: z.boolean().optional().describe('Replace existing props'),
     }),
     execute: withToolErrorHandler(
       'setUINodeProps',
-      async ({ id, props: propsArg, merge = true }) =>
+      async ({ id, props: propsArg, replace = false }) =>
         withMutationLock(async () => {
           const parsedProps = smartParse(propsArg)
           const spec = readSpec()
@@ -238,9 +238,10 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
           const elements = { ...spec.elements }
           const current = elements[id]
-          const nextProps = merge
-            ? { ...current.props, ...parsedProps }
-            : parsedProps
+          const nextProps = replace
+            ? parsedProps
+            : { ...current.props, ...parsedProps }
+
           elements[id] = { ...current, props: nextProps }
 
           commitSpec({ root: spec.root, elements } as TSpec)
@@ -283,7 +284,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
     description:
       'Add a new node as a child of parentId. Creates element with type and props. Returns new node id. Props must be a valid JSON object.',
     inputSchema: z.object({
-      parentId: z.string().describe('Parent node id'),
+      parentId: z.string().optional().describe('Parent node id; omit for root'),
       type: z
         .string()
         .describe('Component type (e.g. Container, Column, Text, Button)'),
@@ -300,6 +301,9 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
             return { success: false, message: 'No UI spec' }
           }
+
+          parentId ??= spec.root
+
           if (!spec.elements[parentId]) {
             console.warn(
               '[json-ui-lite-rn tool addNode] Parent not found, aborting'
@@ -334,26 +338,21 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
   const reorderUINodes = tool({
     description:
-      'Move one node before or after an anchor node among siblings. ALWAYS CALL getUILayout before and after.',
+      'Move one node among siblings by offset (negative = up, positive = down).',
     inputSchema: z.object({
       nodeId: z.string().describe('Node id to move'),
-      otherId: z.string().describe('Other node relative to which to move'),
-      mode: z
-        .enum(['pre', 'post'])
-        .describe('Insert mode: pre = before anchor, post = after anchor'),
+      offset: z
+        .number()
+        .describe(
+          'Relative index shift among siblings; negative moves earlier, positive moves later'
+        ),
     }),
     execute: withToolErrorHandler(
       'reorderUINodes',
-      async ({ nodeId, otherId, mode }) =>
+      async ({ nodeId, offset }) =>
         withMutationLock(async () => {
           const spec = readSpec()
           if (!spec) return { success: false, message: 'No UI spec' }
-          if (nodeId === otherId) {
-            return {
-              success: false,
-              message: 'nodeId and otherId must be different',
-            }
-          }
 
           const findParentId = (childId: string) => {
             for (const [id, element] of Object.entries(spec.elements)) {
@@ -363,18 +362,10 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
           }
 
           const nodeParentId = findParentId(nodeId)
-          const anchorParentId = findParentId(otherId)
-          if (!nodeParentId || !anchorParentId) {
+          if (!nodeParentId) {
             return {
               success: false,
-              message:
-                'Both nodeId and otherId must exist and have the same parent',
-            }
-          }
-          if (nodeParentId !== anchorParentId) {
-            return {
-              success: false,
-              message: 'nodeId and otherId must be siblings',
+              message: 'nodeId must exist and have a parent',
             }
           }
 
@@ -384,21 +375,29 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
           const currentChildren = [...(parent.children ?? [])]
           const nodeIndex = currentChildren.indexOf(nodeId)
-          const anchorIndex = currentChildren.indexOf(otherId)
-          if (nodeIndex === -1 || anchorIndex === -1) {
+          if (nodeIndex === -1) {
             return {
               success: false,
-              message: 'nodeId and otherId must both be direct children',
+              message: 'nodeId must be a direct child',
             }
           }
 
+          if (offset === 0) {
+            return {
+              success: true,
+              parentId,
+              nodeId,
+              fromIndex: nodeIndex,
+              toIndex: nodeIndex,
+              appliedOffset: 0,
+              childIds: currentChildren,
+            }
+          }
+
+          const maxIndex = currentChildren.length - 1
+          const toIndex = Math.min(Math.max(nodeIndex + offset, 0), maxIndex)
           currentChildren.splice(nodeIndex, 1)
-          const anchorIndexAfterRemoval = currentChildren.indexOf(otherId)
-          const insertIndex =
-            mode === 'pre'
-              ? anchorIndexAfterRemoval
-              : anchorIndexAfterRemoval + 1
-          currentChildren.splice(insertIndex, 0, nodeId)
+          currentChildren.splice(toIndex, 0, nodeId)
 
           const elements = { ...spec.elements }
           elements[parentId].children = currentChildren
@@ -408,8 +407,9 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
             success: true,
             parentId,
             nodeId,
-            otherId,
-            mode,
+            fromIndex: nodeIndex,
+            toIndex,
+            appliedOffset: toIndex - nodeIndex,
             childIds: currentChildren,
           }
         })

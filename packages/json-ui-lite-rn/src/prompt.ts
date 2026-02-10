@@ -29,7 +29,7 @@ export function buildGenUISystemPrompt({
 
   const parts = [
     'You are a helpful assistant.',
-    'You have tools to create and update UI nodes.',
+    'You have tools to create and update UI nodes. Before any tool calls for UI, ALWAYS CALL getUILayout before and after.',
     'Remember this is React Native, not web, and use simple props.',
     `If you set the "style" prop on a UI node, the possible keys are: ${styleKeysText}.`,
     'Remember NEVER use web values.',
