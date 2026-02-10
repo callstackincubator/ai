@@ -66,13 +66,20 @@ const result = streamText({
 
 Creates a set of tool definitions:
 
-- `getGenUIRootNode`
-- `getGenUINode`
-- `getGenUILayout`
-- `getAvailableGenUINodes`
-- `setGenUINodeProps`
-- `deleteNode`
-- `addNode`
+- `getUIRootNode`
+- `getUINode`
+- `getUILayout`
+- `getAvailableUINodes`
+- `setUINodeProps`
+- `deleteUINode`
+- `addUINode`
+- `reorderUINodes`
+
+`reorderUINodes` moves one sibling around another:
+
+- `nodeId`: node to move
+- `anchorId`: sibling anchor
+- `mode`: `'pre' | 'post'`
 
 Options:
 
@@ -108,8 +115,7 @@ Renders a JSON UI spec directly in React Native:
 
 ```tsx
 import { GenerativeUIView } from 'json-ui-lite-rn'
-
-<GenerativeUIView spec={spec} loading={isGenerating} />
+;<GenerativeUIView spec={spec} loading={isGenerating} />
 ```
 
 Props:

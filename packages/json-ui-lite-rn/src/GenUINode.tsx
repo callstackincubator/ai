@@ -36,7 +36,7 @@ export function GenUINode({ nodeId, elements }: GenUINodeProps) {
         baseStyle[key] = props[key]
       } else {
         console.warn(
-          `Invalid style prop: ${key} for node ${nodeId} of type ${type}: ${props[key]}`
+          `[json-ui-lite-rn] Invalid style prop: ${key} for node ${nodeId} of type ${type}: ${props[key]}`
         )
       }
     }
