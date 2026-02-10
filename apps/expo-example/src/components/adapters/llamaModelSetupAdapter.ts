@@ -7,7 +7,7 @@ import {
   removeModel,
 } from '../../../../../packages/llama/src/storage'
 import type { Availability, SetupAdapter } from '../../config/providers.common'
-import { isModelDownloaded } from '../../utils/storage'
+import { isLlamaModelDownloaded } from '../../utils/llamaStorageUtils'
 
 export const createLlamaLanguageSetupAdapter = (
   hfModelId: string
@@ -32,7 +32,7 @@ export const createLlamaLanguageSetupAdapter = (
     },
     builtIn: false,
     isAvailable(): Availability {
-      const downloaded = isModelDownloaded(hfModelId)
+      const downloaded = isLlamaModelDownloaded(hfModelId)
       return downloaded ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
