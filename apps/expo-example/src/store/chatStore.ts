@@ -8,12 +8,18 @@ import { toolDefinitions } from '../tools'
 const storage = createJSONStorage<any>(() => AsyncStorage)
 
 export type MessageRole = 'user' | 'assistant'
+export type MessageType = 'text' | 'toolExecution'
 
 export type Message = {
   id: string
   role: MessageRole
   content: string
   createdAt: string
+  type?: MessageType
+  toolExecution?: {
+    toolName: string
+    payload: unknown
+  }
 }
 
 export type ChatSettings = {
@@ -180,6 +186,40 @@ export function useChatStore() {
     return { chatId, messageIds: newMessages.map((m) => m.id) }
   }
 
+  const addToolExecutionMessage = (
+    chatId: string,
+    toolName: string,
+    payload: unknown
+  ) => {
+    const toolMessage: Message = {
+      id: createId(),
+      role: 'assistant',
+      type: 'toolExecution',
+      content: `Executed tool: ${toolName}`,
+      createdAt: new Date().toISOString(),
+      toolExecution: {
+        toolName,
+        payload,
+      },
+    }
+
+    setChats((prev) => {
+      const arr = getSafeChats(prev)
+      return arr.map((chat) =>
+        chat.id === chatId
+          ? {
+              ...chat,
+              messages: [
+                ...chat.messages.slice(0, -1),
+                toolMessage,
+                ...chat.messages.slice(-1),
+              ],
+            }
+          : chat
+      )
+    })
+  }
+
   const updateChatUISpec = (chatId: string, spec: ChatUISpec | null) => {
     const normalized = normalizeGenUISpec(spec)
     setChats((prev) => {
@@ -247,6 +287,7 @@ export function useChatStore() {
     selectChat: setCurrentChatId,
     deleteChat,
     addMessages,
+    addToolExecutionMessage,
     updateMessageContent,
     updateChatUISpec,
     updateChatSettings,

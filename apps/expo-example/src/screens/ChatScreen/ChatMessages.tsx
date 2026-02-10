@@ -18,6 +18,11 @@ type ChatMessage = {
   id: string
   role: string
   content: string
+  type?: 'text' | 'toolExecution'
+  toolExecution?: {
+    toolName: string
+    payload: unknown
+  }
 }
 
 type ChatMessagesProps = {
@@ -85,6 +90,8 @@ export function ChatMessages({
                 key={message.id}
                 content={message.content}
                 isUser={message.role === 'user'}
+                messageType={message.type}
+                toolExecution={message.toolExecution}
               />
             ))}
 

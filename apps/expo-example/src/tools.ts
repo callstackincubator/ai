@@ -7,6 +7,19 @@ import type { ChatUISpec } from './store/chatStore'
 import { GEN_UI_ROOT_ID } from './store/chatStore'
 import { GEN_UI_NODE_HINTS } from './ui/genUiNodes'
 
+type ToolExecutionReporter = (event: {
+  toolName: string
+  args: unknown
+}) => void
+
+let toolExecutionReporter: ToolExecutionReporter | null = null
+
+export function setToolExecutionReporter(
+  reporter: ToolExecutionReporter | null
+) {
+  toolExecutionReporter = reporter
+}
+
 /**
  * Sometimes LLMs call the tools with a string instead of an object.
  * This function parses the string if it's a valid JSON string.
@@ -29,6 +42,11 @@ function withToolErrorHandler<TArgs, TResult>(
   return async (args: TArgs) => {
     try {
       console.log('[tools] Executing tool', toolName, args)
+      try {
+        toolExecutionReporter?.({ toolName, args })
+      } catch (reportError) {
+        console.warn('[tools] Failed to report execution', reportError)
+      }
       return await execute(args)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

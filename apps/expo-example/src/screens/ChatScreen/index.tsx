@@ -8,7 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
-import { createGenUITools, toolDefinitions } from '../../tools'
+import {
+  createGenUITools,
+  setToolExecutionReporter,
+  toolDefinitions,
+} from '../../tools'
 import { GEN_UI_STYLES } from '../../ui/genUiNodes'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
@@ -23,9 +27,9 @@ export default function ChatScreen() {
     currentChat,
     chatSettings,
     addMessages,
+    addToolExecutionMessage,
     updateMessageContent,
     updateChatUISpec,
-    hasGenerativeUI,
   } = useChatStore()
   const chatsRef = useRef(chats)
   chatsRef.current = chats
@@ -88,13 +92,18 @@ export default function ChatScreen() {
           >
         ).updateTools(tools)
       }
+      setToolExecutionReporter(({ toolName, args }) => {
+        addToolExecutionMessage(chatId, toolName, args)
+      })
       const result = streamText({
         model: selectedAdapter.model,
         messages: [
-          ...baseMessages.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
+          ...baseMessages
+            .filter((message) => message.type !== 'toolExecution')
+            .map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
           { role: 'user', content: userInput },
         ],
         tools,
@@ -141,6 +150,7 @@ export default function ChatScreen() {
         error instanceof Error ? error.message : 'Failed to generate response'
       updateMessageContent(chatId, assistantMessageId, `Error: ${message}`)
     } finally {
+      setToolExecutionReporter(null)
       setIsGenerating(false)
     }
   }
@@ -178,13 +188,6 @@ export default function ChatScreen() {
           />
         ) : selectedModelAvailability === 'availableForDownload' ? (
           <ModelAvailableForDownload />
-        ) : hasGenerativeUI ? (
-          <ChatMessages
-            messages={currentChat?.messages ?? []}
-            onSend={handleSend}
-            isGenerating={isGenerating}
-            selectedModelLabel={selectedAdapter.display.label}
-          />
         ) : (
           <ChatMessages
             messages={currentChat?.messages ?? []}
