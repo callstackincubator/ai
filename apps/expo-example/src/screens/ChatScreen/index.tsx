@@ -1,10 +1,10 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { type createAppleProvider } from '@react-native-ai/apple'
-import { stepCountIs, streamText } from 'ai'
 import {
   buildGenUISystemPrompt,
   createGenUITools,
 } from '@react-native-ai/json-ui'
+import { stepCountIs, streamText } from 'ai'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
