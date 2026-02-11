@@ -102,6 +102,22 @@ const apple = createAppleProvider({
 });
 ```
 
+If you want to change the tools at runtime, you can do it as follows:
+
+```typescript
+const apple = createAppleProvider({
+  availableTools: {
+    getWeather
+  }
+});
+const model = apple();
+
+model.updateTools({
+  getWeather,
+  getDate
+});
+```
+
 ### Basic Tool Usage
 
 Then, generate output like with any other Vercel AI SDK provider:
