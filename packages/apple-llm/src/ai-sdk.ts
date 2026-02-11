@@ -30,9 +30,13 @@ import NativeAppleUtils from './NativeAppleUtils'
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 type ToolDefinitionSet = Record<string, FullToolDefinition>
 
-export function createAppleProvider() {
+export function createAppleProvider({
+  availableTools,
+}: {
+  availableTools?: ToolDefinitionSet
+} = {}) {
   const createLanguageModel = () => {
-    return new AppleLLMChatLanguageModel()
+    return new AppleLLMChatLanguageModel(availableTools)
   }
   const provider = function () {
     return createLanguageModel()
@@ -232,6 +236,10 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   readonly modelId = 'system-default'
 
   private tools: ToolDefinitionSet = {}
+
+  constructor(availableTools: ToolDefinitionSet = {}) {
+    this.updateTools(availableTools)
+  }
 
   async prepare(): Promise<void> {}
 

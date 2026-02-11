@@ -4,6 +4,7 @@ import {
   createAppleLanguageSetupAdapter,
   createAppleSpeechSetupAdapter,
 } from '../components/adapters/appleSetupAdapter'
+import { toolDefinitions } from '../tools'
 import {
   commonLanguageAdapters,
   commonSpeechAdapters,
@@ -12,7 +13,7 @@ import {
 
 // Available language model adapters for text generation.
 export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
-  createAppleLanguageSetupAdapter(),
+  createAppleLanguageSetupAdapter(toolDefinitions),
   ...commonLanguageAdapters,
 ]
 
