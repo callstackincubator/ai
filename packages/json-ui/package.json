@@ -1,6 +1,6 @@
 {
-  "name": "json-ui-lite-rn",
-  "version": "0.12.0",
+  "name": "@react-native-ai/json-ui",
+  "version": "1.0.0-alpha.1",
   "description": "Lightweight JSON UI generation for React Native based on tool calling, compatible with Vercel AI SDK",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",

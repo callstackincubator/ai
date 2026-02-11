@@ -49,7 +49,7 @@ export function parseGenUIElementProps(
         baseStyle[key] = props[key]
       } else {
         console.warn(
-          `[json-ui-lite-rn] Invalid style prop: ${key} for node ${nodeId} of type ${type}: ${props[key]}`
+          `[@react-native-ai/json-ui] Invalid style prop: ${key} for node ${nodeId} of type ${type}: ${props[key]}`
         )
       }
     }

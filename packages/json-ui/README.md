@@ -1,4 +1,4 @@
-# `json-ui-lite-rn`
+# `@react-native-ai/json-ui`
 
 Lightweight JSON UI tooling for React Native + Vercel AI SDK tool calling.
 
@@ -11,7 +11,7 @@ Lightweight JSON UI tooling for React Native + Vercel AI SDK tool calling.
 
 **Why this package?** a.k.a. prior art
 
-There exists a great library for streaming interfaces: [`json-render`](https://github.com/vercel-labs/json-render). The full specification is provided in this section, but **TLDR**: this library - `json-ui-lite-rn` - is the choice for small language models (e.g. parameters in the order of magnitude of 3B), which is usually the case if you are running inference locally, on-device. If you are using a cloud provider (OpenAI or Antrophic API), then you will want to go with `json-render` instead.
+There exists a great library for streaming interfaces: [`json-render`](https://github.com/vercel-labs/json-render). The full specification is provided in this section, but **TLDR**: this library - `@react-native-ai/json-ui` - is the choice for small language models (e.g. parameters in the order of magnitude of 3B), which is usually the case if you are running inference locally, on-device. If you are using a cloud provider (OpenAI or Antrophic API), then you will want to go with `json-render` instead.
 
 ## Requirements
 
@@ -22,14 +22,17 @@ There exists a great library for streaming interfaces: [`json-render`](https://g
 ## Installation
 
 ```sh
-bun add json-ui-lite-rn
+bun add @react-native-ai/json-ui
 ```
 
 ## Quick Start
 
 ```ts
 import { streamText } from 'ai'
-import { buildGenUISystemPrompt, createGenUITools } from 'json-ui-lite-rn'
+import {
+  buildGenUISystemPrompt,
+  createGenUITools,
+} from '@react-native-ai/json-ui'
 
 type UISpec = {
   root: string
@@ -44,7 +47,7 @@ const tools = createGenUITools<UISpec>({
   getSpec: (id) => getSpecForChat(id),
   updateSpec: (id, nextSpec) => setSpecForChat(id, nextSpec),
   toolWrapper: (toolName, execute) => async (args) => {
-    console.log('[json-ui-lite-rn] Executing tool', toolName, args)
+    console.log('[@react-native-ai/json-ui] Executing tool', toolName, args)
     return execute(args)
   },
 })
@@ -120,7 +123,7 @@ Options:
 Renders a JSON UI spec directly in React Native. The default node renderer (`GenUINode`) receives style validators from the view; you can override styles or supply a custom renderer.
 
 ```tsx
-import { GenerativeUIView } from 'json-ui-lite-rn'
+import { GenerativeUIView } from '@react-native-ai/json-ui'
 ;<GenerativeUIView spec={spec} loading={isGenerating} />
 ```
 
@@ -138,8 +141,7 @@ The default `GenUINode` does not import `GEN_UI_STYLES` itself. `GenerativeUIVie
 
 ```tsx
 import { z } from 'zod'
-import { GenerativeUIView, GEN_UI_STYLES } from 'json-ui-lite-rn'
-
+import { GenerativeUIView, GEN_UI_STYLES } from '@react-native-ai/json-ui'
 ;<GenerativeUIView
   spec={spec}
   styles={{
@@ -159,7 +161,7 @@ import {
   GenUINode,
   parseGenUIElementProps,
   type GenUINodeProps,
-} from 'json-ui-lite-rn'
+} from '@react-native-ai/json-ui'
 
 const BADGE_TYPE = 'Badge'
 

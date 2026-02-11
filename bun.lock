@@ -39,6 +39,7 @@
         "@expo/vector-icons": "^15.0.3",
         "@lodev09/react-native-true-sheet": "^3.8.1",
         "@react-native-ai/apple": "workspace:*",
+        "@react-native-ai/json-ui": "workspace:*",
         "@react-native-ai/llama": "workspace:*",
         "@react-native-ai/mlc": "workspace:*",
         "@react-native-async-storage/async-storage": "^2.2.0",
@@ -63,7 +64,6 @@
         "expo-symbols": "~1.0.8",
         "expo-system-ui": "^6.0.9",
         "jotai": "^2.12.2",
-        "json-ui-lite-rn": "workspace:*",
         "llama.rn": "^0.10.1",
         "react": "19.1.0",
         "react-native": "0.81.5",
@@ -125,9 +125,9 @@
         "react-native": "*",
       },
     },
-    "packages/json-ui-lite-rn": {
-      "name": "json-ui-lite-rn",
-      "version": "0.12.0",
+    "packages/json-ui": {
+      "name": "@react-native-ai/json-ui",
+      "version": "1.0.0-alpha.1",
       "dependencies": {
         "ai": "^6.0.0",
         "zod": "^4.0.0",
@@ -757,6 +757,8 @@
     "@react-native-ai/dev-tools": ["@react-native-ai/dev-tools@workspace:packages/dev-tools"],
 
     "@react-native-ai/example": ["@react-native-ai/example@workspace:apps/expo-example"],
+
+    "@react-native-ai/json-ui": ["@react-native-ai/json-ui@workspace:packages/json-ui"],
 
     "@react-native-ai/llama": ["@react-native-ai/llama@workspace:packages/llama"],
 
@@ -1879,8 +1881,6 @@
     "json-stable-stringify-without-jsonify": ["json-stable-stringify-without-jsonify@1.0.1", "", {}, "sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw=="],
 
     "json-stringify-safe": ["json-stringify-safe@5.0.1", "", {}, "sha512-ZClg6AaYvamvYEE82d3Iyd3vSSIjQ+odgjaTzRuO3s7toCdFKczob2i0zCh7JE8kWn17yvAWhUVxvqGwUalsRA=="],
-
-    "json-ui-lite-rn": ["json-ui-lite-rn@workspace:packages/json-ui-lite-rn"],
 
     "json5": ["json5@2.2.3", "", { "bin": { "json5": "lib/cli.js" } }, "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="],
 

@@ -1,4 +1,4 @@
-import { GenerativeUIView } from 'json-ui-lite-rn'
+import { GenerativeUIView } from '@react-native-ai/json-ui'
 import React, { useEffect, useRef } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { useKeyboardHandler } from 'react-native-keyboard-controller'

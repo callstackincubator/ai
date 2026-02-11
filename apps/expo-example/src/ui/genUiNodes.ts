@@ -3,4 +3,4 @@ export {
   GEN_UI_NODE_NAMES,
   GEN_UI_NODE_NAMES_THAT_SUPPORT_CHILDREN,
   GEN_UI_STYLES,
-} from 'json-ui-lite-rn'
+} from '@react-native-ai/json-ui'

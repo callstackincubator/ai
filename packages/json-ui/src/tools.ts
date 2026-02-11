@@ -262,7 +262,9 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
           const parsedProps = smartParse(propsArg ?? '{}')
           const spec = readSpec()
           if (!spec) {
-            console.warn('[json-ui-lite-rn tool addNode] No UI spec, aborting')
+            console.warn(
+              '[@react-native-ai/json-ui tool addNode] No UI spec, aborting'
+            )
 
             return { success: false, message: 'No UI spec' }
           }
@@ -271,7 +273,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
 
           if (!spec.elements[parentId]) {
             console.warn(
-              '[json-ui-lite-rn tool addNode] Parent not found, aborting'
+              '[@react-native-ai/json-ui tool addNode] Parent not found, aborting'
             )
             return { success: false, message: 'Parent not found' }
           }
