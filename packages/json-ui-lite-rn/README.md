@@ -4,10 +4,10 @@ Lightweight JSON UI tooling for React Native + Vercel AI SDK tool calling.
 
 **This package provides:**
 
-- a component/style registry (`GEN_UI_NODE_HINTS`, `GEN_UI_STYLES`)
+- a component/style registry (`GEN_UI_NODE_HINTS`, `GEN_UI_STYLES`, `GEN_UI_NODE_NAMES`)
 - a ready-to-use tool set for JSON UI mutation (`createGenUITools`)
 - a reusable system prompt builder (`buildGenUISystemPrompt`)
-- a React Native renderer for specs (`GenerativeUIView`)
+- a React Native renderer for specs (`GenerativeUIView`), which passes `GEN_UI_STYLES` (overridable) to the default `GenUINode` and lets you supply a custom node renderer
 
 **Why this package?** a.k.a. prior art
 
@@ -117,7 +117,7 @@ Options:
 
 ### `GenerativeUIView`
 
-Renders a JSON UI spec directly in React Native:
+Renders a JSON UI spec directly in React Native. The default node renderer (`GenUINode`) receives style validators from the view; you can override styles or supply a custom renderer.
 
 ```tsx
 import { GenerativeUIView } from 'json-ui-lite-rn'
@@ -129,6 +129,77 @@ Props:
 - `spec`: `{ root, elements }` object (or `null`/`undefined`)
 - `loading`: optional boolean for empty-state loading text
 - `showCollapsibleJSON`: optional boolean to render an expandable JSON debug panel
+- `styles`: optional override for style validators (merged with default `GEN_UI_STYLES`); the resulting map is passed to `GenUINode`
+- `GenUINodeComponent`: optional custom component to render the tree; receives `{ nodeId, elements, styles }`; delegate to default `GenUINode` for nodes you don’t handle
+
+#### Styles from GenerativeUIView
+
+The default `GenUINode` does not import `GEN_UI_STYLES` itself. `GenerativeUIView` merges the registry default with any `styles` prop and passes the result down as the `styles` prop to `GenUINode`. So all style validation is driven by what the view provides, and you can pass custom validators:
+
+```tsx
+import { z } from 'zod'
+import { GenerativeUIView, GEN_UI_STYLES } from 'json-ui-lite-rn'
+
+;<GenerativeUIView
+  spec={spec}
+  styles={{
+    borderRadius: z.number(),
+  }}
+/>
+```
+
+#### Custom GenUINode example
+
+You can supply your own node renderer and reuse the library’s style/prop parsing for custom component types. For one type render a custom component using `parseGenUIElementProps`; for everything else use the default `GenUINode`:
+
+```tsx
+import { View, Text, StyleSheet } from 'react-native'
+import {
+  GenerativeUIView,
+  GenUINode,
+  parseGenUIElementProps,
+  type GenUINodeProps,
+} from 'json-ui-lite-rn'
+
+const BADGE_TYPE = 'Badge'
+
+function CustomGenUINode({
+  nodeId,
+  elements,
+  styles,
+  GenUINodeComponent,
+}: GenUINodeProps) {
+  const element = elements[nodeId]
+  if (!element) return null
+  if (element.type === BADGE_TYPE) {
+    const { baseStyle, text } = parseGenUIElementProps(element, styles, {
+      nodeId,
+      type: BADGE_TYPE,
+    })
+    return (
+      <View style={[customStyles.badge, baseStyle]}>
+        <Text style={customStyles.badgeText}>{text ?? ''}</Text>
+      </View>
+    )
+  }
+  return (
+    <GenUINode
+      nodeId={nodeId}
+      elements={elements}
+      styles={styles}
+      GenUINodeComponent={GenUINodeComponent}
+    />
+  )
+}
+
+const customStyles = StyleSheet.create({
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  badgeText: { fontSize: 12, color: '#fff' },
+})
+
+// Use the custom renderer; styles still come from the view (default or overridden).
+<GenerativeUIView spec={spec} GenUINodeComponent={CustomGenUINode} />
+```
 
 ## Notes
 

@@ -4,6 +4,12 @@ export {
 } from './GenerativeUIView'
 export { GenUINode, type GenUINodeProps } from './GenUINode'
 export {
+  type GenUIStylesConfig,
+  type ParsedGenUIProps,
+  parseGenUIElementProps,
+  type ParseGenUIElementPropsOptions,
+} from './parseGenUIProps'
+export {
   buildGenUISystemPrompt,
   type BuildGenUISystemPromptOptions,
 } from './prompt'

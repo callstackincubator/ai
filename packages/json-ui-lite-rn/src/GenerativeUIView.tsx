@@ -1,8 +1,10 @@
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
+import type { GenUINodeProps } from './GenUINode'
 import { GenUINode } from './GenUINode'
-import type { JsonUISpec } from './registry'
+import type { GenUIStylesConfig } from './parseGenUIProps'
+import { GEN_UI_STYLES, type JsonUISpec } from './registry'
 
 export type GenerativeUIViewProps = {
   /** Normalized spec (root + elements with root node "root"). */
@@ -10,12 +12,24 @@ export type GenerativeUIViewProps = {
   loading?: boolean
   /** Show expandable JSON payload for the current UI spec. */
   showCollapsibleJSON?: boolean
+  /**
+   * Override or extend style validators (zod schemas) for node props.
+   * Merged with default GEN_UI_STYLES and passed to GenUINode.
+   */
+  styles?: Partial<typeof GEN_UI_STYLES> & GenUIStylesConfig
+  /**
+   * Custom node renderer. Receives nodeId, elements, styles (same as default GenUINode).
+   * Use for custom component types; delegate to default GenUINode for others.
+   */
+  GenUINodeComponent?: React.ComponentType<GenUINodeProps>
 }
 
 export function GenerativeUIView({
   spec,
   loading,
   showCollapsibleJSON,
+  styles: stylesOverride,
+  GenUINodeComponent,
 }: GenerativeUIViewProps) {
   const [expanded, setExpanded] = React.useState(false)
   const normalized = React.useMemo(() => {
@@ -24,6 +38,11 @@ export function GenerativeUIView({
     if (!rootElement) return null
     return spec
   }, [spec])
+
+  const styleValidators: GenUIStylesConfig = React.useMemo(
+    () => ({ ...GEN_UI_STYLES, ...stylesOverride }),
+    [stylesOverride]
+  )
 
   if (!normalized) {
     return (
@@ -37,9 +56,15 @@ export function GenerativeUIView({
     )
   }
 
+  const NodeRenderer = GenUINodeComponent ?? GenUINode
   return (
     <View style={styles.wrapper}>
-      <GenUINode nodeId={normalized.root} elements={normalized.elements} />
+      <NodeRenderer
+        nodeId={normalized.root}
+        elements={normalized.elements}
+        styles={styleValidators}
+        GenUINodeComponent={GenUINodeComponent}
+      />
       {showCollapsibleJSON ? (
         <View style={styles.jsonPanel}>
           <Pressable

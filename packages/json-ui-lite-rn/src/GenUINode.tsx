@@ -1,45 +1,39 @@
 import React from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 
-import { GEN_UI_NODE_NAMES, GEN_UI_STYLES, type JsonUISpec } from './registry'
+import type { GenUIStylesConfig } from './parseGenUIProps'
+import { parseGenUIElementProps } from './parseGenUIProps'
+import { GEN_UI_NODE_NAMES, type JsonUISpec } from './registry'
 
 export type GenUINodeProps = {
   nodeId: string
   elements: JsonUISpec['elements']
+  styles: GenUIStylesConfig
+  /** When provided by GenerativeUIView, used to render children so custom types are handled at any depth. */
+  GenUINodeComponent?: React.ComponentType<GenUINodeProps>
 }
 
-export function GenUINode({ nodeId, elements }: GenUINodeProps) {
+export function GenUINode({
+  nodeId,
+  elements,
+  styles: styleValidators,
+  GenUINodeComponent,
+}: GenUINodeProps) {
   const element = elements[nodeId]
   if (!element) return null
 
   const { type, props, children = [] } = element
-  const style = props?.style as Record<string, unknown> | undefined
-  const flex = props?.flex as number | undefined
-  const padding = props?.padding as number | undefined
-  const gap = props?.gap as number | undefined
-  const text = (props?.text ?? props?.value ?? props?.label) as
-    | string
-    | undefined
-  const label = (props?.label ?? props?.text) as string | undefined
+  const { baseStyle, text, label } = parseGenUIElementProps(
+    element,
+    styleValidators,
+    { nodeId, type }
+  )
 
-  const baseStyle = {
-    ...(flex != null ? { flex } : {}),
-    ...(padding != null ? { padding } : {}),
-    ...(gap != null ? { gap } : {}),
-    ...style,
-  } as Record<string, unknown>
-
-  for (const key of Object.keys(props)) {
-    const validator = GEN_UI_STYLES[key as keyof typeof GEN_UI_STYLES]
-    if (validator) {
-      if (validator.safeParse(props[key]).success) {
-        baseStyle[key] = props[key]
-      } else {
-        console.warn(
-          `[json-ui-lite-rn] Invalid style prop: ${key} for node ${nodeId} of type ${type}: ${props[key]}`
-        )
-      }
-    }
+  const ChildRenderer = GenUINodeComponent ?? GenUINode
+  const childProps: Omit<GenUINodeProps, 'nodeId'> = {
+    elements,
+    styles: styleValidators,
+    GenUINodeComponent,
   }
 
   switch (type) {
@@ -47,7 +41,7 @@ export function GenUINode({ nodeId, elements }: GenUINodeProps) {
       return (
         <View style={[styles.container, baseStyle]}>
           {children.map((id) => (
-            <GenUINode key={id} nodeId={id} elements={elements} />
+            <ChildRenderer key={id} {...childProps} nodeId={id} />
           ))}
         </View>
       )
@@ -80,7 +74,7 @@ export function GenUINode({ nodeId, elements }: GenUINodeProps) {
       return (
         <View style={[styles.container, baseStyle]}>
           {children.map((id) => (
-            <GenUINode key={id} nodeId={id} elements={elements} />
+            <ChildRenderer key={id} {...childProps} nodeId={id} />
           ))}
         </View>
       )
