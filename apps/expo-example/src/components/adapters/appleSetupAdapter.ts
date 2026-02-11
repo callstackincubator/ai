@@ -1,15 +1,13 @@
 import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
+import type { Tool } from '@ai-sdk/provider-utils'
 import { apple, createAppleProvider } from '@react-native-ai/apple'
-import { ToolSet } from 'ai'
 
 import type { SetupAdapter } from '../../config/providers.common'
 
 export const createAppleLanguageSetupAdapter = (
-  tools: ToolSet = {}
+  tools: Record<string, Tool>
 ): SetupAdapter<LanguageModelV3> => {
-  const apple = createAppleProvider({
-    availableTools: tools,
-  })
+  const apple = createAppleProvider({ availableTools: tools })
   const model = apple.languageModel()
   return {
     model,

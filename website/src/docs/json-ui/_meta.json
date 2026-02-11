@@ -1,0 +1,22 @@
+[
+  {
+    "type": "file",
+    "name": "getting-started",
+    "label": "Getting Started"
+  },
+  {
+    "type": "file",
+    "name": "tools",
+    "label": "Tools"
+  },
+  {
+    "type": "file",
+    "name": "view",
+    "label": "GenUI View component"
+  },
+  {
+    "type": "file",
+    "name": "prior-art",
+    "label": "Prior Art"
+  }
+]

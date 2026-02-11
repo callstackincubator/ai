@@ -5,7 +5,6 @@ import { atomWithRefresh } from 'jotai/utils'
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { languageAdapters } from '../config/providers'
 import { type Availability } from '../config/providers.common'
-import { toolDefinitions } from '../tools'
 
 export type CustomModel = {
   id: string
@@ -18,7 +17,7 @@ const customModelsAtom = atom<CustomModel[]>([])
 
 const adaptersAtom = atom((get) => {
   const customModels = get(customModelsAtom).map((model) =>
-    createLlamaLanguageSetupAdapter(model.url, toolDefinitions)
+    createLlamaLanguageSetupAdapter(model.url)
   )
   return [...languageAdapters, ...customModels]
 })

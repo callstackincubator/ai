@@ -405,7 +405,6 @@ using namespace facebook;
     }
 
     [self.engine reload:engineConfigJSON];
-
     resolve([NSString stringWithFormat:@"Model prepared: %@", modelId]);
   } @catch (NSException *exception) {
     reject(@"MLCEngine", exception.reason, nil);

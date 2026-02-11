@@ -1,3 +1,4 @@
+import { GenerativeUIView } from '@react-native-ai/json-ui'
 import React, { useEffect, useRef } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { useKeyboardHandler } from 'react-native-keyboard-controller'
@@ -8,6 +9,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
+import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { ChatEmptyState } from './ChatEmptyState'
 import { ChatInputBar } from './ChatInputBar'
 import { ChatMessageBubble } from './ChatMessageBubble'
@@ -16,6 +18,12 @@ type ChatMessage = {
   id: string
   role: string
   content: string
+  type?: 'text' | 'toolExecution'
+  toolExecution?: {
+    toolName: string
+    payload: unknown
+    result?: unknown
+  }
 }
 
 type ChatMessagesProps = {
@@ -62,6 +70,8 @@ export function ChatMessages({
 
   useEffect(scrollToBottom, [messages.length])
 
+  const { chats, currentChatId } = useChatStore()
+
   return (
     <>
       <ScrollView
@@ -72,7 +82,7 @@ export function ChatMessages({
         {messages.length === 0 ? (
           <ChatEmptyState
             title="What can I help you with?"
-            subtitle={`Start a conversation with ${selectedModelLabel}. Ask questions, get creative, or explore ideas.`}
+            subtitle={`Start a conversation with ${selectedModelLabel}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`}
           />
         ) : (
           <View style={styles.messageList}>
@@ -81,8 +91,20 @@ export function ChatMessages({
                 key={message.id}
                 content={message.content}
                 isUser={message.role === 'user'}
+                messageType={message.type}
+                toolExecution={message.toolExecution}
               />
             ))}
+
+            <GenerativeUIView
+              spec={
+                currentChatId
+                  ? getChatUISpecFromChats(chats, currentChatId)
+                  : null
+              }
+              loading={isGenerating}
+              showCollapsibleJSON
+            />
           </View>
         )}
       </ScrollView>

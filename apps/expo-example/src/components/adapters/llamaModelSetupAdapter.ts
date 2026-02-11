@@ -1,6 +1,5 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { llama } from '@react-native-ai/llama'
-import { ToolSet } from 'ai'
 
 import {
   downloadModel,
@@ -11,8 +10,7 @@ import type { Availability, SetupAdapter } from '../../config/providers.common'
 import { isLlamaModelDownloaded } from '../../utils/llamaStorageUtils'
 
 export const createLlamaLanguageSetupAdapter = (
-  hfModelId: string,
-  tools: ToolSet = {}
+  hfModelId: string
 ): SetupAdapter<LanguageModelV3> => {
   const modelPath = getModelPath(hfModelId)
   const model = llama.languageModel(modelPath, {

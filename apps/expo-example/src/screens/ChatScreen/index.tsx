@@ -1,13 +1,22 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
+import { type createAppleProvider } from '@react-native-ai/apple'
+import {
+  buildGenUISystemPrompt,
+  createGenUITools,
+} from '@react-native-ai/json-ui'
 import { stepCountIs, streamText } from 'ai'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { useChatStore } from '../../store/chatStore'
+import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
-import { toolDefinitions } from '../../tools'
+import {
+  setToolExecutionReporter,
+  toolDefinitions,
+  withToolProxy,
+} from '../../tools'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -16,8 +25,21 @@ import { ModelUnavailable } from './ModelUnavailable'
 import { SettingsSheet } from './SettingsSheet'
 
 export default function ChatScreen() {
-  const { currentChat, chatSettings, addMessages, updateMessageContent } =
-    useChatStore()
+  const {
+    chats,
+    currentChat,
+    chatSettings,
+    addMessages,
+    addToolExecutionMessage,
+    updateMessageContent,
+    updateChatUISpec,
+  } = useChatStore()
+  const chatsRef = useRef(chats)
+  chatsRef.current = chats
+  const getSpec = useCallback(
+    (chatId: string) => getChatUISpecFromChats(chatsRef.current, chatId),
+    []
+  )
   const { adapters, availability } = useProviderStore()
 
   const {
@@ -57,30 +79,65 @@ export default function ChatScreen() {
     setIsGenerating(true)
 
     try {
-      const result = streamText({
-        model: selectedAdapter.model,
-        messages: [
-          ...baseMessages.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
-          { role: 'user', content: userInput },
-        ],
-        tools: Object.fromEntries(
+      const genUITools = createGenUITools({
+        contextId: chatId,
+        getSpec,
+        updateSpec: updateChatUISpec,
+        toolWrapper: withToolProxy as any,
+      })
+      const tools = {
+        ...Object.fromEntries(
           enabledToolIds
             .filter((id) => toolDefinitions[id])
             .map((id) => [id, toolDefinitions[id]])
         ),
+        ...genUITools,
+      }
+      if ('updateTools' in selectedAdapter.model) {
+        ;(
+          selectedAdapter.model as ReturnType<
+            ReturnType<typeof createAppleProvider>['languageModel']
+          >
+        ).updateTools(tools)
+      }
+      setToolExecutionReporter(({ toolName, args, result }) => {
+        addToolExecutionMessage(chatId, toolName, args, result)
+      })
+      const result = streamText({
+        model: selectedAdapter.model,
+        messages: [
+          ...baseMessages
+            .filter((message) => message.type !== 'toolExecution')
+            .map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
+          { role: 'user', content: userInput },
+        ],
+        tools,
         temperature,
         stopWhen: stepCountIs(maxSteps),
         abortSignal: signal,
+        system: buildGenUISystemPrompt({
+          additionalInstructions:
+            'If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
+        }),
       })
 
       let accumulated = ''
       for await (const chunk of result.textStream) {
         if (signal.aborted) break
+        if (!chunk) continue
         accumulated += chunk
         updateMessageContent(chatId, assistantMessageId, accumulated)
+      }
+
+      if (accumulated.trim().length === 0) {
+        updateMessageContent(
+          chatId,
+          assistantMessageId,
+          'The LLM did not yield a response. Please try again.'
+        )
       }
     } catch (error) {
       // Don't show error if user cancelled
@@ -88,7 +145,9 @@ export default function ChatScreen() {
       const message =
         error instanceof Error ? error.message : 'Failed to generate response'
       updateMessageContent(chatId, assistantMessageId, `Error: ${message}`)
+      abortControllerRef.current?.abort()
     } finally {
+      setToolExecutionReporter(null)
       setIsGenerating(false)
     }
   }

@@ -8,12 +8,19 @@ import { toolDefinitions } from '../tools'
 const storage = createJSONStorage<any>(() => AsyncStorage)
 
 export type MessageRole = 'user' | 'assistant'
+export type MessageType = 'text' | 'toolExecution'
 
 export type Message = {
   id: string
   role: MessageRole
   content: string
   createdAt: string
+  type?: MessageType
+  toolExecution?: {
+    toolName: string
+    payload: unknown
+    result?: unknown
+  }
 }
 
 export type ChatSettings = {
@@ -23,12 +30,85 @@ export type ChatSettings = {
   enabledToolIds: string[]
 }
 
+/** Single element in the generative UI tree (id is the key in elements). */
+export type ChatUIElement = {
+  type: string
+  props: Record<string, unknown>
+  children?: string[]
+}
+
+/** Generative UI spec: root id + elements map. Root element id is always "root" (undeletable View with flex: 1). */
+export type ChatUISpec = {
+  root: string
+  elements: Record<string, ChatUIElement>
+}
+
+export const GEN_UI_ROOT_ID = 'root'
+
+/** Default root-only spec so tools and view always have a root to work with. */
+export const DEFAULT_GEN_UI_SPEC: ChatUISpec = {
+  root: GEN_UI_ROOT_ID,
+  elements: {
+    [GEN_UI_ROOT_ID]: {
+      type: 'Container',
+      props: { flex: 1 },
+      children: [],
+    },
+  },
+}
+
+const cloneGenUISpec = (spec: ChatUISpec): ChatUISpec => ({
+  root: spec.root,
+  elements: Object.fromEntries(
+    Object.entries(spec.elements).map(([id, element]) => [
+      id,
+      {
+        ...element,
+        props: { ...(element.props ?? {}) },
+        children: [...(element.children ?? [])],
+      },
+    ])
+  ),
+})
+
+/** Ensures spec has an undeletable root Container with flex: 1. */
+export function normalizeGenUISpec(
+  spec: ChatUISpec | null | undefined
+): ChatUISpec | null {
+  if (!spec) return null
+  const elements = { ...spec.elements }
+  if (!elements[GEN_UI_ROOT_ID]) {
+    elements[GEN_UI_ROOT_ID] = {
+      type: 'Container',
+      props: { flex: 1 },
+      children: [],
+    }
+  }
+  const rootId = spec.root || GEN_UI_ROOT_ID
+  if (!elements[rootId]) elements[rootId] = elements[GEN_UI_ROOT_ID]
+  return { root: rootId, elements }
+}
+
+/** Get normalized UI spec for a chat by id. Returns default root spec when chat has no uiSpec. */
+export function getChatUISpecFromChats(
+  chats: Chat[],
+  chatId: string
+): ChatUISpec {
+  const chat = chats.find((c) => c.id === chatId)
+  const normalized = normalizeGenUISpec(chat?.uiSpec ?? null)
+  return normalized
+    ? cloneGenUISpec(normalized)
+    : cloneGenUISpec(DEFAULT_GEN_UI_SPEC)
+}
+
 export type Chat = {
   id: string
   title: string
   messages: Message[]
   createdAt: string
   settings: ChatSettings
+  /** Generative UI spec (root + elements). Root node id "root" is always present. */
+  uiSpec?: ChatUISpec | null
 }
 
 const DEFAULT_SETTINGS: ChatSettings = {
@@ -60,6 +140,9 @@ export function useChatStore() {
 
   const currentChat = chats.find((chat) => chat.id === currentChatId)
 
+  const getSafeChats = (value: unknown) =>
+    Array.isArray(value) ? value : chats
+
   const resetPendingSettings = () => {
     setPendingSettings({ ...DEFAULT_SETTINGS })
   }
@@ -83,11 +166,11 @@ export function useChatStore() {
       createdAt: new Date().toISOString(),
     }))
 
-    const isNewChat = !currentChatId
+    const isNewChat = !currentChatId || !currentChat
     if (isNewChat) {
       const firstUserMessage = messages.find((m) => m.role === 'user')
       setChats((prev) => {
-        const arr = Array.isArray(prev) ? prev : []
+        const arr = getSafeChats(prev)
         return [
           {
             id: chatId,
@@ -97,6 +180,7 @@ export function useChatStore() {
             messages: newMessages,
             createdAt: new Date().toISOString(),
             settings: { ...pendingSettings },
+            uiSpec: undefined,
           },
           ...arr,
         ]
@@ -105,7 +189,7 @@ export function useChatStore() {
       resetPendingSettings()
     } else {
       setChats((prev) => {
-        const arr = Array.isArray(prev) ? prev : []
+        const arr = getSafeChats(prev)
         return arr.map((chat) =>
           chat.id === chatId
             ? {
@@ -120,14 +204,58 @@ export function useChatStore() {
     return { chatId, messageIds: newMessages.map((m) => m.id) }
   }
 
+  const addToolExecutionMessage = (
+    chatId: string,
+    toolName: string,
+    payload: unknown,
+    result?: unknown
+  ) => {
+    const toolMessage: Message = {
+      id: createId(),
+      role: 'assistant',
+      type: 'toolExecution',
+      content: `Executed tool: ${toolName}`,
+      createdAt: new Date().toISOString(),
+      toolExecution: {
+        toolName,
+        payload,
+        result,
+      },
+    }
+
+    setChats((prev) => {
+      return (prev as Chat[]).map((chat) =>
+        chat.id === chatId
+          ? {
+              ...chat,
+              messages: [
+                ...chat.messages.slice(0, -1),
+                toolMessage,
+                ...chat.messages.slice(-1),
+              ],
+            }
+          : chat
+      )
+    })
+  }
+
+  const updateChatUISpec = (chatId: string, spec: ChatUISpec | null) => {
+    const normalized = normalizeGenUISpec(spec)
+
+    setChats((prev) => {
+      return (prev as Chat[]).map((chat) =>
+        chat.id === chatId ? { ...chat, uiSpec: normalized ?? undefined } : chat
+      )
+    })
+  }
+
   const updateMessageContent = (
     chatId: string,
     messageId: string,
     content: string
   ) => {
     setChats((prev) => {
-      const arr = Array.isArray(prev) ? prev : []
-      return arr.map((chat) =>
+      return (prev as Chat[]).map((chat) =>
         chat.id === chatId
           ? {
               ...chat,
@@ -146,7 +274,7 @@ export function useChatStore() {
       return
     }
     setChats((prev) => {
-      const arr = Array.isArray(prev) ? prev : []
+      const arr = getSafeChats(prev)
       return arr.map((chat) =>
         chat.id === currentChatId
           ? { ...chat, settings: { ...chat.settings, ...updates } }
@@ -166,15 +294,20 @@ export function useChatStore() {
     })
   }
 
+  const hasGenerativeUI = Boolean(currentChat?.uiSpec)
+
   return {
     chats,
     currentChatId,
     currentChat,
     chatSettings,
+    hasGenerativeUI,
     selectChat: setCurrentChatId,
     deleteChat,
     addMessages,
+    addToolExecutionMessage,
     updateMessageContent,
+    updateChatUISpec,
     updateChatSettings,
     toggleTool,
   }

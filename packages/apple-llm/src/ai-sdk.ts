@@ -17,7 +17,7 @@ import {
   generateId,
   jsonSchema,
   parseJSON,
-  type Tool as ToolDefinition,
+  Tool as FullToolDefinition,
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
@@ -28,12 +28,12 @@ import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
-type ToolSet = Record<string, ToolDefinition>
+type ToolDefinitionSet = Record<string, FullToolDefinition>
 
 export function createAppleProvider({
   availableTools,
 }: {
-  availableTools?: ToolSet
+  availableTools?: ToolDefinitionSet
 } = {}) {
   const createLanguageModel = () => {
     return new AppleLLMChatLanguageModel(availableTools)
@@ -235,10 +235,10 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   readonly provider = 'apple'
   readonly modelId = 'system-default'
 
-  private tools: ToolSet
+  private tools: ToolDefinitionSet = {}
 
-  constructor(tools: ToolSet = {}) {
-    this.tools = tools
+  constructor(availableTools: ToolDefinitionSet = {}) {
+    this.updateTools(availableTools)
   }
 
   async prepare(): Promise<void> {}
@@ -265,25 +265,33 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   private prepareTools(tools: Tool[] = []) {
     return tools.map((tool) => {
       if (tool.type === 'function') {
-        const toolDefinition = this.tools[tool.name]
-        if (!toolDefinition) {
-          throw new Error(`Tool ${tool.name} not found`)
-        }
         const schema = jsonSchema(tool.inputSchema)
         return {
           ...tool,
           id: generateId(),
-          execute: async (modelInput: any, opts: ToolCallOptions) => {
+          execute: async (modelInput: unknown) => {
+            const text =
+              typeof modelInput === 'string'
+                ? modelInput
+                : JSON.stringify(modelInput ?? '')
             const toolCallArguments = await parseJSON({
-              text: modelInput,
+              text,
               schema,
             })
-            return toolDefinition.execute?.(toolCallArguments, opts)
+            const opts: ToolCallOptions = {
+              toolCallId: generateId(),
+              messages: [],
+            }
+            return this.tools[tool.name].execute?.(toolCallArguments, opts)
           },
         }
       }
       throw new Error('Unsupported tool type')
     })
+  }
+
+  updateTools(tools: ToolDefinitionSet) {
+    this.tools = tools
   }
 
   async doGenerate(options: LanguageModelV3CallOptions) {
@@ -403,17 +411,24 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
             id: streamId,
           })
 
-          let previousContent = ''
+          let previousRawContent = ''
 
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
             if (data.streamId === streamId) {
-              const delta = data.content.slice(previousContent.length)
+              const nextRawContent = String(data.content ?? '')
+              const rawDelta = nextRawContent.startsWith(previousRawContent)
+                ? nextRawContent.slice(previousRawContent.length)
+                : nextRawContent
+              previousRawContent = nextRawContent
+
+              // Apple native streaming can emit bogus "null" chunks as text.
+              if (rawDelta === 'null') return
+
               controller.enqueue({
                 type: 'text-delta',
-                delta,
+                delta: rawDelta,
                 id: data.streamId,
               })
-              previousContent = data.content
             }
           })
 

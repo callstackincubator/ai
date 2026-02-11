@@ -1,37 +1,104 @@
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { colors } from '../../theme/colors'
 
 type ChatMessageBubbleProps = {
   content: string
   isUser: boolean
+  messageType?: 'text' | 'toolExecution'
+  toolExecution?: {
+    toolName: string
+    payload: unknown
+    result?: unknown
+  }
 }
 
-export function ChatMessageBubble({ content, isUser }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({
+  content,
+  isUser,
+  messageType = 'text',
+  toolExecution,
+}: ChatMessageBubbleProps) {
+  const [expanded, setExpanded] = React.useState(false)
+  const isToolHint = messageType === 'toolExecution'
+  const toolLabel = toolExecution
+    ? `Tool executed: ${toolExecution.toolName}`
+    : content
+  const payload = toolExecution?.payload
+    ? JSON.stringify(toolExecution.payload, null, 2)
+    : ''
+  const result =
+    toolExecution?.result !== undefined
+      ? JSON.stringify(toolExecution.result, null, 2)
+      : ''
+  const hasPayload = payload !== '{}' && payload.length > 0
+  const hasResult = result.length > 0
+  const hasDetails = hasPayload || hasResult
+
   return (
     <View
       style={[
         styles.messageRow,
-        isUser ? styles.messageRowUser : styles.messageRowAssistant,
+        isToolHint
+          ? styles.messageRowAssistant
+          : isUser
+            ? styles.messageRowUser
+            : styles.messageRowAssistant,
       ]}
     >
-      <View
+      <Pressable
+        disabled={!isToolHint}
+        onPress={() => hasDetails && setExpanded((prev) => !prev)}
         style={[
           styles.messageBubble,
-          isUser ? styles.messageBubbleUser : styles.messageBubbleAssistant,
+          isToolHint
+            ? styles.messageBubbleToolHint
+            : isUser
+              ? styles.messageBubbleUser
+              : styles.messageBubbleAssistant,
         ]}
       >
-        <Text
-          selectable
-          style={[
-            styles.messageText,
-            isUser ? styles.messageTextUser : styles.messageTextAssistant,
-          ]}
-        >
-          {content}
-        </Text>
-      </View>
+        {isToolHint ? (
+          <View style={styles.toolHintHeader}>
+            <Text
+              selectable
+              style={[styles.messageText, styles.messageTextToolHint]}
+            >
+              {toolLabel}
+            </Text>
+            {hasDetails && (
+              <Text style={styles.expandIcon}>{expanded ? '[-]' : '[+]'}</Text>
+            )}
+          </View>
+        ) : (
+          <Text
+            selectable
+            style={[
+              styles.messageText,
+              isUser ? styles.messageTextUser : styles.messageTextAssistant,
+            ]}
+          >
+            {content}
+          </Text>
+        )}
+        {isToolHint && expanded && hasPayload ? (
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailLabel}>args</Text>
+            <Text selectable style={styles.payloadText}>
+              {payload}
+            </Text>
+          </View>
+        ) : null}
+        {isToolHint && expanded && hasResult ? (
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailLabel}>result</Text>
+            <Text selectable style={styles.payloadText}>
+              {result}
+            </Text>
+          </View>
+        ) : null}
+      </Pressable>
     </View>
   )
 }
@@ -59,6 +126,10 @@ const styles = StyleSheet.create({
   messageBubbleAssistant: {
     backgroundColor: colors.secondarySystemBackground as any,
   },
+  messageBubbleToolHint: {
+    backgroundColor: colors.tertiarySystemFill as any,
+    borderRadius: 14,
+  },
   messageText: {
     fontSize: 16,
     lineHeight: 22,
@@ -68,5 +139,36 @@ const styles = StyleSheet.create({
   },
   messageTextAssistant: {
     color: colors.label as any,
+  },
+  messageTextToolHint: {
+    color: colors.secondaryLabel as any,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  toolHintHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  expandIcon: {
+    color: colors.tertiaryLabel as any,
+    fontSize: 12,
+  },
+  payloadText: {
+    marginTop: 8,
+    fontFamily: 'Menlo',
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.tertiaryLabel as any,
+  },
+  detailBlock: {
+    marginTop: 8,
+  },
+  detailLabel: {
+    fontSize: 11,
+    color: colors.tertiaryLabel as any,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 })
