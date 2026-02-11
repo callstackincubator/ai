@@ -9,9 +9,9 @@ Lightweight JSON UI tooling for React Native + Vercel AI SDK tool calling.
 - a reusable system prompt builder (`buildGenUISystemPrompt`)
 - a React Native renderer for specs (`GenerativeUIView`), which passes `GEN_UI_STYLES` (overridable) to the default `GenUINode` and lets you supply a custom node renderer
 
-**Why this package?** a.k.a. prior art
+**Why this package?**
 
-There exists a great library for streaming interfaces: [`json-render`](https://github.com/vercel-labs/json-render). The full specification is provided in this section, but **TLDR**: this library - `@react-native-ai/json-ui` - is the choice for small language models (e.g. parameters in the order of magnitude of 3B), which is usually the case if you are running inference locally, on-device. If you are using a cloud provider (OpenAI or Antrophic API), then you will want to go with `json-render` instead.
+There exists a great library for streaming interfaces: [`json-render`](https://github.com/vercel-labs/json-render). The full specification is provided in the ['Prior art'](#prior-art) section, but **TL;DR**: this library - `@react-native-ai/json-ui` - is the choice for small language models (e.g. parameters in the order of magnitude of 3B), which is usually the case if you are running inference locally, on-device. If you are using a cloud provider, consider `json-render` instead.
 
 ## Requirements
 
@@ -34,20 +34,12 @@ import {
   createGenUITools,
 } from '@react-native-ai/json-ui'
 
-type UISpec = {
-  root: string
-  elements: Record<
-    string,
-    { type: string; props: Record<string, unknown>; children?: string[] }
-  >
-}
-
-const tools = createGenUITools<UISpec>({
+const tools = createGenUITools({
   contextId: chatId,
   getSpec: (id) => getSpecForChat(id),
   updateSpec: (id, nextSpec) => setSpecForChat(id, nextSpec),
   toolWrapper: (toolName, execute) => async (args) => {
-    console.log('[@react-native-ai/json-ui] Executing tool', toolName, args)
+    console.log('Executing tool', toolName, args)
     return execute(args)
   },
 })
@@ -58,7 +50,7 @@ const result = streamText({
   tools,
   system: buildGenUISystemPrompt({
     additionalInstructions:
-      'Keep responses short. Ask follow-up questions when UI intent is unclear.',
+      'Your name is John. Keep responses short. Ask follow-up questions when UI intent is unclear.',
   }),
 })
 ```
@@ -203,6 +195,8 @@ const customStyles = StyleSheet.create({
 <GenerativeUIView spec={spec} GenUINodeComponent={CustomGenUINode} />
 ```
 
+For a full usage example, see [this file](https://github.com/callstackincubator/ai/tree/main/generative-ui/apps/expo-example/src/store/chatStore.ts).
+
 ## Notes
 
 - style validation is schema-based (`zod`) through `GEN_UI_STYLES`
@@ -217,15 +211,15 @@ It provides a package both for React and React Native integration and is also co
 - the LLM streams the UI directly in a predefined format and all outputs are intercepted by the stream parser
 - the library provides a (long) system prompt which well describes that format for the LLM to follow, along with examples
 
-This is good if you are running a large language model, such as the powerful models provided by cloud providers like OpenAPI or Antrophic. However, if you are running locally, for instance using Apple Foundation models, you will encounter the following problems:
+That works well for **large language models** (e.g. cloud APIs). For **on-device, small models** (e.g. Apple Foundation Models with limited context), you run into:
 
-- context window size limit - Apple Foundation models have 4096 tokens, meaning roughly 2-3 times as much latin characters (even less multi-byte chars); if you consider the long system prompt (which is needed since the format is complex), you will soon run out of tokens in this window and need e.g. to summarize
-- model comprehension - json-render introduces complex actions and state capabilities, while just generating static UIs is a complex task for small language models; thus, json-render is an overkill that the local model may not manage to power
+1. **Context size** — Small models often have 4K-token windows (such as Apple Foundation having a 4096 token limit). A long system prompt plus conversation leaves little room; you end up summarizing or truncating, if you even fit into the window at all.
+2. **Task complexity** — json-render supports rich actions and state. For small models (e.g. 3B parameters), generating a correct static UI is already hard; a simpler, tool-based flow is more reliable.
 
-This library solves this:
+How this library differs is:
 
-- instead of a feature-rich, complex format for streaming, we use tool calling - thus, the model outputs small JSONs in parts by calling tools on smaller pieces, reducing the probability of errors
-- the feature set is more narrow, currently supporting only static UIs (which will change in the future), for models with less parameters to be able to complete the given tasks successfully
+- **Tool calling instead of streaming UI** — The model emits small JSON payloads by calling tools (add node, set props, etc.). Each step is small and easier for the model to get right.
+- **Narrower feature set** — Focus on static UI building first, so smaller models can complete the task. More features will be added later.
 
 ## License
 

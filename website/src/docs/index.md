@@ -5,7 +5,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 ## Why On-Device AI?
 
 - **Privacy-first:** All processing happens locally—no data leaves the device
-- **Instant responses:** No network latency, immediate AI capabilities  
+- **Instant responses:** No network latency, immediate AI capabilities
 - **Offline-ready:** Works anywhere, even without internet
 - **Zero server costs:** No API fees or infrastructure to maintain
 
@@ -49,6 +49,16 @@ Run any open-source LLM locally using MLC's optimized runtime through `@react-na
 
 > [!NOTE]
 > MLC support is experimental and not recommended for production use yet.
+
+### JSON UI
+
+Build UIs from tool-calling models with `@react-native-ai/json-ui`:
+
+- **Tool-based spec** — Model calls tools to add/set/delete nodes and props
+- **GenerativeUIView** — Renders the spec in React Native; override styles or supply a custom node renderer
+- **Small-model friendly** — Designed for on-device models with limited context
+
+See the [JSON UI docs](./json-ui/getting-started) for setup and API.
 
 ### Google (Coming Soon)
 
