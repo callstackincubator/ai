@@ -1,6 +1,5 @@
 import { tool } from 'ai'
 import * as Calendar from 'expo-calendar'
-import { setToolExecutionReporter as setGenUIToolExecutionReporter } from 'json-ui-lite-rn'
 import { z } from 'zod'
 
 type ToolExecutionReporter = (event: {
@@ -15,13 +14,13 @@ export function setToolExecutionReporter(
   reporter: ToolExecutionReporter | null
 ) {
   toolExecutionReporter = reporter
-  setGenUIToolExecutionReporter(reporter)
 }
 
 /**
  * Wraps a tool execute function: on throw, logs the error and returns { error: message }.
+ * Reports tool execution args & results to the toolExecutionReporter.
  */
-function withToolErrorHandler<TArgs, TResult>(
+export function withToolProxy<TArgs, TResult>(
   toolName: string,
   execute: (args: TArgs) => Promise<TResult>
 ): (args: TArgs) => Promise<TResult | { error: string }> {
@@ -30,6 +29,12 @@ function withToolErrorHandler<TArgs, TResult>(
       console.log('[tools] Executing tool', toolName, args)
       const result = await execute(args)
       try {
+        console.log(
+          '[tools] Finished tool execution with success',
+          toolName,
+          args,
+          result
+        )
         toolExecutionReporter?.({ toolName, args, result })
       } catch (reportError) {
         console.warn('[tools] Failed to report tool execution', reportError)
@@ -39,6 +44,12 @@ function withToolErrorHandler<TArgs, TResult>(
       const message = err instanceof Error ? err.message : String(err)
       console.error(`[tool ${toolName}]`, err)
       try {
+        console.log(
+          '[tools] Finished tool execution with error',
+          toolName,
+          args,
+          { error: message }
+        )
         toolExecutionReporter?.({ toolName, args, result: { error: message } })
       } catch (reportError) {
         console.warn('[tools] Failed to report tool execution', reportError)
@@ -57,7 +68,7 @@ const createCalendarEvent = tool({
     time: z.string().optional().describe('Event time (HH:MM)'),
     duration: z.number().optional().describe('Duration in minutes'),
   }),
-  execute: withToolErrorHandler(
+  execute: withToolProxy(
     'createCalendarEvent',
     async ({ title, date, time, duration = 60 }) => {
       await Calendar.requestCalendarPermissionsAsync()
@@ -89,7 +100,7 @@ const checkCalendarEvents = tool({
   inputSchema: z.object({
     days: z.number().optional().describe('Number of days to look ahead'),
   }),
-  execute: withToolErrorHandler('checkCalendarEvents', async ({ days = 7 }) => {
+  execute: withToolProxy('checkCalendarEvents', async ({ days = 7 }) => {
     await Calendar.requestCalendarPermissionsAsync()
 
     const calendars = await Calendar.getCalendarsAsync(
@@ -116,7 +127,7 @@ const getCurrentTime = tool({
   title: 'getCurrentTime',
   description: 'Get current time and date',
   inputSchema: z.object({}),
-  execute: withToolErrorHandler('getCurrentTime', async () => {
+  execute: withToolProxy('getCurrentTime', async () => {
     return `Current time is: ${new Date().toUTCString()}`
   }),
 })

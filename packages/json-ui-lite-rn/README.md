@@ -29,11 +29,7 @@ bun add json-ui-lite-rn
 
 ```ts
 import { streamText } from 'ai'
-import {
-  buildGenUISystemPrompt,
-  createGenUITools,
-  setToolExecutionReporter,
-} from 'json-ui-lite-rn'
+import { buildGenUISystemPrompt, createGenUITools } from 'json-ui-lite-rn'
 
 type UISpec = {
   root: string
@@ -47,10 +43,10 @@ const tools = createGenUITools<UISpec>({
   contextId: chatId,
   getSpec: (id) => getSpecForChat(id),
   updateSpec: (id, nextSpec) => setSpecForChat(id, nextSpec),
-})
-
-setToolExecutionReporter(({ toolName, args }) => {
-  console.log('tool call', toolName, args)
+  toolWrapper: (toolName, execute) => async (args) => {
+    console.log('[json-ui-lite-rn] Executing tool', toolName, args)
+    return execute(args)
+  },
 })
 
 const result = streamText({
@@ -93,6 +89,13 @@ Options:
 - `rootId`: optional root id override (default: `"root"`)
 - `nodeHints`: optional component registry override
 - `nodeNamesThatSupportChildren`: optional parent whitelist override
+- `toolWrapper(toolName, execute)`: required wrapper used to decorate all tool executions (for logging, error handling, telemetry, etc.)
+
+Tool behavior details:
+
+- `setUINodeProps`: `{ id, props, replace? }`; defaults to merge mode, set `replace: true` to replace all props
+- `addUINode`: `{ parentId?, type, props? }`; if `parentId` is omitted it defaults to root
+- `reorderUINodes`: clamps index movement to valid sibling bounds
 
 ### `buildGenUISystemPrompt(options?)`
 

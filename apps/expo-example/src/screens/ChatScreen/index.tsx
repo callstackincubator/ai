@@ -9,7 +9,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
-import { setToolExecutionReporter, toolDefinitions } from '../../tools'
+import {
+  setToolExecutionReporter,
+  toolDefinitions,
+  withToolProxy,
+} from '../../tools'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -76,6 +80,7 @@ export default function ChatScreen() {
         contextId: chatId,
         getSpec,
         updateSpec: updateChatUISpec,
+        toolWrapper: withToolProxy as any,
       })
       const tools = {
         ...Object.fromEntries(
@@ -137,6 +142,7 @@ export default function ChatScreen() {
       const message =
         error instanceof Error ? error.message : 'Failed to generate response'
       updateMessageContent(chatId, assistantMessageId, `Error: ${message}`)
+      abortControllerRef.current?.abort()
     } finally {
       setToolExecutionReporter(null)
       setIsGenerating(false)

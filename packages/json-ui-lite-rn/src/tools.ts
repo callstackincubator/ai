@@ -8,19 +8,6 @@ import {
   type JsonUISpec,
 } from './registry'
 
-type ToolExecutionReporter = (event: {
-  toolName: string
-  args: unknown
-}) => void
-
-let toolExecutionReporter: ToolExecutionReporter | null = null
-
-export function setToolExecutionReporter(
-  reporter: ToolExecutionReporter | null
-) {
-  toolExecutionReporter = reporter
-}
-
 /**
  * Sometimes LLMs call tools with a string instead of an object.
  */
@@ -28,33 +15,6 @@ function smartParse(
   props: string | Record<string, unknown>
 ): Record<string, unknown> {
   return typeof props === 'string' ? JSON.parse(props) : props
-}
-
-/**
- * Wraps a tool execute function: on throw, logs the error and returns { error: message }.
- */
-function withToolErrorHandler<TArgs, TResult>(
-  toolName: string,
-  execute: (args: TArgs) => Promise<TResult>
-): (args: TArgs) => Promise<TResult | { error: string }> {
-  return async (args: TArgs) => {
-    try {
-      console.log('[json-ui-lite-rn] Executing tool', toolName, args)
-      try {
-        toolExecutionReporter?.({ toolName, args })
-      } catch (reportError) {
-        console.warn(
-          '[json-ui-lite-rn] Failed to report tool execution',
-          reportError
-        )
-      }
-      return await execute(args)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      console.error(`[json-ui-lite-rn tool ${toolName}]`, error)
-      return { error: message }
-    }
-  }
 }
 
 const defaultCreateId = () =>
@@ -68,6 +28,10 @@ export type CreateGenTUIoolsOptions<TSpec extends JsonUISpec = JsonUISpec> = {
   rootId?: string
   nodeHints?: Record<string, string>
   nodeNamesThatSupportChildren?: readonly string[]
+  toolWrapper?: <TArgs, TResult>(
+    toolName: string,
+    execute: (args: TArgs) => Promise<TResult>
+  ) => (args: TArgs) => Promise<TResult>
 }
 
 const cloneSpec = <TSpec extends JsonUISpec>(spec: TSpec): TSpec =>
@@ -114,6 +78,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
   rootId = DEFAULT_GEN_UI_ROOT_ID,
   nodeHints = GEN_UI_NODE_HINTS,
   nodeNamesThatSupportChildren = GEN_UI_NODE_NAMES_THAT_SUPPORT_CHILDREN,
+  toolWrapper = (_, execute) => execute,
 }: CreateGenTUIoolsOptions<TSpec>) {
   // Serialize mutating tool calls to avoid interleaving writes.
   let cachedSpec: TSpec | null = null
@@ -135,7 +100,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
     description:
       'Get the root node of the generative UI tree. Returns id, type, props, and children (array of { id, type }). Root always exists with id "root".',
     inputSchema: z.object({}),
-    execute: withToolErrorHandler('getUIRootNode', async () => {
+    execute: toolWrapper('getUIRootNode', async () => {
       const spec = readSpec()
       if (!spec?.root || !spec.elements[spec.root]) return { root: null }
       const element = spec.elements[spec.root]
@@ -160,7 +125,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
     inputSchema: z.object({
       id: z.string().optional().describe('Node id; omit for root'),
     }),
-    execute: withToolErrorHandler('getUINode', async ({ id }) => {
+    execute: toolWrapper('getUINode', async ({ id }) => {
       const spec = readSpec()
       if (!spec) return { node: null }
       const nodeId = id ?? spec.root
@@ -184,7 +149,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
   const getUILayout = tool({
     description: 'Get compact UI layout.',
     inputSchema: z.object({}),
-    execute: withToolErrorHandler('getUILayout', async () => {
+    execute: toolWrapper('getUILayout', async () => {
       const spec = readSpec()
       if (!spec) return { root: null, nodes: [] }
 
@@ -210,7 +175,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
   const getAvailableUINodes = tool({
     description: 'List nodes + props.',
     inputSchema: z.object({}),
-    execute: withToolErrorHandler('getAvailableUINodes', async () => ({
+    execute: toolWrapper('getAvailableUINodes', async () => ({
       nodes: Object.entries(nodeHints).map(([name, props]) => ({
         name,
         props,
@@ -225,7 +190,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
       props: z.string().describe('Props object for the node'),
       replace: z.boolean().optional().describe('Replace existing props'),
     }),
-    execute: withToolErrorHandler(
+    execute: toolWrapper(
       'setUINodeProps',
       async ({ id, props: propsArg, replace = false }) =>
         withMutationLock(async () => {
@@ -256,7 +221,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
     inputSchema: z.object({
       id: z.string().describe('Node id to delete'),
     }),
-    execute: withToolErrorHandler('deleteUINode', async ({ id }) =>
+    execute: toolWrapper('deleteUINode', async ({ id }) =>
       withMutationLock(async () => {
         if (id === rootId) {
           return { success: false, message: 'Cannot delete root node' }
@@ -290,7 +255,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
         .describe('Component type (e.g. Container, Column, Text, Button)'),
       props: z.string().optional().describe('Props object for the node'),
     }),
-    execute: withToolErrorHandler(
+    execute: toolWrapper(
       'addUINode',
       async ({ parentId, type, props: propsArg }) =>
         withMutationLock(async () => {
@@ -347,72 +312,70 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
           'Relative index shift among siblings; negative moves earlier, positive moves later'
         ),
     }),
-    execute: withToolErrorHandler(
-      'reorderUINodes',
-      async ({ nodeId, offset }) =>
-        withMutationLock(async () => {
-          const spec = readSpec()
-          if (!spec) return { success: false, message: 'No UI spec' }
+    execute: toolWrapper('reorderUINodes', async ({ nodeId, offset }) =>
+      withMutationLock(async () => {
+        const spec = readSpec()
+        if (!spec) return { success: false, message: 'No UI spec' }
 
-          const findParentId = (childId: string) => {
-            for (const [id, element] of Object.entries(spec.elements)) {
-              if (element.children?.includes(childId)) return id
-            }
-            return null
+        const findParentId = (childId: string) => {
+          for (const [id, element] of Object.entries(spec.elements)) {
+            if (element.children?.includes(childId)) return id
           }
+          return null
+        }
 
-          const nodeParentId = findParentId(nodeId)
-          if (!nodeParentId) {
-            return {
-              success: false,
-              message: 'nodeId must exist and have a parent',
-            }
+        const nodeParentId = findParentId(nodeId)
+        if (!nodeParentId) {
+          return {
+            success: false,
+            message: 'nodeId must exist and have a parent',
           }
+        }
 
-          const parentId = nodeParentId
-          const parent = spec.elements[parentId]
-          if (!parent) return { success: false, message: 'Parent not found' }
+        const parentId = nodeParentId
+        const parent = spec.elements[parentId]
+        if (!parent) return { success: false, message: 'Parent not found' }
 
-          const currentChildren = [...(parent.children ?? [])]
-          const nodeIndex = currentChildren.indexOf(nodeId)
-          if (nodeIndex === -1) {
-            return {
-              success: false,
-              message: 'nodeId must be a direct child',
-            }
+        const currentChildren = [...(parent.children ?? [])]
+        const nodeIndex = currentChildren.indexOf(nodeId)
+        if (nodeIndex === -1) {
+          return {
+            success: false,
+            message: 'nodeId must be a direct child',
           }
+        }
 
-          if (offset === 0) {
-            return {
-              success: true,
-              parentId,
-              nodeId,
-              fromIndex: nodeIndex,
-              toIndex: nodeIndex,
-              appliedOffset: 0,
-              childIds: currentChildren,
-            }
-          }
-
-          const maxIndex = currentChildren.length - 1
-          const toIndex = Math.min(Math.max(nodeIndex + offset, 0), maxIndex)
-          currentChildren.splice(nodeIndex, 1)
-          currentChildren.splice(toIndex, 0, nodeId)
-
-          const elements = { ...spec.elements }
-          elements[parentId].children = currentChildren
-          commitSpec({ root: spec.root, elements } as TSpec)
-
+        if (offset === 0) {
           return {
             success: true,
             parentId,
             nodeId,
             fromIndex: nodeIndex,
-            toIndex,
-            appliedOffset: toIndex - nodeIndex,
+            toIndex: nodeIndex,
+            appliedOffset: 0,
             childIds: currentChildren,
           }
-        })
+        }
+
+        const maxIndex = currentChildren.length - 1
+        const toIndex = Math.min(Math.max(nodeIndex + offset, 0), maxIndex)
+        currentChildren.splice(nodeIndex, 1)
+        currentChildren.splice(toIndex, 0, nodeId)
+
+        const elements = { ...spec.elements }
+        elements[parentId].children = currentChildren
+        commitSpec({ root: spec.root, elements } as TSpec)
+
+        return {
+          success: true,
+          parentId,
+          nodeId,
+          fromIndex: nodeIndex,
+          toIndex,
+          appliedOffset: toIndex - nodeIndex,
+          childIds: currentChildren,
+        }
+      })
     ),
   })
 
