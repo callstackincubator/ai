@@ -128,6 +128,7 @@ Props:
 
 - `spec`: `{ root, elements }` object (or `null`/`undefined`)
 - `loading`: optional boolean for empty-state loading text
+- `showCollapsibleJSON`: optional boolean to render an expandable JSON debug panel
 
 ## Notes
 

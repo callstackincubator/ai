@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
@@ -69,11 +68,7 @@ export function ChatMessageBubble({
               {toolLabel}
             </Text>
             {hasDetails && (
-              <Ionicons
-                name={expanded ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={colors.tertiaryLabel}
-              />
+              <Text style={styles.expandIcon}>{expanded ? '[-]' : '[+]'}</Text>
             )}
           </View>
         ) : (

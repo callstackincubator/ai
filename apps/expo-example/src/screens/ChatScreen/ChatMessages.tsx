@@ -1,3 +1,4 @@
+import { GenerativeUIView } from 'json-ui-lite-rn'
 import React, { useEffect, useRef } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { useKeyboardHandler } from 'react-native-keyboard-controller'
@@ -12,7 +13,6 @@ import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
 import { ChatEmptyState } from './ChatEmptyState'
 import { ChatInputBar } from './ChatInputBar'
 import { ChatMessageBubble } from './ChatMessageBubble'
-import { GenerativeUIView } from './GenerativeUIView'
 
 type ChatMessage = {
   id: string
@@ -103,6 +103,7 @@ export function ChatMessages({
                   : null
               }
               loading={isGenerating}
+              showCollapsibleJSON
             />
           </View>
         )}
