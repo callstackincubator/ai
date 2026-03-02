@@ -7,13 +7,13 @@ npm add @react-native-ai/apple
 ```
 
 ```ts
-import {apple} from '@react-native-ai/apple';
-import {generateText} from 'ai';
+import { apple } from '@react-native-ai/apple'
+import { generateText } from 'ai'
 
 const result = await generateText({
   model: apple(),
   prompt: 'Explain quantum computing in simple terms',
-});
+})
 ```
 
 ## When to Use
@@ -40,7 +40,7 @@ npm add @react-native-ai/apple
 ### 2. Availability Check
 
 ```ts
-import {apple} from '@react-native-ai/apple';
+import { apple } from '@react-native-ai/apple'
 
 if (apple.isAvailable()) {
   // Use Apple provider
@@ -49,20 +49,20 @@ if (apple.isAvailable()) {
 
 ### 3. Model Types
 
-| Type          | Method                       | Use Case              |
-| ------------- | ---------------------------- | --------------------- |
-| Language      | `apple.languageModel()`      | Text generation, chat |
-| Embedding     | `apple.textEmbeddingModel()` | RAG, similarity       |
-| Transcription | `apple.transcriptionModel()` | Speech-to-text        |
-| Speech        | `apple.speechModel()`        | Text-to-speech        |
+| Type          | Method                       | Use Case                                | Documentation                                            |
+| ------------- | ---------------------------- | --------------------------------------- | -------------------------------------------------------- |
+| Language      | `apple.languageModel()`      | Text generation, chat                   | https://www.react-native-ai.dev/docs/apple/generating    |
+| Embedding     | `apple.textEmbeddingModel()` | RAG, similarity, prompt size estimation | https://www.react-native-ai.dev/docs/apple/embeddings    |
+| Transcription | `apple.transcriptionModel()` | Speech-to-text                          | https://www.react-native-ai.dev/docs/apple/transcription |
+| Speech        | `apple.speechModel()`        | Text-to-speech                          | https://www.react-native-ai.dev/docs/apple/speech        |
 
 ### 4. Tool Calling
 
 ```ts
-import {createAppleProvider} from '@react-native-ai/apple';
+import { createAppleProvider } from '@react-native-ai/apple'
 
-const apple = createAppleProvider({availableTools: tools});
-const model = apple.languageModel();
+const apple = createAppleProvider({ availableTools: tools })
+const model = apple.languageModel()
 ```
 
 ## Common Pitfalls

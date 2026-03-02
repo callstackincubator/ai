@@ -22,19 +22,18 @@ Example workflow for integrating on-device AI in React Native apps using the @re
 
 Before selecting any reference file, classify the user request:
 
-1. Select **Apple** if prompt mentions:
-   - `apple`, `Apple Intelligence`, `Apple Foundation Models`
-   - `transcription`, `speech synthesis`, `embeddings` on Apple devices
-   - `createAppleProvider`, `tool calling` with Apple Intelligence
-2. Select **Llama** if prompt mentions:
-   - `llama`, `GGUF`, `llama.rn`, `HuggingFace`, `downloadModel`, `SmolLM`
-   - `embedding model`, `rerank`, `speech model` with GGUF
-3. Select **MLC** if prompt mentions:
-   - `mlc`, `MLC`, `Llama-3.2`, `Phi`, `Qwen`, `model.download()`
-   - `increased memory limit`, `physical device` for iOS
-4. Select **NCNN** if prompt mentions:
-   - `ncnn`, `NCNN`, `loadModel`, `runInference`, `Tensor`
-   - custom models such as convolutional networks, multi-layer perceptrons, low-level inference, etc.
+1. Select **Apple**:
+   - if you intend to build with: `apple`, `Apple Intelligence`, `Apple Foundation Models`
+   - if you want features: `transcription`, `speech synthesis`, `embeddings` on Apple devices
+   - optionally with capabilities: tool calling
+2. Select **Llama**:
+   - if you intend to use the following technologies: `llama`, `GGUF`, `llama.rn`, `HuggingFace`, `SmolLM`
+   - if you want to perform the following operations: `embedding model`, `rerank`, `speech model`
+3. Select **MLC**:
+   - if you intend to use a library that allows for custom models and involves build-time model optimizations
+4. Select **NCNN**:
+   - if you need to use run low-level inference on bare metal tensors
+   - if you intend to run inference of custom models such as convolutional networks, multi-layer perceptrons, low-level inference, etc.
    - DO NOT select NCNN if the prompt mentions LLMs only, this use case is better solved by other providers
 
 ## Skill Format
@@ -63,13 +62,13 @@ Reference this package when:
 
 ## Priority-Ordered Guidelines
 
-| Priority | Category                    | Impact   | Start File                       |
-| -------- | --------------------------- | -------- | -------------------------------- |
-| 1        | Path selection and baseline | CRITICAL | [quick-start][quick-start]       |
-| 2        | Apple provider              | CRITICAL | [apple-provider][apple-provider] |
-| 3        | Llama provider              | CRITICAL | [llama-provider][llama-provider] |
-| 4        | MLC-LLM provider            | CRITICAL | [mlc-provider][mlc-provider]     |
-| 5        | NCNN provider               | HIGH     | [ncnn-provider][ncnn-provider]   |
+| Priority | Category                    | Impact | Start File                       |
+| -------- | --------------------------- | ------ | -------------------------------- |
+| 1        | Path selection and baseline | N/A    | [quick-start][quick-start]       |
+| 2        | Apple provider              | N/A    | [apple-provider][apple-provider] |
+| 3        | Llama provider              | N/A    | [llama-provider][llama-provider] |
+| 4        | MLC-LLM provider            | N/A    | [mlc-provider][mlc-provider]     |
+| 5        | NCNN provider               | N/A    | [ncnn-provider][ncnn-provider]   |
 
 ## Quick Reference
 
@@ -92,13 +91,13 @@ Route by path:
 
 ## References
 
-| File                             | Impact   | Description                                |
-| -------------------------------- | -------- | ------------------------------------------ |
-| [quick-start][quick-start]       | CRITICAL | Shared preflight                           |
-| [apple-provider][apple-provider] | CRITICAL | Apple Intelligence setup and integration   |
-| [llama-provider][llama-provider] | CRITICAL | GGUF models, llama.rn, model management    |
-| [mlc-provider][mlc-provider]     | CRITICAL | MLC models, download, prepare, Expo plugin |
-| [ncnn-provider][ncnn-provider]   | HIGH     | NCNN wrapper, loadModel, runInference      |
+| File                             | Impact | Description                                |
+| -------------------------------- | ------ | ------------------------------------------ |
+| [quick-start][quick-start]       | N/A    | Shared preflight                           |
+| [apple-provider][apple-provider] | N/A    | Apple Intelligence setup and integration   |
+| [llama-provider][llama-provider] | N/A    | GGUF models, llama.rn, model management    |
+| [mlc-provider][mlc-provider]     | N/A    | MLC models, download, prepare, Expo plugin |
+| [ncnn-provider][ncnn-provider]   | N/A    | NCNN wrapper, loadModel, runInference      |
 
 ## Problem → Skill Mapping
 

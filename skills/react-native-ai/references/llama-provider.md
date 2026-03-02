@@ -7,15 +7,15 @@ npm add @react-native-ai/llama llama.rn
 ```
 
 ```ts
-import {llama, downloadModel} from '@react-native-ai/llama';
-import {generateText} from 'ai';
+import { llama, downloadModel } from '@react-native-ai/llama'
+import { generateText } from 'ai'
 
 const modelPath = await downloadModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf',
-);
-const model = llama.languageModel(modelPath);
-await model.prepare();
-const {text} = await generateText({model, prompt: 'Hello'});
+  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+)
+const model = llama.languageModel(modelPath)
+await model.prepare()
+const { text } = await generateText({ model, prompt: 'Hello' })
 ```
 
 ## When to Use
@@ -54,7 +54,7 @@ plugins: [
       enableOpenCL: true,
     },
   ],
-];
+]
 ```
 
 ### 3. Model ID Format
@@ -75,32 +75,32 @@ import {
   isModelDownloaded,
   removeModel,
   getDownloadedModels,
-} from '@react-native-ai/llama';
+} from '@react-native-ai/llama'
 
 // Download with progress
-await downloadModel('owner/repo/model.gguf', (p) => console.log(p.percentage));
+await downloadModel('owner/repo/model.gguf', (p) => console.log(p.percentage))
 
 // Get path for existing model
-const path = getModelPath('owner/repo/model.gguf');
+const path = getModelPath('owner/repo/model.gguf')
 
 // Check if downloaded
-const exists = await isModelDownloaded('owner/repo/model.gguf');
+const exists = await isModelDownloaded('owner/repo/model.gguf')
 ```
 
 ### 5. Model Types
 
-| Type      | Method                       | Notes                          |
-| --------- | ---------------------------- | ------------------------------ |
-| Language  | `llama.languageModel()`      | Text generation, chat          |
-| Embedding | `llama.textEmbeddingModel()` | RAG, similarity                |
-| Rerank    | `llama.rerankModel()`        | Document ranking               |
-| Speech    | `llama.speechModel()`        | Requires `vocoderPath` in opts |
+| Type      | Method                       | Notes                                   | Documentation                                                                        |
+| --------- | ---------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| Language  | `llama.languageModel()`      | Text generation, chat                   | https://www.react-native-ai.dev/docs/llama/generating                                |
+| Embedding | `llama.textEmbeddingModel()` | RAG, similarity, prompt size estimation | https://www.react-native-ai.dev/docs/llama/embeddings                                |
+| Rerank    | `llama.rerankModel()`        | Document ranking, RAG                   | https://www.react-native-ai.dev/docs/llama/reranking                                 |
+| Speech    | `llama.speechModel()`        | Requires `vocoderPath` in opts          | https://www.react-native-ai.dev/docs/llama/model-management#creating-model-instances |
 
 ### 6. Lifecycle
 
 ```ts
-await model.prepare(); // Load into memory
-await model.unload(); // Release when done
+await model.prepare() // Load into memory
+await model.unload() // Release when done
 ```
 
 ## Common Pitfalls

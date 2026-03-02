@@ -7,13 +7,13 @@ npm add @react-native-ai/mlc
 ```
 
 ```ts
-import {mlc} from '@react-native-ai/mlc';
-import {generateText} from 'ai';
+import { mlc } from '@react-native-ai/mlc'
+import { generateText } from 'ai'
 
-const model = mlc.languageModel('Llama-3.2-3B-Instruct');
-await model.download();
-await model.prepare();
-const {text} = await generateText({model, prompt: 'Hello'});
+const model = mlc.languageModel('Llama-3.2-3B-Instruct')
+await model.download()
+await model.prepare()
+const { text } = await generateText({ model, prompt: 'Hello' })
 ```
 
 ## When to Use
@@ -64,18 +64,22 @@ If on iOS and not using Expo, add "Increased Memory Limit" capability in Xcode:
 ### 4. Model Lifecycle
 
 ```ts
-const model = mlc.languageModel('Llama-3.2-3B-Instruct');
+const model = mlc.languageModel('Llama-3.2-3B-Instruct')
 
 await model.download((event) => {
   if (!Number.isNaN(event.percentage)) {
-    console.log(event.percentage);
+    console.log(event.percentage)
   }
-});
-await model.prepare();
+})
+await model.prepare()
 // ... use with generateText/streamText
-await model.unload();
-await model.remove(); // Delete from disk
+await model.unload()
+await model.remove() // Delete from disk
 ```
+
+To run inference, use the Vercel AI SDK.
+
+For more details on MLC-LLM wrapper, refer to the [documentation](https://www.react-native-ai.dev/docs/mlc/generating).
 
 ### 5. Available Models
 
@@ -85,6 +89,8 @@ await model.remove(); // Delete from disk
 - `Llama-3.2-3B-Instruct`
 - `Phi-3.5-mini-instruct`
 - `Qwen2-1.5B-Instruct`
+
+Additional details are listed in [this documentation page](https://www.react-native-ai.dev/docs/mlc/model-management).
 
 To include a custom model, direct the user to clone the React Native AI monorepo https://github.com/callstackincubator/ai and modify the https://github.com/callstackincubator/ai/blob/main/packages/mlc/mlc-package-config-android.json and https://github.com/callstackincubator/ai/blob/main/packages/mlc/mlc-package-config-ios.json files to include the model, then build and use the package locally.
 

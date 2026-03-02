@@ -11,10 +11,10 @@ import {
   loadModel,
   runInference,
   toFlatArray,
-} from '@react-native-ai/ncnn-wrapper';
+} from '@react-native-ai/ncnn-wrapper'
 
-await loadModel(modelPath, paramPath); // .bin and .param paths
-const result = runInference([1, 2, 3]);
+await loadModel(modelPath, paramPath) // .bin and .param paths
+const result = runInference([1, 2, 3])
 ```
 
 ## When to Use
@@ -41,20 +41,20 @@ npm add @react-native-ai/ncnn-wrapper
 ### 2. Load Model
 
 ```ts
-import {loadModel} from '@react-native-ai/ncnn-wrapper';
+import { loadModel } from '@react-native-ai/ncnn-wrapper'
 
-await loadModel(paramPath, binPath);
+await loadModel(paramPath, binPath)
 ```
 
 ### 3. Run Inference
 
 ```ts
-import {runInference, toFlatArray} from '@react-native-ai/ncnn-wrapper';
+import { runInference, toFlatArray } from '@react-native-ai/ncnn-wrapper'
 
 // Input as number[] or Tensor
-const output = runInference([1, 2, 3]);
+const output = runInference([1, 2, 3])
 // or
-const output = runInference(toFlatArray(tensor));
+const output = runInference(toFlatArray(tensor))
 ```
 
 ### 4. Tensor Utilities
@@ -66,15 +66,15 @@ import {
   tensorSize,
   toFlatArray,
   type Tensor,
-} from '@react-native-ai/ncnn-wrapper';
+} from '@react-native-ai/ncnn-wrapper'
 ```
 
 ### 5. Model Info
 
 ```ts
-import {getModelInfo} from '@react-native-ai/ncnn-wrapper';
+import { getModelInfo } from '@react-native-ai/ncnn-wrapper'
 
-const info = getModelInfo();
+const info = getModelInfo()
 ```
 
 ## Common Pitfalls
