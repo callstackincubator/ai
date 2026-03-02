@@ -14,7 +14,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 ## AI SDK Compatibility
 
 | React Native AI | AI SDK |
-|-----------------|--------|
+| --------------- | ------ |
 | 0.11 and below  | v5     |
 | 0.12 and above  | v6     |
 
@@ -35,11 +35,11 @@ Rozenite must be installed and enabled in your app. See the
 
 ## Available Providers
 
-| Provider | Built-in | Platforms | Runtime | Description |
-|----------|----------|-----------|---------|-------------|
-| [Apple](#apple) | ✅ Yes | iOS | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
-| [Llama](#llama) | ❌ No | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn) | Run GGUF models via llama.rn |
-| [MLC](#mlc) | ❌ No | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm) | Run open-source LLMs via MLC runtime |
+| Provider        | Built-in | Platforms    | Runtime                                                             | Description                                                |
+| --------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [Apple](#apple) | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
+| [Llama](#llama) | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
+| [MLC](#mlc)     | ❌ No    | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm)                        | Run open-source LLMs via MLC runtime                       |
 
 ---
 
@@ -64,46 +64,46 @@ No additional linking needed, works immediately on iOS devices (autolinked).
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
-import { 
+import {
   generateText,
-  embed, 
-  experimental_transcribe as transcribe, 
-  experimental_generateSpeech as speech 
+  embed,
+  experimental_transcribe as transcribe,
+  experimental_generateSpeech as speech,
 } from 'ai'
 
 // Text generation with Apple Intelligence
 const { text } = await generateText({
   model: apple(),
-  prompt: 'Explain quantum computing'
+  prompt: 'Explain quantum computing',
 })
 
 // Generate embeddings
 const { embedding } = await embed({
   model: apple.textEmbeddingModel(),
-  value: 'Hello world'
+  value: 'Hello world',
 })
 
 // Transcribe audio
 const { text } = await transcribe({
   model: apple.transcriptionModel(),
-  audio: audioBuffer
+  audio: audioBuffer,
 })
 
 // Text-to-speech
 const { audio } = await speech({
   model: apple.speechModel(),
-  text: 'Hello from Apple!'
+  text: 'Hello from Apple!',
 })
 ```
 
 #### Availability
 
-| Feature | iOS Version | Additional Requirements |
-|---------|-------------|------------------------|
-| Text Generation | iOS 26+ | Apple Intelligence device |
-| Embeddings | iOS 17+ | - |
-| Transcription | iOS 26+ | - |
-| Speech Synthesis | iOS 13+ | iOS 17+ for Personal Voice |
+| Feature          | iOS Version | Additional Requirements    |
+| ---------------- | ----------- | -------------------------- |
+| Text Generation  | iOS 26+     | Apple Intelligence device  |
+| Embeddings       | iOS 17+     | -                          |
+| Transcription    | iOS 26+     | -                          |
+| Speech Synthesis | iOS 13+     | iOS 17+ for Personal Voice |
 
 See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
 
@@ -115,11 +115,11 @@ Run any GGUF model on-device using [llama.rn](https://github.com/mybigday/llama.
 
 #### Supported Features
 
-| Feature | Method | Description |
-|---------|--------|-------------|
-| Text Generation | `llama.languageModel()` | Chat, completion, streaming, reasoning models |
-| Embeddings | `llama.textEmbeddingModel()` | Text embeddings for RAG and similarity search |
-| Speech | `llama.speechModel()` | Text-to-speech with vocoder models |
+| Feature         | Method                       | Description                                   |
+| --------------- | ---------------------------- | --------------------------------------------- |
+| Text Generation | `llama.languageModel()`      | Chat, completion, streaming, reasoning models |
+| Embeddings      | `llama.textEmbeddingModel()` | Text embeddings for RAG and similarity search |
+| Speech          | `llama.speechModel()`        | Text-to-speech with vocoder models            |
 
 #### Installation
 
@@ -134,7 +134,9 @@ import { llama } from '@react-native-ai/llama'
 import { generateText, streamText } from 'ai'
 
 // Create model instance (Model ID format: "owner/repo/filename.gguf")
-const model = llama.languageModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+const model = llama.languageModel(
+  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+)
 
 // Download from HuggingFace (with progress)
 await model.download((progress) => {
@@ -197,18 +199,18 @@ await model.prepare()
 // Generate response with Llama via MLC engine
 const { text } = await generateText({
   model,
-  prompt: 'Explain quantum computing'
+  prompt: 'Explain quantum computing',
 })
 ```
 
 #### Available Models
 
-| Model ID | Size |
-|----------|------|
-| `Llama-3.2-3B-Instruct` | ~2GB |
+| Model ID                 | Size   |
+| ------------------------ | ------ |
+| `Llama-3.2-3B-Instruct`  | ~2GB   |
 | `Phi-3-mini-4k-instruct` | ~2.5GB |
-| `Mistral-7B-Instruct` | ~4.5GB |
-| `Qwen2.5-1.5B-Instruct` | ~1GB |
+| `Mistral-7B-Instruct`    | ~4.5GB |
+| `Qwen2.5-1.5B-Instruct`  | ~1GB   |
 
 > [!NOTE]
 > MLC requires iOS devices with sufficient memory (1-8GB depending on model). The prebuilt runtime supports the models listed above. For other models or custom configurations, you'll need to recompile the MLC runtime from source.
@@ -221,9 +223,17 @@ Comprehensive guides and API references are available at [react-native-ai.dev](h
 
 Read the [contribution guidelines](/CONTRIBUTING.md) before contributing.
 
+## Agent skills
+
+This repository provides agent skills to help you integrate and use the packages. You can easily install them with:
+
+`npx skills add https://github.com/callstackincubator/react-native-ai --skill json-render-react`
+
+or manually by copying the `skills/` directory in your `.cursor/` directory.
+
 ## Made with ❤️ at Callstack
 
-**react-native-ai** is an open source project and will always remain free to use. If you think it's cool, please star it 🌟. 
+**react-native-ai** is an open source project and will always remain free to use. If you think it's cool, please star it 🌟.
 
 [Callstack][callstack-readme-with-love] is a group of React and React Native geeks, contact us at [hello@callstack.com](mailto:hello@callstack.com) if you need any help with these or just want to say hi!
 
