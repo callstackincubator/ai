@@ -1,0 +1,6 @@
+module NcnnWrapper {
+  explicit module Cpp {
+    requires cplusplus
+    header "../cpp/NcnnWrapperModule.h"
+  }
+}
