@@ -15,6 +15,11 @@ export interface RunInferenceResult {
   inferenceTime?: number
 }
 
+export interface RunInferenceOptions {
+  inputBlob?: string
+  outputBlob?: string
+}
+
 /**
  * Model instance wrapping a loaded NCNN model.
  * Hides the internal model ID - use runInference on the model directly.
@@ -30,8 +35,16 @@ export class Model {
     return this.#modelId
   }
 
-  runInference(input: Tensor | TensorData | number[]): RunInferenceResult {
+  runInference(
+    input: Tensor | TensorData | number[],
+    options?: RunInferenceOptions
+  ): RunInferenceResult {
     const bridgeInput = toBridgeInput(input)
-    return NativeNcnnWrapper.runInference(this.#modelId, bridgeInput)
+    return NativeNcnnWrapper.runInference(
+      this.#modelId,
+      bridgeInput,
+      options?.inputBlob,
+      options?.outputBlob
+    )
   }
 }

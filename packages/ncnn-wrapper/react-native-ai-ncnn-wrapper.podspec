@@ -18,6 +18,16 @@ Pod::Spec.new do |s|
 
   s.header_mappings_dir = "."
   s.public_header_files = "cpp/**/*.h", "ios/**/*.h"
+
+  ncnn_ios = File.join(__dir__, "vendor", "ncnn-ios")
+  if File.directory?(ncnn_ios)
+    s.vendored_frameworks = [
+      "vendor/ncnn-ios/ncnn.xcframework",
+      "vendor/ncnn-ios/glslang.xcframework",
+      "vendor/ncnn-ios/openmp.xcframework",
+      "vendor/ncnn-ios/vulkan.xcframework"
+    ].select { |f| File.directory?(File.join(__dir__, f)) }
+  end
   
   # Use install_modules_dependencies helper to install the dependencies if React Native version >=0.71.0.
   # See https://github.com/facebook/react-native/blob/main/scripts/react_native_pods.rb#L197-L202
@@ -40,6 +50,6 @@ Pod::Spec.new do |s|
     "CLANG_CXX_LIBRARY" => "libc++",
     "DEFINES_MODULE" => "YES",
     "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/Headers/Private/React-Core\" \"$(PODS_ROOT)/Headers/Public/React-Core\" \"$(PODS_ROOT)/Headers/Private/ReactCommon\" \"$(PODS_ROOT)/Headers/Public/ReactCommon\"",
-    "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1"
+    "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DNCNN_VULKAN=1"
   }
 end

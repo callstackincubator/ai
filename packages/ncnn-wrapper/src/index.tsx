@@ -4,7 +4,12 @@ import { type Tensor, type TensorData } from './Tensor'
 
 export const NcnnWrapper = NativeNcnnWrapper
 
-export { type LoadModelResult, Model, type RunInferenceResult } from './Model'
+export {
+  type LoadModelResult,
+  Model,
+  type RunInferenceOptions,
+  type RunInferenceResult,
+} from './Model'
 export type { Tensor, TensorData } from './Tensor'
 export {
   allocateTensor,
@@ -16,8 +21,8 @@ export {
   toBridgeInput,
 } from './Tensor'
 
-export function loadModel(modelPath: string, paramPath: string) {
-  const result = NativeNcnnWrapper.loadModel(modelPath, paramPath)
+export function loadModel(paramPath: string, binPath: string) {
+  const result = NativeNcnnWrapper.loadModel(paramPath, binPath)
   return result.success ? new Model(result.modelId) : null
 }
 

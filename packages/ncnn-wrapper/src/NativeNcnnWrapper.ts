@@ -3,18 +3,20 @@ import { TurboModuleRegistry } from 'react-native'
 
 export interface Spec extends TurboModule {
   loadModel(
-    modelPath: string,
-    paramPath: string
+    paramPath: string,
+    binPath: string
   ): {
     success: boolean
     modelId: number
-    modelPath: string
     paramPath: string
+    binPath: string
   }
 
   runInference(
     modelId: number,
-    input: ArrayBufferLike | Float32Array | number[]
+    input: ArrayBufferLike | Float32Array | number[],
+    inputBlob?: string,
+    outputBlob?: string
   ): {
     success?: boolean
     error?: string

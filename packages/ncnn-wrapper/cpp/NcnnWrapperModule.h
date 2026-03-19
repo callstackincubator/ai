@@ -1,18 +1,23 @@
 #pragma once
 
+#include <ReactCommon/CallInvoker.h>
+#include <ReactCommon/TurboModule.h>
 #include <jsi/jsi.h>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <ncnn/net.h>
+
 namespace facebook::react
 {
 
 struct LoadedModelInfo
 {
-    std::string modelPath;
     std::string paramPath;
+    std::string binPath;
+    std::unique_ptr<ncnn::Net> net;
 };
 
 class NcnnWrapperModule : public TurboModule

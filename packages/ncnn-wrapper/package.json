@@ -13,6 +13,8 @@
     "android",
     "ios",
     "cpp",
+    "scripts",
+    "vendor",
     "prebuilt",
     "*.podspec",
     "app.plugin.js",
@@ -30,7 +32,10 @@
   "scripts": {
     "clean": "del-cli lib",
     "typecheck": "tsc --noEmit",
-    "prepare": "bob build"
+    "prepare": "bob build",
+    "download:ncnn:android": "bash scripts/download-ncnn-android.sh",
+    "download:ncnn:ios": "bash scripts/download-ncnn-ios.sh",
+    "download:ncnn": "bun run download:ncnn:android && bun run download:ncnn:ios"
   },
   "keywords": [
     "react-native",
