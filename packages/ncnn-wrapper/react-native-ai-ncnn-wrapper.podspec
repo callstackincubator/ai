@@ -49,7 +49,10 @@ Pod::Spec.new do |s|
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
     "CLANG_CXX_LIBRARY" => "libc++",
     "DEFINES_MODULE" => "YES",
-    "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/Headers/Private/React-Core\" \"$(PODS_ROOT)/Headers/Public/React-Core\" \"$(PODS_ROOT)/Headers/Private/ReactCommon\" \"$(PODS_ROOT)/Headers/Public/ReactCommon\"",
+    # Make the vendored NCNN headers visible to the C++ compiler.
+    # The NCNN xcframework contains headers under `ncnn.framework/Headers/ncnn/net.h`,
+    # but CocoaPods doesn't always add these automatically for pods compiling C++ sources.
+    "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/Headers/Private/React-Core\" \"$(PODS_ROOT)/Headers/Public/React-Core\" \"$(PODS_ROOT)/Headers/Private/ReactCommon\" \"$(PODS_ROOT)/Headers/Public/ReactCommon\" \"$(PODS_TARGET_SRCROOT)/vendor/ncnn-ios/ncnn.xcframework/ios-arm64/ncnn.framework/Headers\" \"$(PODS_TARGET_SRCROOT)/vendor/ncnn-ios/ncnn.xcframework/ios-arm64_x86_64-simulator/ncnn.framework/Headers\" \"$(PODS_TARGET_SRCROOT)/vendor/ncnn-ios/ncnn.xcframework/ios-arm64_x86_64-maccatalyst/ncnn.framework/Headers\"",
     "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DNCNN_VULKAN=1"
   }
 end

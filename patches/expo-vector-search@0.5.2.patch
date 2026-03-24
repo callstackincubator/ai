@@ -1,0 +1,17 @@
+diff --git a/ios/ExpoVectorSearchModule.mm b/ios/ExpoVectorSearchModule.mm
+index f17c225213c823f6fd34a8deed9e970a1087f037..400b45b378b9df9fcd917cf5030188adee9ef357 100644
+--- a/ios/ExpoVectorSearchModule.mm
++++ b/ios/ExpoVectorSearchModule.mm
+@@ -1,6 +1,12 @@
+ #import "ExpoVectorSearchModule.h"
+ #import "../cpp/ExpoVectorSearch.h"
++#if __has_include(<ExpoModulesJSI/EXJavaScriptRuntime.h>)
++#import <ExpoModulesJSI/EXJavaScriptRuntime.h>
++#elif __has_include(<ExpoModulesCore/EXJavaScriptRuntime.h>)
+ #import <ExpoModulesCore/EXJavaScriptRuntime.h>
++#else
++#error "EXJavaScriptRuntime.h not found. Ensure ExpoModulesJSI is installed."
++#endif
+ #import <jsi/jsi.h>
+ 
+ @implementation ExpoVectorSearchJSI

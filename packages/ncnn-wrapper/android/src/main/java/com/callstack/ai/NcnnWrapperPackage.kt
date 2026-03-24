@@ -19,15 +19,15 @@ class NcnnWrapperPackage : TurboReactPackage() {
     override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
         return ReactModuleInfoProvider {
             val moduleInfo = mutableMapOf<String, ReactModuleInfo>()
-            moduleInfo["NcnnWrapperModule"] = ReactModuleInfo(
-                "NcnnWrapperModule",
-                "com.callstack.ai.ncnnwrapper.NcnnWrapperModule",
-                canOverrideExistingModule = false,
-                needsEagerInit = false,
-                hasConstants = false,
-                isCxxModule = true,
-                isTurboModule = true
-            )
+            // moduleInfo["NcnnWrapperModule"] = ReactModuleInfo(
+            //     "NcnnWrapperModule",
+            //     "com.callstack.ai.ncnnwrapper.NcnnWrapperModule",
+            //     canOverrideExistingModule = false,
+            //     needsEagerInit = false,
+            //     hasConstants = false,
+            //     isCxxModule = true,
+            //     isTurboModule = true
+            // )
             moduleInfo
         }
     }

@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { AdaptiveGlass } from './components/AdaptiveGlass'
 import ChatScreen from './screens/ChatScreen'
+import GalleryScreen from './screens/GalleryScreen'
 import { useChatStore } from './store/chatStore'
 import { colors } from './theme/colors'
 
@@ -45,6 +46,38 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
 
   return (
     <DrawerContentScrollView style={styles.drawerScroll}>
+      <Pressable
+        style={styles.navItem}
+        onPress={() => {
+          navigation.navigate('Gallery')
+          navigation.closeDrawer()
+        }}
+      >
+        <SymbolView
+          name="photo.on.rectangle.angled"
+          size={20}
+          tintColor={colors.label}
+          resizeMode="scaleAspectFit"
+          fallback={<Ionicons name="images" size={20} color={colors.label} />}
+        />
+        <Text style={styles.navItemText}>Semantic Search</Text>
+      </Pressable>
+      <Pressable
+        style={styles.navItem}
+        onPress={() => {
+          navigation.navigate('Chat')
+          navigation.closeDrawer()
+        }}
+      >
+        <SymbolView
+          name="bubble.left"
+          size={20}
+          tintColor={colors.label}
+          resizeMode="scaleAspectFit"
+          fallback={<Ionicons name="chatbubbles" size={20} color={colors.label} />}
+        />
+        <Text style={styles.navItemText}>Chat</Text>
+      </Pressable>
       <View style={styles.drawerHeader}>
         <View style={styles.drawerHeaderRow}>
           <Text style={styles.drawerTitle}>Chats</Text>
@@ -174,6 +207,11 @@ export default function App() {
                 }}
               >
                 <Drawer.Screen name="Chat" component={ChatScreen} />
+                <Drawer.Screen
+                  name="Gallery"
+                  component={GalleryScreen}
+                  options={{ drawerLabel: 'Semantic Search' }}
+                />
               </Drawer.Navigator>
             </NavigationContainer>
             <StatusBar style="dark" />
@@ -286,6 +324,22 @@ const styles = StyleSheet.create({
   chatItemTitle: {
     flex: 1,
     fontSize: 15,
+    color: colors.label as any,
+  },
+  navItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 12,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+  },
+  navItemText: {
+    fontSize: 16,
+    fontWeight: '500',
     color: colors.label as any,
   },
 })

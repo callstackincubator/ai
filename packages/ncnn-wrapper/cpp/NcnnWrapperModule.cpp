@@ -64,7 +64,7 @@ jsi::Value NcnnWrapperModule::loadModel(jsi::Runtime &rt, const jsi::Value *args
     result.setProperty(rt, "success", jsi::Value(true));
     result.setProperty(rt, "modelId", jsi::Value(static_cast<double>(modelId)));
     result.setProperty(rt, "paramPath", jsi::String::createFromUtf8(rt, loadedModels_[modelId].paramPath));
-    result.setProperty(rt, "binPath", jsi::String::createFromUtf8(rt, loadedModels_[modelId].modelPath));
+    result.setProperty(rt, "binPath", jsi::String::createFromUtf8(rt, loadedModels_[modelId].binPath));
 
     return result;
 }
@@ -80,15 +80,13 @@ jsi::Value NcnnWrapperModule::runInference(jsi::Runtime &rt, const jsi::Value *a
     auto it = loadedModels_.find(modelId);
     if (it == loadedModels_.end() || !it->second.net)
     {
-        auto error = jsi::Object(rt);
-        error.setProperty(rt, "error", jsi::String::createFromUtf8(rt, "Model not loaded"));
-        return error;
+        throw jsi::JSError(rt, "Model not loaded");
     }
 
     std::vector<float> inputData;
 
-    auto inputVal = args[1];
-    if (inputVal.isObject(rt))
+    const jsi::Value &inputVal = args[1];
+    if (inputVal.isObject())
     {
         auto obj = inputVal.asObject(rt);
         if (obj.isArrayBuffer(rt))
@@ -141,9 +139,7 @@ jsi::Value NcnnWrapperModule::runInference(jsi::Runtime &rt, const jsi::Value *a
 
     if (ret != 0)
     {
-        auto error = jsi::Object(rt);
-        error.setProperty(rt, "error", jsi::String::createFromUtf8(rt, "Inference failed"));
-        return error;
+        throw jsi::JSError(rt, "Inference failed");
     }
 
     size_t total = out.total();

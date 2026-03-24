@@ -7,6 +7,7 @@
   "types": "lib/typescript/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
+  "author": "artus9033 <artus9033@gmail.com>",
   "files": [
     "src",
     "lib",
@@ -84,9 +85,6 @@
       "modulesProvider": {
         "NcnnWrapperModule": "NativeNcnnWrapperProvider"
       }
-    },
-    "android": {
-      "javaPackageName": "com.callstack.ai"
     }
   },
   "dependencies": {

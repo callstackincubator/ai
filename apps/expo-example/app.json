@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -21,7 +20,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.callstack.ai.example"
     },
     "web": {
@@ -53,6 +51,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to your photos to add them to the semantic search gallery."
+        }
+      ],
+      [
         "react-native-audio-api",
         {
           "iosBackgroundMode": true,
@@ -66,7 +70,8 @@
           "androidFSTypes": ["mediaPlayback"]
         }
       ],
-      "llama.rn"
+      "llama.rn",
+      "expo-font"
     ]
   }
 }
