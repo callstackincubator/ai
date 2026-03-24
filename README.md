@@ -227,7 +227,7 @@ Read the [contribution guidelines](/CONTRIBUTING.md) before contributing.
 
 This repository provides agent skills to help you integrate and use the packages. You can easily install them with:
 
-`npx skills add https://github.com/callstackincubator/react-native-ai --skill json-render-react`
+`npx skills add https://github.com/callstackincubator/react-native-ai --skill react-native-ai-skills`
 
 or manually by copying the `skills/` directory in your `.cursor/` directory.
 
