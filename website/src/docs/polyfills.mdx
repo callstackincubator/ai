@@ -1,3 +1,5 @@
+import { PackageManagerTabs } from '@theme'
+
 # Polyfills
 
 Several functions that are internally used by the AI SDK might not be available in the React Native runtime depending on your configuration and the target platform.
@@ -16,13 +18,11 @@ import structuredClone from '@ungap/structured-clone'
 
 if (Platform.OS !== 'web') {
   const setupPolyfills = async () => {
-    const { polyfillGlobal } = await import(
-      'react-native/Libraries/Utilities/PolyfillFunctions'
-    )
+    const { polyfillGlobal } =
+      await import('react-native/Libraries/Utilities/PolyfillFunctions')
 
-    const { TextEncoderStream, TextDecoderStream } = await import(
-      '@stardazed/streams-text-encoding'
-    )
+    const { TextEncoderStream, TextDecoderStream } =
+      await import('@stardazed/streams-text-encoding')
 
     if (!('structuredClone' in global)) {
       polyfillGlobal('structuredClone', () => structuredClone)
@@ -65,13 +65,11 @@ import {
 
 if (Platform.OS !== 'web') {
   const setupPolyfills = async () => {
-    const { polyfillGlobal } = await import(
-      'react-native/Libraries/Utilities/PolyfillFunctions'
-    )
+    const { polyfillGlobal } =
+      await import('react-native/Libraries/Utilities/PolyfillFunctions')
 
-    const { TextEncoderStream, TextDecoderStream } = await import(
-      '@stardazed/streams-text-encoding'
-    )
+    const { TextEncoderStream, TextDecoderStream } =
+      await import('@stardazed/streams-text-encoding')
 
     if (!('structuredClone' in global)) {
       polyfillGlobal('structuredClone', () => structuredClone)
