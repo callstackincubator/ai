@@ -1,9 +1,10 @@
 import type { TurboModule } from 'react-native'
-import { TurboModuleRegistry } from 'react-native'
 import type {
   EventEmitter,
   UnsafeObject,
 } from 'react-native/Libraries/Types/CodegenTypes'
+
+import { unsupportedAsync, unsupportedSync } from './unsupportedPlatform'
 
 export interface AppleMessage {
   role: 'assistant' | 'system' | 'tool' | 'user'
@@ -64,4 +65,15 @@ export interface Spec extends TurboModule {
   onStreamError: EventEmitter<StreamErrorEvent>
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleLLM')
+const unsupportedStreamEmitter = <T>(): EventEmitter<T> =>
+  (() => unsupportedSync('Apple Foundation Models')) as EventEmitter<T>
+
+export default {
+  isAvailable: () => false,
+  generateText: () => unsupportedAsync('Apple Foundation Models'),
+  generateStream: () => unsupportedSync('Apple Foundation Models'),
+  cancelStream: () => unsupportedSync('Apple Foundation Models'),
+  onStreamUpdate: unsupportedStreamEmitter<StreamUpdateEvent>(),
+  onStreamComplete: unsupportedStreamEmitter<StreamCompleteEvent>(),
+  onStreamError: unsupportedStreamEmitter<StreamErrorEvent>(),
+} satisfies Spec

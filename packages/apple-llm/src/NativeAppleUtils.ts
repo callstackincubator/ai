@@ -1,17 +1,8 @@
 import type { TurboModule } from 'react-native'
-
-import {
-  getOptionalTurboModule,
-  unsupportedSync,
-} from './unsupportedPlatform'
+import { TurboModuleRegistry } from 'react-native'
 
 export interface Spec extends TurboModule {
   getCurrentLocale(): string
 }
 
-const NativeAppleUtils =
-  getOptionalTurboModule<Spec>('NativeAppleUtils') ?? {
-    getCurrentLocale: () => unsupportedSync('Apple utilities'),
-  }
-
-export default NativeAppleUtils
+export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleUtils')

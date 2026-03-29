@@ -1,5 +1,6 @@
 import type { TurboModule } from 'react-native'
-import { TurboModuleRegistry } from 'react-native'
+
+import { unsupportedAsync } from './unsupportedPlatform'
 
 export interface TranscriptionSegment {
   text: string
@@ -17,20 +18,15 @@ export interface Spec extends TurboModule {
   prepare(language: string): Promise<void>
 }
 
-declare global {
-  function __apple__llm__transcribe__(
+export default {
+  transcribe: () => unsupportedAsync('Apple transcription'),
+  prepare: () => unsupportedAsync('Apple transcription'),
+  isAvailable: () => false,
+} satisfies {
+  transcribe(
     data: ArrayBufferLike,
     language: string
   ): Promise<TranscriptionResult>
-}
-
-const NativeAppleTranscription = TurboModuleRegistry.getEnforcing<Spec>(
-  'NativeAppleTranscription'
-)
-
-export default {
-  transcribe: (data: ArrayBufferLike, language: string) =>
-    globalThis.__apple__llm__transcribe__(data, language),
-  prepare: NativeAppleTranscription.prepare,
-  isAvailable: NativeAppleTranscription.isAvailable,
+  prepare(language: string): Promise<void>
+  isAvailable(language: string): boolean
 }
