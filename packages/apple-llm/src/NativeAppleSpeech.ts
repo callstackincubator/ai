@@ -1,7 +1,10 @@
 import type { TurboModule } from 'react-native'
-import { TurboModuleRegistry } from 'react-native'
 import type { UnsafeObject } from 'react-native/Libraries/Types/CodegenTypes'
 
+import {
+  getOptionalTurboModule,
+  unsupportedAsync,
+} from './unsupportedPlatform'
 import { addWAVHeader } from './utils'
 
 export interface SpeechOptions {
@@ -23,7 +26,9 @@ export interface Spec extends TurboModule {
 }
 
 const NativeAppleSpeech =
-  TurboModuleRegistry.getEnforcing<Spec>('NativeAppleSpeech')
+  getOptionalTurboModule<Spec>('NativeAppleSpeech') ?? {
+    getVoices: () => unsupportedAsync('Apple speech synthesis'),
+  }
 
 interface AudioResult {
   data: ArrayBufferLike
@@ -46,6 +51,10 @@ export default {
     text: string,
     options: SpeechOptions = {}
   ): Promise<ArrayBufferLike> => {
+    if (typeof globalThis.__apple__llm__generate_audio__ !== 'function') {
+      return unsupportedAsync('Apple speech synthesis')
+    }
+
     const result = await globalThis.__apple__llm__generate_audio__(
       text,
       options

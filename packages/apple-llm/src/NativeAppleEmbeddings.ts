@@ -1,5 +1,9 @@
 import type { TurboModule } from 'react-native'
-import { TurboModuleRegistry } from 'react-native'
+
+import {
+  getOptionalTurboModule,
+  unsupportedAsync,
+} from './unsupportedPlatform'
 
 export interface EmbeddingInfo {
   hasAvailableAssets: boolean
@@ -17,4 +21,11 @@ export interface Spec extends TurboModule {
   generateEmbeddings(values: string[], language: string): Promise<number[][]>
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleEmbeddings')
+const NativeAppleEmbeddings =
+  getOptionalTurboModule<Spec>('NativeAppleEmbeddings') ?? {
+    getInfo: () => unsupportedAsync('Apple embeddings'),
+    prepare: () => unsupportedAsync('Apple embeddings'),
+    generateEmbeddings: () => unsupportedAsync('Apple embeddings'),
+  }
+
+export default NativeAppleEmbeddings
