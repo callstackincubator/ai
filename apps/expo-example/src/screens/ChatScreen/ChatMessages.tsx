@@ -31,6 +31,7 @@ type ChatMessagesProps = {
   selectedModelLabel: string
   onSend: (message: string) => void
   isGenerating: boolean
+  genUiEnabled: boolean
 }
 
 export function ChatMessages({
@@ -38,6 +39,7 @@ export function ChatMessages({
   selectedModelLabel,
   onSend,
   isGenerating,
+  genUiEnabled,
 }: ChatMessagesProps) {
   const ref = useRef<ScrollView>(null)
 
@@ -82,7 +84,11 @@ export function ChatMessages({
         {messages.length === 0 ? (
           <ChatEmptyState
             title="What can I help you with?"
-            subtitle={`Start a conversation with ${selectedModelLabel}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`}
+            subtitle={
+              genUiEnabled
+                ? `Start a conversation with ${selectedModelLabel}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`
+                : `Start a conversation with ${selectedModelLabel}. Ask questions, get creative, or explore ideas.`
+            }
           />
         ) : (
           <View style={styles.messageList}>
@@ -96,15 +102,17 @@ export function ChatMessages({
               />
             ))}
 
-            <GenerativeUIView
-              spec={
-                currentChatId
-                  ? getChatUISpecFromChats(chats, currentChatId)
-                  : null
-              }
-              loading={isGenerating}
-              showCollapsibleJSON
-            />
+            {genUiEnabled && (
+              <GenerativeUIView
+                spec={
+                  currentChatId
+                    ? getChatUISpecFromChats(chats, currentChatId)
+                    : null
+                }
+                loading={isGenerating}
+                showCollapsibleJSON
+              />
+            )}
           </View>
         )}
       </ScrollView>
