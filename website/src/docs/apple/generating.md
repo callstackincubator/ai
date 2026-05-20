@@ -203,6 +203,58 @@ if (!apple.isAvailable()) {
 }
 ```
 
+## Context Window
+
+Apple Foundation Models have a fixed context window of 4096 tokens. This limit applies to the full request context, including system instructions, previous conversation messages, tool definitions, schemas, and the current user prompt.
+
+The `maxTokens` option only limits how many tokens the model can generate in its response. It does not increase the available context window or reserve enough room for a long prompt.
+
+If the full context is too large, Apple may fail generation with a context-window overflow error. The provider does not automatically remove messages from your prompt, because different apps need different memory strategies. Handle this at the application level by catching the error and choosing the recovery behavior that fits your product:
+
+- Start a new conversation without the previous transcript
+- Keep a sliding window of recent messages
+- Summarize older messages and include the summary instead of the full transcript
+- Ask the user to shorten the prompt or start a new chat
+
+```typescript
+import { apple } from '@react-native-ai/apple';
+import { generateText } from 'ai';
+
+try {
+  const result = await generateText({
+    model: apple(),
+    messages
+  });
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.toLowerCase().includes('context')) {
+    // Apply your app's recovery strategy here.
+    // For example: retry with fewer messages or start a new chat.
+  }
+
+  throw error;
+}
+```
+
+For streaming calls, use `fullStream` when you need to inspect provider error parts:
+
+```typescript
+import { apple } from '@react-native-ai/apple';
+import { streamText } from 'ai';
+
+const result = streamText({
+  model: apple(),
+  messages
+});
+
+for await (const part of result.fullStream) {
+  if (part.type === 'error') {
+    // Handle streamed errors here.
+  }
+}
+```
+
 ## Available Options
 
 Configure model behavior with generation options:
