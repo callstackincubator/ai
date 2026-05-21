@@ -33,6 +33,16 @@ npm install @react-native-ai/dev-tools
 Rozenite must be installed and enabled in your app. See the
 [Rozenite getting started guide](https://www.rozenite.dev/docs/getting-started).
 
+The Expo demo app in [apps/expo-example](./apps/expo-example)
+includes native-development Rozenite wiring for this plugin. Run the example
+app, open React Native DevTools, and select `AI SDK Profiler` to inspect chat
+spans emitted by the Vercel AI SDK.
+
+If the `AI SDK Profiler` panel is visible but remains empty after sending a chat
+message, close that React Native DevTools window and open a fresh one. In
+practice, a stale debugger session can keep the Rozenite panel mounted without
+receiving the current app's telemetry stream.
+
 ## Available Providers
 
 | Provider        | Built-in | Platforms    | Runtime                                                             | Description                                                |

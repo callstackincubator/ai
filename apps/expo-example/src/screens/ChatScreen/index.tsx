@@ -17,6 +17,7 @@ import {
   toolDefinitions,
   withToolProxy,
 } from '../../tools'
+import { getAiSdkTelemetry } from '../../utils/aiSdkTelemetry'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -118,6 +119,7 @@ export default function ChatScreen() {
         temperature,
         stopWhen: stepCountIs(maxSteps),
         abortSignal: signal,
+        experimental_telemetry: getAiSdkTelemetry('chat-screen-stream-text'),
         system: buildGenUISystemPrompt({
           additionalInstructions:
             'If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
