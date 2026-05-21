@@ -103,6 +103,7 @@ export default function ChatScreen() {
       setToolExecutionReporter(({ toolName, args, result }) => {
         addToolExecutionMessage(chatId, toolName, args, result)
       })
+      let streamError: unknown
       const result = streamText({
         model: selectedAdapter.model,
         messages: [
@@ -122,6 +123,9 @@ export default function ChatScreen() {
           additionalInstructions:
             'If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
         }),
+        onError: ({ error }) => {
+          streamError = error
+        },
       })
 
       let accumulated = ''
@@ -131,6 +135,8 @@ export default function ChatScreen() {
         accumulated += chunk
         updateMessageContent(chatId, assistantMessageId, accumulated)
       }
+
+      if (streamError) throw streamError
 
       if (accumulated.trim().length === 0) {
         updateMessageContent(
