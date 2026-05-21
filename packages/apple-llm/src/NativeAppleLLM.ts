@@ -30,6 +30,7 @@ export type StreamCompleteEvent = {
 
 export type StreamErrorEvent = {
   streamId: string
+  code: string
   error: string
 }
 

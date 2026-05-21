@@ -155,8 +155,8 @@ using namespace JS::NativeAppleLLM;
                                  onComplete:^(NSString *streamId) {
     [self emitOnStreamComplete:@{@"streamId": streamId}];
   }
-                                    onError:^(NSString *streamId, NSString *error) {
-    [self emitOnStreamError:@{@"streamId": streamId, @"error": error}];
+                                    onError:^(NSString *streamId, NSString *code, NSString *error) {
+    [self emitOnStreamError:@{@"streamId": streamId, @"code": code, @"error": error}];
   }
                                 toolInvoker:callToolBlock];
   

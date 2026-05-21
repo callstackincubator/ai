@@ -17,6 +17,7 @@ enum AppleLLMError: Error, LocalizedError {
   case invalidSchema(String)
   case toolCallError(Error)
   case unknownToolCallError
+  case contextWindowExceeded
   
   var errorDescription: String? {
     switch self {
@@ -38,8 +39,35 @@ enum AppleLLMError: Error, LocalizedError {
       return "Error calling tool: \(error.localizedDescription)"
     case .unknownToolCallError:
       return "Unknown tool call error"
+    case .contextWindowExceeded:
+      return "Context window exceeded"
     }
     
+  }
+
+  var reactNativeCode: String {
+    switch self {
+    case .modelUnavailable:
+      return "MODEL_UNAVAILABLE"
+    case .unsupportedOS:
+      return "UNSUPPORTED_OS"
+    case .generationError:
+      return "GENERATION_ERROR"
+    case .streamNotFound:
+      return "STREAM_NOT_FOUND"
+    case .invalidMessage:
+      return "INVALID_MESSAGE"
+    case .conflictingSamplingMethods:
+      return "CONFLICTING_SAMPLING_METHODS"
+    case .invalidSchema:
+      return "INVALID_SCHEMA"
+    case .toolCallError:
+      return "TOOL_CALL_ERROR"
+    case .unknownToolCallError:
+      return "UNKNOWN_TOOL_CALL_ERROR"
+    case .contextWindowExceeded:
+      return "CONTEXT_WINDOW_EXCEEDED"
+    }
   }
   
   var code: Int {
@@ -53,6 +81,7 @@ enum AppleLLMError: Error, LocalizedError {
     case .invalidSchema: return 7
     case .unknownToolCallError: return 8
     case .toolCallError: return 9
+    case .contextWindowExceeded: return 10
     }
   }
 }

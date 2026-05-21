@@ -74,16 +74,17 @@ public class AppleLLMImpl: NSObject {
             resolve(response.toModelMessages())
           }
         } catch {
-          reject("AppleLLM", error.localizedDescription, error)
+          let appleError = self.createAppleLLMError(from: error)
+          reject(appleError.reactNativeCode, appleError.localizedDescription, appleError)
         }
       }
     } else {
       let error = AppleLLMError.unsupportedOS
-      reject("AppleLLM", error.localizedDescription, error)
+      reject(error.reactNativeCode, error.localizedDescription, error)
     }
 #else
     let error = AppleLLMError.unsupportedOS
-    reject("AppleLLM", error.localizedDescription, error)
+    reject(error.reactNativeCode, error.localizedDescription, error)
 #endif
   }
   
@@ -93,14 +94,15 @@ public class AppleLLMImpl: NSObject {
     options: [String: Any],
     onUpdate: @escaping (String, String) -> Void,
     onComplete: @escaping (String) -> Void,
-    onError: @escaping (String, String) -> Void,
+    onError: @escaping (String, String, String) -> Void,
     toolInvoker: @escaping ToolInvoker
   ) throws -> String {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
       let streamId = UUID().uuidString
       guard SystemLanguageModel.default.availability == .available else {
-        onError(streamId, "Apple Intelligence model is not available")
+        let error = AppleLLMError.modelUnavailable
+        onError(streamId, error.reactNativeCode, error.localizedDescription)
         return streamId
       }
       
@@ -140,7 +142,8 @@ public class AppleLLMImpl: NSObject {
             onComplete(streamId)
           }
         } catch {
-          onError(streamId, error.localizedDescription)
+          let appleError = self.createAppleLLMError(from: error)
+          onError(streamId, appleError.reactNativeCode, appleError.localizedDescription)
         }
         
         // Clean up task from map when completed
@@ -171,6 +174,19 @@ public class AppleLLMImpl: NSObject {
   
   // MARK: - Private Methods
 #if canImport(FoundationModels)
+
+  @available(iOS 26, *)
+  private func createAppleLLMError(from error: Error) -> AppleLLMError {
+    if case LanguageModelSession.GenerationError.exceededContextWindowSize = error {
+      return .contextWindowExceeded
+    }
+
+    if let appleError = error as? AppleLLMError {
+      return appleError
+    }
+
+    return .generationError(error.localizedDescription)
+  }
   
   @available(iOS 26, *)
   private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {
