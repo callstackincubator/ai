@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
+import { useAiSdkDevTools } from '@react-native-ai/dev-tools'
 import {
   createDrawerNavigator,
   DrawerContentComponentProps,
@@ -160,6 +161,8 @@ function CustomDrawerContent({ navigation }: DrawerContentComponentProps) {
 const Drawer = createDrawerNavigator()
 
 export default function App() {
+  useAiSdkDevTools()
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <KeyboardProvider>

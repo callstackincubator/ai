@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
+    "start": "WITH_ROZENITE=true expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -16,6 +16,8 @@
     "@expo/vector-icons": "^15.0.3",
     "@lodev09/react-native-true-sheet": "^3.8.1",
     "@react-native-ai/apple": "workspace:*",
+    "@react-native-ai/dev-tools": "workspace:*",
+    "@react-native-ai/json-ui": "workspace:*",
     "@react-native-ai/llama": "workspace:*",
     "@react-native-ai/mlc": "workspace:*",
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -40,7 +42,6 @@
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "^6.0.9",
     "jotai": "^2.12.2",
-    "@react-native-ai/json-ui": "workspace:*",
     "llama.rn": "^0.10.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
@@ -56,6 +57,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@rozenite/metro": "^1.9.0",
     "@babel/core": "^7.20.0",
     "@types/react": "~19.1.0"
   },
