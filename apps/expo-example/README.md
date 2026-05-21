@@ -40,6 +40,48 @@ bun run ios
 bun run android
 ```
 
+## Rozenite DevTools
+
+The native example app includes Rozenite wiring for
+`@react-native-ai/dev-tools`, so AI SDK chat requests can be inspected in the
+`AI SDK Profiler` panel during development.
+
+This setup is native-dev-only. The dev-tools package intentionally falls back to
+no-op behavior on web and in production builds.
+
+### Setup
+
+From the repository root, install workspace dependencies:
+
+```bash
+bun install
+```
+
+Then start the example app Metro server from this directory:
+
+```bash
+bun run start
+```
+
+Run the app on iOS or Android using the commands above, then open React Native
+DevTools and switch to the Rozenite view. You should see an `AI SDK Profiler`
+panel provided by `@react-native-ai/dev-tools`.
+
+If the panel appears but stays empty after sending a message, close that React
+Native DevTools window and open a new one. A stale debugger session can keep
+the panel visible while missing the active app connection.
+
+### Verify Telemetry
+
+1. Start the native app in development mode.
+2. Open the chat screen.
+3. Send a message.
+4. Open `AI SDK Profiler` in Rozenite.
+
+After the message is sent, the profiler should show spans for the
+`streamText(...)` request with the function identifier
+`chat-screen-stream-text`.
+
 ## Features
 
 - Apple Intelligence (iOS 17+): Text generation, embeddings, transcription, speech synthesis
