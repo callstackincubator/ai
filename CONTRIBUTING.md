@@ -18,6 +18,7 @@ This is a monorepo with the following packages:
 ## Quick Start
 
 1. **Clone and install dependencies:**
+
    ```bash
    git clone https://github.com/callstackincubator/ai.git
    cd ai
@@ -25,6 +26,7 @@ This is a monorepo with the following packages:
    ```
 
 2. **Run quality checks:**
+
    ```bash
    bun run typecheck
    bun run lint
@@ -54,6 +56,7 @@ This is a monorepo with the following packages:
 ### Commit Messages
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
 - `feat:` new features
 - `fix:` bug fixes
 - `docs:` documentation changes
@@ -78,7 +81,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 Build all packages
 
-```bash 
+```bash
 bun run --filter='@react-native-ai/*' prepare
 ```
 
@@ -106,6 +109,12 @@ bun run android
 - **RN example app**: Open `apps/expo-example/ios/example.xcworkspace` in Xcode
   - The Apple Intelligence package is a Turbo Module - work directly from the integrated Xcode project
   - Native code is in `packages/apple-llm/ios/` but best developed through the example app
+
+## Required Native Builds
+
+The demos require the MLC package to have built the MLC-LLM engine libraries for Android and iOS. We publish the package with prebuilt binaries and this monorepo contains a postinstall script that fetches them on initial setup so you don't need to go through the prerequisites for the MLC package yourself. Set `SKIP_MLC_PREBUILT_FETCH=1` to opt out, or run
+`bun run fetch-prebuilt` in `packages/mlc` package to fetch manually. Rebuild from source with
+`build:runtime:ios` / `build:runtime:android` when needed.
 
 ## Need Help?
 

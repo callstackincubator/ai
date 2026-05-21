@@ -33,6 +33,7 @@
     "clean": "del-cli lib",
     "typecheck": "tsc --noEmit",
     "prepare": "bob build",
+    "fetch-prebuilt": "./scripts/fetch-prebuilt.sh",
     "build:runtime:ios": "./scripts/build-runtime.sh --platform ios",
     "build:runtime:android": "./scripts/build-runtime.sh --platform android"
   },

@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native'
@@ -22,7 +23,7 @@ type SettingsSheetProps = {
 
 export function SettingsSheet({ ref }: SettingsSheetProps) {
   const { chatSettings, toggleTool, updateChatSettings } = useChatStore()
-  const { temperature, maxSteps, enabledToolIds } = chatSettings
+  const { temperature, maxSteps, enabledToolIds, genUiEnabled } = chatSettings
 
   return (
     <TrueSheet ref={ref} scrollable style={styles.sheetContainerSlidingWrapper}>
@@ -78,6 +79,26 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                 </Pressable>
               )
             })}
+          </View>
+
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionLabel}>Features</Text>
+            <View style={styles.settingsCard}>
+              <View style={styles.settingRowToggle}>
+                <View style={styles.settingToggleText}>
+                  <Text style={styles.settingTitle}>JSON UI</Text>
+                  <Text style={styles.settingDescription}>
+                    Let the model build on-screen UI and show the spec JSON
+                  </Text>
+                </View>
+                <Switch
+                  value={genUiEnabled}
+                  onValueChange={(value) =>
+                    updateChatSettings({ genUiEnabled: value })
+                  }
+                />
+              </View>
+            </View>
           </View>
 
           <View style={styles.settingsSection}>
@@ -222,6 +243,21 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     backgroundColor: colors.secondarySystemBackground as any,
     overflow: 'hidden',
+  },
+  settingRowToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  settingToggleText: {
+    flex: 1,
+  },
+  settingDescription: {
+    marginTop: 2,
+    fontSize: 13,
+    color: colors.secondaryLabel as any,
   },
   settingRowSlider: {
     paddingHorizontal: 16,

@@ -1,5 +1,5 @@
-import { TrueSheet } from '@lodev09/react-native-true-sheet'
-import { type createAppleProvider } from '@react-native-ai/apple'
+import type { TrueSheet } from '@lodev09/react-native-true-sheet'
+import type { createAppleProvider } from '@react-native-ai/apple'
 import {
   buildGenUISystemPrompt,
   createGenUITools,
@@ -48,6 +48,7 @@ export default function ChatScreen() {
     temperature,
     maxSteps,
     enabledToolIds,
+    genUiEnabled,
   } = chatSettings
 
   const [isGenerating, setIsGenerating] = useState(false)
@@ -80,12 +81,14 @@ export default function ChatScreen() {
     setIsGenerating(true)
 
     try {
-      const genUITools = createGenUITools({
-        contextId: chatId,
-        getSpec,
-        updateSpec: updateChatUISpec,
-        toolWrapper: withToolProxy as any,
-      })
+      const genUITools = genUiEnabled
+        ? createGenUITools({
+            contextId: chatId,
+            getSpec,
+            updateSpec: updateChatUISpec,
+            toolWrapper: withToolProxy as any,
+          })
+        : {}
       const tools = {
         ...Object.fromEntries(
           enabledToolIds
@@ -120,10 +123,12 @@ export default function ChatScreen() {
         stopWhen: stepCountIs(maxSteps),
         abortSignal: signal,
         experimental_telemetry: getAiSdkTelemetry('chat-screen-stream-text'),
-        system: buildGenUISystemPrompt({
-          additionalInstructions:
-            'If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
-        }),
+        system: genUiEnabled
+          ? buildGenUISystemPrompt({
+              additionalInstructions:
+                'If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
+            })
+          : 'You are a helpful assistant. If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
       })
 
       let accumulated = ''
@@ -193,6 +198,7 @@ export default function ChatScreen() {
             onSend={handleSend}
             isGenerating={isGenerating}
             selectedModelLabel={selectedAdapter.display.label}
+            genUiEnabled={genUiEnabled}
           />
         )}
       </View>
