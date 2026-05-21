@@ -12,4 +12,5 @@ config.resolver.disableHierarchicalLookup = true
 
 module.exports = withRozenite(wrapWithAudioAPIMetroConfig(config), {
   include: ['@react-native-ai/dev-tools'],
+  enabled: process.env.WITH_ROZENITE === 'true', // Required: Rozenite is disabled by default
 })
