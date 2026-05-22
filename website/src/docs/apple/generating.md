@@ -217,7 +217,11 @@ If the full context is too large, Apple may fail generation with a context-windo
 - Ask the user to shorten the prompt or start a new chat
 
 ```typescript
-import { apple } from '@react-native-ai/apple';
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
 import { generateText } from 'ai';
 
 try {
@@ -226,9 +230,9 @@ try {
     messages
   });
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
+  const appleError = error as AppleLLMError;
 
-  if (message.toLowerCase().includes('context')) {
+  if (appleError.code === AppleLLMErrorCodes.ContextWindowExceeded) {
     // Apply your app's recovery strategy here.
     // For example: retry with fewer messages or start a new chat.
   }
@@ -240,7 +244,11 @@ try {
 For streaming calls, use `fullStream` when you need to inspect provider error parts:
 
 ```typescript
-import { apple } from '@react-native-ai/apple';
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
 import { streamText } from 'ai';
 
 const result = streamText({
@@ -250,8 +258,46 @@ const result = streamText({
 
 for await (const part of result.fullStream) {
   if (part.type === 'error') {
-    // Handle streamed errors here.
+    const error = part.error as AppleLLMError;
+
+    if (error.code === AppleLLMErrorCodes.ContextWindowExceeded) {
+      // Apply your app's recovery strategy here.
+    }
   }
+}
+```
+
+If you only consume `textStream`, pass `onError` to `streamText`. The AI SDK does not emit error parts through the text-only stream, so capture the error there and handle it after the stream finishes:
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
+import { streamText } from 'ai';
+
+let streamError: unknown;
+const result = streamText({
+  model: apple(),
+  messages,
+  onError: ({ error }) => {
+    streamError = error;
+  },
+});
+
+for await (const delta of result.textStream) {
+  console.log(delta);
+}
+
+if (streamError) {
+  const error = streamError as AppleLLMError;
+
+  if (error.code === AppleLLMErrorCodes.ContextWindowExceeded) {
+    // Apply your app's recovery strategy here.
+  }
+
+  throw streamError;
 }
 ```
 
