@@ -209,9 +209,9 @@ Apple Foundation Models have a fixed context window of 4096 tokens. This limit a
 
 The `maxTokens` option only limits how many tokens the model can generate in its response. It does not increase the available context window or reserve enough room for a long prompt.
 
-If the full context is too large, Apple may fail generation with a context-window overflow error. The provider does not automatically remove messages from your prompt, because different apps need different memory strategies. Handle this at the application level by catching the error and choosing the recovery behavior that fits your product:
+If the full context is too large, Apple may fail generation with a context-window overflow error. The provider does not automatically estimate tokens, remove messages from your prompt, or retry the request, because token estimates can vary by language and different apps need different memory strategies. Handle this at the application level by catching the error and choosing the recovery behavior that fits your product:
 
-- Start a new conversation without the previous transcript
+- Start a new conversation without the previous transcript, which is Apple's recommended baseline after this error
 - Keep a sliding window of recent messages
 - Summarize older messages and include the summary instead of the full transcript
 - Ask the user to shorten the prompt or start a new chat
