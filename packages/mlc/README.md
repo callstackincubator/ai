@@ -22,7 +22,7 @@ await model.prepare()
 // Generate
 const { text } = await generateText({
   model,
-  prompt: 'What is the meaning of life?'
+  prompt: 'What is the meaning of life?',
 })
 ```
 

@@ -28,6 +28,7 @@ export type ChatSettings = {
   temperature: number
   maxSteps: number
   enabledToolIds: string[]
+  genUiEnabled: boolean
 }
 
 /** Single element in the generative UI tree (id is the key in elements). */
@@ -116,6 +117,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
   temperature: 0.7,
   maxSteps: 5,
   enabledToolIds: Object.keys(toolDefinitions),
+  genUiEnabled: false,
 }
 
 const chatsAtom = atomWithStorage<Chat[]>('chats', [], storage)
@@ -283,7 +285,10 @@ export function useChatStore() {
     })
   }
 
-  const chatSettings = currentChat?.settings ?? pendingSettings
+  const chatSettings: ChatSettings = {
+    ...DEFAULT_SETTINGS,
+    ...(currentChat?.settings ?? pendingSettings),
+  }
 
   const toggleTool = (toolId: string) => {
     const tools = chatSettings.enabledToolIds
