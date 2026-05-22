@@ -4,7 +4,6 @@ export type AppleLLMError = Error & {
 
 export const AppleLLMErrorCodes = {
   ContextWindowExceeded: 'CONTEXT_WINDOW_EXCEEDED',
-  ModelUnavailable: 'MODEL_UNAVAILABLE',
 } as const
 
 export type AppleLLMErrorCode =

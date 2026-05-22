@@ -74,17 +74,21 @@ public class AppleLLMImpl: NSObject {
             resolve(response.toModelMessages())
           }
         } catch {
-          let appleError = self.createAppleLLMError(from: error)
-          reject(appleError.reactNativeCode, appleError.localizedDescription, appleError)
+          if let appleError = self.createContextWindowError(from: error),
+             let code = appleError.contextWindowErrorCode {
+            reject(code, appleError.localizedDescription, appleError)
+          } else {
+            reject("AppleLLM", error.localizedDescription, error)
+          }
         }
       }
     } else {
       let error = AppleLLMError.unsupportedOS
-      reject(error.reactNativeCode, error.localizedDescription, error)
+      reject("AppleLLM", error.localizedDescription, error)
     }
 #else
     let error = AppleLLMError.unsupportedOS
-    reject(error.reactNativeCode, error.localizedDescription, error)
+    reject("AppleLLM", error.localizedDescription, error)
 #endif
   }
   
@@ -102,7 +106,7 @@ public class AppleLLMImpl: NSObject {
       let streamId = UUID().uuidString
       guard SystemLanguageModel.default.availability == .available else {
         let error = AppleLLMError.modelUnavailable
-        onError(streamId, error.reactNativeCode, error.localizedDescription)
+        onError(streamId, "", error.localizedDescription)
         return streamId
       }
       
@@ -142,8 +146,12 @@ public class AppleLLMImpl: NSObject {
             onComplete(streamId)
           }
         } catch {
-          let appleError = self.createAppleLLMError(from: error)
-          onError(streamId, appleError.reactNativeCode, appleError.localizedDescription)
+          if let appleError = self.createContextWindowError(from: error),
+             let code = appleError.contextWindowErrorCode {
+            onError(streamId, code, appleError.localizedDescription)
+          } else {
+            onError(streamId, "", error.localizedDescription)
+          }
         }
         
         // Clean up task from map when completed
@@ -176,16 +184,12 @@ public class AppleLLMImpl: NSObject {
 #if canImport(FoundationModels)
 
   @available(iOS 26, *)
-  private func createAppleLLMError(from error: Error) -> AppleLLMError {
+  private func createContextWindowError(from error: Error) -> AppleLLMError? {
     if case LanguageModelSession.GenerationError.exceededContextWindowSize = error {
       return .contextWindowExceeded
     }
 
-    if let appleError = error as? AppleLLMError {
-      return appleError
-    }
-
-    return .generationError(error.localizedDescription)
+    return nil
   }
   
   @available(iOS 26, *)

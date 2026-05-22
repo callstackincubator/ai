@@ -156,7 +156,11 @@ using namespace JS::NativeAppleLLM;
     [self emitOnStreamComplete:@{@"streamId": streamId}];
   }
                                     onError:^(NSString *streamId, NSString *code, NSString *error) {
-    [self emitOnStreamError:@{@"streamId": streamId, @"code": code, @"error": error}];
+    NSMutableDictionary *payload = [@{@"streamId": streamId, @"error": error} mutableCopy];
+    if (code.length > 0) {
+      payload[@"code"] = code;
+    }
+    [self emitOnStreamError:payload];
   }
                                 toolInvoker:callToolBlock];
   
