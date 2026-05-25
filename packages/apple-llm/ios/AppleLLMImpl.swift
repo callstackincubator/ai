@@ -185,7 +185,11 @@ public class AppleLLMImpl: NSObject {
 
   @available(iOS 26, *)
   private func createContextWindowError(from error: Error) -> AppleLLMError? {
-    if case LanguageModelSession.GenerationError.exceededContextWindowSize = error {
+    guard let generationError = error as? LanguageModelSession.GenerationError else {
+      return nil
+    }
+
+    if case .exceededContextWindowSize = generationError {
       return .contextWindowExceeded
     }
 
