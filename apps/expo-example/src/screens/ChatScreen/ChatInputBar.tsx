@@ -7,13 +7,19 @@ import { AdaptiveGlass } from '../../components/AdaptiveGlass'
 import { Button, ContextMenu, Host } from '../../components/expo-ui'
 import { RecordButton } from '../../components/RecordButton'
 import { colors } from '../../theme/colors'
+import { AppleTokenCounter } from './AppleTokenCounter'
 
 type ChatInputBarProps = {
   onSend: (message: string) => void
   isGenerating: boolean
+  showAppleTokenCount: boolean
 }
 
-export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
+export function ChatInputBar({
+  onSend,
+  isGenerating,
+  showAppleTokenCount,
+}: ChatInputBarProps) {
   const [input, setInput] = useState('')
 
   const handleSend = () => {
@@ -25,6 +31,9 @@ export function ChatInputBar({ onSend, isGenerating }: ChatInputBarProps) {
 
   return (
     <AdaptiveGlass style={styles.inputBar}>
+      <View style={styles.tokenCounterContainer}>
+        <AppleTokenCounter input={input} isVisible={showAppleTokenCount} />
+      </View>
       <View style={styles.inputRow}>
         <AdaptiveGlass isInteractive style={styles.plusButton}>
           <Host matchContents>
@@ -130,6 +139,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tertiarySystemFill as any,
     paddingHorizontal: 16,
     minHeight: 40,
+  },
+  tokenCounterContainer: {
+    alignItems: 'center',
   },
   textInput: {
     flex: 1,

@@ -182,6 +182,9 @@ export default function ChatScreen() {
   }, [selectedAdapter, selectedModelAvailability])
 
   const headerSubtitle = selectedAdapter?.display.label ?? 'No model selected'
+  const showAppleTokenCount =
+    selectedAdapter?.model.provider === 'apple' &&
+    selectedModelAvailability === 'yes'
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -205,6 +208,7 @@ export default function ChatScreen() {
             isGenerating={isGenerating}
             selectedModelLabel={selectedAdapter.display.label}
             genUiEnabled={genUiEnabled}
+            showAppleTokenCount={showAppleTokenCount}
           />
         )}
       </View>
