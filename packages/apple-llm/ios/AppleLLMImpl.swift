@@ -34,6 +34,40 @@ public class AppleLLMImpl: NSObject {
   }
 
   @objc
+  public func countTokens(
+    _ text: String,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(FoundationModels)
+    if #available(iOS 26.4, *) {
+      guard SystemLanguageModel.default.availability == .available else {
+        reject(
+          "MODEL_UNAVAILABLE",
+          "Apple Intelligence model is not available",
+          nil
+        )
+        return
+      }
+      Task {
+        do {
+          let tokenCount = try await SystemLanguageModel.default.tokenCount(for: text)
+          resolve(tokenCount)
+        } catch {
+          reject("AppleLLM", error.localizedDescription, error)
+        }
+      }
+    } else {
+      let error = AppleLLMError.unsupportedOS
+      reject("AppleLLM", error.localizedDescription, error)
+    }
+#else
+    let error = AppleLLMError.unsupportedOS
+    reject("AppleLLM", error.localizedDescription, error)
+#endif
+  }
+
+  @objc
   public func generateText(
     _ messages: [[String: Any]],
     options: [String: Any],

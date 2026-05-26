@@ -343,3 +343,19 @@ const options = { temperature: 0.7, maxTokens: 100 }
 
 const result = await AppleFoundationModels.generateText(messages, options)
 ```
+
+On iOS 26.4 and newer, you can also count the number of tokens in a string
+before sending it to the model:
+
+```tsx
+import { AppleFoundationModels } from '@react-native-ai/apple'
+
+const tokenCount = await AppleFoundationModels.countTokens(
+  'Summarize this text in three bullet points.'
+)
+```
+
+Token counting is useful for estimating prompt size, but it is not a complete
+guarantee that a generation request will fit in the model context window. The
+full context also includes instructions, previous messages in the transcript,
+tools, schemas, and generated output.

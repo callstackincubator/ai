@@ -36,6 +36,7 @@ export type StreamErrorEvent = {
 
 export interface Spec extends TurboModule {
   isAvailable(): boolean
+  countTokens(text: string): Promise<number>
   generateText(
     messages: AppleMessage[],
     options: AppleGenerationOptions
