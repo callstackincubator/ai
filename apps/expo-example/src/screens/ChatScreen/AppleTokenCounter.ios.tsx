@@ -60,7 +60,6 @@ const styles = StyleSheet.create({
     color: colors.secondaryLabel as any,
     fontSize: 12,
     lineHeight: 16,
-    textAlign: 'right',
     marginBottom: 6,
   },
 })
