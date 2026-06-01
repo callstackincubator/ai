@@ -107,6 +107,7 @@ export default function ChatScreen() {
       setToolExecutionReporter(({ toolName, args, result }) => {
         addToolExecutionMessage(chatId, toolName, args, result)
       })
+      let streamError: unknown
       const result = streamText({
         model: selectedAdapter.model,
         messages: [
@@ -129,6 +130,9 @@ export default function ChatScreen() {
                 'If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
             })
           : 'You are a helpful assistant. If the user asks, tell who you are (assistant) and what is this (Callstack AI demo app).',
+        onError: ({ error }) => {
+          streamError = error
+        },
       })
 
       let accumulated = ''
@@ -138,6 +142,8 @@ export default function ChatScreen() {
         accumulated += chunk
         updateMessageContent(chatId, assistantMessageId, accumulated)
       }
+
+      if (streamError) throw streamError
 
       if (accumulated.trim().length === 0) {
         updateMessageContent(
@@ -176,6 +182,9 @@ export default function ChatScreen() {
   }, [selectedAdapter, selectedModelAvailability])
 
   const headerSubtitle = selectedAdapter?.display.label ?? 'No model selected'
+  const showAppleTokenCount =
+    selectedAdapter?.model.provider === 'apple' &&
+    selectedModelAvailability === 'yes'
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -199,6 +208,7 @@ export default function ChatScreen() {
             isGenerating={isGenerating}
             selectedModelLabel={selectedAdapter.display.label}
             genUiEnabled={genUiEnabled}
+            showAppleTokenCount={showAppleTokenCount}
           />
         )}
       </View>

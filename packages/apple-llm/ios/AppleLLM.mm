@@ -125,6 +125,12 @@ using namespace JS::NativeAppleLLM;
   [_llm generateText:messages options:opts resolve:resolve reject:reject toolInvoker:callToolBlock];
 }
 
+- (void)countTokens:(nonnull NSString *)text
+            resolve:(nonnull RCTPromiseResolveBlock)resolve
+             reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_llm countTokens:text resolve:resolve reject:reject];
+}
+
 - (void)cancelStream:(nonnull NSString *)streamId {
   [_llm cancelStream:streamId];
 }
@@ -155,8 +161,12 @@ using namespace JS::NativeAppleLLM;
                                  onComplete:^(NSString *streamId) {
     [self emitOnStreamComplete:@{@"streamId": streamId}];
   }
-                                    onError:^(NSString *streamId, NSString *error) {
-    [self emitOnStreamError:@{@"streamId": streamId, @"error": error}];
+                                    onError:^(NSString *streamId, NSString *code, NSString *error) {
+    NSMutableDictionary *payload = [@{@"streamId": streamId, @"error": error} mutableCopy];
+    if (code.length > 0) {
+      payload[@"code"] = code;
+    }
+    [self emitOnStreamError:payload];
   }
                                 toolInvoker:callToolBlock];
   

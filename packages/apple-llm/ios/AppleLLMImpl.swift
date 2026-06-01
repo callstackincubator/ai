@@ -34,6 +34,40 @@ public class AppleLLMImpl: NSObject {
   }
 
   @objc
+  public func countTokens(
+    _ text: String,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(FoundationModels)
+    if #available(iOS 26.4, *) {
+      guard SystemLanguageModel.default.availability == .available else {
+        reject(
+          "MODEL_UNAVAILABLE",
+          "Apple Intelligence model is not available",
+          nil
+        )
+        return
+      }
+      Task {
+        do {
+          let tokenCount = try await SystemLanguageModel.default.tokenCount(for: text)
+          resolve(tokenCount)
+        } catch {
+          reject("AppleLLM", error.localizedDescription, error)
+        }
+      }
+    } else {
+      let error = AppleLLMError.unsupportedOS
+      reject("AppleLLM", error.localizedDescription, error)
+    }
+#else
+    let error = AppleLLMError.unsupportedOS
+    reject("AppleLLM", error.localizedDescription, error)
+#endif
+  }
+
+  @objc
   public func generateText(
     _ messages: [[String: Any]],
     options: [String: Any],
@@ -74,7 +108,12 @@ public class AppleLLMImpl: NSObject {
             resolve(response.toModelMessages())
           }
         } catch {
-          reject("AppleLLM", error.localizedDescription, error)
+          if let appleError = self.createContextWindowError(from: error),
+             let code = appleError.contextWindowErrorCode {
+            reject(code, appleError.localizedDescription, appleError)
+          } else {
+            reject("AppleLLM", error.localizedDescription, error)
+          }
         }
       }
     } else {
@@ -93,14 +132,15 @@ public class AppleLLMImpl: NSObject {
     options: [String: Any],
     onUpdate: @escaping (String, String) -> Void,
     onComplete: @escaping (String) -> Void,
-    onError: @escaping (String, String) -> Void,
+    onError: @escaping (String, String, String) -> Void,
     toolInvoker: @escaping ToolInvoker
   ) throws -> String {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
       let streamId = UUID().uuidString
       guard SystemLanguageModel.default.availability == .available else {
-        onError(streamId, "Apple Intelligence model is not available")
+        let error = AppleLLMError.modelUnavailable
+        onError(streamId, "", error.localizedDescription)
         return streamId
       }
       
@@ -140,7 +180,12 @@ public class AppleLLMImpl: NSObject {
             onComplete(streamId)
           }
         } catch {
-          onError(streamId, error.localizedDescription)
+          if let appleError = self.createContextWindowError(from: error),
+             let code = appleError.contextWindowErrorCode {
+            onError(streamId, code, appleError.localizedDescription)
+          } else {
+            onError(streamId, "", error.localizedDescription)
+          }
         }
         
         // Clean up task from map when completed
@@ -171,6 +216,19 @@ public class AppleLLMImpl: NSObject {
   
   // MARK: - Private Methods
 #if canImport(FoundationModels)
+
+  @available(iOS 26, *)
+  private func createContextWindowError(from error: Error) -> AppleLLMError? {
+    guard let generationError = error as? LanguageModelSession.GenerationError else {
+      return nil
+    }
+
+    if case .exceededContextWindowSize = generationError {
+      return .contextWindowExceeded
+    }
+
+    return nil
+  }
   
   @available(iOS 26, *)
   private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {

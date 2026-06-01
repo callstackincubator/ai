@@ -1,5 +1,6 @@
 import type { LanguageModelV2StreamPart } from '@ai-sdk/provider'
 
+import { createAppleLLMError } from './errors'
 import NativeAppleLLMSpec, {
   type AppleGenerationOptions,
   type AppleMessage,
@@ -67,7 +68,7 @@ export function generateStream(
           if (data.streamId === streamId) {
             controller.enqueue({
               type: 'error',
-              error: data.error,
+              error: createAppleLLMError(data.error, data.code),
             })
             cleanup()
             controller.close()

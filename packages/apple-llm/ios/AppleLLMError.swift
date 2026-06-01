@@ -17,6 +17,7 @@ enum AppleLLMError: Error, LocalizedError {
   case invalidSchema(String)
   case toolCallError(Error)
   case unknownToolCallError
+  case contextWindowExceeded
   
   var errorDescription: String? {
     switch self {
@@ -38,8 +39,19 @@ enum AppleLLMError: Error, LocalizedError {
       return "Error calling tool: \(error.localizedDescription)"
     case .unknownToolCallError:
       return "Unknown tool call error"
+    case .contextWindowExceeded:
+      return "Context window exceeded"
     }
     
+  }
+
+  var contextWindowErrorCode: String? {
+    switch self {
+    case .contextWindowExceeded:
+      return "CONTEXT_WINDOW_EXCEEDED"
+    default:
+      return nil
+    }
   }
   
   var code: Int {
@@ -53,6 +65,7 @@ enum AppleLLMError: Error, LocalizedError {
     case .invalidSchema: return 7
     case .unknownToolCallError: return 8
     case .toolCallError: return 9
+    case .contextWindowExceeded: return 10
     }
   }
 }

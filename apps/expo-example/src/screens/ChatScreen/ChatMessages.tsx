@@ -32,6 +32,7 @@ type ChatMessagesProps = {
   onSend: (message: string) => void
   isGenerating: boolean
   genUiEnabled: boolean
+  showAppleTokenCount: boolean
 }
 
 export function ChatMessages({
@@ -40,6 +41,7 @@ export function ChatMessages({
   onSend,
   isGenerating,
   genUiEnabled,
+  showAppleTokenCount,
 }: ChatMessagesProps) {
   const ref = useRef<ScrollView>(null)
 
@@ -117,7 +119,11 @@ export function ChatMessages({
         )}
       </ScrollView>
       <Reanimated.View style={inputBarBottomPadding}>
-        <ChatInputBar onSend={onSend} isGenerating={isGenerating} />
+        <ChatInputBar
+          onSend={onSend}
+          isGenerating={isGenerating}
+          showAppleTokenCount={showAppleTokenCount}
+        />
       </Reanimated.View>
     </>
   )

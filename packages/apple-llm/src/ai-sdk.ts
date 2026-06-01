@@ -21,6 +21,7 @@ import {
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
+import { createAppleLLMError } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
@@ -464,7 +465,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
             if (data.streamId === streamId) {
               controller.enqueue({
                 type: 'error',
-                error: data.error,
+                error: createAppleLLMError(data.error, data.code),
               })
               cleanup()
               controller.close()

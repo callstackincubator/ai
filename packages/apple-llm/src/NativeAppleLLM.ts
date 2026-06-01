@@ -30,11 +30,13 @@ export type StreamCompleteEvent = {
 
 export type StreamErrorEvent = {
   streamId: string
+  code?: string
   error: string
 }
 
 export interface Spec extends TurboModule {
   isAvailable(): boolean
+  countTokens(text: string): Promise<number>
   generateText(
     messages: AppleMessage[],
     options: AppleGenerationOptions

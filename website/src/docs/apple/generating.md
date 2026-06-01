@@ -203,6 +203,104 @@ if (!apple.isAvailable()) {
 }
 ```
 
+## Context Window
+
+Apple Foundation Models have a fixed context window of 4096 tokens. This limit applies to the full request context, including system instructions, previous conversation messages, tool definitions, schemas, and the current user prompt.
+
+The `maxTokens` option only limits how many tokens the model can generate in its response. It does not increase the available context window or reserve enough room for a long prompt.
+
+If the full context is too large, Apple may fail generation with a context-window overflow error. The provider does not automatically estimate tokens, remove messages from your prompt, or retry the request, because token estimates can vary by language and different apps need different memory strategies. Handle this at the application level by catching the error and choosing the recovery behavior that fits your product:
+
+- Start a new conversation without the previous transcript, which is Apple's recommended baseline after this error
+- Keep a sliding window of recent messages
+- Summarize older messages and include the summary instead of the full transcript
+- Ask the user to shorten the prompt or start a new chat
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
+import { generateText } from 'ai';
+
+try {
+  const result = await generateText({
+    model: apple(),
+    messages
+  });
+} catch (error) {
+  const appleError = error as AppleLLMError;
+
+  if (appleError.code === AppleLLMErrorCodes.ContextWindowExceeded) {
+    // Apply your app's recovery strategy here.
+    // For example: retry with fewer messages or start a new chat.
+  }
+
+  throw error;
+}
+```
+
+For streaming calls, use `fullStream` when you need to inspect provider error parts:
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
+import { streamText } from 'ai';
+
+const result = streamText({
+  model: apple(),
+  messages
+});
+
+for await (const part of result.fullStream) {
+  if (part.type === 'error') {
+    const error = part.error as AppleLLMError;
+
+    if (error.code === AppleLLMErrorCodes.ContextWindowExceeded) {
+      // Apply your app's recovery strategy here.
+    }
+  }
+}
+```
+
+If you only consume `textStream`, pass `onError` to `streamText`. The AI SDK does not emit error parts through the text-only stream, so capture the error there and handle it after the stream finishes:
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
+import { streamText } from 'ai';
+
+let streamError: unknown;
+const result = streamText({
+  model: apple(),
+  messages,
+  onError: ({ error }) => {
+    streamError = error;
+  },
+});
+
+for await (const delta of result.textStream) {
+  console.log(delta);
+}
+
+if (streamError) {
+  const error = streamError as AppleLLMError;
+
+  if (error.code === AppleLLMErrorCodes.ContextWindowExceeded) {
+    // Apply your app's recovery strategy here.
+  }
+
+  throw streamError;
+}
+```
+
 ## Available Options
 
 Configure model behavior with generation options:
@@ -245,3 +343,22 @@ const options = { temperature: 0.7, maxTokens: 100 }
 
 const result = await AppleFoundationModels.generateText(messages, options)
 ```
+
+On iOS 26.4 and newer, you can also count the number of tokens in a string
+before sending it to the model:
+
+```tsx
+import { AppleFoundationModels } from '@react-native-ai/apple'
+
+const tokenCount = await AppleFoundationModels.countTokens(
+  'Summarize this text in three bullet points.'
+)
+```
+
+Token counting is useful for estimating prompt size, but it is not a complete
+guarantee that a generation request will fit in the model context window. The
+full context also includes instructions, previous messages in the transcript,
+tools, schemas, and generated output.
+
+The maximum context window size for Apple's Foundation models is 4096 tokens
+per session. More information can be found [here](https://developer.apple.com/documentation/technotes/tn3193-managing-the-on-device-foundation-model-s-context-window).
