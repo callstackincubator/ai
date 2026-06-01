@@ -301,6 +301,123 @@ if (streamError) {
 }
 ```
 
+## Public Error Codes
+
+Apple Foundation Models exposes a deliberate public error-code surface through `AppleLLMError.code`. Use `error.code` for application control flow and treat `error.message` as display/debug text rather than a compatibility contract.
+
+Only documented `AppleLLMErrorCodes.*` values are stable:
+
+- `AppleLLMErrorCodes.ModelUnavailable` / `MODEL_UNAVAILABLE`
+- `AppleLLMErrorCodes.UnsupportedOS` / `UNSUPPORTED_OS`
+- `AppleLLMErrorCodes.GenerationError` / `GENERATION_ERROR`
+- `AppleLLMErrorCodes.InvalidMessage` / `INVALID_MESSAGE`
+- `AppleLLMErrorCodes.ConflictingSamplingMethods` / `CONFLICTING_SAMPLING_METHODS`
+- `AppleLLMErrorCodes.InvalidSchema` / `INVALID_SCHEMA`
+- `AppleLLMErrorCodes.ToolCallError` / `TOOL_CALL_ERROR`
+- `AppleLLMErrorCodes.UnknownToolCallError` / `UNKNOWN_TOOL_CALL_ERROR`
+- `AppleLLMErrorCodes.ContextWindowExceeded` / `CONTEXT_WINDOW_EXCEEDED`
+
+These codes mean:
+
+- `MODEL_UNAVAILABLE`: Apple Intelligence is unavailable on the current device or configuration.
+- `UNSUPPORTED_OS`: the current runtime does not support the required Apple Foundation Models API.
+- `GENERATION_ERROR`: Foundation Models generation failed for an uncategorized provider-side reason.
+- `INVALID_MESSAGE`: the prompt/message structure is invalid for this provider.
+- `CONFLICTING_SAMPLING_METHODS`: both `topP` and `topK` were provided.
+- `INVALID_SCHEMA`: the provided schema or tool schema cannot be used by Apple Foundation Models.
+- `TOOL_CALL_ERROR`: a tool execution failed.
+- `UNKNOWN_TOOL_CALL_ERROR`: tool execution finished in an unusable or unexpected state.
+- `CONTEXT_WINDOW_EXCEEDED`: the request exceeded the model context window.
+
+Errors that do not have a recognized public Apple LLM code may still be thrown, but they are plain `Error` values and are not part of the stable Apple provider API.
+
+### Handling `generateText` errors
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
+import { generateText } from 'ai';
+
+try {
+  await generateText({
+    model: apple(),
+    messages,
+  })
+} catch (error) {
+  if (
+    error instanceof Error &&
+    'code' in error &&
+    error.code === AppleLLMErrorCodes.ModelUnavailable
+  ) {
+    // Show fallback UI or disable Apple-specific features.
+  }
+
+  throw error
+}
+```
+
+### Handling streaming errors with `fullStream`
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
+import { streamText } from 'ai';
+
+const result = streamText({
+  model: apple(),
+  messages,
+})
+
+for await (const part of result.fullStream) {
+  if (
+    part.type === 'error' &&
+    part.error instanceof Error &&
+    'code' in part.error &&
+    part.error.code === AppleLLMErrorCodes.InvalidSchema
+  ) {
+    // Handle invalid schema input.
+  }
+}
+```
+
+### Handling streaming errors with `textStream` and `onError`
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple';
+import { streamText } from 'ai';
+
+let streamError: unknown
+const result = streamText({
+  model: apple(),
+  messages,
+  onError: ({ error }) => {
+    streamError = error
+  },
+})
+
+for await (const delta of result.textStream) {
+  console.log(delta)
+}
+
+if (
+  streamError instanceof Error &&
+  'code' in streamError &&
+  streamError.code === AppleLLMErrorCodes.ToolCallError
+) {
+  // Handle tool failure.
+}
+```
+
 ## Available Options
 
 Configure model behavior with generation options:
