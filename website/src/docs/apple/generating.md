@@ -359,3 +359,6 @@ Token counting is useful for estimating prompt size, but it is not a complete
 guarantee that a generation request will fit in the model context window. The
 full context also includes instructions, previous messages in the transcript,
 tools, schemas, and generated output.
+
+The maximum context window size for Apple's Foundation models is 4096 tokens
+per session. More information can be found [here](https://developer.apple.com/documentation/technotes/tn3193-managing-the-on-device-foundation-model-s-context-window).
