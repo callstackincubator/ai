@@ -1,6 +1,7 @@
 import type { LanguageModelV2StreamPart } from '@ai-sdk/provider'
+import { generateId } from '@ai-sdk/provider-utils'
 
-import { createAppleLLMError } from './errors'
+import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleLLMSpec, {
   type AppleGenerationOptions,
   type AppleMessage,
@@ -27,7 +28,7 @@ export function generateStream(
   const stream = new ReadableStream<LanguageModelV2StreamPart>({
     async start(controller) {
       try {
-        streamId = NativeAppleLLMSpec.generateStream(messages, options)
+        streamId = generateId()
 
         controller.enqueue({
           type: 'text-start',
@@ -68,7 +69,9 @@ export function generateStream(
           if (data.streamId === streamId) {
             controller.enqueue({
               type: 'error',
-              error: createAppleLLMError(data.error, data.code),
+              error: isAppleLLMErrorCode(data.code)
+                ? createAppleLLMError(data.error, data.code)
+                : new Error(data.error),
             })
             cleanup()
             controller.close()
@@ -76,6 +79,8 @@ export function generateStream(
         })
 
         listeners = [updateListener, completeListener, errorListener]
+
+        NativeAppleLLMSpec.generateStream(streamId, messages, options)
       } catch (error) {
         cleanup()
         controller.error(new Error(`Apple LLM stream failed: ${error}`))

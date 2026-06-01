@@ -56,9 +56,10 @@ export interface Spec extends TurboModule {
     )[]
   >
   generateStream(
+    streamId: string,
     messages: AppleMessage[],
     options: AppleGenerationOptions
-  ): string
+  ): void
   cancelStream(streamId: string): void
 
   onStreamUpdate: EventEmitter<StreamUpdateEvent>

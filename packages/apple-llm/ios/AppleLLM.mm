@@ -136,7 +136,7 @@ using namespace JS::NativeAppleLLM;
 }
 
 
-- (nonnull NSString *)generateStream:(nonnull NSArray *)messages options:(JS::NativeAppleLLM::AppleGenerationOptions &)options {
+- (void)generateStream:(nonnull NSString *)streamId messages:(nonnull NSArray *)messages options:(JS::NativeAppleLLM::AppleGenerationOptions &)options {
   NSDictionary *opts = @{
     @"temperature": options.temperature().has_value() ? @(options.temperature().value()) : [NSNull null],
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
@@ -146,37 +146,27 @@ using namespace JS::NativeAppleLLM;
     @"tools": options.tools() ?: [NSNull null],
   };
   
-  NSError *error;
-  
   auto callToolBlock = ^(NSString *toolId, NSString *arguments, void (^completion)(id, NSError *)) {
     [self callToolWithId:toolId arguments:arguments completion:completion];
   };
-  
-  NSString *streamId = [_llm generateStream:messages
-                                    options:opts
-                                      error: &error
-                                   onUpdate:^(NSString *streamId, NSString *content) {
+
+  [_llm generateStream:streamId
+              messages:messages
+               options:opts
+              onUpdate:^(NSString *streamId, NSString *content) {
     [self emitOnStreamUpdate:@{@"streamId": streamId, @"content": content}];
   }
-                                 onComplete:^(NSString *streamId) {
+            onComplete:^(NSString *streamId) {
     [self emitOnStreamComplete:@{@"streamId": streamId}];
   }
-                                    onError:^(NSString *streamId, NSString *code, NSString *error) {
+               onError:^(NSString *streamId, NSString *code, NSString *error) {
     NSMutableDictionary *payload = [@{@"streamId": streamId, @"error": error} mutableCopy];
     if (code.length > 0) {
       payload[@"code"] = code;
     }
     [self emitOnStreamError:payload];
   }
-                                toolInvoker:callToolBlock];
-  
-  if (error) {
-    @throw [NSException exceptionWithName:@"AppleLLM"
-                                   reason:error.localizedDescription
-                                 userInfo:nil];
-  }
-  
-  return streamId;
+           toolInvoker:callToolBlock];
   
 }
 
