@@ -289,8 +289,13 @@ public class AppleLLMImpl: NSObject {
       return nil
     }
 
+    return try Self.createGenerationSchema(fromSchema: schemaOption)
+  }
+
+  @available(iOS 26, *)
+  private static func createGenerationSchema(fromSchema schema: [String: Any]) throws -> GenerationSchema {
     do {
-      return try AppleLLMSchemaParser.createGenerationSchema(from: schemaOption)
+      return try AppleLLMSchemaParser.createGenerationSchema(from: schema)
     } catch let appleError as AppleLLMError {
       throw appleError
     } catch {
@@ -430,13 +435,7 @@ public class AppleLLMImpl: NSObject {
       self.name = name
       self.description = description
       self.invokeJavaScriptTool = javaScriptToolInvoker
-      do {
-        self.parameters = try AppleLLMSchemaParser.createGenerationSchema(from: parameters)
-      } catch let appleError as AppleLLMError {
-        throw appleError
-      } catch {
-        throw AppleLLMError.invalidSchema(error.localizedDescription)
-      }
+      self.parameters = try AppleLLMImpl.createGenerationSchema(fromSchema: parameters)
     }
     
     func call(arguments: GeneratedContent) async throws -> String {
