@@ -21,7 +21,7 @@ import {
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
-import { createAppleLLMError } from './errors'
+import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
@@ -303,60 +303,62 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
       globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
     }
 
-    const response = await NativeAppleLLM.generateText(messages, {
-      maxTokens: options.maxOutputTokens,
-      temperature: options.temperature,
-      topP: options.topP,
-      topK: options.topK,
-      tools,
-      schema:
-        options.responseFormat?.type === 'json'
-          ? options.responseFormat.schema
-          : undefined,
-    })
+    try {
+      const response = await NativeAppleLLM.generateText(messages, {
+        maxTokens: options.maxOutputTokens,
+        temperature: options.temperature,
+        topP: options.topP,
+        topK: options.topK,
+        tools,
+        schema:
+          options.responseFormat?.type === 'json'
+            ? options.responseFormat.schema
+            : undefined,
+      })
 
-    for (const tool of tools) {
-      delete globalThis.__APPLE_LLM_TOOLS__[tool.id]
-    }
-
-    return {
-      content: response.map((part) => {
-        switch (part.type) {
-          case 'text':
-            return part
-          case 'tool-call':
-            return {
-              type: 'tool-call' as const,
-              toolCallId: '',
-              providerExecuted: true,
-              toolName: part.toolName,
-              input: part.input,
-            }
-          case 'tool-result':
-            return {
-              type: 'tool-result' as const,
-              toolCallId: '',
-              providerExecuted: true,
-              toolName: part.toolName,
-              result: part.output,
-            }
-        }
-      }),
-      finishReason: { unified: 'stop' as const, raw: 'stop' },
-      usage: {
-        inputTokens: {
-          total: 0,
-          noCache: undefined,
-          cacheRead: undefined,
-          cacheWrite: undefined,
+      return {
+        content: response.map((part) => {
+          switch (part.type) {
+            case 'text':
+              return part
+            case 'tool-call':
+              return {
+                type: 'tool-call' as const,
+                toolCallId: '',
+                providerExecuted: true,
+                toolName: part.toolName,
+                input: part.input,
+              }
+            case 'tool-result':
+              return {
+                type: 'tool-result' as const,
+                toolCallId: '',
+                providerExecuted: true,
+                toolName: part.toolName,
+                result: part.output,
+              }
+          }
+        }),
+        finishReason: { unified: 'stop' as const, raw: 'stop' },
+        usage: {
+          inputTokens: {
+            total: 0,
+            noCache: undefined,
+            cacheRead: undefined,
+            cacheWrite: undefined,
+          },
+          outputTokens: {
+            total: 0,
+            text: undefined,
+            reasoning: undefined,
+          },
         },
-        outputTokens: {
-          total: 0,
-          text: undefined,
-          reasoning: undefined,
-        },
-      },
-      warnings: [],
+        warnings: [],
+      }
+    } finally {
+      for (const tool of tools) {
+        delete globalThis.__APPLE_LLM_TOOLS__[tool.id]
+      }
     }
   }
 
@@ -398,14 +400,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
     const stream = new ReadableStream<LanguageModelV3StreamPart>({
       async start(controller) {
         try {
-          streamId = NativeAppleLLM.generateStream(messages, {
-            maxTokens: options.maxOutputTokens,
-            temperature: options.temperature,
-            topP: options.topP,
-            topK: options.topK,
-            tools,
-            schema,
-          })
+          streamId = generateId()
 
           controller.enqueue({
             type: 'text-start',
@@ -465,7 +460,9 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
             if (data.streamId === streamId) {
               controller.enqueue({
                 type: 'error',
-                error: createAppleLLMError(data.error, data.code),
+                error: isAppleLLMErrorCode(data.code)
+                  ? createAppleLLMError(data.error, data.code)
+                  : new Error(data.error),
               })
               cleanup()
               controller.close()
@@ -473,6 +470,15 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
           })
 
           listeners = [updateListener, completeListener, errorListener]
+
+          NativeAppleLLM.generateStream(streamId, messages, {
+            maxTokens: options.maxOutputTokens,
+            temperature: options.temperature,
+            topP: options.topP,
+            topK: options.topK,
+            tools,
+            schema,
+          })
         } catch (error) {
           cleanup()
           controller.error(new Error(`Apple LLM stream failed: ${error}`))

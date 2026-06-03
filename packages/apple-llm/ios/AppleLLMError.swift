@@ -45,11 +45,27 @@ enum AppleLLMError: Error, LocalizedError {
     
   }
 
-  var contextWindowErrorCode: String? {
+  var publicErrorCode: String? {
     switch self {
+    case .modelUnavailable:
+      return "MODEL_UNAVAILABLE"
+    case .unsupportedOS:
+      return "UNSUPPORTED_OS"
+    case .generationError:
+      return "GENERATION_ERROR"
+    case .invalidMessage:
+      return "INVALID_MESSAGE"
+    case .conflictingSamplingMethods:
+      return "CONFLICTING_SAMPLING_METHODS"
+    case .invalidSchema:
+      return "INVALID_SCHEMA"
+    case .toolCallError:
+      return "TOOL_CALL_ERROR"
+    case .unknownToolCallError:
+      return "UNKNOWN_TOOL_CALL_ERROR"
     case .contextWindowExceeded:
       return "CONTEXT_WINDOW_EXCEEDED"
-    default:
+    case .streamNotFound:
       return nil
     }
   }

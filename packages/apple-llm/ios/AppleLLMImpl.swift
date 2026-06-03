@@ -78,13 +78,10 @@ public class AppleLLMImpl: NSObject {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
       guard SystemLanguageModel.default.availability == .available else {
-        reject(
-          "MODEL_UNAVAILABLE",
-          "Apple Intelligence model is not available",
-          nil
-        )
+        rejectWithAppleError(.modelUnavailable, reject: reject)
         return
       }
+
       Task {
         do {
           let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
@@ -97,53 +94,61 @@ public class AppleLLMImpl: NSObject {
           )
           
           let generationOptions = try self.createGenerationOptions(from: options)
-          
-          if let schemaObj = options["schema"],
-             let schema = schemaObj as? [String: Any] {
-            let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schema)
-            let response = try await session.respond(to: userPrompt, schema: generationSchema, includeSchemaInPrompt: true, options: generationOptions)
-            resolve(response.toModelMessages())
-          } else {
-            let response = try await session.respond(to: userPrompt, options: generationOptions)
-            resolve(response.toModelMessages())
+          let generationSchema = try self.createGenerationSchema(from: options)
+
+          do {
+            if let generationSchema {
+              let response = try await session.respond(
+                to: userPrompt,
+                schema: generationSchema,
+                includeSchemaInPrompt: true,
+                options: generationOptions
+              )
+              resolve(response.toModelMessages())
+            } else {
+              let response = try await session.respond(to: userPrompt, options: generationOptions)
+              resolve(response.toModelMessages())
+            }
+          } catch {
+            if let appleError = self.mapToAppleLLMError(error, includeGenerationFallback: true) {
+              self.rejectWithAppleError(appleError, reject: reject)
+            } else {
+              reject("AppleLLM", error.localizedDescription, error)
+            }
           }
         } catch {
-          if let appleError = self.createContextWindowError(from: error),
-             let code = appleError.contextWindowErrorCode {
-            reject(code, appleError.localizedDescription, appleError)
+          if let appleError = self.mapKnownAppleLLMError(error) {
+            self.rejectWithAppleError(appleError, reject: reject)
           } else {
             reject("AppleLLM", error.localizedDescription, error)
           }
         }
       }
     } else {
-      let error = AppleLLMError.unsupportedOS
-      reject("AppleLLM", error.localizedDescription, error)
+      rejectWithAppleError(.unsupportedOS, reject: reject)
     }
 #else
-    let error = AppleLLMError.unsupportedOS
-    reject("AppleLLM", error.localizedDescription, error)
+    rejectWithAppleError(.unsupportedOS, reject: reject)
 #endif
   }
   
   @objc
   public func generateStream(
-    _ messages: [[String: Any]],
+    _ streamId: String,
+    messages: [[String: Any]],
     options: [String: Any],
     onUpdate: @escaping (String, String) -> Void,
     onComplete: @escaping (String) -> Void,
     onError: @escaping (String, String, String) -> Void,
     toolInvoker: @escaping ToolInvoker
-  ) throws -> String {
+  ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      let streamId = UUID().uuidString
       guard SystemLanguageModel.default.availability == .available else {
-        let error = AppleLLMError.modelUnavailable
-        onError(streamId, "", error.localizedDescription)
-        return streamId
+        emitStreamError(.modelUnavailable, streamId: streamId, onError: onError)
+        return
       }
-      
+
       let task = Task {
         do {
           let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
@@ -156,33 +161,47 @@ public class AppleLLMImpl: NSObject {
           )
           
           let generationOptions = try self.createGenerationOptions(from: options)
-          
-          if let schemaOption = options["schema"] as? [String: Any] {
-            let generationSchema = try AppleLLMSchemaParser.createGenerationSchema(from: schemaOption)
-            let responseStream = session.streamResponse(
-              to: userPrompt,
-              schema: generationSchema,
-              includeSchemaInPrompt: true,
-              options: generationOptions
-            )
-            for try await chunk in responseStream {
-              onUpdate(streamId, String(describing: chunk.content))
+          let generationSchema = try self.createGenerationSchema(from: options)
+
+          do {
+            if let generationSchema {
+              let responseStream = session.streamResponse(
+                to: userPrompt,
+                schema: generationSchema,
+                includeSchemaInPrompt: true,
+                options: generationOptions
+              )
+              for try await chunk in responseStream {
+                onUpdate(streamId, String(describing: chunk.content))
+              }
+            } else {
+              let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
+              for try await chunk in responseStream {
+                onUpdate(streamId, chunk.content)
+              }
             }
-          } else {
-            let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
-            for try await chunk in responseStream {
-              onUpdate(streamId, chunk.content)
+
+            if !Task.isCancelled {
+              onComplete(streamId)
             }
-          }
-          
-          // Send completion event only if not cancelled
-          if !Task.isCancelled {
-            onComplete(streamId)
+          } catch {
+            if Task.isCancelled {
+              return
+            }
+
+            if let appleError = self.mapToAppleLLMError(error, includeGenerationFallback: true) {
+              self.emitStreamError(appleError, streamId: streamId, onError: onError)
+            } else {
+              onError(streamId, "", error.localizedDescription)
+            }
           }
         } catch {
-          if let appleError = self.createContextWindowError(from: error),
-             let code = appleError.contextWindowErrorCode {
-            onError(streamId, code, appleError.localizedDescription)
+          if Task.isCancelled {
+            return
+          }
+
+          if let appleError = self.mapKnownAppleLLMError(error) {
+            self.emitStreamError(appleError, streamId: streamId, onError: onError)
           } else {
             onError(streamId, "", error.localizedDescription)
           }
@@ -194,13 +213,11 @@ public class AppleLLMImpl: NSObject {
       
       // Store task in map
       streamTasks[streamId] = task
-      
-      return streamId
     } else {
-      throw AppleLLMError.unsupportedOS
+      emitStreamError(.unsupportedOS, streamId: streamId, onError: onError)
     }
 #else
-    throw AppleLLMError.unsupportedOS
+    emitStreamError(.unsupportedOS, streamId: streamId, onError: onError)
 #endif
   }
   
@@ -215,10 +232,33 @@ public class AppleLLMImpl: NSObject {
   }
   
   // MARK: - Private Methods
-#if canImport(FoundationModels)
 
+  private func rejectWithAppleError(
+    _ error: AppleLLMError,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+    if let publicErrorCode = error.publicErrorCode {
+      reject(publicErrorCode, error.localizedDescription, error)
+    } else {
+      reject("AppleLLM", error.localizedDescription, error)
+    }
+  }
+
+  private func emitStreamError(
+    _ error: AppleLLMError,
+    streamId: String,
+    onError: @escaping (String, String, String) -> Void
+  ) {
+    onError(streamId, error.publicErrorCode ?? "", error.localizedDescription)
+  }
+
+#if canImport(FoundationModels)
   @available(iOS 26, *)
-  private func createContextWindowError(from error: Error) -> AppleLLMError? {
+  private func mapKnownAppleLLMError(_ error: Error) -> AppleLLMError? {
+    if let appleError = error as? AppleLLMError {
+      return appleError
+    }
+
     guard let generationError = error as? LanguageModelSession.GenerationError else {
       return nil
     }
@@ -229,7 +269,40 @@ public class AppleLLMImpl: NSObject {
 
     return nil
   }
-  
+
+  @available(iOS 26, *)
+  private func mapToAppleLLMError(_ error: Error, includeGenerationFallback: Bool) -> AppleLLMError? {
+    if let appleError = mapKnownAppleLLMError(error) {
+      return appleError
+    }
+
+    if includeGenerationFallback {
+      return .generationError(error.localizedDescription)
+    }
+
+    return nil
+  }
+
+  @available(iOS 26, *)
+  private func createGenerationSchema(from options: [String: Any]) throws -> GenerationSchema? {
+    guard let schemaOption = options["schema"] as? [String: Any] else {
+      return nil
+    }
+
+    return try Self.createGenerationSchema(fromSchema: schemaOption)
+  }
+
+  @available(iOS 26, *)
+  private static func createGenerationSchema(fromSchema schema: [String: Any]) throws -> GenerationSchema {
+    do {
+      return try AppleLLMSchemaParser.createGenerationSchema(from: schema)
+    } catch let appleError as AppleLLMError {
+      throw appleError
+    } catch {
+      throw AppleLLMError.invalidSchema(error.localizedDescription)
+    }
+  }
+
   @available(iOS 26, *)
   private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {
     guard let toolsDict = options["tools"] as? [[String: Any]] else {
@@ -362,7 +435,7 @@ public class AppleLLMImpl: NSObject {
       self.name = name
       self.description = description
       self.invokeJavaScriptTool = javaScriptToolInvoker
-      self.parameters = try AppleLLMSchemaParser.createGenerationSchema(from: parameters)
+      self.parameters = try AppleLLMImpl.createGenerationSchema(fromSchema: parameters)
     }
     
     func call(arguments: GeneratedContent) async throws -> String {

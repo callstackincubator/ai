@@ -1,4 +1,3 @@
-import { createAppleLLMError } from './errors'
 import NativeAppleLLM, {
   type AppleGenerationOptions,
   type AppleMessage,
@@ -16,17 +15,18 @@ const AppleFoundationModels: Spec = {
   isAvailable: () => NativeAppleLLM.isAvailable(),
   countTokens: (text) => {
     if (typeof nativeAppleLLM.countTokens !== 'function') {
-      return Promise.reject(
-        createAppleLLMError(tokenCountingUnavailableMessage)
-      )
+      return Promise.reject(new Error(tokenCountingUnavailableMessage))
     }
 
     return nativeAppleLLM.countTokens(text)
   },
   generateText: (messages: AppleMessage[], options: AppleGenerationOptions) =>
     NativeAppleLLM.generateText(messages, options),
-  generateStream: (messages: AppleMessage[], options: AppleGenerationOptions) =>
-    NativeAppleLLM.generateStream(messages, options),
+  generateStream: (
+    streamId,
+    messages: AppleMessage[],
+    options: AppleGenerationOptions
+  ) => NativeAppleLLM.generateStream(streamId, messages, options),
   cancelStream: (streamId) => NativeAppleLLM.cancelStream(streamId),
   onStreamUpdate: NativeAppleLLM.onStreamUpdate,
   onStreamComplete: NativeAppleLLM.onStreamComplete,
