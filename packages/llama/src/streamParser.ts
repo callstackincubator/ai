@@ -17,6 +17,8 @@ const PLACEHOLDERS = [
   END_OF_TOOL_CALL_PLACEHOLDER,
 ] as const
 
+type Placeholder = (typeof PLACEHOLDERS)[number]
+
 const MAX_PLACEHOLDER_LENGTH = Math.max(
   ...PLACEHOLDERS.map((value) => value.length)
 )
@@ -30,14 +32,17 @@ export interface LlamaStreamParser {
   finish: () => void
 }
 
-function getLongestPlaceholderPrefixSuffix(value: string): string {
+function getLongestPlaceholderPrefixSuffix(
+  value: string,
+  placeholders: readonly Placeholder[] = PLACEHOLDERS
+): string {
   for (
     let length = Math.min(value.length, MAX_PLACEHOLDER_LENGTH);
     length > 0;
     length -= 1
   ) {
     const suffix = value.slice(-length)
-    if (PLACEHOLDERS.some((placeholder) => placeholder.startsWith(suffix))) {
+    if (placeholders.some((placeholder) => placeholder.startsWith(suffix))) {
       return suffix
     }
   }
@@ -45,11 +50,16 @@ function getLongestPlaceholderPrefixSuffix(value: string): string {
   return ''
 }
 
-function getFirstPlaceholderMatch(value: string) {
-  const matches = PLACEHOLDERS.map((placeholder) => ({
-    placeholder,
-    index: value.indexOf(placeholder),
-  })).filter(({ index }) => index !== -1)
+function getFirstPlaceholderMatch(
+  value: string,
+  placeholders: readonly Placeholder[] = PLACEHOLDERS
+) {
+  const matches = placeholders
+    .map((placeholder) => ({
+      placeholder,
+      index: value.indexOf(placeholder),
+    }))
+    .filter(({ index }) => index !== -1)
 
   if (matches.length === 0) {
     return null
@@ -152,7 +162,7 @@ export function createLlamaStreamParser(
     pendingToolCalls = []
   }
 
-  const handlePlaceholder = (placeholder: (typeof PLACEHOLDERS)[number]) => {
+  const handlePlaceholder = (placeholder: Placeholder) => {
     if (placeholder === START_OF_THINKING_PLACEHOLDER) {
       finishCurrentBlock()
       state = 'reasoning'
@@ -181,7 +191,12 @@ export function createLlamaStreamParser(
 
   const flushBuffer = (force = false) => {
     while (pendingText.length > 0) {
-      const placeholderMatch = getFirstPlaceholderMatch(pendingText)
+      const activePlaceholders: readonly Placeholder[] =
+        state === 'tool-call' ? [END_OF_TOOL_CALL_PLACEHOLDER] : PLACEHOLDERS
+      const placeholderMatch = getFirstPlaceholderMatch(
+        pendingText,
+        activePlaceholders
+      )
 
       if (placeholderMatch) {
         const { placeholder, index } = placeholderMatch
@@ -194,7 +209,10 @@ export function createLlamaStreamParser(
         continue
       }
 
-      const pendingPrefix = getLongestPlaceholderPrefixSuffix(pendingText)
+      const pendingPrefix = getLongestPlaceholderPrefixSuffix(
+        pendingText,
+        activePlaceholders
+      )
       const flushableLength = pendingText.length - pendingPrefix.length
 
       if (!force && flushableLength <= 0) {

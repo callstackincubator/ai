@@ -373,4 +373,62 @@ describe('createLlamaStreamParser', () => {
       delta: 'final answer',
     })
   })
+
+  test('treats thinking markers inside tool-call payload as opaque text', () => {
+    const parts = runParser([
+      { token: '<tool_call>' },
+      {
+        token: '{"query":"what does <think>reasoning</think> mean?"}',
+        tool_calls: [
+          {
+            id: 'tool-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query":"what does <think>reasoning</think> mean?"}',
+            },
+          },
+        ],
+      },
+      { token: '</tool_call>' },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual(['tool-call'])
+    expect(parts[0]).toMatchObject({
+      type: 'tool-call',
+      toolCallId: 'tool-1',
+      toolName: 'search',
+      input: '{"query":"what does <think>reasoning</think> mean?"}',
+    })
+  })
+
+  test('treats split thinking markers inside tool-call payload as opaque text', () => {
+    const parts = runParser([
+      { token: '<tool_call>' },
+      { token: '{"query":"what does <thi' },
+      { token: 'nk>reasoning</thi' },
+      {
+        token: 'nk> mean?"}',
+        tool_calls: [
+          {
+            id: 'tool-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query":"what does <think>reasoning</think> mean?"}',
+            },
+          },
+        ],
+      },
+      { token: '</tool_call>' },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual(['tool-call'])
+    expect(parts[0]).toMatchObject({
+      type: 'tool-call',
+      toolCallId: 'tool-1',
+      toolName: 'search',
+      input: '{"query":"what does <think>reasoning</think> mean?"}',
+    })
+  })
 })
