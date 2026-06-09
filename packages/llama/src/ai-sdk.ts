@@ -22,10 +22,9 @@ import {
   type LlamaContext,
   type NativeCompletionResult,
   type NativeEmbeddingResult,
-  type TokenData,
 } from 'llama.rn'
 
-type LLMState = 'text' | 'reasoning' | 'tool-call' | 'none'
+import { createLlamaStreamParser } from './streamParser'
 
 interface LLMMessagePart {
   type: 'text' | 'image_url' | 'input_audio'
@@ -246,12 +245,6 @@ export interface LlamaModelOptions {
    */
   contextParams?: Partial<ContextParams>
 }
-
-const START_OF_THINKING_PLACEHOLDER = '<think>'
-const END_OF_THINKING_PLACEHOLDER = '</think>'
-
-const START_OF_TOOL_CALL_PLACEHOLDER = '<tool_call>'
-const END_OF_TOOL_CALL_PLACEHOLDER = '</tool_call>'
 
 /**
  * llama.rn Language Model for AI SDK
@@ -520,111 +513,23 @@ export class LlamaLanguageModel implements LanguageModelV3 {
     const stream = new ReadableStream<LanguageModelV3StreamPart>({
       start: async (controller) => {
         try {
-          let currentChunkId = generateId()
-
-          let state: LLMState = 'none' as LLMState
+          const streamParser = createLlamaStreamParser({
+            enqueue: (part) => controller.enqueue(part),
+          })
 
           controller.enqueue({
             type: 'stream-start',
             warnings: [],
           })
 
-          const finishCurrentBlock = () => {
-            if (state === 'text') {
-              controller.enqueue({
-                type: 'text-end',
-                id: currentChunkId,
-              })
-            }
-            if (state === 'reasoning') {
-              controller.enqueue({
-                type: 'reasoning-end',
-                id: currentChunkId,
-              })
-            }
-            state = 'none'
-          }
-
           const result = await context.completion(
             completionOptions,
-            (tokenData: TokenData) => {
-              const { token } = tokenData
-
-              switch (token) {
-                case START_OF_THINKING_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  state = 'reasoning'
-                  currentChunkId = generateId()
-                  controller.enqueue({
-                    type: 'reasoning-start',
-                    id: currentChunkId,
-                  })
-                  break
-                }
-                case START_OF_TOOL_CALL_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  state = 'tool-call'
-                  break
-                }
-                case END_OF_TOOL_CALL_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  for (const toolCall of tokenData.tool_calls ?? []) {
-                    controller.enqueue({
-                      type: 'tool-call',
-                      toolCallId: toolCall.id ?? generateId(),
-                      toolName: toolCall.function.name,
-                      input: toolCall.function.arguments,
-                    })
-                  }
-                  break
-                }
-                case END_OF_THINKING_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  break
-                }
-                default:
-                  switch (state) {
-                    case 'none': {
-                      state = 'text'
-                      currentChunkId = generateId()
-                      controller.enqueue({
-                        type: 'text-start',
-                        id: currentChunkId,
-                      })
-                      controller.enqueue({
-                        type: 'text-delta',
-                        id: currentChunkId,
-                        delta: token,
-                      })
-                      break
-                    }
-                    case 'text': {
-                      controller.enqueue({
-                        type: 'text-delta',
-                        id: currentChunkId,
-                        delta: token,
-                      })
-                      break
-                    }
-                    case 'reasoning': {
-                      controller.enqueue({
-                        type: 'reasoning-delta',
-                        id: currentChunkId,
-                        delta: token,
-                      })
-                      break
-                    }
-                    case 'tool-call': {
-                      // Ignore tokens while in tool-call state; tool call data
-                      // is handled via tokenData.tool_calls at the end marker.
-                      break
-                    }
-                  }
-              }
+            (tokenData) => {
+              streamParser.processToken(tokenData)
             }
           )
 
-          finishCurrentBlock()
+          streamParser.finish()
 
           controller.enqueue({
             type: 'finish',
