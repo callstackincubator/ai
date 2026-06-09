@@ -3,7 +3,10 @@
 A Vercel AI SDK provider for Apple Foundation Models, enabling access to Apple Intelligence in React Native applications.
 
 **Requirements:**
-- iOS 26+
+
+- iOS 26+ for text generation
+- iOS 26.4+ for token counting and Image Playground generation
+- iOS 27+ for image prompts, Private Cloud Compute, and Vision built-in tools
 - Apple Intelligence enabled device
 - Vercel AI SDK v5
 - React Native New Architecture
@@ -14,16 +17,21 @@ import { generateText } from 'ai'
 
 const answer = await generateText({
   model: apple(),
-  prompt: 'What is the meaning of life?'
+  prompt: 'What is the meaning of life?',
 })
 ```
 
 ## Features
 
 - ✅ Text generation with Apple Foundation Models
+- ✅ Image prompts on iOS 27+
+- ✅ Runtime model info and context-size metadata
+- ✅ Private Cloud Compute language model selection on iOS 27+
 - ✅ Structured outputs
 - ✅ Tool calling
+- ✅ Vision OCR and barcode built-in tools on iOS 27+
 - ✅ Streaming
+- ✅ Image Playground generation through the AI SDK image API
 
 ## Documentation
 

@@ -29,8 +29,8 @@ enum AppleLLMError: Error, LocalizedError {
       return "Generation error: \(message)"
     case .streamNotFound(let id):
       return "Stream with ID \(id) not found"
-    case .invalidMessage(let role):
-      return "Invalid message role '\(role)'. Supported roles are: system, user, assistant"
+    case .invalidMessage(let message):
+      return "Invalid message: \(message)"
     case .conflictingSamplingMethods:
       return "Cannot specify both topP and topK parameters simultaneously. Please use only one sampling method."
     case .invalidSchema(let message):

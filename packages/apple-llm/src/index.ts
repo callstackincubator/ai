@@ -1,4 +1,19 @@
-export { apple, createAppleProvider } from './ai-sdk'
+export {
+  apple,
+  createAppleProvider,
+  trimAppleMessagesForContext,
+} from './ai-sdk'
+export type {
+  AppleBuiltInTool,
+  AppleContextOptions,
+  AppleImagePersonalization,
+  AppleImageModelOptions,
+  AppleImageStyle,
+  AppleLanguageModelId,
+  AppleLanguageModelOptions,
+  AppleModelInfo,
+  AppleProviderOptions,
+} from './ai-sdk'
 export { default as AppleFoundationModels } from './AppleFoundationModels'
 export type { AppleLLMError, AppleLLMErrorCode } from './errors'
 export { AppleLLMErrorCodes } from './errors'
