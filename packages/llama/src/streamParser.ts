@@ -330,6 +330,13 @@ export function createLlamaStreamParser(
       tokenData.reasoning_content !== undefined
 
     if (hasNativeParsedContent) {
+      if (
+        pendingToolCalls.length > 0 &&
+        tokenData.token.includes(END_OF_TOOL_CALL_PLACEHOLDER)
+      ) {
+        finishCurrentBlock()
+        emitPendingToolCalls()
+      }
       processNativeParsedContent(tokenData)
       return
     }

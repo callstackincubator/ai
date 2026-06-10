@@ -402,10 +402,36 @@ describe('createLlamaStreamParser', () => {
     ])
 
     expect(parts.map((part) => part.type)).toEqual([
+      'tool-call',
       'text-start',
       'text-delta',
       'text-end',
+    ])
+  })
+
+  test('emits native tool calls at the closing marker boundary before resumed text', () => {
+    const parts = runParser([
+      {
+        token: '</tool_call>final answer',
+        content: 'final answer',
+        tool_calls: [
+          {
+            id: 'tool-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query":"react native"}',
+            },
+          },
+        ],
+      },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual([
       'tool-call',
+      'text-start',
+      'text-delta',
+      'text-end',
     ])
   })
 
