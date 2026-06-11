@@ -10,11 +10,17 @@ export interface AppleMessage {
   content: string
 }
 
+export type AppleLanguageModelId = 'system-default' | 'private-cloud-compute'
+
+export type AppleReasoningLevel = 'deep' | 'light' | 'moderate'
+
 export interface AppleGenerationOptions {
+  model?: AppleLanguageModelId
   temperature?: number
   maxTokens?: number
   topP?: number
   topK?: number
+  reasoningLevel?: AppleReasoningLevel
   schema?: UnsafeObject
   tools?: UnsafeObject
 }

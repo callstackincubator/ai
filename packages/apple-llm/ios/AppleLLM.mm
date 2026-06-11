@@ -110,10 +110,12 @@ using namespace JS::NativeAppleLLM;
              resolve:(nonnull RCTPromiseResolveBlock)resolve
               reject:(nonnull RCTPromiseRejectBlock)reject {
   NSDictionary *opts = @{
+    @"model": options.model() ?: [NSNull null],
     @"temperature": options.temperature().has_value() ? @(options.temperature().value()) : [NSNull null],
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
+    @"reasoningLevel": options.reasoningLevel() ?: [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null]
   };
@@ -138,10 +140,12 @@ using namespace JS::NativeAppleLLM;
 
 - (void)generateStream:(nonnull NSString *)streamId messages:(nonnull NSArray *)messages options:(JS::NativeAppleLLM::AppleGenerationOptions &)options {
   NSDictionary *opts = @{
+    @"model": options.model() ?: [NSNull null],
     @"temperature": options.temperature().has_value() ? @(options.temperature().value()) : [NSNull null],
     @"maxTokens": options.maxTokens().has_value() ? @(options.maxTokens().value()) : [NSNull null],
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
+    @"reasoningLevel": options.reasoningLevel() ?: [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null],
   };

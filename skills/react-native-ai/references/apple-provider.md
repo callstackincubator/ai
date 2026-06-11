@@ -26,7 +26,7 @@ const result = await generateText({
 - [ ] React Native New Architecture
 - [ ] iOS 26+ (Android not supported)
 - [ ] Apple Intelligence enabled device
-- [ ] Vercel AI SDK v5+ (`ai`)
+- [ ] Vercel AI SDK v6+ (`ai`)
 - [ ] Android or iOS
 
 ## Step-by-Step Instructions
@@ -63,6 +63,12 @@ import { createAppleProvider } from '@react-native-ai/apple'
 
 const apple = createAppleProvider({ availableTools: tools })
 const model = apple.languageModel()
+```
+
+Use Private Cloud Compute with an iOS 27 SDK build when the app has Apple's managed PCC entitlement and needs a larger context window or reasoning:
+
+```ts
+const model = apple.languageModel('private-cloud-compute')
 ```
 
 ## Common Pitfalls

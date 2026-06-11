@@ -17,13 +17,19 @@ import {
   generateId,
   jsonSchema,
   parseJSON,
+  parseProviderOptions,
   Tool as FullToolDefinition,
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
+import { z } from 'zod'
 
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
-import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
+import NativeAppleLLM, {
+  type AppleLanguageModelId,
+  type AppleMessage,
+  type AppleReasoningLevel,
+} from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
@@ -31,16 +37,26 @@ import NativeAppleUtils from './NativeAppleUtils'
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 type ToolDefinitionSet = Record<string, FullToolDefinition>
 
+const appleProviderOptionsSchema = z.object({
+  reasoningLevel: z.enum(['deep', 'light', 'moderate']).optional(),
+})
+
+export interface AppleProviderOptions {
+  reasoningLevel?: AppleReasoningLevel
+}
+
 export function createAppleProvider({
   availableTools,
 }: {
   availableTools?: ToolDefinitionSet
 } = {}) {
-  const createLanguageModel = () => {
-    return new AppleLLMChatLanguageModel(availableTools)
+  const createLanguageModel = (
+    modelId: AppleLanguageModelId = 'system-default'
+  ) => {
+    return new AppleLLMChatLanguageModel(modelId, availableTools)
   }
-  const provider = function () {
-    return createLanguageModel()
+  const provider = function (modelId: AppleLanguageModelId = 'system-default') {
+    return createLanguageModel(modelId)
   }
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
   provider.languageModel = createLanguageModel
@@ -234,11 +250,15 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   readonly supportedUrls = {}
 
   readonly provider = 'apple'
-  readonly modelId = 'system-default'
+  readonly modelId: AppleLanguageModelId
 
   private tools: ToolDefinitionSet = {}
 
-  constructor(availableTools: ToolDefinitionSet = {}) {
+  constructor(
+    modelId: AppleLanguageModelId = 'system-default',
+    availableTools: ToolDefinitionSet = {}
+  ) {
+    this.modelId = modelId
     this.updateTools(availableTools)
   }
 
@@ -295,9 +315,22 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
     this.tools = tools
   }
 
+  private async prepareProviderOptions(
+    options: LanguageModelV3CallOptions
+  ): Promise<AppleProviderOptions> {
+    return (
+      (await parseProviderOptions({
+        provider: this.provider,
+        providerOptions: options.providerOptions,
+        schema: appleProviderOptionsSchema,
+      })) ?? {}
+    )
+  }
+
   async doGenerate(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
+    const providerOptions = await this.prepareProviderOptions(options)
 
     for (const tool of tools) {
       globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
@@ -305,10 +338,12 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
 
     try {
       const response = await NativeAppleLLM.generateText(messages, {
+        model: this.modelId,
         maxTokens: options.maxOutputTokens,
         temperature: options.temperature,
         topP: options.topP,
         topK: options.topK,
+        reasoningLevel: providerOptions.reasoningLevel,
         tools,
         schema:
           options.responseFormat?.type === 'json'
@@ -365,6 +400,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   async doStream(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
+    const providerOptions = await this.prepareProviderOptions(options)
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
@@ -387,6 +423,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
 
     let streamId: string | null = null
     let listeners: { remove(): void }[] = []
+    const modelId = this.modelId
 
     const cleanup = () => {
       listeners.forEach((listener) => listener.remove())
@@ -472,10 +509,12 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
           listeners = [updateListener, completeListener, errorListener]
 
           NativeAppleLLM.generateStream(streamId, messages, {
+            model: modelId,
             maxTokens: options.maxOutputTokens,
             temperature: options.temperature,
             topP: options.topP,
             topK: options.topK,
+            reasoningLevel: providerOptions.reasoningLevel,
             tools,
             schema,
           })

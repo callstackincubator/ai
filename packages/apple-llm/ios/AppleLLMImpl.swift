@@ -15,6 +15,14 @@ import FoundationModels
 
 public typealias ToolInvoker = @Sendable (String, String, @escaping (Any?, Error?) -> Void) -> Void
 
+#if canImport(FoundationModels)
+@available(iOS 26, *)
+private enum AppleLanguageModelSelection {
+  case systemDefault
+  case privateCloudCompute
+}
+#endif
+
 @objc
 public class AppleLLMImpl: NSObject {
   
@@ -77,38 +85,28 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      guard SystemLanguageModel.default.availability == .available else {
-        rejectWithAppleError(.modelUnavailable, reject: reject)
-        return
-      }
-
       Task {
         do {
+          let modelSelection = try self.createLanguageModelSelection(from: options)
           let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
           let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
-          
-          let session = LanguageModelSession.init(
-            model: SystemLanguageModel.default,
+          let session = try self.createSession(
+            modelSelection: modelSelection,
             tools: tools,
             transcript: transcript
           )
-          
           let generationOptions = try self.createGenerationOptions(from: options)
           let generationSchema = try self.createGenerationSchema(from: options)
 
           do {
-            if let generationSchema {
-              let response = try await session.respond(
-                to: userPrompt,
-                schema: generationSchema,
-                includeSchemaInPrompt: true,
-                options: generationOptions
-              )
-              resolve(response.toModelMessages())
-            } else {
-              let response = try await session.respond(to: userPrompt, options: generationOptions)
-              resolve(response.toModelMessages())
-            }
+            let response = try await self.respond(
+              with: session,
+              userPrompt: userPrompt,
+              generationSchema: generationSchema,
+              generationOptions: generationOptions,
+              rawOptions: options
+            )
+            resolve(response)
           } catch {
             if let appleError = self.mapToAppleLLMError(error, includeGenerationFallback: true) {
               self.rejectWithAppleError(appleError, reject: reject)
@@ -144,42 +142,30 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      guard SystemLanguageModel.default.availability == .available else {
-        emitStreamError(.modelUnavailable, streamId: streamId, onError: onError)
-        return
-      }
-
       let task = Task {
         do {
+          let modelSelection = try self.createLanguageModelSelection(from: options)
           let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
           let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
-          
-          let session = LanguageModelSession.init(
-            model: SystemLanguageModel.default,
+          let session = try self.createSession(
+            modelSelection: modelSelection,
             tools: tools,
             transcript: transcript
           )
-          
           let generationOptions = try self.createGenerationOptions(from: options)
           let generationSchema = try self.createGenerationSchema(from: options)
 
           do {
-            if let generationSchema {
-              let responseStream = session.streamResponse(
-                to: userPrompt,
-                schema: generationSchema,
-                includeSchemaInPrompt: true,
-                options: generationOptions
-              )
-              for try await chunk in responseStream {
-                onUpdate(streamId, String(describing: chunk.content))
+            try await self.streamResponse(
+              with: session,
+              userPrompt: userPrompt,
+              generationSchema: generationSchema,
+              generationOptions: generationOptions,
+              rawOptions: options,
+              onUpdate: { content in
+                onUpdate(streamId, content)
               }
-            } else {
-              let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
-              for try await chunk in responseStream {
-                onUpdate(streamId, chunk.content)
-              }
-            }
+            )
 
             if !Task.isCancelled {
               onComplete(streamId)
@@ -267,6 +253,12 @@ public class AppleLLMImpl: NSObject {
       return .contextWindowExceeded
     }
 
+#if compiler(>=6.3)
+    if case .rateLimited = generationError {
+      return .rateLimited
+    }
+#endif
+
     return nil
   }
 
@@ -291,6 +283,216 @@ public class AppleLLMImpl: NSObject {
 
     return try Self.createGenerationSchema(fromSchema: schemaOption)
   }
+
+  @available(iOS 26, *)
+  private func createLanguageModelSelection(from options: [String: Any]) throws -> AppleLanguageModelSelection {
+    let model = options["model"] as? String ?? "system-default"
+
+    switch model {
+    case "system-default":
+      return .systemDefault
+    case "private-cloud-compute":
+      return .privateCloudCompute
+    default:
+      throw AppleLLMError.generationError("Unsupported Apple language model: \(model)")
+    }
+  }
+
+  @available(iOS 26, *)
+  private func createSession(
+    modelSelection: AppleLanguageModelSelection,
+    tools: [any Tool],
+    transcript: Transcript
+  ) throws -> LanguageModelSession {
+    switch modelSelection {
+    case .systemDefault:
+      guard SystemLanguageModel.default.availability == .available else {
+        throw AppleLLMError.modelUnavailable
+      }
+
+      return LanguageModelSession.init(
+        model: SystemLanguageModel.default,
+        tools: tools,
+        transcript: transcript
+      )
+    case .privateCloudCompute:
+#if compiler(>=6.3)
+      guard #available(iOS 27, *) else {
+        throw AppleLLMError.unsupportedOS
+      }
+
+      let model = PrivateCloudComputeLanguageModel()
+
+      guard model.availability == .available else {
+        throw AppleLLMError.modelUnavailable
+      }
+
+      return LanguageModelSession.init(
+        model: model,
+        tools: tools,
+        transcript: transcript
+      )
+#else
+      throw AppleLLMError.unsupportedOS
+#endif
+    }
+  }
+
+  @available(iOS 26, *)
+  private func respond(
+    with session: LanguageModelSession,
+    userPrompt: String,
+    generationSchema: GenerationSchema?,
+    generationOptions: GenerationOptions,
+    rawOptions: [String: Any]
+  ) async throws -> [[String: Any]] {
+    if hasReasoningLevel(rawOptions) {
+#if compiler(>=6.3)
+      guard #available(iOS 27, *) else {
+        throw AppleLLMError.unsupportedOS
+      }
+
+      let contextOptions = try createContextOptions(
+        from: rawOptions,
+        includeSchemaInPrompt: generationSchema == nil ? nil : true
+      )
+
+      if let generationSchema {
+        let response = try await session.respond(
+          to: userPrompt,
+          schema: generationSchema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        )
+        return response.toModelMessages()
+      }
+
+      let response = try await session.respond(
+        to: userPrompt,
+        options: generationOptions,
+        contextOptions: contextOptions
+      )
+      return response.toModelMessages()
+#else
+      throw AppleLLMError.unsupportedOS
+#endif
+    }
+
+    if let generationSchema {
+      let response = try await session.respond(
+        to: userPrompt,
+        schema: generationSchema,
+        includeSchemaInPrompt: true,
+        options: generationOptions
+      )
+      return response.toModelMessages()
+    }
+
+    let response = try await session.respond(to: userPrompt, options: generationOptions)
+    return response.toModelMessages()
+  }
+
+  @available(iOS 26, *)
+  private func streamResponse(
+    with session: LanguageModelSession,
+    userPrompt: String,
+    generationSchema: GenerationSchema?,
+    generationOptions: GenerationOptions,
+    rawOptions: [String: Any],
+    onUpdate: @escaping (String) -> Void
+  ) async throws {
+    if hasReasoningLevel(rawOptions) {
+#if compiler(>=6.3)
+      guard #available(iOS 27, *) else {
+        throw AppleLLMError.unsupportedOS
+      }
+
+      let contextOptions = try createContextOptions(
+        from: rawOptions,
+        includeSchemaInPrompt: generationSchema == nil ? nil : true
+      )
+
+      if let generationSchema {
+        let responseStream = session.streamResponse(
+          to: userPrompt,
+          schema: generationSchema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        )
+        for try await chunk in responseStream {
+          onUpdate(String(describing: chunk.content))
+        }
+        return
+      }
+
+      let responseStream = session.streamResponse(
+        to: userPrompt,
+        options: generationOptions,
+        contextOptions: contextOptions
+      )
+      for try await chunk in responseStream {
+        onUpdate(chunk.content)
+      }
+      return
+#else
+      throw AppleLLMError.unsupportedOS
+#endif
+    }
+
+    if let generationSchema {
+      let responseStream = session.streamResponse(
+        to: userPrompt,
+        schema: generationSchema,
+        includeSchemaInPrompt: true,
+        options: generationOptions
+      )
+      for try await chunk in responseStream {
+        onUpdate(String(describing: chunk.content))
+      }
+      return
+    }
+
+    let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
+    for try await chunk in responseStream {
+      onUpdate(chunk.content)
+    }
+  }
+
+  @available(iOS 26, *)
+  private func hasReasoningLevel(_ options: [String: Any]) -> Bool {
+    return options["reasoningLevel"] is String
+  }
+
+#if compiler(>=6.3)
+  @available(iOS 27, *)
+  private func createContextOptions(
+    from options: [String: Any],
+    includeSchemaInPrompt: Bool?
+  ) throws -> ContextOptions {
+    return try ContextOptions(
+      includeSchemaInPrompt: includeSchemaInPrompt,
+      reasoningLevel: createReasoningLevel(from: options)
+    )
+  }
+
+  @available(iOS 27, *)
+  private func createReasoningLevel(from options: [String: Any]) throws -> ContextOptions.ReasoningLevel? {
+    guard let reasoningLevel = options["reasoningLevel"] as? String else {
+      return nil
+    }
+
+    switch reasoningLevel {
+    case "light":
+      return .light
+    case "moderate":
+      return .moderate
+    case "deep":
+      return .deep
+    default:
+      throw AppleLLMError.generationError("Unsupported Apple reasoning level: \(reasoningLevel)")
+    }
+  }
+#endif
 
   @available(iOS 26, *)
   private static func createGenerationSchema(fromSchema schema: [String: Any]) throws -> GenerationSchema {
