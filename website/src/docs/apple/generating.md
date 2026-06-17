@@ -313,6 +313,23 @@ const apple = createAppleProvider({
 })
 ```
 
+For the Dynamic Profile-style fluent API, chain the history policies on the
+Apple language model:
+
+```typescript
+const summarizerModel = apple()
+
+const model = apple()
+  .summarizeHistory(5000, summarizerModel)
+  .rollingWindow(10)
+  .droppingCompletedToolCalls()
+```
+
+Fluent history modifiers are applied outside-in, matching Apple's utilities. In
+the example above, completed tool calls are dropped first, the rolling window is
+applied second, and older messages are summarized only if the remaining prompt
+still exceeds the threshold.
+
 You can also set them per request:
 
 ```typescript
