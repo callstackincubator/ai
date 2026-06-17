@@ -1,7 +1,6 @@
 import { generateId } from '@ai-sdk/provider-utils'
 import type { UnsafeObject } from 'react-native/Libraries/Types/CodegenTypes'
 
-import { catalog } from './catalog'
 import NativeCoreAI from './NativeCoreAI'
 import type {
   CoreAICapabilities,
@@ -253,8 +252,6 @@ export class CoreAIRawModel extends CoreAIModel {
 }
 
 export const coreAI = {
-  catalog,
-
   getCapabilities(): Promise<CoreAICapabilities> {
     return NativeCoreAI.getCapabilities() as Promise<CoreAICapabilities>
   },

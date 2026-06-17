@@ -1,6 +1,8 @@
 # Starter Models
 
-Source this list from `apple/coreai-models/python/src/coreai_models/model_registry.py` when updating the package catalog. Prefer iOS examples. Use macOS only when the registry has no iOS entry.
+Source this list from `apple/coreai-models/python/src/coreai_models/model_registry.py` when updating the docs. Prefer iOS examples. Use macOS only when the registry has no iOS entry.
+
+This is not a package API. Apps should discover installed/downloaded Core AI bundles dynamically.
 
 | Feature                                                      | Starter model                 | Platform    | Package status                 | Notes                                                          |
 | ------------------------------------------------------------ | ----------------------------- | ----------- | ------------------------------ | -------------------------------------------------------------- |

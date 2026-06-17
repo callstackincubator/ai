@@ -6,7 +6,6 @@ export {
   CoreAITranscriptionAdapter,
   createCoreAIProvider,
 } from './ai-sdk'
-export { catalog } from './catalog'
 export {
   coreAI,
   CoreAIEmbeddingModel,

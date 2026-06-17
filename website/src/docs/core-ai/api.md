@@ -66,14 +66,6 @@ Native-only API status:
 | Super-resolution     | `coreAI.superResolution(...)`    | Explicit unsupported error | AI SDK has no image-to-image upscaling primitive.                          |
 | Raw `.aimodel` calls | `coreAI.unstable.loadModel(...)` | Explicit unsupported error | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
 
-## Catalog
+## Starter Models
 
-The package ships lightweight metadata generated from Apple’s model registry:
-
-```typescript
-coreAI.catalog.list({ task: 'language', platform: 'iOS' })
-coreAI.catalog.get('qwen3-0.6b')
-coreAI.catalog.getExportCommand('qwen3-0.6b', { platform: 'iOS' })
-```
-
-This metadata helps avoid downloading or exporting a model that cannot run on the target platform.
+The starter model list in these docs is informational only. The package does not ship a static model catalog; apps should load available models dynamically from their own bundle, download state, or registry integration.
