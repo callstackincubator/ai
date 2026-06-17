@@ -22,7 +22,12 @@ export type CoreAIExpoPluginOptions = {
 
 const CORE_AI_PACKAGE_URL = 'https://github.com/apple/coreai-models'
 const CORE_AI_PACKAGE_NAME = 'coreai-models'
-const DEFAULT_PRODUCTS: CoreAISwiftPackageProduct[] = ['CoreAILM']
+const DEFAULT_PRODUCTS: CoreAISwiftPackageProduct[] = [
+  'CoreAILM',
+  'CoreAIDiffusion',
+  'CoreAISegmentation',
+  'CoreAIObjectDetection',
+]
 
 const withCoreAISwiftPackage: ConfigPlugin<CoreAIExpoPluginOptions | void> = (
   config,

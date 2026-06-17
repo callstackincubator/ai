@@ -41,18 +41,24 @@ target.
 
 React Native installs this package through CocoaPods, but Apple's helpers are
 Swift Package products. The app target still needs those SPM products linked.
-For Expo, add the config plugin and choose the products your app uses:
+For Expo, add the config plugin. It links all known Apple Core AI Swift Package
+products by default:
+
+```json
+{
+  "expo": {
+    "plugins": ["@react-native-ai/core-ai"]
+  }
+}
+```
+
+Pass `products` only when you want to link a smaller set:
 
 ```json
 {
   "expo": {
     "plugins": [
-      [
-        "@react-native-ai/core-ai",
-        {
-          "products": ["CoreAILM"]
-        }
-      ]
+      ["@react-native-ai/core-ai", { "products": ["CoreAILM"] }]
     ]
   }
 }
