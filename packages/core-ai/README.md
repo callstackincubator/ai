@@ -41,8 +41,25 @@ target.
 
 React Native installs this package through CocoaPods, but Apple's helpers are
 Swift Package products. The app target still needs those SPM products linked.
-For Expo, use a config plugin to patch the generated Xcode project. For bare
-React Native, add the Swift Package in Xcode or with a project patching script.
+For Expo, add the config plugin and choose the products your app uses:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "@react-native-ai/core-ai",
+        {
+          "products": ["CoreAILM"]
+        }
+      ]
+    ]
+  }
+}
+```
+
+For bare React Native, add the Swift Package in Xcode or with a project patching
+script.
 
 ## Usage
 

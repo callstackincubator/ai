@@ -12,6 +12,7 @@
     "lib",
     "ios",
     "*.podspec",
+    "app.plugin.js",
     "!ios/build",
     "!**/__tests__",
     "!**/__fixtures__",
@@ -32,6 +33,7 @@
     "sdk",
     "vercel",
     "expo",
+    "config-plugin",
     "spm"
   ],
   "repository": {

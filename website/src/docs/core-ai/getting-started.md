@@ -37,7 +37,24 @@ This is the intended integration path, but it still needs full verification in a
 
 React Native installs this package through CocoaPods, but CocoaPods will not automatically link those Swift Package products into your app target. Treat SPM as a host-app integration step.
 
-For Expo, use a config plugin that patches the generated Xcode project with `XCRemoteSwiftPackageReference` and links the selected products. For bare React Native, add the Swift Package in Xcode or use a project patching script that modifies `project.pbxproj` predictably.
+For Expo, add the config plugin and choose the products your app uses:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "@react-native-ai/core-ai",
+        {
+          "products": ["CoreAILM"]
+        }
+      ]
+    ]
+  }
+}
+```
+
+The plugin patches the generated Xcode project with `XCRemoteSwiftPackageReference` and links the selected products. For bare React Native, add the Swift Package in Xcode or use a project patching script that modifies `project.pbxproj` predictably.
 
 The native module checks for missing products and returns clear setup errors instead of failing silently.
 
