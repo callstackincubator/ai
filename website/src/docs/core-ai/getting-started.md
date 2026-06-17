@@ -28,6 +28,8 @@ npm install ai
 
 Add `https://github.com/apple/coreai-models` to the iOS app as a Swift Package dependency, then link the products you use:
 
+This is the intended integration path, but it still needs full verification in an Xcode 27 / iOS 27 host app with Apple Core AI products linked into the app target.
+
 - `CoreAILM` for `coreAI.languageModel(...)` and sessions
 - `CoreAIDiffusion` for `coreAI.imageModel(...)`
 - `CoreAISegmentation` for `CoreAI.runTask('segmentation', ...)`

@@ -30,6 +30,10 @@ real Core AI model/runtime exists.
 Add `https://github.com/apple/coreai-models` as a Swift Package dependency in
 the host iOS app and link the products used by your wrappers:
 
+This is the intended integration path, but it still needs full verification in
+an Xcode 27 / iOS 27 host app with Apple Core AI products linked into the app
+target.
+
 - `CoreAILM` for language models and sessions
 - `CoreAIDiffusion` for image generation
 - `CoreAISegmentation` for segmentation
