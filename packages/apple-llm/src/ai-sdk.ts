@@ -6,8 +6,8 @@ import type {
   ImageModelV3CallOptions,
   LanguageModelV3,
   LanguageModelV3CallOptions,
-  LanguageModelV3Message,
   LanguageModelV3FunctionTool,
+  LanguageModelV3Message,
   LanguageModelV3Prompt,
   LanguageModelV3ProviderTool,
   LanguageModelV3StreamPart,
@@ -24,6 +24,7 @@ import {
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
+import AppleFoundationModels from './AppleFoundationModels'
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
@@ -32,7 +33,23 @@ import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
-type ToolDefinitionSet = Record<string, FullToolDefinition>
+export type AppleToolDefinitionSet = Record<string, FullToolDefinition>
+type HistoryTransform = {
+  apply: (
+    prompt: LanguageModelV3Prompt
+  ) => Promise<LanguageModelV3Prompt> | LanguageModelV3Prompt
+}
+
+export interface AppleLanguageModel extends LanguageModelV3 {
+  prepare: () => Promise<void>
+  updateTools: (tools: AppleToolDefinitionSet) => void
+  summarizeHistory: (
+    threshold: number,
+    model: LanguageModelV3
+  ) => AppleLanguageModel
+  rollingWindow: (entries: number) => AppleLanguageModel
+  droppingCompletedToolCalls: () => AppleLanguageModel
+}
 export type AppleLanguageModelId = 'system' | 'private-cloud-compute'
 export type AppleBuiltInTool = 'ocr' | 'barcode'
 export type AppleImageStyle =
@@ -69,7 +86,7 @@ export interface AppleModelInfo {
 
 export interface AppleLanguageModelOptions {
   model?: AppleLanguageModelId
-  availableTools?: ToolDefinitionSet
+  availableTools?: AppleToolDefinitionSet
   context?: AppleContextOptions
 }
 
@@ -94,6 +111,14 @@ type AppleMessageAttachment = {
 type AppleImageModelFile = {
   mediaType: string
   data: string
+}
+
+type LanguageModelLikeResult = Awaited<
+  ReturnType<LanguageModelV3['doGenerate']>
+>
+
+type TokenCountCapableLanguageModel = LanguageModelV3 & {
+  countTokens?: (text: string) => Promise<number>
 }
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
@@ -217,6 +242,152 @@ function mergeAppleProviderOptions(
   }
 }
 
+async function summarizePromptHistory(
+  prompt: LanguageModelV3Prompt,
+  threshold: number,
+  summarizerModel: LanguageModelV3
+): Promise<LanguageModelV3Prompt> {
+  if (threshold <= 0) {
+    return prompt
+  }
+
+  const promptTokenCount = await countPromptTokens(prompt, summarizerModel)
+
+  if (promptTokenCount <= threshold) {
+    return prompt
+  }
+
+  const systemMessages = prompt.filter((message) => message.role === 'system')
+  const conversationMessages = prompt.filter(
+    (message) => message.role !== 'system'
+  )
+
+  if (conversationMessages.length <= 2) {
+    return prompt
+  }
+
+  const latestMessage = conversationMessages[conversationMessages.length - 1]
+  const messagesToSummarize = conversationMessages.slice(0, -1)
+
+  if (messagesToSummarize.length === 0) {
+    return prompt
+  }
+
+  const summaryPrompt = buildSummaryPrompt(messagesToSummarize)
+  const summaryResult = await summarizerModel.doGenerate({
+    prompt: summaryPrompt,
+    maxOutputTokens: 400,
+  } as LanguageModelV3CallOptions)
+  const summaryText = extractTextFromGenerationResult(summaryResult).trim()
+
+  if (!summaryText) {
+    return prompt
+  }
+
+  return [
+    ...systemMessages,
+    {
+      role: 'assistant',
+      content: [
+        {
+          type: 'text',
+          text: `Summary of earlier conversation:\n${summaryText}`,
+        },
+      ],
+    },
+    latestMessage,
+  ]
+}
+
+async function countPromptTokens(
+  prompt: LanguageModelV3Prompt,
+  model: LanguageModelV3
+): Promise<number> {
+  const serializedPrompt = serializePromptForSummary(prompt)
+  const countTokens =
+    (model as TokenCountCapableLanguageModel).countTokens ??
+    (model.provider === 'apple' ? AppleFoundationModels.countTokens : undefined)
+
+  if (typeof countTokens === 'function') {
+    try {
+      return await countTokens(serializedPrompt)
+    } catch {
+      return estimateTokenCount(serializedPrompt)
+    }
+  }
+
+  return estimateTokenCount(serializedPrompt)
+}
+
+function estimateTokenCount(text: string): number {
+  if (!text.trim()) {
+    return 0
+  }
+
+  return Math.ceil(text.length / 4)
+}
+
+function buildSummaryPrompt(
+  messages: LanguageModelV3Prompt
+): LanguageModelV3Prompt {
+  return [
+    {
+      role: 'system',
+      content:
+        'Summarize the conversation history for continued assistant use. Preserve user goals, constraints, factual details, decisions, unresolved questions, and tool outcomes. Be concise and structured.',
+    },
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: serializePromptForSummary(messages),
+        },
+      ],
+    },
+  ]
+}
+
+function serializePromptForSummary(messages: LanguageModelV3Prompt): string {
+  return messages
+    .map((message) => {
+      const content = Array.isArray(message.content)
+        ? message.content
+            .map((part) => {
+              if (part.type === 'text') {
+                return part.text
+              }
+
+              if (part.type === 'file') {
+                return `[file:${part.mediaType}]`
+              }
+
+              if (part.type === 'tool-call') {
+                return `[tool-call:${part.toolName}] ${JSON.stringify(part.input)}`
+              }
+
+              if (part.type === 'tool-result') {
+                return `[tool-result:${part.toolName}] ${JSON.stringify(part.output)}`
+              }
+
+              return `[${part.type}]`
+            })
+            .join('\n')
+        : message.content
+
+      return `${message.role.toUpperCase()}: ${content}`
+    })
+    .join('\n\n')
+}
+
+function extractTextFromGenerationResult(
+  result: LanguageModelLikeResult
+): string {
+  return result.content
+    .map((part) => (part.type === 'text' ? part.text : ''))
+    .join('')
+}
+
 export function trimAppleMessagesForContext(
   messages: LanguageModelV3Prompt,
   options: AppleContextOptions = {}
@@ -301,7 +472,9 @@ export function createAppleProvider({
   model,
   context,
 }: AppleLanguageModelOptions = {}) {
-  const createLanguageModel = (options: AppleLanguageModelOptions = {}) => {
+  const createLanguageModel = (
+    options: AppleLanguageModelOptions = {}
+  ): AppleLanguageModel => {
     return new AppleLLMChatLanguageModel({
       availableTools: options.availableTools ?? availableTools,
       model: options.model ?? model,
@@ -547,18 +720,23 @@ class AppleTextEmbeddingModel implements EmbeddingModelV3 {
   }
 }
 
-class AppleLLMChatLanguageModel implements LanguageModelV3 {
+class AppleLLMChatLanguageModel implements AppleLanguageModel {
+  private historyTransforms: HistoryTransform[]
   readonly specificationVersion = 'v3'
   readonly supportedUrls = {}
 
   readonly provider = 'apple'
   readonly modelId: string
 
-  private tools: ToolDefinitionSet = {}
+  private tools: AppleToolDefinitionSet = {}
   private options: AppleLanguageModelOptions
 
-  constructor(options: AppleLanguageModelOptions = {}) {
+  constructor(
+    options: AppleLanguageModelOptions = {},
+    historyTransforms: HistoryTransform[] = []
+  ) {
     this.options = options
+    this.historyTransforms = historyTransforms
     this.modelId = options.model ?? 'system'
     this.updateTools(options.availableTools ?? {})
   }
@@ -626,8 +804,52 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
     })
   }
 
-  updateTools(tools: ToolDefinitionSet) {
+  updateTools(tools: AppleToolDefinitionSet) {
     this.tools = tools
+  }
+
+  summarizeHistory(
+    threshold: number,
+    summarizerModel: LanguageModelV3
+  ): AppleLanguageModel {
+    return this.withHistoryTransform((prompt) =>
+      summarizePromptHistory(prompt, threshold, summarizerModel)
+    )
+  }
+
+  rollingWindow(entries: number): AppleLanguageModel {
+    return this.withHistoryTransform((prompt) =>
+      trimAppleMessagesForContext(prompt, {
+        rollingWindowMessages: entries,
+      })
+    )
+  }
+
+  droppingCompletedToolCalls(): AppleLanguageModel {
+    return this.withHistoryTransform((prompt) =>
+      trimAppleMessagesForContext(prompt, {
+        dropCompletedToolCalls: true,
+      })
+    )
+  }
+
+  private withHistoryTransform(apply: HistoryTransform['apply']) {
+    const model = new AppleLLMChatLanguageModel(this.options, [
+      { apply },
+      ...this.historyTransforms,
+    ])
+    model.updateTools({ ...this.tools })
+    return model
+  }
+
+  private async applyHistoryTransforms(prompt: LanguageModelV3Prompt) {
+    let nextPrompt = prompt
+
+    for (const transform of this.historyTransforms) {
+      nextPrompt = await transform.apply(nextPrompt)
+    }
+
+    return nextPrompt
   }
 
   async doGenerate(options: LanguageModelV3CallOptions) {
@@ -635,9 +857,10 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
       this.options,
       getAppleProviderOptions(options.providerOptions)
     )
+    const transformedPrompt = await this.applyHistoryTransforms(options.prompt)
     const prompt = appleOptions.context
-      ? trimAppleMessagesForContext(options.prompt, appleOptions.context)
-      : options.prompt
+      ? trimAppleMessagesForContext(transformedPrompt, appleOptions.context)
+      : transformedPrompt
     const messages = this.prepareMessages(prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -710,9 +933,10 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
       this.options,
       getAppleProviderOptions(options.providerOptions)
     )
+    const transformedPrompt = await this.applyHistoryTransforms(options.prompt)
     const prompt = appleOptions.context
-      ? trimAppleMessagesForContext(options.prompt, appleOptions.context)
-      : options.prompt
+      ? trimAppleMessagesForContext(transformedPrompt, appleOptions.context)
+      : transformedPrompt
     const messages = this.prepareMessages(prompt)
     const tools = this.prepareTools(options.tools)
 
