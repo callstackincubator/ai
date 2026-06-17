@@ -61,7 +61,7 @@ The plugin patches the generated Xcode project with `XCRemoteSwiftPackageReferen
 
 The native module checks for missing products and returns clear setup errors instead of failing silently.
 
-The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Embeddings, transcription, depth, super-resolution, and classification are listed as starter-model docs only; those task runners still need follow-up native wrappers.
+The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Starter-model docs only list those exposed feature families; embeddings, transcription, depth, super-resolution, and classification still need follow-up native wrappers.
 
 ## First iOS Model
 
