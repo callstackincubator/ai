@@ -9,10 +9,6 @@ import type {
   LanguageModelV3FinishReason,
   LanguageModelV3Prompt,
   LanguageModelV3StreamPart,
-  RerankingModelV3,
-  RerankingModelV3CallOptions,
-  SpeechModelV3,
-  SpeechModelV3CallOptions,
   TranscriptionModelV3,
   TranscriptionModelV3CallOptions,
 } from '@ai-sdk/provider'
@@ -55,12 +51,6 @@ export function createCoreAIProvider() {
   }
   provider.transcriptionModel = (config: CoreAIModelConfig) => {
     return new CoreAITranscriptionAdapter(config)
-  }
-  provider.rerankingModel = (config: CoreAIModelConfig) => {
-    return new UnsupportedCoreAIRerankingModel(config)
-  }
-  provider.speechModel = (config: CoreAIModelConfig) => {
-    return new UnsupportedCoreAISpeechModel(config)
   }
 
   return provider
@@ -281,42 +271,6 @@ export class CoreAITranscriptionAdapter
           } as any)
         : undefined,
     }
-  }
-}
-
-class UnsupportedCoreAIRerankingModel implements RerankingModelV3 {
-  readonly specificationVersion = 'v3'
-  readonly provider = 'core-ai'
-  readonly modelId: string
-
-  constructor(config: CoreAIModelConfig) {
-    this.modelId = config.id
-  }
-
-  doRerank(_options: RerankingModelV3CallOptions) {
-    return Promise.reject(
-      new Error(
-        'Core AI reranking is not available yet. Apple coreai-models does not currently list a reranking starter model, so @react-native-ai/core-ai exposes no real reranking provider.'
-      )
-    ) as ReturnType<RerankingModelV3['doRerank']>
-  }
-}
-
-class UnsupportedCoreAISpeechModel implements SpeechModelV3 {
-  readonly specificationVersion = 'v3'
-  readonly provider = 'core-ai'
-  readonly modelId: string
-
-  constructor(config: CoreAIModelConfig) {
-    this.modelId = config.id
-  }
-
-  doGenerate(_options: SpeechModelV3CallOptions) {
-    return Promise.reject(
-      new Error(
-        'Core AI speech generation is not available yet. Use @react-native-ai/apple for AVSpeechSynthesizer-backed speech unless a real Core AI TTS model is added.'
-      )
-    ) as ReturnType<SpeechModelV3['doGenerate']>
   }
 }
 

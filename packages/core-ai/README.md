@@ -20,9 +20,10 @@ Core AI exposes two layers:
 The first native wrappers cover language sessions, diffusion image generation,
 segmentation, and object detection. Embeddings, transcription, depth,
 super-resolution, classification, reranking, speech generation, video
-generation, and arbitrary raw tensor calls stay explicit: the JS APIs exist
-where useful, but they reject with a setup/unsupported error until a real
-task-specific Core AI runner is wired.
+generation, and arbitrary raw tensor calls stay explicit: embeddings and
+transcription keep AI SDK-shaped adapters because Apple has starter export
+recipes, while reranking, speech, and video have no provider helpers until a
+real Core AI model/runtime exists.
 
 ## Native Setup
 
