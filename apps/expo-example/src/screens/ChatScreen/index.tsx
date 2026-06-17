@@ -1,5 +1,8 @@
 import type { TrueSheet } from '@lodev09/react-native-true-sheet'
-import type { createAppleProvider } from '@react-native-ai/apple'
+import {
+  type AppleLanguageModel,
+  createAppleProvider,
+} from '@react-native-ai/apple'
 import {
   buildGenUISystemPrompt,
   createGenUITools,
@@ -49,6 +52,9 @@ export default function ChatScreen() {
     maxSteps,
     enabledToolIds,
     genUiEnabled,
+    appleHistoryDemoEnabled,
+    appleHistoryWindowEntries,
+    appleHistorySummarizationThreshold,
   } = chatSettings
 
   const [isGenerating, setIsGenerating] = useState(false)
@@ -97,19 +103,33 @@ export default function ChatScreen() {
         ),
         ...genUITools,
       }
-      if ('updateTools' in selectedAdapter.model) {
-        ;(
-          selectedAdapter.model as ReturnType<
-            ReturnType<typeof createAppleProvider>['languageModel']
-          >
-        ).updateTools(tools)
+      let model = selectedAdapter.model
+      if ('updateTools' in model) {
+        ;(model as AppleLanguageModel).updateTools(tools)
+      }
+
+      if (
+        appleHistoryDemoEnabled &&
+        model.provider === 'apple' &&
+        'rollingWindow' in model &&
+        'summarizeHistory' in model &&
+        'droppingCompletedToolCalls' in model
+      ) {
+        // Use a token-style threshold closer to Apple's summarizeHistory API.
+        model = (model as AppleLanguageModel)
+          .summarizeHistory(
+            appleHistorySummarizationThreshold,
+            createAppleProvider().languageModel()
+          )
+          .rollingWindow(appleHistoryWindowEntries)
+          .droppingCompletedToolCalls()
       }
       setToolExecutionReporter(({ toolName, args, result }) => {
         addToolExecutionMessage(chatId, toolName, args, result)
       })
       let streamError: unknown
       const result = streamText({
-        model: selectedAdapter.model,
+        model,
         messages: [
           ...baseMessages
             .filter((message) => message.type !== 'toolExecution')
@@ -185,6 +205,9 @@ export default function ChatScreen() {
   const showAppleTokenCount =
     selectedAdapter?.model.provider === 'apple' &&
     selectedModelAvailability === 'yes'
+  const emptyStateSubtitle = genUiEnabled
+    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.${appleHistoryDemoEnabled ? ' Apple History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
+    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.${appleHistoryDemoEnabled ? ' Apple History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -204,9 +227,10 @@ export default function ChatScreen() {
         ) : (
           <ChatMessages
             messages={currentChat?.messages ?? []}
+            selectedModelLabel={selectedAdapter.display.label}
+            emptyStateSubtitle={emptyStateSubtitle}
             onSend={handleSend}
             isGenerating={isGenerating}
-            selectedModelLabel={selectedAdapter.display.label}
             genUiEnabled={genUiEnabled}
             showAppleTokenCount={showAppleTokenCount}
           />
