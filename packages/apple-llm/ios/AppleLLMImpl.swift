@@ -758,7 +758,10 @@ public class AppleLLMImpl: NSObject {
       concepts.append(.text(prompt))
     }
 
-    if let files = options["files"] as? [[String: Any]], let firstFile = files.first {
+    if let files = options["files"] as? [[String: Any]], !files.isEmpty {
+      guard files.count == 1, let firstFile = files.first else {
+        throw AppleLLMError.invalidMessage("Image Playground supports at most one source image file")
+      }
       let attachment = try imageAttachmentFromImageModelFile(firstFile)
       let url = try createImageURL(from: attachment)
 
