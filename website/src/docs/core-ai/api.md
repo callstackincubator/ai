@@ -38,13 +38,21 @@ Reranking, speech generation, and video generation are intentionally not exposed
 Use direct APIs when Core AI has no AI SDK equivalent or when you need Core AI-specific lifecycle control:
 
 ```typescript
-const model = coreAI.languageModel({
+import { CoreAI, coreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
+
+const config = {
   id: 'qwen3-0.6b',
   source: { type: 'file', uri: qwen3ModelDirectory },
   variant: 'iOS',
+} as const
+
+await CoreAI.inspectModel(toNativeModelConfig({ ...config, task: 'language' }))
+
+const model = coreAI.languageModel({
+  ...config,
 })
 
-await model.prepare({ specialize: true })
+await model.prepare()
 
 const session = await model.createSession({
   instructions: 'Keep answers short.',
@@ -55,16 +63,16 @@ await session.respond('Create a vocabulary card for "flower".')
 
 Native-only API status:
 
-| Capability           | API                              | Status                     | Why native-only                                                            |
-| -------------------- | -------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
-| Model inspection     | `coreAI.models.inspect(...)`     | Implemented                | AI SDK does not manage Core AI asset metadata.                             |
-| Specialization       | `coreAI.models.specialize(...)`  | Metadata stub              | Core AI-specific preparation step.                                         |
-| Persistent sessions  | `model.createSession(...)`       | Implemented for LLMs       | AI SDK owns message history; Core AI sessions own native transcript state. |
-| Segmentation         | `coreAI.segmenter(...)`          | Implemented                | AI SDK image APIs do not model segmentation masks.                         |
-| Object detection     | `coreAI.objectDetector(...)`     | Implemented                | AI SDK has no detection primitive.                                         |
-| Depth estimation     | `coreAI.depthEstimator(...)`     | Explicit unsupported error | AI SDK has no depth primitive.                                             |
-| Super-resolution     | `coreAI.superResolution(...)`    | Explicit unsupported error | AI SDK has no image-to-image upscaling primitive.                          |
-| Raw `.aimodel` calls | `coreAI.unstable.loadModel(...)` | Explicit unsupported error | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
+| Capability           | API                                       | Status                     | Why native-only                                                            |
+| -------------------- | ----------------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
+| Model inspection     | `CoreAI.inspectModel(...)`                | Implemented                | AI SDK does not manage Core AI asset metadata.                             |
+| Specialization       | `CoreAI.specializeModel(...)`             | Metadata stub              | Core AI-specific preparation step.                                         |
+| Persistent sessions  | `model.createSession(...)`                | Implemented for LLMs       | AI SDK owns message history; Core AI sessions own native transcript state. |
+| Segmentation         | `CoreAI.runTask('segmentation', ...)`     | Implemented                | AI SDK image APIs do not model segmentation masks.                         |
+| Object detection     | `CoreAI.runTask('object-detection', ...)` | Implemented                | AI SDK has no detection primitive.                                         |
+| Depth estimation     | `CoreAI.runTask('depth', ...)`            | Explicit unsupported error | AI SDK has no depth primitive.                                             |
+| Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Explicit unsupported error | AI SDK has no image-to-image upscaling primitive.                          |
+| Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Explicit unsupported error | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
 
 ## Starter Models
 

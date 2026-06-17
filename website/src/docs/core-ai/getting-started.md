@@ -30,8 +30,8 @@ Add `https://github.com/apple/coreai-models` to the iOS app as a Swift Package d
 
 - `CoreAILM` for `coreAI.languageModel(...)` and sessions
 - `CoreAIDiffusion` for `coreAI.imageModel(...)`
-- `CoreAISegmentation` for `coreAI.segmenter(...)`
-- `CoreAIObjectDetection` for `coreAI.objectDetector(...)`
+- `CoreAISegmentation` for `CoreAI.runTask('segmentation', ...)`
+- `CoreAIObjectDetection` for `CoreAI.runTask('object-detection', ...)`
 
 React Native installs this package through CocoaPods, but CocoaPods will not automatically link those Swift Package products into your app target. Treat SPM as a host-app integration step.
 
@@ -39,7 +39,7 @@ For Expo, use a config plugin that patches the generated Xcode project with `XCR
 
 The native module checks for missing products and returns clear setup errors instead of failing silently.
 
-The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Catalog entries for embeddings, transcription, depth, super-resolution, and classification are included so apps can discover Apple starter models, but those task runners still need follow-up native wrappers.
+The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Embeddings, transcription, depth, super-resolution, and classification are listed as starter-model docs only; those task runners still need follow-up native wrappers.
 
 ## First iOS Model
 

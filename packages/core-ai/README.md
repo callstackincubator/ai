@@ -69,3 +69,11 @@ const session = await model.createSession({
 
 const response = await session.respond('What is Qwen3?')
 ```
+
+For lower-level calls, import `CoreAI` and call the native TurboModule directly:
+
+```ts
+import { CoreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
+
+await CoreAI.inspectModel(toNativeModelConfig(modelConfig))
+```

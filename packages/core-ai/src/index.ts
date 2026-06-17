@@ -1,21 +1,13 @@
-export {
-  CoreAIImageGenerationModel,
-  CoreAILanguageModelAdapter,
-  coreAIProvider,
-  CoreAITextEmbeddingModel,
-  CoreAITranscriptionAdapter,
-  createCoreAIProvider,
-} from './ai-sdk'
+export type { CoreAILanguageSession } from './ai-sdk'
 export {
   coreAI,
-  CoreAIEmbeddingModel,
-  CoreAIImageModel,
+  CoreAIImageGenerationModel,
   CoreAILanguageModel,
-  CoreAILanguageSession,
-  CoreAIModel,
-  CoreAIRawModel,
+  CoreAITextEmbeddingModel,
   CoreAITranscriptionModel,
-} from './core'
+  createCoreAIProvider,
+} from './ai-sdk'
+export { default as CoreAI } from './NativeCoreAI'
 export type {
   CoreAICapabilities,
   CoreAIEmbeddingResult,
@@ -34,3 +26,4 @@ export type {
   CoreAITaskResult,
   CoreAITranscriptionResult,
 } from './types'
+export { toNativeModelConfig } from './types'
