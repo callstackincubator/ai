@@ -74,6 +74,12 @@ Native-only API status:
 | Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Explicit unsupported error | AI SDK has no image-to-image upscaling primitive.                          |
 | Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Explicit unsupported error | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
 
+## Model Management TBD
+
+Core AI still needs a model-management layer for remote assets. Apple’s Core AI APIs load and specialize local `.aimodel` or `.aimodelc` URLs, so remote models need to be downloaded into app storage before they can be used.
+
+The intended follow-up is to add APIs that can download a model bundle, return a local `source: { type: 'file', uri }`, optionally call Core AI specialization ahead of first use, and persist bookmark data for specialized cached assets. This should reuse shared download and storage helpers with other runtimes where practical, instead of creating a separate downloader for every provider.
+
 ## Starter Models
 
 The starter model list in these docs is informational only. The package does not ship a static model catalog; apps should load available models dynamically from their own bundle, download state, or registry integration.

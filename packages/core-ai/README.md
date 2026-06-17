@@ -104,3 +104,13 @@ import { CoreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
 
 await CoreAI.inspectModel(toNativeModelConfig(modelConfig))
 ```
+
+## Model Management TBD
+
+Remote Core AI assets still need a first-class download path. Apple’s native
+API loads and specializes local `.aimodel` or `.aimodelc` URLs, so this package
+should add helpers that download model bundles into app storage, return a local
+file source, optionally specialize the model before first use, and persist
+bookmark data for cached specialized assets. Where possible, the downloader and
+storage pieces should be shared with the other React Native AI runtimes instead
+of duplicating provider-specific plumbing.
