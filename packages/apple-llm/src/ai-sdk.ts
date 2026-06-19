@@ -111,6 +111,11 @@ type AppleImageModelFile = {
   data: string
 }
 
+type AppleMessageContentPart = Extract<
+  LanguageModelV3Message['content'],
+  readonly unknown[]
+>[number]
+
 type LanguageModelLikeResult = Awaited<
   ReturnType<LanguageModelV3['doGenerate']>
 >
@@ -186,9 +191,27 @@ function prepareImageModelFiles(
 ): AppleImageModelFile[] {
   return files.map((file) => {
     if (file.type === 'url') {
+      const url = file.url.toString()
+
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        throw new Error(
+          'Remote Apple Image Playground file URLs are not supported. Provide image data, a data URL, or a local file URL instead.'
+        )
+      }
+
+      if (
+        !url.startsWith('data:') &&
+        !url.startsWith('file://') &&
+        !url.startsWith('/')
+      ) {
+        throw new Error(
+          'Unsupported Apple Image Playground file URL. Provide image data, a data URL, or a local file URL instead.'
+        )
+      }
+
       return {
-        mediaType: 'image/png',
-        data: file.url,
+        mediaType: getImageModelFileUrlMediaType(url),
+        data: url,
       }
     }
 
@@ -218,6 +241,15 @@ function prepareImageModelFiles(
       data: normalizedData,
     }
   })
+}
+
+function getImageModelFileUrlMediaType(url: string) {
+  if (!url.startsWith('data:')) {
+    return 'image/png'
+  }
+
+  const [, mediaType] = /^data:([^;,]+)/.exec(url) ?? []
+  return mediaType?.toLowerCase() ?? 'image/png'
 }
 
 function getAppleProviderOptions(
@@ -367,32 +399,44 @@ function serializePromptForSummary(messages: LanguageModelV3Prompt): string {
   return messages
     .map((message) => {
       const content = Array.isArray(message.content)
-        ? message.content
-            .map((part) => {
-              if (part.type === 'text') {
-                return part.text
-              }
-
-              if (part.type === 'file') {
-                return `[file:${part.mediaType}]`
-              }
-
-              if (part.type === 'tool-call') {
-                return `[tool-call:${part.toolName}] ${JSON.stringify(part.input)}`
-              }
-
-              if (part.type === 'tool-result') {
-                return `[tool-result:${part.toolName}] ${JSON.stringify(part.output)}`
-              }
-
-              return `[${part.type}]`
-            })
-            .join('\n')
+        ? message.content.map(serializeMessageContentPart).join('\n')
         : message.content
 
       return `${message.role.toUpperCase()}: ${content}`
     })
     .join('\n\n')
+}
+
+function serializeKnownMessageContentPart(
+  part: AppleMessageContentPart
+): string | undefined {
+  if (part.type === 'text') {
+    return part.text
+  }
+
+  if (part.type === 'file') {
+    return `[file:${part.mediaType}]`
+  }
+
+  if (part.type === 'tool-call') {
+    return `[tool-call:${part.toolName}] ${JSON.stringify(part.input)}`
+  }
+
+  if (part.type === 'tool-result') {
+    return `[tool-result:${part.toolName}] ${JSON.stringify(part.output)}`
+  }
+}
+
+function serializeMessageContentPart(part: AppleMessageContentPart): string {
+  return serializeKnownMessageContentPart(part) ?? `[${part.type}]`
+}
+
+function appendMessageContent(content: string, addition: string) {
+  if (!addition) {
+    return content
+  }
+
+  return content ? `${content}\n${addition}` : addition
 }
 
 function extractTextFromGenerationResult(
@@ -792,13 +836,14 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       if (Array.isArray(message.content)) {
         const attachments: AppleMessageAttachment[] = []
         const content = message.content.reduce((acc, part) => {
-          if (part.type === 'text') {
-            return acc + part.text
-          }
-
           if (part.type === 'file') {
             attachments.push(prepareImageAttachment(part))
             return acc
+          }
+
+          const serializedPart = serializeKnownMessageContentPart(part)
+          if (serializedPart !== undefined) {
+            return appendMessageContent(acc, serializedPart)
           }
 
           throw new Error(
