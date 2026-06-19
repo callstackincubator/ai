@@ -477,6 +477,10 @@ function isToolRelatedMessage(message: LanguageModelV3Message) {
     return false
   }
 
+  if (!Array.isArray(message.content)) {
+    return false
+  }
+
   return message.content.some(
     (part) => part.type === 'tool-call' || part.type === 'tool-result'
   )
