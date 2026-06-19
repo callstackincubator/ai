@@ -299,59 +299,35 @@ const info = await apple.getModelInfo()
 console.log(info.contextSize)
 ```
 
-The provider exposes two light context policies inspired by Apple's Dynamic
-Profile history utilities:
+The provider exposes context policies inspired by Apple's Dynamic Profile
+history utilities:
 
 ```typescript
 import { createAppleProvider } from '@react-native-ai/apple'
 
+const summarizerModel = createAppleProvider().languageModel()
+
 const apple = createAppleProvider({
   context: {
+    summarizeHistory: {
+      threshold: 5000,
+      model: summarizerModel,
+    },
     rollingWindowMessages: 12,
     dropCompletedToolCalls: true,
   },
 })
 ```
 
-For the Dynamic Profile-style fluent API, chain the history policies on the
-Apple language model:
-
-```typescript
-const summarizerModel = apple()
-
-const model = apple()
-  .summarizeHistory(5000, summarizerModel)
-  .rollingWindow(10)
-  .droppingCompletedToolCalls()
-```
-
-Fluent history modifiers are applied outside-in, matching Apple's utilities. In
-the example above, completed tool calls are dropped first, the rolling window is
-applied second, and older messages are summarized only if the remaining prompt
-still exceeds the threshold.
-
-You can also set them per request:
-
-```typescript
-const result = await generateText({
-  model: apple(),
-  messages,
-  providerOptions: {
-    apple: {
-      context: {
-        rollingWindowMessages: 8,
-        dropCompletedToolCalls: true,
-      },
-    },
-  },
-})
-```
+History policies are applied in a fixed order: completed tool calls are dropped
+first, the rolling window is applied second, and older messages are summarized
+only if the remaining prompt still exceeds the threshold.
 
 `rollingWindowMessages` keeps system messages and the last N non-system
 messages. `dropCompletedToolCalls` removes older completed tool-call/tool-result
-entries while keeping the newest tool-related exchange. For larger apps,
-summarize older turns at the application layer and include the summary as a
-system or user message.
+entries while keeping the newest tool-related exchange. `summarizeHistory`
+replaces older conversation turns with a generated summary once the prompt token
+count exceeds the configured threshold.
 
 Use low-level token counting as an estimate, not a fit guarantee:
 

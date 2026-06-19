@@ -34,21 +34,10 @@ import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 export type AppleToolDefinitionSet = Record<string, FullToolDefinition>
-type HistoryTransform = {
-  apply: (
-    prompt: LanguageModelV3Prompt
-  ) => Promise<LanguageModelV3Prompt> | LanguageModelV3Prompt
-}
 
 export interface AppleLanguageModel extends LanguageModelV3 {
   prepare: () => Promise<void>
   updateTools: (tools: AppleToolDefinitionSet) => void
-  summarizeHistory: (
-    threshold: number,
-    model: LanguageModelV3
-  ) => AppleLanguageModel
-  rollingWindow: (entries: number) => AppleLanguageModel
-  droppingCompletedToolCalls: () => AppleLanguageModel
 }
 export type AppleLanguageModelId = 'system' | 'private-cloud-compute'
 export type AppleBuiltInTool = 'ocr' | 'barcode'
@@ -90,9 +79,18 @@ export interface AppleLanguageModelOptions {
   context?: AppleContextOptions
 }
 
+export interface AppleSummarizeHistoryOptions {
+  threshold: number
+  model: LanguageModelV3
+}
+
 export interface AppleContextOptions {
   /**
-   * Keep the first system message and only the last N non-system messages.
+   * Summarize older messages when the prompt token count exceeds the threshold.
+   */
+  summarizeHistory?: AppleSummarizeHistoryOptions
+  /**
+   * Keep system messages and only the last N non-system messages.
    */
   rollingWindowMessages?: number
   /**
@@ -228,6 +226,18 @@ function getAppleProviderOptions(
   return (providerOptions?.apple ?? {}) as AppleProviderOptions
 }
 
+function mergeAppleContextOptions(
+  defaults: AppleContextOptions | undefined,
+  callOptions: AppleContextOptions | undefined
+): AppleContextOptions | undefined {
+  const context = {
+    ...defaults,
+    ...callOptions,
+  }
+
+  return Object.keys(context).length > 0 ? context : undefined
+}
+
 function mergeAppleProviderOptions(
   defaults: AppleLanguageModelOptions,
   callOptions: AppleProviderOptions
@@ -235,11 +245,16 @@ function mergeAppleProviderOptions(
   return {
     model: callOptions.model ?? defaults.model,
     builtInTools: callOptions.builtInTools,
-    context: {
-      ...defaults.context,
-      ...callOptions.context,
-    },
+    context: mergeAppleContextOptions(defaults.context, callOptions.context),
   }
+}
+
+function getNativeAppleProviderOptions(
+  options: AppleProviderOptions
+): Omit<AppleProviderOptions, 'context'> {
+  const nativeOptions = { ...options }
+  delete nativeOptions.context
+  return nativeOptions
 }
 
 async function summarizePromptHistory(
@@ -467,6 +482,39 @@ function isToolRelatedMessage(message: LanguageModelV3Message) {
   )
 }
 
+async function applyAppleContextOptions(
+  prompt: LanguageModelV3Prompt,
+  context: AppleContextOptions | undefined
+): Promise<LanguageModelV3Prompt> {
+  if (!context) {
+    return prompt
+  }
+
+  let nextPrompt = prompt
+
+  if (context.dropCompletedToolCalls) {
+    nextPrompt = trimAppleMessagesForContext(nextPrompt, {
+      dropCompletedToolCalls: true,
+    })
+  }
+
+  if (context.rollingWindowMessages && context.rollingWindowMessages > 0) {
+    nextPrompt = trimAppleMessagesForContext(nextPrompt, {
+      rollingWindowMessages: context.rollingWindowMessages,
+    })
+  }
+
+  if (context.summarizeHistory) {
+    nextPrompt = await summarizePromptHistory(
+      nextPrompt,
+      context.summarizeHistory.threshold,
+      context.summarizeHistory.model
+    )
+  }
+
+  return nextPrompt
+}
+
 export function createAppleProvider({
   availableTools,
   model,
@@ -478,10 +526,7 @@ export function createAppleProvider({
     return new AppleLLMChatLanguageModel({
       availableTools: options.availableTools ?? availableTools,
       model: options.model ?? model,
-      context: {
-        ...context,
-        ...options.context,
-      },
+      context: mergeAppleContextOptions(context, options.context),
     })
   }
   const provider = function (options: AppleLanguageModelOptions = {}) {
@@ -721,7 +766,6 @@ class AppleTextEmbeddingModel implements EmbeddingModelV3 {
 }
 
 class AppleLLMChatLanguageModel implements AppleLanguageModel {
-  private historyTransforms: HistoryTransform[]
   readonly specificationVersion = 'v3'
   readonly supportedUrls = {}
 
@@ -731,12 +775,8 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   private tools: AppleToolDefinitionSet = {}
   private options: AppleLanguageModelOptions
 
-  constructor(
-    options: AppleLanguageModelOptions = {},
-    historyTransforms: HistoryTransform[] = []
-  ) {
+  constructor(options: AppleLanguageModelOptions = {}) {
     this.options = options
-    this.historyTransforms = historyTransforms
     this.modelId = options.model ?? 'system'
     this.updateTools(options.availableTools ?? {})
   }
@@ -808,59 +848,15 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     this.tools = tools
   }
 
-  summarizeHistory(
-    threshold: number,
-    summarizerModel: LanguageModelV3
-  ): AppleLanguageModel {
-    return this.withHistoryTransform((prompt) =>
-      summarizePromptHistory(prompt, threshold, summarizerModel)
-    )
-  }
-
-  rollingWindow(entries: number): AppleLanguageModel {
-    return this.withHistoryTransform((prompt) =>
-      trimAppleMessagesForContext(prompt, {
-        rollingWindowMessages: entries,
-      })
-    )
-  }
-
-  droppingCompletedToolCalls(): AppleLanguageModel {
-    return this.withHistoryTransform((prompt) =>
-      trimAppleMessagesForContext(prompt, {
-        dropCompletedToolCalls: true,
-      })
-    )
-  }
-
-  private withHistoryTransform(apply: HistoryTransform['apply']) {
-    const model = new AppleLLMChatLanguageModel(this.options, [
-      { apply },
-      ...this.historyTransforms,
-    ])
-    model.updateTools({ ...this.tools })
-    return model
-  }
-
-  private async applyHistoryTransforms(prompt: LanguageModelV3Prompt) {
-    let nextPrompt = prompt
-
-    for (const transform of this.historyTransforms) {
-      nextPrompt = await transform.apply(nextPrompt)
-    }
-
-    return nextPrompt
-  }
-
   async doGenerate(options: LanguageModelV3CallOptions) {
     const appleOptions = mergeAppleProviderOptions(
       this.options,
       getAppleProviderOptions(options.providerOptions)
     )
-    const transformedPrompt = await this.applyHistoryTransforms(options.prompt)
-    const prompt = appleOptions.context
-      ? trimAppleMessagesForContext(transformedPrompt, appleOptions.context)
-      : transformedPrompt
+    const prompt = await applyAppleContextOptions(
+      options.prompt,
+      appleOptions.context
+    )
     const messages = this.prepareMessages(prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -875,7 +871,9 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         topP: options.topP,
         topK: options.topK,
         tools,
-        providerOptions: appleOptions as unknown as Record<string, unknown>,
+        providerOptions: getNativeAppleProviderOptions(
+          appleOptions
+        ) as unknown as Record<string, unknown>,
         schema:
           options.responseFormat?.type === 'json'
             ? options.responseFormat.schema
@@ -933,10 +931,10 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       this.options,
       getAppleProviderOptions(options.providerOptions)
     )
-    const transformedPrompt = await this.applyHistoryTransforms(options.prompt)
-    const prompt = appleOptions.context
-      ? trimAppleMessagesForContext(transformedPrompt, appleOptions.context)
-      : transformedPrompt
+    const prompt = await applyAppleContextOptions(
+      options.prompt,
+      appleOptions.context
+    )
     const messages = this.prepareMessages(prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -1051,7 +1049,9 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             topP: options.topP,
             topK: options.topK,
             tools,
-            providerOptions: appleOptions as unknown as Record<string, unknown>,
+            providerOptions: getNativeAppleProviderOptions(
+              appleOptions
+            ) as unknown as Record<string, unknown>,
             schema,
           })
         } catch (error) {

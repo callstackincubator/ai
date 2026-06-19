@@ -9,6 +9,7 @@ export type {
   AppleLanguageModelOptions,
   AppleModelInfo,
   AppleProviderOptions,
+  AppleSummarizeHistoryOptions,
   AppleToolDefinitionSet,
 } from './ai-sdk'
 export {

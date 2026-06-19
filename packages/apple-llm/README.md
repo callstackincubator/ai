@@ -24,10 +24,16 @@ const answer = await generateText({
 ```ts
 const summarizerModel = apple()
 
-const model = apple()
-  .summarizeHistory(5000, summarizerModel)
-  .rollingWindow(10)
-  .droppingCompletedToolCalls()
+const model = apple({
+  context: {
+    summarizeHistory: {
+      threshold: 5000,
+      model: summarizerModel,
+    },
+    rollingWindowMessages: 10,
+    dropCompletedToolCalls: true,
+  },
+})
 ```
 
 ## Features

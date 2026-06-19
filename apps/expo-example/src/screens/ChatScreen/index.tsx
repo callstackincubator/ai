@@ -1,6 +1,7 @@
 import type { TrueSheet } from '@lodev09/react-native-true-sheet'
 import {
   type AppleLanguageModel,
+  type AppleLanguageModelId,
   createAppleProvider,
 } from '@react-native-ai/apple'
 import {
@@ -104,25 +105,27 @@ export default function ChatScreen() {
         ...genUITools,
       }
       let model = selectedAdapter.model
-      if ('updateTools' in model) {
-        ;(model as AppleLanguageModel).updateTools(tools)
+      if (appleHistoryDemoEnabled && model.provider === 'apple') {
+        const modelId = model.modelId as AppleLanguageModelId
+        const appleProvider = createAppleProvider({
+          availableTools: tools,
+          model: modelId,
+          context: {
+            summarizeHistory: {
+              threshold: appleHistorySummarizationThreshold,
+              model: createAppleProvider({
+                model: modelId,
+              }).languageModel(),
+            },
+            rollingWindowMessages: appleHistoryWindowEntries,
+            dropCompletedToolCalls: true,
+          },
+        })
+        model = appleProvider.languageModel()
       }
 
-      if (
-        appleHistoryDemoEnabled &&
-        model.provider === 'apple' &&
-        'rollingWindow' in model &&
-        'summarizeHistory' in model &&
-        'droppingCompletedToolCalls' in model
-      ) {
-        // Use a token-style threshold closer to Apple's summarizeHistory API.
-        model = (model as AppleLanguageModel)
-          .summarizeHistory(
-            appleHistorySummarizationThreshold,
-            createAppleProvider().languageModel()
-          )
-          .rollingWindow(appleHistoryWindowEntries)
-          .droppingCompletedToolCalls()
+      if ('updateTools' in model) {
+        ;(model as AppleLanguageModel).updateTools(tools)
       }
       setToolExecutionReporter(({ toolName, args, result }) => {
         addToolExecutionMessage(chatId, toolName, args, result)
