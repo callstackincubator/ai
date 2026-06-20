@@ -82,6 +82,8 @@ export function createLlamaStreamParser(
   let pendingText = ''
   let pendingToolCallIds = new Set<string>()
   let pendingToolCalls: NonNullable<TokenData['tool_calls']> = []
+  let lastNativeContent = ''
+  let lastNativeReasoning = ''
 
   const finishCurrentBlock = () => {
     if (state === 'text') {
@@ -133,6 +135,26 @@ export function createLlamaStreamParser(
     })
   }
 
+  const openReasoningBlock = () => {
+    finishCurrentBlock()
+    state = 'reasoning'
+    currentChunkId = generateId()
+    sink.enqueue({
+      type: 'reasoning-start',
+      id: currentChunkId,
+    })
+  }
+
+  const openTextBlock = () => {
+    finishCurrentBlock()
+    state = 'text'
+    currentChunkId = generateId()
+    sink.enqueue({
+      type: 'text-start',
+      id: currentChunkId,
+    })
+  }
+
   const queueToolCalls = (toolCalls: TokenData['tool_calls']) => {
     for (const toolCall of toolCalls ?? []) {
       if (!toolCall.id) {
@@ -162,15 +184,87 @@ export function createLlamaStreamParser(
     pendingToolCalls = []
   }
 
+  const emitNativeDelta = (type: 'text' | 'reasoning', value: string) => {
+    const previousValue =
+      type === 'text' ? lastNativeContent : lastNativeReasoning
+
+    if (
+      value.length < previousValue.length ||
+      !value.startsWith(previousValue)
+    ) {
+      if (type === 'text') {
+        openTextBlock()
+      } else {
+        openReasoningBlock()
+      }
+
+      const resetDelta = value
+      if (type === 'text') {
+        lastNativeContent = value
+      } else {
+        lastNativeReasoning = value
+      }
+      emitDelta(resetDelta)
+      return
+    }
+
+    const delta = value.slice(previousValue.length)
+    if (!delta) {
+      if (type === 'text') {
+        lastNativeContent = value
+      } else {
+        lastNativeReasoning = value
+      }
+      return
+    }
+
+    if (type === 'text' && state !== 'text') {
+      openTextBlock()
+    }
+
+    if (type === 'reasoning' && state !== 'reasoning') {
+      openReasoningBlock()
+    }
+
+    if (type === 'text') {
+      lastNativeContent = value
+    } else {
+      lastNativeReasoning = value
+    }
+
+    emitDelta(delta)
+  }
+
+  const processNativeParsedContent = (tokenData: TokenData) => {
+    const reasoningValue = tokenData.reasoning_content ?? ''
+    const contentValue = tokenData.content ?? ''
+
+    if (!reasoningValue && lastNativeReasoning) {
+      lastNativeReasoning = ''
+      if (state === 'reasoning') {
+        finishCurrentBlock()
+      }
+    }
+
+    if (reasoningValue) {
+      emitNativeDelta('reasoning', reasoningValue)
+    }
+
+    if (!contentValue && lastNativeContent) {
+      lastNativeContent = ''
+      if (state === 'text') {
+        finishCurrentBlock()
+      }
+    }
+
+    if (contentValue) {
+      emitNativeDelta('text', contentValue)
+    }
+  }
+
   const handlePlaceholder = (placeholder: Placeholder) => {
     if (placeholder === START_OF_THINKING_PLACEHOLDER) {
-      finishCurrentBlock()
-      state = 'reasoning'
-      currentChunkId = generateId()
-      sink.enqueue({
-        type: 'reasoning-start',
-        id: currentChunkId,
-      })
+      openReasoningBlock()
       return
     }
 
@@ -231,6 +325,22 @@ export function createLlamaStreamParser(
       queueToolCalls(tokenData.tool_calls)
     }
 
+    const hasNativeParsedContent =
+      tokenData.content !== undefined ||
+      tokenData.reasoning_content !== undefined
+
+    if (hasNativeParsedContent) {
+      if (
+        pendingToolCalls.length > 0 &&
+        tokenData.token.includes(END_OF_TOOL_CALL_PLACEHOLDER)
+      ) {
+        finishCurrentBlock()
+        emitPendingToolCalls()
+      }
+      processNativeParsedContent(tokenData)
+      return
+    }
+
     pendingText += tokenData.token
     flushBuffer(false)
   }
@@ -239,10 +349,9 @@ export function createLlamaStreamParser(
     processToken,
     finish: () => {
       flushBuffer(true)
-      if (state === 'tool-call') {
+      if (pendingToolCalls.length > 0) {
         finishCurrentBlock()
         emitPendingToolCalls()
-        return
       }
       finishCurrentBlock()
     },
