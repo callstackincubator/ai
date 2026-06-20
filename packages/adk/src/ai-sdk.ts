@@ -1,11 +1,13 @@
 import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
+  LanguageModelV3FilePart,
   LanguageModelV3FinishReason,
   LanguageModelV3FunctionTool,
   LanguageModelV3Prompt,
   LanguageModelV3ProviderTool,
   LanguageModelV3StreamPart,
+  LanguageModelV3Usage,
 } from '@ai-sdk/provider'
 import {
   generateId,
@@ -19,10 +21,13 @@ import {
   type AdkAgentConfig,
   type AdkGenerationOptions,
   type AdkMessage,
+  type AdkMessagePart,
   type AdkModelType,
   type AdkTool,
   type AdkToolParameter,
+  type AdkUsageMetadata,
   getNativeAdkEngine,
+  type StreamToolCallEvent,
   type ToolCallEvent,
 } from './NativeAdkEngine'
 
@@ -52,6 +57,45 @@ export const adk = createAdkProvider()
 
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 type ToolDefinitionSet = Record<string, FullToolDefinition>
+
+const createEmptyUsage = (): LanguageModelV3Usage => ({
+  inputTokens: {
+    total: undefined,
+    noCache: undefined,
+    cacheRead: undefined,
+    cacheWrite: undefined,
+  },
+  outputTokens: {
+    total: undefined,
+    text: undefined,
+    reasoning: undefined,
+  },
+})
+
+const mapUsage = (usage?: AdkUsageMetadata): LanguageModelV3Usage => {
+  if (!usage) {
+    return createEmptyUsage()
+  }
+
+  return {
+    inputTokens: {
+      total: usage.promptTokenCount,
+      noCache: undefined,
+      cacheRead: undefined,
+      cacheWrite: undefined,
+    },
+    outputTokens: {
+      total: usage.candidatesTokenCount,
+      text: undefined,
+      reasoning: undefined,
+    },
+    raw: {
+      promptTokenCount: usage.promptTokenCount,
+      candidatesTokenCount: usage.candidatesTokenCount,
+      totalTokenCount: usage.totalTokenCount,
+    },
+  }
+}
 
 const convertFinishReason = (
   finishReason?: string
@@ -87,6 +131,34 @@ const schemaPropertyToAdkParameter = (
     description: schema?.description,
     type: (schema?.type as AdkToolParameter['type']) ?? 'string',
     required,
+  }
+}
+
+const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
+  let binary = ''
+  for (let index = 0; index < bytes.length; index++) {
+    binary += String.fromCharCode(bytes[index])
+  }
+  return btoa(binary)
+}
+
+const normalizeFilePart = (
+  part: LanguageModelV3FilePart
+): { data: string; mediaType: string } => {
+  if (part.data instanceof URL) {
+    throw new Error(
+      'ADK wrapper does not support file URLs yet. Pass base64 or Uint8Array data.'
+    )
+  }
+
+  const data =
+    typeof part.data === 'string'
+      ? part.data.replace(/^data:[^;]+;base64,/, '')
+      : uint8ArrayToBase64(part.data)
+
+  return {
+    data,
+    mediaType: part.mediaType,
   }
 }
 
@@ -132,19 +204,60 @@ class AdkChatLanguageModel implements LanguageModelV3 {
 
   private prepareMessages(messages: LanguageModelV3Prompt): AdkMessage[] {
     return messages.map((message): AdkMessage => {
-      const content = Array.isArray(message.content)
-        ? message.content.reduce((acc, part) => {
-            if (part.type === 'text') {
-              return acc + part.text
-            }
-            console.warn('Unsupported message content type:', part)
-            return acc
-          }, '')
-        : message.content
+      if (message.role === 'system') {
+        return {
+          role: 'system',
+          content: message.content,
+        }
+      }
 
+      if (message.role === 'user') {
+        const parts = message.content
+          .map((part): AdkMessagePart | null => {
+            if (part.type === 'text') {
+              return { type: 'text', text: part.text }
+            }
+            if (part.type === 'file') {
+              const { data, mediaType } = normalizeFilePart(part)
+              return { type: 'file', mimeType: mediaType, data }
+            }
+            console.warn('Unsupported user message content type:', part)
+            return null
+          })
+          .filter((part): part is AdkMessagePart => part !== null)
+
+        if (parts.length === 1 && parts[0]?.type === 'text') {
+          return {
+            role: 'user',
+            content: parts[0].text,
+          }
+        }
+
+        return {
+          role: 'user',
+          parts,
+        }
+      }
+
+      if (message.role === 'assistant') {
+        const content = message.content.reduce((acc, part) => {
+          if (part.type === 'text') {
+            return acc + part.text
+          }
+          console.warn('Unsupported assistant message content type:', part)
+          return acc
+        }, '')
+
+        return {
+          role: 'assistant',
+          content,
+        }
+      }
+
+      console.warn('Unsupported message role for ADK provider:', message.role)
       return {
-        role: message.role as AdkMessage['role'],
-        content,
+        role: 'user',
+        content: '',
       }
     })
   }
@@ -157,6 +270,14 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       maxTokens: options.maxOutputTokens,
       topP: options.topP,
       topK: options.topK,
+      responseFormat:
+        options.responseFormat?.type === 'json'
+          ? {
+              type: 'json',
+              mimeType: 'application/json',
+              schema: options.responseFormat.schema as Record<string, unknown>,
+            }
+          : undefined,
     }
   }
 
@@ -261,7 +382,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     try {
       if (options.toolChoice && options.toolChoice.type === 'required') {
         console.warn(
-          'ADK does not support required toolChoice yet. Defaulting to auto.'
+          'ADK wrapper does not support required toolChoice yet. Defaulting to auto.'
         )
       }
 
@@ -275,19 +396,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       return {
         content: [{ type: 'text' as const, text: response.content }],
         finishReason: convertFinishReason(response.finishReason),
-        usage: {
-          inputTokens: {
-            total: undefined,
-            noCache: undefined,
-            cacheRead: undefined,
-            cacheWrite: undefined,
-          },
-          outputTokens: {
-            total: undefined,
-            text: undefined,
-            reasoning: undefined,
-          },
-        },
+        usage: mapUsage(response.usage),
         warnings: [],
       }
     } finally {
@@ -302,6 +411,10 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     const preparedTools = this.prepareTools(options.tools)
     const nativeTools = preparedTools.map((tool) => tool.native)
     const agentConfig = this.agentConfig
+
+    if (options.responseFormat?.type === 'json') {
+      throw new Error('Streaming JSON responses is not yet supported by ADK.')
+    }
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
@@ -351,6 +464,47 @@ class AdkChatLanguageModel implements LanguageModelV3 {
             }
           })
 
+          const streamToolCallListener = getNativeAdkEngine().onStreamToolCall(
+            (data: StreamToolCallEvent) => {
+              if (data.streamId !== currentStreamId) {
+                return
+              }
+
+              if (data.phase === 'start' && data.toolName) {
+                controller.enqueue({
+                  type: 'tool-input-start',
+                  id: data.toolCallId,
+                  toolName: data.toolName,
+                  providerExecuted: true,
+                })
+                return
+              }
+
+              if (data.phase === 'delta' && data.inputDelta) {
+                controller.enqueue({
+                  type: 'tool-input-delta',
+                  id: data.toolCallId,
+                  delta: data.inputDelta,
+                })
+                return
+              }
+
+              if (data.phase === 'end' && data.toolName && data.input) {
+                controller.enqueue({
+                  type: 'tool-input-end',
+                  id: data.toolCallId,
+                })
+                controller.enqueue({
+                  type: 'tool-call',
+                  toolCallId: data.toolCallId,
+                  toolName: data.toolName,
+                  input: data.input,
+                  providerExecuted: true,
+                })
+              }
+            }
+          )
+
           const completeListener = getNativeAdkEngine().onStreamComplete(
             (data) => {
               if (data.streamId === currentStreamId) {
@@ -361,19 +515,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
                 controller.enqueue({
                   type: 'finish',
                   finishReason: convertFinishReason(data.finishReason),
-                  usage: {
-                    inputTokens: {
-                      total: undefined,
-                      noCache: undefined,
-                      cacheRead: undefined,
-                      cacheWrite: undefined,
-                    },
-                    outputTokens: {
-                      total: undefined,
-                      text: undefined,
-                      reasoning: undefined,
-                    },
-                  },
+                  usage: mapUsage(data.usage),
                 })
                 cleanup()
                 controller.close()
@@ -392,7 +534,12 @@ class AdkChatLanguageModel implements LanguageModelV3 {
             }
           })
 
-          listeners = [updateListener, completeListener, errorListener]
+          listeners = [
+            updateListener,
+            streamToolCallListener,
+            completeListener,
+            errorListener,
+          ]
         } catch (error) {
           cleanup()
           controller.error(new Error(`ADK stream failed: ${error}`))

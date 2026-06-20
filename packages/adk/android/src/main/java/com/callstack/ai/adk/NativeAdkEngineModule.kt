@@ -5,6 +5,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
+import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -72,6 +73,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
           putString("role", "assistant")
           putString("content", result.content)
           result.finishReason?.let { putString("finishReason", it) }
+          AdkUsage.toWritableMap(result.usage)?.let { putMap("usage", it) }
         }
         promise.resolve(response)
       } catch (error: Exception) {
@@ -92,8 +94,16 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     val job = scope.launch {
       try {
         var previousText = ""
+        var latestUsage: UsageMetadata? = null
+        val toolCallEmitter = AdkStreamToolCallEmitter(streamId) { args ->
+          emitOnStreamToolCall(args)
+        }
+
         runner.streamText(messages, config, options, tools, streamId).collect { event ->
           if (!isActive) return@collect
+
+          event.usageMetadata?.let { latestUsage = it }
+          toolCallEmitter.handleEvent(event)
 
           val text = event.content?.parts?.mapNotNull { it.text }?.joinToString("") ?: ""
           if (text.isNotEmpty() && text != previousText) {
@@ -115,6 +125,9 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
             val completeArgs = Arguments.createMap().apply {
               putString("streamId", streamId)
               putString("finishReason", event.finishReason?.name)
+              AdkUsage.toWritableMap(latestUsage ?: event.usageMetadata)?.let {
+                putMap("usage", it)
+              }
             }
             emitOnStreamComplete(completeArgs)
           }

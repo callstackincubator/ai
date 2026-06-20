@@ -1,5 +1,6 @@
 package com.callstack.ai.adk
 
+import android.util.Base64
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.google.adk.kt.agents.Instruction
@@ -11,9 +12,12 @@ import com.google.adk.kt.models.mlkit.GenaiPrompt
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
+import com.google.adk.kt.types.Blob
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.GenerateContentConfig
+import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import com.google.adk.kt.types.UsageMetadata
 import com.google.adk.kt.utils.mlkit.GenerativeModelHelpers
 import com.google.mlkit.genai.prompt.GenerativeModel
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +27,7 @@ import java.util.UUID
 data class AdkRunResult(
   val content: String,
   val finishReason: String?,
+  val usage: UsageMetadata?,
 )
 
 class AdkAgentRunner(
@@ -62,7 +67,8 @@ class AdkAgentRunner(
       .joinToString("")
 
     val finishReason = events.lastOrNull()?.finishReason?.name
-    return AdkRunResult(content = text, finishReason = finishReason)
+    val usage = AdkUsage.latestFromEvents(events)
+    return AdkRunResult(content = text, finishReason = finishReason, usage = usage)
   }
 
   suspend fun streamText(
@@ -120,7 +126,7 @@ class AdkAgentRunner(
       val author = if (message.role == Role.USER) Role.USER else agent.name
       val event = Event(
         author = author,
-        content = Content.fromText(message.role, message.content),
+        content = message.content,
       )
       sessionService.appendEvent(session, event)
     }
@@ -128,7 +134,7 @@ class AdkAgentRunner(
     return runner.runAsync(
       userId = userId,
       sessionId = sessionId,
-      newMessage = Content.fromText(lastMessage.role, lastMessage.content),
+      newMessage = lastMessage.content,
       runConfig = com.google.adk.kt.agents.RunConfig(streamingMode = if (stream) {
         com.google.adk.kt.agents.StreamingMode.SSE
       } else {
@@ -148,28 +154,27 @@ class AdkAgentRunner(
     }
   }
 
-  private fun parseAgentConfig(config: ReadableMap): AgentConfig {
-    val model = config.getMap("model")
-      ?: throw IllegalArgumentException("Agent config requires a model")
-
-    return AgentConfig(
-      name = config.getString("name") ?: "react_native_adk_agent",
-      description = config.getString("description") ?: "",
-      instruction = config.getString("instruction"),
-      modelType = model.getString("type") ?: "gemini",
-      modelName = model.getString("name") ?: "gemini-2.5-flash",
-      apiKey = model.getString("apiKey"),
-    )
-  }
+  private fun parseAgentConfig(config: ReadableMap): AgentConfig =
+    parseAgentConfigStatic(config)
 
   private fun parseGenerationConfig(options: ReadableMap?): GenerateContentConfig? {
     if (options == null) return null
+
+    val responseFormat = options.getMap("responseFormat")
+    val responseMimeType = when {
+      responseFormat?.hasKey("mimeType") == true -> responseFormat.getString("mimeType")
+      responseFormat?.getString("type") == "json" -> "application/json"
+      else -> null
+    }
+    val responseSchema = responseFormat?.getMap("schema")?.let { AdkSchema.fromReadableMap(it) }
 
     return GenerateContentConfig(
       temperature = options.takeIf { it.hasKey("temperature") }?.getDouble("temperature")?.toFloat(),
       maxOutputTokens = options.takeIf { it.hasKey("maxTokens") }?.getInt("maxTokens"),
       topP = options.takeIf { it.hasKey("topP") }?.getDouble("topP")?.toFloat(),
       topK = options.takeIf { it.hasKey("topK") }?.getDouble("topK")?.toFloat()?.toInt(),
+      responseMimeType = responseMimeType,
+      responseSchema = responseSchema,
     )
   }
 
@@ -186,10 +191,39 @@ class AdkAgentRunner(
         "system" -> Role.SYSTEM
         else -> Role.USER
       }
-      val content = message.getString("content") ?: ""
+
+      val partsArray = message.getArray("parts")
+      val content = if (partsArray != null) {
+        parseContentParts(role, partsArray)
+      } else {
+        Content.fromText(role, message.getString("content") ?: "")
+      }
+
       parsed.add(ParsedMessage(role = role, content = content))
     }
     return parsed
+  }
+
+  private fun parseContentParts(role: String, partsArray: ReadableArray): Content {
+    val parts = mutableListOf<Part>()
+    for (index in 0 until partsArray.size()) {
+      val part = partsArray.getMap(index) ?: continue
+      when (part.getString("type")) {
+        "text" -> part.getString("text")?.let { parts.add(Part(text = it)) }
+        "file" -> {
+          val data = part.getString("data") ?: continue
+          val mimeType = part.getString("mimeType") ?: "application/octet-stream"
+          val bytes = Base64.decode(data, Base64.DEFAULT)
+          parts.add(Part(inlineData = Blob(mimeType = mimeType, data = bytes)))
+        }
+      }
+    }
+
+    if (parts.isEmpty()) {
+      return Content.fromText(role, "")
+    }
+
+    return Content(role = role, parts = parts)
   }
 
   private fun parseTools(tools: ReadableArray?, streamId: String?): List<ReactNativeFunctionTool> {
@@ -239,6 +273,24 @@ class AdkAgentRunner(
       else -> com.google.adk.kt.types.Type.STRING
     }
   }
+
+  companion object {
+    fun parseAgentConfig(config: ReadableMap): AgentConfig = parseAgentConfigStatic(config)
+
+    private fun parseAgentConfigStatic(config: ReadableMap): AgentConfig {
+      val model = config.getMap("model")
+        ?: throw IllegalArgumentException("Agent config requires a model")
+
+      return AgentConfig(
+        name = config.getString("name") ?: "react_native_adk_agent",
+        description = config.getString("description") ?: "",
+        instruction = config.getString("instruction"),
+        modelType = model.getString("type") ?: "gemini",
+        modelName = model.getString("name") ?: "gemini-2.5-flash",
+        apiKey = model.getString("apiKey"),
+      )
+    }
+  }
 }
 
 data class AgentConfig(
@@ -252,5 +304,5 @@ data class AgentConfig(
 
 data class ParsedMessage(
   val role: String,
-  val content: String,
+  val content: Content,
 )

@@ -4,9 +4,14 @@ import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes'
 
 export type AdkMessageRole = 'assistant' | 'system' | 'user'
 
+export type AdkMessagePart =
+  | { type: 'text'; text: string }
+  | { type: 'file'; mimeType: string; data: string }
+
 export interface AdkMessage {
   role: AdkMessageRole
-  content: string
+  content?: string
+  parts?: AdkMessagePart[]
 }
 
 export type AdkModelType = 'gemini' | 'genai-nano'
@@ -36,17 +41,31 @@ export interface AdkTool {
   parameters?: AdkToolParameter[]
 }
 
+export interface AdkResponseFormat {
+  type: 'json'
+  mimeType?: string
+  schema: Record<string, unknown>
+}
+
 export interface AdkGenerationOptions {
   temperature?: number
   maxTokens?: number
   topP?: number
   topK?: number
+  responseFormat?: AdkResponseFormat
+}
+
+export interface AdkUsageMetadata {
+  promptTokenCount?: number
+  candidatesTokenCount?: number
+  totalTokenCount?: number
 }
 
 export interface AdkGeneratedMessage {
   role: AdkMessageRole
   content: string
   finishReason?: string
+  usage?: AdkUsageMetadata
 }
 
 export interface StreamUpdateEvent {
@@ -57,11 +76,21 @@ export interface StreamUpdateEvent {
 export interface StreamCompleteEvent {
   streamId: string
   finishReason?: string
+  usage?: AdkUsageMetadata
 }
 
 export interface StreamErrorEvent {
   streamId: string
   error: string
+}
+
+export interface StreamToolCallEvent {
+  streamId: string
+  phase: 'start' | 'delta' | 'end'
+  toolCallId: string
+  toolName?: string
+  inputDelta?: string
+  input?: string
 }
 
 export interface ToolCallEvent {
@@ -94,6 +123,7 @@ export interface Spec extends TurboModule {
   onStreamUpdate: EventEmitter<StreamUpdateEvent>
   onStreamComplete: EventEmitter<StreamCompleteEvent>
   onStreamError: EventEmitter<StreamErrorEvent>
+  onStreamToolCall: EventEmitter<StreamToolCallEvent>
   onToolCall: EventEmitter<ToolCallEvent>
 }
 

@@ -25,8 +25,60 @@ const { text } = await generateText({
 - Cloud Gemini agents via ADK `LlmAgent` and `InMemoryRunner`
 - On-device Gemini Nano via ML Kit GenAI (`genai-nano` model type)
 - Tool calling bridged to JavaScript executors
-- Streaming responses
+- Streaming responses with tool-call stream parts
+- Post-generation token usage via ADK `UsageMetadata`
+- Multimodal user prompts (text + inline images)
+- Structured JSON output via ADK `GenerateContentConfig`
 - Vercel AI SDK v6 `LanguageModelV3` provider
+
+## Usage metadata
+
+ADK returns token usage in response events (`promptTokenCount`, `candidatesTokenCount`, `totalTokenCount`). The provider maps this into AI SDK `usage` on both `generateText` and streaming `finish` events.
+
+## Multimodal input
+
+Pass file parts in user messages using the standard AI SDK prompt format:
+
+```ts
+import { generateText } from 'ai'
+
+const { text } = await generateText({
+  model: adk.languageModel(),
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'What is in this image?' },
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          data: base64Image,
+        },
+      ],
+    },
+  ],
+})
+```
+
+## Structured output
+
+Use AI SDK `responseFormat` with JSON schema. ADK maps this to `responseMimeType` and `responseSchema`:
+
+```ts
+import { generateObject } from 'ai'
+import { z } from 'zod'
+
+const { object } = await generateObject({
+  model: adk.languageModel(),
+  schema: z.object({
+    summary: z.string(),
+    sentiment: z.enum(['positive', 'neutral', 'negative']),
+  }),
+  prompt: 'Summarize this product review: ...',
+})
+```
+
+Streaming structured JSON is not supported yet.
 
 ## Cloud Gemini
 
@@ -97,6 +149,8 @@ const { text } = await generateText({
   prompt: 'What time is it in Warsaw?',
 })
 ```
+
+During streaming, the provider emits AI SDK `tool-input-*` and `tool-call` stream parts when ADK surfaces function calls from the model.
 
 Pass tools through the AI SDK `tools` option as usual; the provider bridges execution to JavaScript while ADK orchestrates the agent loop natively.
 
