@@ -11,8 +11,9 @@ import {
 } from 'react-native'
 
 import type { SetupAdapter } from '../../config/providers.common'
+import { hasGoogleApiKey } from '../../config/adk'
 import {
-  useDownloadProgress,
+  useDownloadProgress,  
   useProviderStore,
 } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
@@ -111,10 +112,15 @@ export function ModelItem({
           ) : (
             <Text style={styles.modelStatusText}>
               {selectedModelAvailability === 'yes'
-                ? 'Downloaded'
+                ? adapter.builtIn
+                  ? 'Ready'
+                  : 'Downloaded'
                 : selectedModelAvailability === 'availableForDownload'
                   ? 'Tap to download'
-                  : 'Not available on this device'}
+                  : adapter.modelId === 'adk-gemini-2.5-flash' &&
+                      !hasGoogleApiKey()
+                    ? 'Set EXPO_PUBLIC_GOOGLE_API_KEY'
+                    : 'Not available on this device'}
             </Text>
           )}
         </View>

@@ -49,6 +49,9 @@
                 "modular_headers": true
               }
             ]
+          },
+          "android": {
+            "minSdkVersion": 24
           }
         }
       ],

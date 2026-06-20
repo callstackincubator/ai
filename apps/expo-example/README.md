@@ -1,6 +1,6 @@
 # React Native AI - Example App
 
-This example app demonstrates both Apple Intelligence and MLC on-device AI capabilities.
+This example app demonstrates Apple Intelligence, Google ADK, and MLC on-device AI capabilities.
 
 ## Prerequisites
 
@@ -12,12 +12,14 @@ This example app demonstrates both Apple Intelligence and MLC on-device AI capab
 Navigate to the MLC package and run the build command for your target platform:
 
 **For iOS:**
+
 ```bash
 cd ../../packages/mlc
 bun run build:runtime:ios
 ```
 
 **For Android:**
+
 ```bash
 cd ../../packages/mlc
 bun run build:runtime:android
@@ -26,16 +28,39 @@ bun run build:runtime:android
 > [!NOTE]
 > The build process requires additional setup. Run `./scripts/build-runtime.sh --help` in the MLC package directory to see detailed prerequisites for your platform.
 
+### ADK (Android)
+
+Google ADK agents are available on Android in the model picker:
+
+- **ADK Gemini Flash** — cloud Gemini via ADK (requires API key)
+- **ADK Gemini Nano** — on-device via ML Kit GenAI
+
+Create `.env` from the example and add your key:
+
+```bash
+cp .env.example .env
+```
+
+Set `EXPO_PUBLIC_GOOGLE_API_KEY` from [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+ADK requires Android API 24+. After changing native config, run:
+
+```bash
+npx expo prebuild --clean
+```
+
 ## Running the App
 
 After building the MLC runtime, navigate back to this directory and run:
 
 **iOS:**
+
 ```bash
 bun run ios
 ```
 
 **Android:**
+
 ```bash
 bun run android
 ```
@@ -85,6 +110,7 @@ After the message is sent, the profiler should show spans for the
 ## Features
 
 - Apple Intelligence (iOS 17+): Text generation, embeddings, transcription, speech synthesis
+- Google ADK (Android): Cloud Gemini and on-device Gemini Nano agents with tool calling
 - MLC Models: Run Llama, Phi, Mistral, and Qwen models on-device
 - Tool calling and structured output support
 - Streaming text generation
@@ -93,6 +119,7 @@ After the message is sent, the profiler should show spans for the
 
 > [!WARNING]
 > If you encounter runtime errors related to MLC:
+>
 > 1. Ensure you've built the runtime binaries (see above)
 > 2. Run `npx expo prebuild --clean` if you've made configuration changes
 > 3. Check that your device has sufficient memory for the model you're using (1-8GB)

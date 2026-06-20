@@ -5,6 +5,7 @@
     "moduleSuffixes": [".android", ".ios", ""],
     "paths": {
       "@react-native-ai/apple": ["../../packages/apple-llm/src"],
+      "@react-native-ai/adk": ["../../packages/adk/src"],
       "@react-native-ai/mlc": ["../../packages/mlc/src"],
       "@react-native-ai/json-ui": [
         "../../packages/@react-native-ai/json-ui/src"
