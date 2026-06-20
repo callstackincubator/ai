@@ -26,7 +26,12 @@ data class AdkRunResult(
 )
 
 class AdkAgentRunner(
-  private val onToolCall: (toolCallId: String, toolId: String, arguments: String) -> Unit,
+  private val onToolCall: (
+    toolCallId: String,
+    toolId: String,
+    arguments: String,
+    streamId: String?,
+  ) -> Unit,
 ) {
   private var generativeModel: GenerativeModel? = null
 
@@ -65,8 +70,9 @@ class AdkAgentRunner(
     config: ReadableMap,
     options: ReadableMap?,
     tools: ReadableArray?,
+    streamId: String,
   ): Flow<Event> {
-    return runAgent(messages, config, options, tools, stream = true)
+    return runAgent(messages, config, options, tools, stream = true, streamId = streamId)
   }
 
   private suspend fun runAgent(
@@ -75,10 +81,11 @@ class AdkAgentRunner(
     options: ReadableMap?,
     tools: ReadableArray?,
     stream: Boolean,
+    streamId: String? = null,
   ): Flow<Event> {
     val parsedMessages = parseMessages(messages)
     val agentConfig = parseAgentConfig(config)
-    val agentTools = parseTools(tools)
+    val agentTools = parseTools(tools, streamId)
     val model = createModel(agentConfig)
     val generateContentConfig = parseGenerationConfig(options)
 
@@ -185,7 +192,7 @@ class AdkAgentRunner(
     return parsed
   }
 
-  private fun parseTools(tools: ReadableArray?): List<ReactNativeFunctionTool> {
+  private fun parseTools(tools: ReadableArray?, streamId: String?): List<ReactNativeFunctionTool> {
     if (tools == null) return emptyList()
 
     val parsed = mutableListOf<ReactNativeFunctionTool>()
@@ -214,6 +221,7 @@ class AdkAgentRunner(
           name = tool.getString("name") ?: continue,
           description = tool.getString("description") ?: "",
           parameters = parameters,
+          streamId = streamId,
           onToolCall = onToolCall,
         )
       )

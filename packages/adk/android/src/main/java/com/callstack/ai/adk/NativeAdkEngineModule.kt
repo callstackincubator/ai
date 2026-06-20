@@ -22,7 +22,8 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   override fun getName(): String = NAME
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-  private val runner = AdkAgentRunner { toolCallId, toolId, arguments ->
+  private val runner = AdkAgentRunner { toolCallId, toolId, arguments, streamId ->
+    streamId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
     val args = Arguments.createMap().apply {
       putString("toolCallId", toolCallId)
       putString("toolId", toolId)
@@ -91,7 +92,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     val job = scope.launch {
       try {
         var previousText = ""
-        runner.streamText(messages, config, options, tools).collect { event ->
+        runner.streamText(messages, config, options, tools, streamId).collect { event ->
           if (!isActive) return@collect
 
           val text = event.content?.parts?.mapNotNull { it.text }?.joinToString("") ?: ""
@@ -135,7 +136,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
 
   override fun cancelStream(streamId: String, promise: Promise) {
     activeStreams.remove(streamId)?.cancel()
-    AdkToolBridge.cancelAll()
+    AdkToolBridge.cancelForStream(streamId)
     promise.resolve(null)
   }
 

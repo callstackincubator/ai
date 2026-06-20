@@ -44,17 +44,6 @@ object AdkJson {
       else -> value
     }
   }
-    val trimmed = value.trim()
-    return when {
-      trimmed.startsWith("{") -> jsonObjectToMap(JSONObject(trimmed))
-      trimmed.startsWith("[") -> jsonArrayToList(JSONArray(trimmed))
-      trimmed == "true" -> true
-      trimmed == "false" -> false
-      trimmed == "null" -> emptyMap<String, Any>()
-      trimmed.toDoubleOrNull() != null -> trimmed.toDouble()
-      else -> trimmed.removeSurrounding("\"")
-    }
-  }
 
   private fun jsonObjectToMap(json: JSONObject): Map<String, Any> {
     val result = mutableMapOf<String, Any>()

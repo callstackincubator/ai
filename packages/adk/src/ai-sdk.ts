@@ -313,19 +313,19 @@ class AdkChatLanguageModel implements LanguageModelV3 {
 
     let streamId: string | undefined
     let listeners: { remove(): void }[] = []
+    const toolListener = this.createToolCallListener()
 
     const cleanup = () => {
       listeners.forEach((listener) => {
         listener.remove()
       })
       listeners = []
+      toolListener.remove()
       this.unregisterTools(preparedTools)
     }
 
     const stream = new ReadableStream<LanguageModelV3StreamPart>({
       start: async (controller) => {
-        const toolListener = this.createToolCallListener()
-
         try {
           streamId = await getNativeAdkEngine().streamText(
             messages,
@@ -376,7 +376,6 @@ class AdkChatLanguageModel implements LanguageModelV3 {
                   },
                 })
                 cleanup()
-                toolListener.remove()
                 controller.close()
               }
             }
@@ -389,7 +388,6 @@ class AdkChatLanguageModel implements LanguageModelV3 {
                 error: new Error(data.error),
               })
               cleanup()
-              toolListener.remove()
               controller.close()
             }
           })
@@ -397,7 +395,6 @@ class AdkChatLanguageModel implements LanguageModelV3 {
           listeners = [updateListener, completeListener, errorListener]
         } catch (error) {
           cleanup()
-          toolListener.remove()
           controller.error(new Error(`ADK stream failed: ${error}`))
         }
       },
