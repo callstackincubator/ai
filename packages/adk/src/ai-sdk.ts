@@ -8,10 +8,10 @@ import type {
   LanguageModelV3StreamPart,
 } from '@ai-sdk/provider'
 import {
-  type Tool as FullToolDefinition,
   generateId,
   jsonSchema,
   parseJSON,
+  type Tool as FullToolDefinition,
   type ToolExecutionOptions,
 } from '@ai-sdk/provider-utils'
 

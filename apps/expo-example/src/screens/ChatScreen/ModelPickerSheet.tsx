@@ -2,7 +2,7 @@ import type { LanguageModelV3 } from '@ai-sdk/provider'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { SymbolView } from 'expo-symbols'
-import React, { RefObject, Suspense, useState } from 'react'
+import React, { type RefObject, Suspense, useState } from 'react'
 import {
   Pressable,
   ScrollView,

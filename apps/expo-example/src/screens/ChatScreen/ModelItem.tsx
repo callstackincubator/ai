@@ -10,10 +10,10 @@ import {
   View,
 } from 'react-native'
 
-import type { SetupAdapter } from '../../config/providers.common'
 import { hasGoogleApiKey } from '../../config/adk'
+import type { SetupAdapter } from '../../config/providers.common'
 import {
-  useDownloadProgress,  
+  useDownloadProgress,
   useProviderStore,
 } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
