@@ -93,7 +93,7 @@ mapped to Apple Foundation Models.
 
 ## Availability And Model Info
 
-Check availability before showing Apple-only UI:
+Check availability before using the Apple Intelligence wrapper backend or showing Apple-only UI:
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
