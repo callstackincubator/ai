@@ -879,7 +879,7 @@ public class AppleLLMImpl: NSObject {
   private static func fileExtension(forImageMediaType mediaType: String?) -> String {
     switch mediaType?.lowercased() {
     case "image/jpeg", "image/jpg":
-      return "jpg"
+      return "jpeg"
     case "image/heic":
       return "heic"
     case "image/webp":
