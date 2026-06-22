@@ -434,7 +434,7 @@ public class AppleLLMImpl: NSObject {
       "isAvailable": model.availability == .available,
       "availability": availabilityString(model.availability),
       "supportsLocale": model.supportsLocale(locale),
-      "supportedLanguages": model.supportedLanguages.map { String(describing: $0) }.sorted(),
+      "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
       "supportsTokenCounting": false,
       "supportsImagePrompts": false,
       "supportsPrivateCloudCompute": false,
@@ -472,7 +472,7 @@ public class AppleLLMImpl: NSObject {
       "contextSize": model.contextSize,
       "quotaUsage": String(describing: model.quotaUsage),
       "supportsLocale": model.supportsLocale(locale),
-      "supportedLanguages": model.supportedLanguages.map { String(describing: $0) }.sorted(),
+      "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
       "supportsTokenCounting": false,
       "supportsImagePrompts": true,
       "supportsPrivateCloudCompute": true,
@@ -484,6 +484,19 @@ public class AppleLLMImpl: NSObject {
 
   private func availabilityString(_ availability: Any) -> String {
     return String(describing: availability)
+  }
+
+  @available(iOS 26, *)
+  private func languageIdentifier(_ language: Locale.Language) -> String {
+    guard let languageCode = language.languageCode?.identifier else {
+      return language.minimalIdentifier
+    }
+
+    guard let region = language.region?.identifier else {
+      return languageCode
+    }
+
+    return "\(languageCode)-\(region)"
   }
 
   @available(iOS 26, *)
