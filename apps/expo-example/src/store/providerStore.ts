@@ -1,6 +1,6 @@
 import { adk } from '@react-native-ai/adk'
 import { generateId } from 'ai'
-import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { atom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithRefresh, loadable } from 'jotai/utils'
 import { Platform } from 'react-native'
 
@@ -70,7 +70,7 @@ const availabilityLoadableAtom = loadable(availabilityAtom)
 export function useProviderStore() {
   const adapters = useAtomValue(adaptersAtom)
   const availabilityLoadable = useAtomValue(availabilityLoadableAtom)
-  const [, refreshAvailability] = useAtom(availabilityAtom)
+  const refreshAvailability = useSetAtom(availabilityAtom)
 
   const availabilityState: AvailabilityState =
     availabilityLoadable.state === 'hasData'

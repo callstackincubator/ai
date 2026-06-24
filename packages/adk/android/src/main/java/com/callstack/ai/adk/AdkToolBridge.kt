@@ -8,9 +8,10 @@ object AdkToolBridge {
   private val streamToolCalls = ConcurrentHashMap<String, MutableSet<String>>()
 
   suspend fun awaitResult(toolCallId: String): String {
-    val deferred = CompletableDeferred<String>()
-    pendingResults[toolCallId] = deferred
-    return deferred.await()
+    val deferred = pendingResults.computeIfAbsent(toolCallId) { CompletableDeferred() }
+    val result = deferred.await()
+    pendingResults.remove(toolCallId, deferred)
+    return result
   }
 
   fun registerToolCall(streamId: String, toolCallId: String) {
@@ -18,7 +19,7 @@ object AdkToolBridge {
   }
 
   fun submitResult(toolCallId: String, result: String) {
-    pendingResults.remove(toolCallId)?.complete(result)
+    pendingResults.computeIfAbsent(toolCallId) { CompletableDeferred() }.complete(result)
     streamToolCalls.values.forEach { toolCallIds -> toolCallIds.remove(toolCallId) }
   }
 

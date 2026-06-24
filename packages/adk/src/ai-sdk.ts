@@ -663,7 +663,9 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       },
       cancel: () => {
         cleanup()
-        getNativeAdkEngine().cancelStream(streamId)
+        void getNativeAdkEngine()
+          .cancelStream(streamId)
+          .catch((error) => console.warn('[adk] cancelStream failed:', error))
       },
     })
 

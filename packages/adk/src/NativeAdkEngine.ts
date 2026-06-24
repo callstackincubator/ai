@@ -47,7 +47,7 @@ export interface AdkTool {
 export interface AdkResponseFormat {
   type: 'json'
   mimeType?: string
-  schema: UnsafeObject
+  schema?: UnsafeObject
 }
 
 export interface AdkGenerationOptions {
