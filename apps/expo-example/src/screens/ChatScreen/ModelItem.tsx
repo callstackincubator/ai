@@ -120,7 +120,9 @@ export function ModelItem({
                   : adapter.modelId === 'adk-gemini-2.5-flash' &&
                       !hasGoogleApiKey()
                     ? 'Set EXPO_PUBLIC_GOOGLE_API_KEY'
-                    : 'Not available on this device'}
+                    : adapter.modelId === 'adk-gemini-nano'
+                      ? 'Gemini Nano not supported on this device'
+                      : 'Not available on this device'}
             </Text>
           )}
         </View>

@@ -1,10 +1,12 @@
+import { isADKNanoSupported } from '@react-native-ai/adk'
 import { generateId } from 'ai'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomWithRefresh } from 'jotai/utils'
+import { atomWithRefresh, loadable } from 'jotai/utils'
+import { Platform } from 'react-native'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { languageAdapters } from '../config/providers'
-import { type Availability } from '../config/providers.common'
+import type { Availability } from '../config/providers.common'
 
 export type CustomModel = {
   id: string
@@ -22,20 +24,39 @@ const adaptersAtom = atom((get) => {
   return [...languageAdapters, ...customModels]
 })
 
-const availabilityAtom = atomWithRefresh((get) => {
+const availabilityAtom = atomWithRefresh(async (get) => {
   const adapters = get(adaptersAtom)
   const map = new Map<string, Availability>()
+
   for (const adapter of adapters) {
+    if (adapter.modelId === 'adk-gemini-nano') {
+      continue
+    }
     map.set(adapter.modelId, adapter.isAvailable())
   }
+
+  if (Platform.OS === 'android') {
+    map.set('adk-gemini-nano', (await isADKNanoSupported()) ? 'yes' : 'no')
+  } else {
+    map.set('adk-gemini-nano', 'no')
+  }
+
   return map
 })
 
 const downloadProgressAtom = atom<Record<string, number>>({})
 
+const availabilityLoadableAtom = loadable(availabilityAtom)
+
 export function useProviderStore() {
   const adapters = useAtomValue(adaptersAtom)
-  const [availability, refreshAvailability] = useAtom(availabilityAtom)
+  const availabilityLoadable = useAtomValue(availabilityLoadableAtom)
+  const [, refreshAvailability] = useAtom(availabilityAtom)
+
+  const availability =
+    availabilityLoadable.state === 'hasData'
+      ? availabilityLoadable.data
+      : new Map<string, Availability>()
 
   const setCustomModels = useSetAtom(customModelsAtom)
   const setDownloadProgress = useSetAtom(downloadProgressAtom)

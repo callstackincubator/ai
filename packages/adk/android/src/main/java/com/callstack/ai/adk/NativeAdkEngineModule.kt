@@ -48,6 +48,16 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  override fun isNanoSupported(promise: Promise) {
+    scope.launch {
+      try {
+        promise.resolve(runner.isNanoSupported())
+      } catch (_: Exception) {
+        promise.resolve(false)
+      }
+    }
+  }
+
   override fun prepareNano(promise: Promise) {
     scope.launch {
       try {

@@ -18,8 +18,8 @@ const adkLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
 
 // Available language model adapters for text generation.
 export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
-  ...adkLanguageAdapters,
   ...commonLanguageAdapters,
+  ...adkLanguageAdapters,
 ]
 
 // Available speech model adapters for text-to-speech.

@@ -101,6 +101,7 @@ export interface ToolCallEvent {
 
 export interface Spec extends TurboModule {
   isAvailable(modelType: AdkModelType): Promise<boolean>
+  isNanoSupported(): Promise<boolean>
   prepareNano(): Promise<void>
 
   generateText(

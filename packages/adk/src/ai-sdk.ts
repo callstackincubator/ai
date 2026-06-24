@@ -17,6 +17,7 @@ import {
   type ToolExecutionOptions,
 } from '@ai-sdk/provider-utils'
 
+import { isADKNanoSupported } from './adk-platform'
 import {
   type AdkAgentConfig,
   type AdkGenerationOptions,
@@ -213,8 +214,15 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     }
 
     if (!this.nanoPreparePromise) {
-      this.nanoPreparePromise = getNativeAdkEngine()
-        .prepareNano()
+      this.nanoPreparePromise = isADKNanoSupported()
+        .then((supported) => {
+          if (!supported) {
+            throw new Error(
+              'Gemini Nano is not supported on this device or device has not fetched the latest configuration to support it'
+            )
+          }
+          return getNativeAdkEngine().prepareNano()
+        })
         .catch((error) => {
           this.nanoPreparePromise = null
           throw error
@@ -293,8 +301,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       topP: options.topP,
       topK: options.topK,
       responseFormat:
-        options.responseFormat?.type === 'json' &&
-        options.responseFormat.schema
+        options.responseFormat?.type === 'json' && options.responseFormat.schema
           ? {
               type: 'json',
               mimeType: 'application/json',

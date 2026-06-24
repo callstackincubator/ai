@@ -132,21 +132,32 @@ const { text } = await generateText({
 
 ## On-device Gemini Nano
 
+Check device support before preparing or generating:
+
 ```ts
-import { createAdkProvider } from '@react-native-ai/adk'
+import { createAdkProvider, isADKNanoSupported } from '@react-native-ai/adk'
+
+const supported = await isADKNanoSupported()
+if (!supported) {
+  // Device lacks Gemini Nano / AICore support
+  return
+}
 
 const provider = createAdkProvider({
   modelType: 'genai-nano',
   modelName: 'gemini-nano',
 })
 
-const available = await provider.isAvailable('genai-nano')
-if (available) {
+const ready = await provider.isAvailable('genai-nano')
+if (ready) {
   await provider.prepareNano()
 }
 
 const model = provider.languageModel()
 ```
+
+- `isADKNanoSupported()` — device supports Nano (`checkStatus` ≠ 0). Does not download models.
+- `isAvailable('genai-nano')` — Nano is ready or downloadable now (status 1 or 3).
 
 ## Tool calling
 

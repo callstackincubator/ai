@@ -19,6 +19,7 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.UsageMetadata
 import com.google.adk.kt.utils.mlkit.GenerativeModelHelpers
+import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
@@ -44,6 +45,11 @@ class AdkAgentRunner(
   private val nanoPrepareMutex = Mutex()
 
   suspend fun prepareNano() {
+    if (!isNanoSupported()) {
+      throw IllegalStateException(
+        "Gemini Nano is not supported on this device or device hasn't fetched the latest configuration to support it",
+      )
+    }
     nanoPrepareMutex.withLock {
       generativeModel = GenerativeModelHelpers.initGenerativeModel()
     }
@@ -56,12 +62,27 @@ class AdkAgentRunner(
     prepareNano()
   }
 
+  /**
+   * Whether this device supports on-device Gemini Nano at all (ML Kit checkStatus != 0).
+   * Does not download models or run full initialization.
+   */
+  suspend fun isNanoSupported(): Boolean {
+    return try {
+      when (Generation.getClient().checkStatus()) {
+        0 -> false
+        else -> true
+      }
+    } catch (_: Exception) {
+      false
+    }
+  }
+
+  /**
+   * Whether Gemini Nano is ready to use now (downloaded or ready to download).
+   */
   suspend fun isNanoAvailable(): Boolean {
     return try {
-      val model = generativeModel ?: GenerativeModelHelpers.initGenerativeModel().also {
-        generativeModel = it
-      }
-      when (model.checkStatus()) {
+      when (Generation.getClient().checkStatus()) {
         1, 3 -> true
         else -> false
       }
