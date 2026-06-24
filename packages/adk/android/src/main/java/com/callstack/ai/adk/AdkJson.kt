@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object AdkJson {
-  fun encode(value: Map<String, Any>): String {
+  fun encode(value: Map<String, Any?>): String {
     return mapToJsonObject(value).toString()
   }
 
@@ -21,7 +21,7 @@ object AdkJson {
     }
   }
 
-  private fun mapToJsonObject(value: Map<String, Any>): JSONObject {
+  private fun mapToJsonObject(value: Map<String, Any?>): JSONObject {
     val json = JSONObject()
     value.forEach { (key, entryValue) ->
       json.put(key, toJsonValue(entryValue))

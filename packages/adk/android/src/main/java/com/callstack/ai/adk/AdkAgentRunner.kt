@@ -22,6 +22,8 @@ import com.google.adk.kt.utils.mlkit.GenerativeModelHelpers
 import com.google.mlkit.genai.prompt.GenerativeModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 data class AdkRunResult(
@@ -39,9 +41,19 @@ class AdkAgentRunner(
   ) -> Unit,
 ) {
   private var generativeModel: GenerativeModel? = null
+  private val nanoPrepareMutex = Mutex()
 
   suspend fun prepareNano() {
-    generativeModel = GenerativeModelHelpers.initGenerativeModel()
+    nanoPrepareMutex.withLock {
+      generativeModel = GenerativeModelHelpers.initGenerativeModel()
+    }
+  }
+
+  private suspend fun ensureNanoPrepared() {
+    if (generativeModel != null) {
+      return
+    }
+    prepareNano()
   }
 
   suspend fun isNanoAvailable(): Boolean {
@@ -49,7 +61,10 @@ class AdkAgentRunner(
       val model = generativeModel ?: GenerativeModelHelpers.initGenerativeModel().also {
         generativeModel = it
       }
-      model.checkStatus().name != "UNAVAILABLE"
+      when (model.checkStatus()) {
+        1, 3 -> true
+        else -> false
+      }
     } catch (_: Exception) {
       false
     }
@@ -143,11 +158,12 @@ class AdkAgentRunner(
     )
   }
 
-  private fun createModel(config: AgentConfig): Model {
+  private suspend fun createModel(config: AgentConfig): Model {
     return when (config.modelType) {
       "genai-nano" -> {
+        ensureNanoPrepared()
         val model = generativeModel
-          ?: throw IllegalStateException("Call prepareNano() before using Gemini Nano")
+          ?: throw IllegalStateException("Failed to initialize Gemini Nano")
         GenaiPrompt.create(model, config.modelName)
       }
       else -> Gemini(name = config.modelName, apiKey = config.apiKey)
@@ -166,15 +182,12 @@ class AdkAgentRunner(
       responseFormat?.getString("type") == "json" -> "application/json"
       else -> null
     }
-    val responseSchema = responseFormat?.getMap("schema")?.let { AdkSchema.fromReadableMap(it) }
-
     return GenerateContentConfig(
       temperature = options.takeIf { it.hasKey("temperature") }?.getDouble("temperature")?.toFloat(),
       maxOutputTokens = options.takeIf { it.hasKey("maxTokens") }?.getInt("maxTokens"),
       topP = options.takeIf { it.hasKey("topP") }?.getDouble("topP")?.toFloat(),
       topK = options.takeIf { it.hasKey("topK") }?.getDouble("topK")?.toFloat()?.toInt(),
       responseMimeType = responseMimeType,
-      responseSchema = responseSchema,
     )
   }
 

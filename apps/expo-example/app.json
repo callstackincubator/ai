@@ -51,7 +51,10 @@
             ]
           },
           "android": {
-            "minSdkVersion": 24
+            "minSdkVersion": 26,
+            "packagingOptions": {
+              "exclude": ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
+            }
           }
         }
       ],

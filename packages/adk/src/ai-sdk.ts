@@ -171,6 +171,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
 
   private readonly agentConfig: AdkAgentConfig
   private tools: ToolDefinitionSet = {}
+  private nanoPreparePromise: Promise<void> | null = null
 
   constructor(options: AdkProviderOptions) {
     const modelType = options.modelType ?? 'gemini'
@@ -200,6 +201,27 @@ class AdkChatLanguageModel implements LanguageModelV3 {
 
   public prepareNano() {
     return getNativeAdkEngine().prepareNano()
+  }
+
+  async prepare(): Promise<void> {
+    await this.ensureNanoPrepared()
+  }
+
+  private ensureNanoPrepared(): Promise<void> {
+    if (this.agentConfig.model.type !== 'genai-nano') {
+      return Promise.resolve()
+    }
+
+    if (!this.nanoPreparePromise) {
+      this.nanoPreparePromise = getNativeAdkEngine()
+        .prepareNano()
+        .catch((error) => {
+          this.nanoPreparePromise = null
+          throw error
+        })
+    }
+
+    return this.nanoPreparePromise
   }
 
   private prepareMessages(messages: LanguageModelV3Prompt): AdkMessage[] {
@@ -271,11 +293,12 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       topP: options.topP,
       topK: options.topK,
       responseFormat:
-        options.responseFormat?.type === 'json'
+        options.responseFormat?.type === 'json' &&
+        options.responseFormat.schema
           ? {
               type: 'json',
               mimeType: 'application/json',
-              schema: options.responseFormat.schema as Record<string, unknown>,
+              schema: options.responseFormat.schema,
             }
           : undefined,
     }
@@ -386,6 +409,8 @@ class AdkChatLanguageModel implements LanguageModelV3 {
         )
       }
 
+      await this.ensureNanoPrepared()
+
       const response = await getNativeAdkEngine().generateText(
         messages,
         this.agentConfig,
@@ -440,6 +465,8 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     const stream = new ReadableStream<LanguageModelV3StreamPart>({
       start: async (controller) => {
         try {
+          await this.ensureNanoPrepared()
+
           streamId = await getNativeAdkEngine().streamText(
             messages,
             agentConfig,

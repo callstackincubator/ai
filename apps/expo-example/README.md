@@ -43,7 +43,7 @@ cp .env.example .env
 
 Set `EXPO_PUBLIC_GOOGLE_API_KEY` from [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-ADK requires Android API 24+. After changing native config, run:
+ADK requires Android `minSdkVersion` 26 or greater (ML Kit GenAI). This example sets it via `expo-build-properties` in `app.json`. After changing native config, run:
 
 ```bash
 npx expo prebuild --clean

@@ -48,8 +48,8 @@ export const createAdkLanguageSetupAdapter = (
     async delete() {},
     async unload() {},
     async prepare() {
-      if (options.modelType === 'genai-nano') {
-        await provider.prepareNano()
+      if ('prepare' in model && typeof model.prepare === 'function') {
+        await model.prepare()
       }
     },
   }

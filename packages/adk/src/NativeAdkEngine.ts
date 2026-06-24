@@ -1,6 +1,6 @@
 import type { TurboModule } from 'react-native'
 import { Platform, TurboModuleRegistry } from 'react-native'
-import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes'
+import type { EventEmitter, UnsafeObject } from 'react-native/Libraries/Types/CodegenTypes'
 
 export type AdkMessageRole = 'assistant' | 'system' | 'user'
 
@@ -44,7 +44,7 @@ export interface AdkTool {
 export interface AdkResponseFormat {
   type: 'json'
   mimeType?: string
-  schema: Record<string, unknown>
+  schema: UnsafeObject
 }
 
 export interface AdkGenerationOptions {

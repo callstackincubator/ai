@@ -4,9 +4,37 @@ A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://deve
 
 **Requirements:**
 
-- Android API 24+
+- Android `minSdkVersion` 26 or greater (required by ML Kit GenAI / Gemini Nano; set in your app, not only in this package)
 - React Native New Architecture
 - Vercel AI SDK v6
+
+Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST`; exclude it in your app packaging. For Expo:
+
+```json
+[
+  "expo-build-properties",
+  {
+    "android": {
+      "minSdkVersion": 26,
+      "packagingOptions": {
+        "exclude": ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
+      }
+    }
+  }
+]
+```
+
+For bare React Native, add to `android/app/build.gradle`:
+
+```gradle
+android {
+  packagingOptions {
+    excludes += ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
+  }
+}
+```
+
+Then run `npx expo prebuild --clean` so the native Android project picks up the change.
 
 ```ts
 import { adk } from '@react-native-ai/adk'
