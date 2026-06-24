@@ -8,14 +8,14 @@ object AdkJson {
     return mapToJsonObject(value).toString()
   }
 
-  fun decodeResult(value: String): Any {
+  fun decodeResult(value: String): Any? {
     val trimmed = value.trim()
     return when {
       trimmed.startsWith("{") -> jsonObjectToMap(JSONObject(trimmed))
       trimmed.startsWith("[") -> jsonArrayToList(JSONArray(trimmed))
       trimmed == "true" -> true
       trimmed == "false" -> false
-      trimmed == "null" -> emptyMap<String, Any>()
+      trimmed == "null" -> null
       trimmed.toDoubleOrNull() != null -> trimmed.toDouble()
       else -> trimmed.removeSurrounding("\"")
     }
@@ -29,12 +29,12 @@ object AdkJson {
     return json
   }
 
-  private fun toJsonValue(value: Any?): Any {
+  private fun toJsonValue(value: Any?): Any? {
     return when (value) {
       null -> JSONObject.NULL
       is Map<*, *> -> {
         @Suppress("UNCHECKED_CAST")
-        mapToJsonObject(value as Map<String, Any>)
+        mapToJsonObject(value as Map<String, Any?>)
       }
       is Iterable<*> -> {
         val array = JSONArray()
@@ -45,25 +45,25 @@ object AdkJson {
     }
   }
 
-  private fun jsonObjectToMap(json: JSONObject): Map<String, Any> {
-    val result = mutableMapOf<String, Any>()
+  private fun jsonObjectToMap(json: JSONObject): Map<String, Any?> {
+    val result = mutableMapOf<String, Any?>()
     json.keys().forEach { key ->
       result[key] = jsonValue(json.get(key))
     }
     return result
   }
 
-  private fun jsonArrayToList(json: JSONArray): List<Any> {
-    val result = mutableListOf<Any>()
+  private fun jsonArrayToList(json: JSONArray): List<Any?> {
+    val result = mutableListOf<Any?>()
     for (index in 0 until json.length()) {
       result.add(jsonValue(json.get(index)))
     }
     return result
   }
 
-  private fun jsonValue(value: Any?): Any {
+  private fun jsonValue(value: Any?): Any? {
     return when (value) {
-      JSONObject.NULL, null -> ""
+      JSONObject.NULL, null -> null
       is JSONObject -> jsonObjectToMap(value)
       is JSONArray -> jsonArrayToList(value)
       else -> value

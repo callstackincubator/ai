@@ -210,6 +210,12 @@ class AdkAgentRunner(
     if (options == null) return null
 
     val responseFormat = options.getMap("responseFormat")
+    if (responseFormat?.hasKey("schema") == true) {
+      throw IllegalArgumentException(
+        "ADK GenerateContentConfig does not support responseFormat.schema yet",
+      )
+    }
+
     val responseMimeType = when {
       responseFormat?.hasKey("mimeType") == true -> responseFormat.getString("mimeType")
       responseFormat?.getString("type") == "json" -> "application/json"
@@ -235,7 +241,10 @@ class AdkAgentRunner(
       val role = when (message.getString("role")) {
         "assistant" -> Role.MODEL
         "system" -> Role.SYSTEM
-        else -> Role.USER
+        "user", "tool" -> Role.USER
+        else -> throw IllegalArgumentException(
+          "Unsupported message role: ${message.getString("role")}",
+        )
       }
 
       val partsArray = message.getArray("parts")

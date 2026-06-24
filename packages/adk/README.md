@@ -56,7 +56,7 @@ const { text } = await generateText({
 - Streaming responses with tool-call stream parts
 - Post-generation token usage via ADK `UsageMetadata`
 - Multimodal user prompts (text + inline images)
-- Structured JSON output via ADK `GenerateContentConfig`
+- Structured JSON output via `responseMimeType` (schema constraints not yet supported)
 - Vercel AI SDK v6 `LanguageModelV3` provider
 
 ## Usage metadata
@@ -90,19 +90,17 @@ const { text } = await generateText({
 
 ## Structured output
 
-Use AI SDK `responseFormat` with JSON schema. ADK maps this to `responseMimeType` and `responseSchema`:
+JSON mode (`responseFormat: { type: 'json' }`) sets `responseMimeType` to `application/json`. Schema-constrained output is not supported yet — `generateObject` and `responseFormat.schema` throw an explicit error because ADK `GenerateContentConfig` (v0.2.0) does not expose `responseSchema`.
+
+Use `generateText` and parse JSON from the response until schema support is added:
 
 ```ts
-import { generateObject } from 'ai'
-import { z } from 'zod'
+import { generateText } from 'ai'
 
-const { object } = await generateObject({
+const { text } = await generateText({
   model: adk.languageModel(),
-  schema: z.object({
-    summary: z.string(),
-    sentiment: z.enum(['positive', 'neutral', 'negative']),
-  }),
-  prompt: 'Summarize this product review: ...',
+  prompt:
+    'Respond with JSON: {"summary": string, "sentiment": "positive"|"neutral"|"negative"}. Review: ...',
 })
 ```
 

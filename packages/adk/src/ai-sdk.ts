@@ -317,28 +317,53 @@ class AdkChatLanguageModel implements LanguageModelV3 {
         }
       }
 
-      console.warn('Unsupported message role for ADK provider:', message.role)
-      return {
-        role: 'user',
-        content: '',
+      if (message.role === 'tool') {
+        const content = message.content
+          .filter((part) => part.type === 'tool-result')
+          .map((part) => {
+            if (part.output.type === 'execution-denied') {
+              return part.output.reason ?? 'Execution denied'
+            }
+            return typeof part.output.value === 'string'
+              ? part.output.value
+              : JSON.stringify(part.output.value)
+          })
+          .join('\n')
+
+        return {
+          role: 'user',
+          content,
+        }
       }
+
+      throw new Error(
+        `Unsupported message role for ADK provider: ${message.role}`
+      )
     })
   }
 
   private prepareGenerationOptions(
     options: LanguageModelV3CallOptions
   ): AdkGenerationOptions {
+    if (
+      options.responseFormat?.type === 'json' &&
+      options.responseFormat.schema
+    ) {
+      throw new Error(
+        'ADK does not support responseFormat.schema yet. Use JSON mode without a schema or omit responseFormat.'
+      )
+    }
+
     return {
       temperature: options.temperature,
       maxTokens: options.maxOutputTokens,
       topP: options.topP,
       topK: options.topK,
       responseFormat:
-        options.responseFormat?.type === 'json' && options.responseFormat.schema
+        options.responseFormat?.type === 'json'
           ? {
               type: 'json',
               mimeType: 'application/json',
-              schema: options.responseFormat.schema,
             }
           : undefined,
     }
@@ -632,7 +657,8 @@ class AdkChatLanguageModel implements LanguageModelV3 {
           )
         } catch (error) {
           cleanup()
-          controller.error(new Error(`ADK stream failed: ${error}`))
+          const message = error instanceof Error ? error.message : String(error)
+          controller.error(new Error(`ADK stream failed: ${message}`))
         }
       },
       cancel: () => {
