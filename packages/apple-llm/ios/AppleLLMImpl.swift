@@ -99,8 +99,12 @@ public class AppleLLMImpl: NSObject {
         if #available(iOS 27, *) {
           let model = PrivateCloudComputeLanguageModel()
           Task {
-            let info = await modelInfo(for: model, locale: locale, modelName: modelName)
+            do {
+              let info = try await modelInfo(for: model, locale: locale, modelName: modelName)
             resolve(info)
+            } catch {
+              reject("AppleLLM", error.localizedDescription, error)
+            }
           }
         } else {
           rejectWithAppleError(.unsupportedOS, reject: reject)
@@ -467,8 +471,8 @@ public class AppleLLMImpl: NSObject {
     for model: PrivateCloudComputeLanguageModel,
     locale: Locale,
     modelName: String
-  ) async -> [String: Any] {
-    let contextSize = await model.contextSize
+  ) async throws -> [String: Any] {
+    let contextSize = try await model.contextSize
     return [
       "model": modelName,
       "isAvailable": model.availability == .available,
