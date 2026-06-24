@@ -16,8 +16,8 @@ import {
   type Tool as FullToolDefinition,
   type ToolExecutionOptions,
 } from '@ai-sdk/provider-utils'
+import { Platform } from 'react-native'
 
-import { isADKNanoSupported } from './adk-platform'
 import {
   type AdkAgentConfig,
   type AdkGenerationOptions,
@@ -42,16 +42,49 @@ export interface AdkProviderOptions {
   availableTools?: Record<string, FullToolDefinition>
 }
 
-export function createAdkProvider(options: AdkProviderOptions = {}) {
+/**
+ * Whether the device can support on-device Gemini Nano at all
+ * (ML Kit `checkStatus !== 0`). Does not download models.
+ */
+async function checkNanoSupported(): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return false
+  }
+
+  return getNativeAdkEngine().isNanoSupported()
+}
+
+export interface AdkProvider {
+  (): LanguageModelV3
+  languageModel: () => LanguageModelV3
+  /** Device capability check (ML Kit `checkStatus !== 0`). Returns `false` on non-Android. */
+  isNanoSupported: () => Promise<boolean>
+  /**
+   * Whether `modelType` can be used now. For `genai-nano`, checks ML Kit readiness
+   * (status 1 or 3). Returns `false` when {@link isNanoSupported} is `false`.
+   * Cloud `gemini` always resolves to `true` on Android.
+   */
+  isAvailable: (modelType?: AdkModelType) => Promise<boolean>
+  /** Downloads and initializes on-device Gemini Nano. No-op for cloud models. */
+  prepareNano: () => Promise<void>
+}
+
+export function createAdkProvider(
+  options: AdkProviderOptions = {}
+): AdkProvider {
   const createLanguageModel = () => new AdkChatLanguageModel(options)
 
-  const provider = () => createLanguageModel()
-  provider.languageModel = createLanguageModel
-  provider.isAvailable = (modelType: AdkModelType = 'gemini') =>
-    getNativeAdkEngine().isAvailable(modelType).then(Boolean)
-  provider.prepareNano = () => getNativeAdkEngine().prepareNano()
-
-  return provider
+  return Object.assign(() => createLanguageModel(), {
+    languageModel: createLanguageModel,
+    isNanoSupported: () => checkNanoSupported(),
+    isAvailable: async (modelType: AdkModelType = 'gemini') => {
+      if (modelType === 'genai-nano' && !(await checkNanoSupported())) {
+        return false
+      }
+      return getNativeAdkEngine().isAvailable(modelType).then(Boolean)
+    },
+    prepareNano: () => getNativeAdkEngine().prepareNano(),
+  })
 }
 
 export const adk = createAdkProvider()
@@ -214,7 +247,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     }
 
     if (!this.nanoPreparePromise) {
-      this.nanoPreparePromise = isADKNanoSupported()
+      this.nanoPreparePromise = checkNanoSupported()
         .then((supported) => {
           if (!supported) {
             throw new Error(

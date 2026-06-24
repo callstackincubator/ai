@@ -132,32 +132,58 @@ const { text } = await generateText({
 
 ## On-device Gemini Nano
 
-Check device support before preparing or generating:
+Gemini Nano has two separate availability checks:
+
+| API | Label | Question |
+| --- | --- | --- |
+| `provider.isNanoSupported()` | **Device capability** | Can this device ever run Nano? |
+| `provider.isAvailable('genai-nano')` | **Runtime readiness** | Can I call `prepareNano()` / generate now? |
+
+If `isNanoSupported()` is `false`, `isAvailable('genai-nano')` is also `false`.
+
+### ML Kit status codes
+
+Both checks use ML Kit `Generation.getClient().checkStatus()`:
+
+| Status | `isNanoSupported()` | `isAvailable('genai-nano')` | Suggested UX |
+| --- | --- | --- | --- |
+| `0` | `false` | `false` | Hide or disable — not supported |
+| `1` | `true` | `true` | Ready — call `prepareNano()` |
+| `3` | `true` | `true` | Ready to download — call `prepareNano()` |
+| Other non-zero | `true` | `false` | Show disabled — not ready yet |
+
+See [ML Kit GenAI Prompt API](https://developers.google.com/ml-kit/genai) for details.
+
+### Recommended flow
 
 ```ts
-import { createAdkProvider, isADKNanoSupported } from '@react-native-ai/adk'
-
-const supported = await isADKNanoSupported()
-if (!supported) {
-  // Device lacks Gemini Nano / AICore support
-  return
-}
+import { createAdkProvider } from '@react-native-ai/adk'
 
 const provider = createAdkProvider({
   modelType: 'genai-nano',
   modelName: 'gemini-nano',
 })
 
-const ready = await provider.isAvailable('genai-nano')
-if (ready) {
-  await provider.prepareNano()
+const supported = await provider.isNanoSupported()
+if (!supported) {
+  // Device lacks Gemini Nano / AICore support — hide from model picker
+  return
 }
 
+const ready = await provider.isAvailable('genai-nano')
+if (!ready) {
+  // Device supports Nano but ML Kit is not ready yet (e.g. downloading)
+  // Show disabled — do not mark as "Ready"
+  return
+}
+
+await provider.prepareNano()
 const model = provider.languageModel()
 ```
 
-- `isADKNanoSupported()` — device supports Nano (`checkStatus` ≠ 0). Does not download models.
-- `isAvailable('genai-nano')` — Nano is ready or downloadable now (status 1 or 3).
+Both checks are cheap native calls (no model download). Safe to cache at app startup and re-check after resume.
+
+> **Note:** `model.prepare()`, `generateText()`, and `streamText()` auto-call `prepareNano()` for `genai-nano` models, but only gate on `isNanoSupported()`. For UI gating, always use `isAvailable('genai-nano')` and handle prepare/generation errors in your chat flow.
 
 ## Tool calling
 

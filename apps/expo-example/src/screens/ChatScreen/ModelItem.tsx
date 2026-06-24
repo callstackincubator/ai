@@ -32,7 +32,8 @@ export function ModelItem({
   onSelect,
   isLast,
 }: ModelItemProps) {
-  const { removeModel, availability, downloadModel } = useProviderStore()
+  const { removeModel, availability, downloadModel, nanoUnavailableReason } =
+    useProviderStore()
   const downloadProgress = useDownloadProgress(adapter.modelId)
 
   const selectedModelAvailability = availability.get(adapter.modelId)
@@ -121,7 +122,9 @@ export function ModelItem({
                       !hasGoogleApiKey()
                     ? 'Set EXPO_PUBLIC_GOOGLE_API_KEY'
                     : adapter.modelId === 'adk-gemini-nano'
-                      ? 'Gemini Nano not supported on this device'
+                      ? nanoUnavailableReason === 'not-ready'
+                        ? 'Gemini Nano not ready yet'
+                        : 'Gemini Nano not supported on this device'
                       : 'Not available on this device'}
             </Text>
           )}

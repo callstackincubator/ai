@@ -1,4 +1,4 @@
-import { isADKNanoSupported } from '@react-native-ai/adk'
+import { adk } from '@react-native-ai/adk'
 import { generateId } from 'ai'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithRefresh, loadable } from 'jotai/utils'
@@ -14,6 +14,13 @@ export type CustomModel = {
   url: string
 }
 
+export type NanoUnavailableReason = 'unsupported' | 'not-ready'
+
+type AvailabilityState = {
+  availability: Map<string, Availability>
+  nanoUnavailableReason: NanoUnavailableReason | null
+}
+
 // todo: persist custom models in storage (synchronous)
 const customModelsAtom = atom<CustomModel[]>([])
 
@@ -26,22 +33,34 @@ const adaptersAtom = atom((get) => {
 
 const availabilityAtom = atomWithRefresh(async (get) => {
   const adapters = get(adaptersAtom)
-  const map = new Map<string, Availability>()
+  const availability = new Map<string, Availability>()
+  let nanoUnavailableReason: NanoUnavailableReason | null = null
 
   for (const adapter of adapters) {
     if (adapter.modelId === 'adk-gemini-nano') {
       continue
     }
-    map.set(adapter.modelId, adapter.isAvailable())
+    availability.set(adapter.modelId, adapter.isAvailable())
   }
 
   if (Platform.OS === 'android') {
-    map.set('adk-gemini-nano', (await isADKNanoSupported()) ? 'yes' : 'no')
+    const supported = await adk.isNanoSupported()
+    if (!supported) {
+      availability.set('adk-gemini-nano', 'no')
+      nanoUnavailableReason = 'unsupported'
+    } else {
+      const ready = await adk.isAvailable('genai-nano')
+      availability.set('adk-gemini-nano', ready ? 'yes' : 'no')
+      if (!ready) {
+        nanoUnavailableReason = 'not-ready'
+      }
+    }
   } else {
-    map.set('adk-gemini-nano', 'no')
+    availability.set('adk-gemini-nano', 'no')
+    nanoUnavailableReason = 'unsupported'
   }
 
-  return map
+  return { availability, nanoUnavailableReason } satisfies AvailabilityState
 })
 
 const downloadProgressAtom = atom<Record<string, number>>({})
@@ -53,10 +72,10 @@ export function useProviderStore() {
   const availabilityLoadable = useAtomValue(availabilityLoadableAtom)
   const [, refreshAvailability] = useAtom(availabilityAtom)
 
-  const availability =
+  const availabilityState: AvailabilityState =
     availabilityLoadable.state === 'hasData'
       ? availabilityLoadable.data
-      : new Map<string, Availability>()
+      : { availability: new Map(), nanoUnavailableReason: null }
 
   const setCustomModels = useSetAtom(customModelsAtom)
   const setDownloadProgress = useSetAtom(downloadProgressAtom)
@@ -118,7 +137,8 @@ export function useProviderStore() {
 
   return {
     adapters,
-    availability,
+    availability: availabilityState.availability,
+    nanoUnavailableReason: availabilityState.nanoUnavailableReason,
     removeModel,
     addCustomModel,
     downloadModel,

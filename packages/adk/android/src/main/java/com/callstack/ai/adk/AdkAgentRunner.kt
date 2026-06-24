@@ -79,8 +79,13 @@ class AdkAgentRunner(
 
   /**
    * Whether Gemini Nano is ready to use now (downloaded or ready to download).
+   * Returns false when [isNanoSupported] is false.
    */
   suspend fun isNanoAvailable(): Boolean {
+    if (!isNanoSupported()) {
+      return false
+    }
+
     return try {
       when (Generation.getClient().checkStatus()) {
         1, 3 -> true

@@ -1,10 +1,14 @@
-export { isADKNanoSupported } from './adk-platform'
-export { type AdkProviderOptions, adk, createAdkProvider } from './ai-sdk'
+export {
+  adk,
+  type AdkProvider,
+  type AdkProviderOptions,
+  createAdkProvider,
+} from './ai-sdk'
 export {
   type AdkAgentConfig,
+  default as AdkEngine,
   type AdkMessage,
   type AdkModelType,
   type AdkTool,
-  default as AdkEngine,
   getNativeAdkEngine,
 } from './NativeAdkEngine'
