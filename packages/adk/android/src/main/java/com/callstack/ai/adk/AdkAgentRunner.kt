@@ -38,7 +38,7 @@ class AdkAgentRunner(
     toolCallId: String,
     toolId: String,
     arguments: String,
-    streamId: String?,
+    scope: ToolCallScope?,
   ) -> Unit,
 ) {
   private var generativeModel: GenerativeModel? = null
@@ -101,8 +101,9 @@ class AdkAgentRunner(
     config: ReadableMap,
     options: ReadableMap?,
     tools: ReadableArray?,
+    runId: String,
   ): AdkRunResult {
-    val events = runAgent(messages, config, options, tools, stream = false).toList()
+    val events = runAgent(messages, config, options, tools, stream = false, runId = runId).toList()
     val text = events
       .flatMap { event -> event.content?.parts?.mapNotNull { it.text } ?: emptyList() }
       .joinToString("")
@@ -129,10 +130,16 @@ class AdkAgentRunner(
     tools: ReadableArray?,
     stream: Boolean,
     streamId: String? = null,
+    runId: String? = null,
   ): Flow<Event> {
     val parsedMessages = parseMessages(messages)
     val agentConfig = parseAgentConfig(config)
-    val agentTools = parseTools(tools, streamId)
+    val toolCallScope = when {
+      stream && streamId != null -> ToolCallScope(streamId = streamId)
+      !stream && runId != null -> ToolCallScope(runId = runId)
+      else -> null
+    }
+    val agentTools = parseTools(tools, toolCallScope)
     val model = createModel(agentConfig)
     val generateContentConfig = parseGenerationConfig(options)
 
@@ -243,7 +250,7 @@ class AdkAgentRunner(
     return parsed
   }
 
-  private fun parseContentParts(role: String, partsArray: ReadableArray): Content {
+  private fun parseContentParts(role: ContentRole, partsArray: ReadableArray): Content {
     val parts = mutableListOf<Part>()
     for (index in 0 until partsArray.size()) {
       val part = partsArray.getMap(index) ?: continue
@@ -265,7 +272,7 @@ class AdkAgentRunner(
     return Content(role = role, parts = parts)
   }
 
-  private fun parseTools(tools: ReadableArray?, streamId: String?): List<ReactNativeFunctionTool> {
+  private fun parseTools(tools: ReadableArray?, toolCallScope: ToolCallScope?): List<ReactNativeFunctionTool> {
     if (tools == null) return emptyList()
 
     val parsed = mutableListOf<ReactNativeFunctionTool>()
@@ -294,7 +301,7 @@ class AdkAgentRunner(
           name = tool.getString("name") ?: continue,
           description = tool.getString("description") ?: "",
           parameters = parameters,
-          streamId = streamId,
+          toolCallScope = toolCallScope,
           onToolCall = onToolCall,
         )
       )
@@ -341,7 +348,15 @@ data class AgentConfig(
   val apiKey: String?,
 )
 
+/** ADK content role — one of [Role.USER], [Role.MODEL], or [Role.SYSTEM]. */
+private typealias ContentRole = String
+
 data class ParsedMessage(
-  val role: String,
+  val role: ContentRole,
   val content: Content,
+)
+
+data class ToolCallScope(
+  val streamId: String? = null,
+  val runId: String? = null,
 )

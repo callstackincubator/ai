@@ -14,7 +14,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
@@ -23,12 +22,15 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   override fun getName(): String = NAME
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-  private val runner = AdkAgentRunner { toolCallId, toolId, arguments, streamId ->
-    streamId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
+  private val runner = AdkAgentRunner { toolCallId, toolId, arguments, toolCallScope ->
+    toolCallScope?.streamId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
+    toolCallScope?.runId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
     val args = Arguments.createMap().apply {
       putString("toolCallId", toolCallId)
       putString("toolId", toolId)
       putString("arguments", arguments)
+      toolCallScope?.streamId?.let { putString("streamId", it) }
+      toolCallScope?.runId?.let { putString("runId", it) }
     }
     emitOnToolCall(args)
   }
@@ -70,6 +72,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   }
 
   override fun generateText(
+    runId: String,
     messages: ReadableArray,
     config: ReadableMap,
     options: ReadableMap?,
@@ -78,7 +81,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   ) {
     scope.launch {
       try {
-        val result = runner.generateText(messages, config, options, tools)
+        val result = runner.generateText(messages, config, options, tools, runId)
         val response = Arguments.createMap().apply {
           putString("role", "assistant")
           putString("content", result.content)
@@ -88,18 +91,24 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         promise.resolve(response)
       } catch (error: Exception) {
         promise.reject("ADK_GENERATION_ERROR", error.message, error)
+      } finally {
+        AdkToolBridge.cancelForStream(runId)
       }
     }
   }
 
   override fun streamText(
+    streamId: String,
     messages: ReadableArray,
     config: ReadableMap,
     options: ReadableMap?,
     tools: ReadableArray?,
     promise: Promise,
   ) {
-    val streamId = UUID.randomUUID().toString()
+    if (activeStreams.containsKey(streamId)) {
+      promise.reject("ADK_STREAM_ERROR", "Stream ID already in use: $streamId")
+      return
+    }
 
     val job = scope.launch {
       try {
@@ -154,7 +163,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     }
 
     activeStreams[streamId] = job
-    promise.resolve(streamId)
+    promise.resolve(null)
   }
 
   override fun cancelStream(streamId: String, promise: Promise) {

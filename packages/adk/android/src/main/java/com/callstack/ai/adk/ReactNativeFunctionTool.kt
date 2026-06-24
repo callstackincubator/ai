@@ -12,12 +12,12 @@ class ReactNativeFunctionTool(
   name: String,
   description: String,
   private val parameters: List<ToolParameterSpec>,
-  private val streamId: String?,
+  private val toolCallScope: ToolCallScope?,
   private val onToolCall: (
     toolCallId: String,
     toolId: String,
     arguments: String,
-    streamId: String?,
+    scope: ToolCallScope?,
   ) -> Unit,
 ) : FunctionTool(name = name, description = description) {
 
@@ -45,7 +45,7 @@ class ReactNativeFunctionTool(
   override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any {
     val toolCallId = UUID.randomUUID().toString()
     val argumentsJson = AdkJson.encode(args)
-    onToolCall(toolCallId, toolId, argumentsJson, streamId)
+    onToolCall(toolCallId, toolId, argumentsJson, toolCallScope)
     val result = AdkToolBridge.awaitResult(toolCallId)
     return AdkJson.decodeResult(result)
   }

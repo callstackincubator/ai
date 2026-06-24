@@ -1,6 +1,9 @@
 import type { TurboModule } from 'react-native'
 import { Platform, TurboModuleRegistry } from 'react-native'
-import type { EventEmitter, UnsafeObject } from 'react-native/Libraries/Types/CodegenTypes'
+import type {
+  EventEmitter,
+  UnsafeObject,
+} from 'react-native/Libraries/Types/CodegenTypes'
 
 export type AdkMessageRole = 'assistant' | 'system' | 'user'
 
@@ -97,6 +100,8 @@ export interface ToolCallEvent {
   toolCallId: string
   toolId: string
   arguments: string
+  streamId?: string
+  runId?: string
 }
 
 export interface Spec extends TurboModule {
@@ -105,6 +110,7 @@ export interface Spec extends TurboModule {
   prepareNano(): Promise<void>
 
   generateText(
+    runId: string,
     messages: AdkMessage[],
     config: AdkAgentConfig,
     options?: AdkGenerationOptions,
@@ -112,11 +118,12 @@ export interface Spec extends TurboModule {
   ): Promise<AdkGeneratedMessage>
 
   streamText(
+    streamId: string,
     messages: AdkMessage[],
     config: AdkAgentConfig,
     options?: AdkGenerationOptions,
     tools?: AdkTool[]
-  ): Promise<string>
+  ): Promise<void>
 
   cancelStream(streamId: string): Promise<void>
   submitToolResult(toolCallId: string, result: string): void

@@ -403,10 +403,24 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     }
   }
 
-  private createToolCallListener() {
+  private createToolCallListener(scope: {
+    streamId?: string
+    runId?: string
+    ownedToolIds: Set<string>
+  }) {
     const native = getNativeAdkEngine()
 
     return native.onToolCall(async (event: ToolCallEvent) => {
+      if (scope.streamId !== undefined && event.streamId !== scope.streamId) {
+        return
+      }
+      if (scope.runId !== undefined && event.runId !== scope.runId) {
+        return
+      }
+      if (!scope.ownedToolIds.has(event.toolId)) {
+        return
+      }
+
       const executor = globalThis.__ADK_TOOLS__?.[event.toolId]
       if (!executor) {
         native.submitToolResult(
@@ -438,9 +452,11 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     const generationOptions = this.prepareGenerationOptions(options)
     const preparedTools = this.prepareTools(options.tools)
     const nativeTools = preparedTools.map((tool) => tool.native)
+    const ownedToolIds = new Set(preparedTools.map((tool) => tool.native.id))
+    const runId = generateId()
 
     this.registerTools(preparedTools)
-    const toolListener = this.createToolCallListener()
+    const toolListener = this.createToolCallListener({ runId, ownedToolIds })
 
     try {
       if (options.toolChoice && options.toolChoice.type === 'required') {
@@ -452,6 +468,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       await this.ensureNanoPrepared()
 
       const response = await getNativeAdkEngine().generateText(
+        runId,
         messages,
         this.agentConfig,
         generationOptions,
@@ -476,6 +493,8 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     const preparedTools = this.prepareTools(options.tools)
     const nativeTools = preparedTools.map((tool) => tool.native)
     const agentConfig = this.agentConfig
+    const streamId = generateId()
+    const ownedToolIds = new Set(preparedTools.map((tool) => tool.native.id))
 
     if (options.responseFormat?.type === 'json') {
       throw new Error('Streaming JSON responses is not yet supported by ADK.')
@@ -489,11 +508,15 @@ class AdkChatLanguageModel implements LanguageModelV3 {
 
     this.registerTools(preparedTools)
 
-    let streamId: string | undefined
     let listeners: { remove(): void }[] = []
-    const toolListener = this.createToolCallListener()
+    let cleanedUp = false
+    const toolListener = this.createToolCallListener({ streamId, ownedToolIds })
 
     const cleanup = () => {
+      if (cleanedUp) {
+        return
+      }
+      cleanedUp = true
       listeners.forEach((listener) => {
         listener.remove()
       })
@@ -504,94 +527,84 @@ class AdkChatLanguageModel implements LanguageModelV3 {
 
     const stream = new ReadableStream<LanguageModelV3StreamPart>({
       start: async (controller) => {
-        try {
-          await this.ensureNanoPrepared()
+        const addListener = (listener: { remove(): void }) => {
+          listeners.push(listener)
+        }
 
-          streamId = await getNativeAdkEngine().streamText(
-            messages,
-            agentConfig,
-            generationOptions,
-            nativeTools
-          )
-
-          const currentStreamId = streamId
-
-          controller.enqueue({
-            type: 'text-start',
-            id: currentStreamId,
-          })
-
-          const updateListener = getNativeAdkEngine().onStreamUpdate((data) => {
-            if (data.streamId === currentStreamId && data.delta) {
+        addListener(
+          getNativeAdkEngine().onStreamUpdate((data) => {
+            if (data.streamId === streamId && data.delta) {
               controller.enqueue({
                 type: 'text-delta',
                 delta: data.delta,
-                id: currentStreamId,
+                id: streamId,
               })
             }
           })
+        )
 
-          const streamToolCallListener = getNativeAdkEngine().onStreamToolCall(
-            (data: StreamToolCallEvent) => {
-              if (data.streamId !== currentStreamId) {
-                return
-              }
-
-              if (data.phase === 'start' && data.toolName) {
-                controller.enqueue({
-                  type: 'tool-input-start',
-                  id: data.toolCallId,
-                  toolName: data.toolName,
-                  providerExecuted: true,
-                })
-                return
-              }
-
-              if (data.phase === 'delta' && data.inputDelta) {
-                controller.enqueue({
-                  type: 'tool-input-delta',
-                  id: data.toolCallId,
-                  delta: data.inputDelta,
-                })
-                return
-              }
-
-              if (data.phase === 'end' && data.toolName && data.input) {
-                controller.enqueue({
-                  type: 'tool-input-end',
-                  id: data.toolCallId,
-                })
-                controller.enqueue({
-                  type: 'tool-call',
-                  toolCallId: data.toolCallId,
-                  toolName: data.toolName,
-                  input: data.input,
-                  providerExecuted: true,
-                })
-              }
+        addListener(
+          getNativeAdkEngine().onStreamToolCall((data: StreamToolCallEvent) => {
+            if (data.streamId !== streamId) {
+              return
             }
-          )
 
-          const completeListener = getNativeAdkEngine().onStreamComplete(
-            (data) => {
-              if (data.streamId === currentStreamId) {
-                controller.enqueue({
-                  type: 'text-end',
-                  id: currentStreamId,
-                })
-                controller.enqueue({
-                  type: 'finish',
-                  finishReason: convertFinishReason(data.finishReason),
-                  usage: mapUsage(data.usage),
-                })
-                cleanup()
-                controller.close()
-              }
+            if (data.phase === 'start' && data.toolName) {
+              controller.enqueue({
+                type: 'tool-input-start',
+                id: data.toolCallId,
+                toolName: data.toolName,
+                providerExecuted: true,
+              })
+              return
             }
-          )
 
-          const errorListener = getNativeAdkEngine().onStreamError((data) => {
-            if (data.streamId === currentStreamId) {
+            if (data.phase === 'delta' && data.inputDelta) {
+              controller.enqueue({
+                type: 'tool-input-delta',
+                id: data.toolCallId,
+                delta: data.inputDelta,
+              })
+              return
+            }
+
+            if (data.phase === 'end' && data.toolName && data.input) {
+              controller.enqueue({
+                type: 'tool-input-end',
+                id: data.toolCallId,
+              })
+              controller.enqueue({
+                type: 'tool-call',
+                toolCallId: data.toolCallId,
+                toolName: data.toolName,
+                input: data.input,
+                providerExecuted: true,
+              })
+            }
+          })
+        )
+
+        addListener(
+          getNativeAdkEngine().onStreamComplete((data) => {
+            if (data.streamId === streamId) {
+              controller.enqueue({
+                type: 'text-end',
+                id: streamId,
+              })
+              controller.enqueue({
+                type: 'finish',
+                finishReason: convertFinishReason(data.finishReason),
+                usage: mapUsage(data.usage),
+              })
+              cleanup()
+              controller.close()
+            }
+          })
+        )
+
+        addListener(
+          getNativeAdkEngine().onStreamError((data) => {
+            if (data.streamId === streamId) {
               controller.enqueue({
                 type: 'error',
                 error: new Error(data.error),
@@ -600,13 +613,23 @@ class AdkChatLanguageModel implements LanguageModelV3 {
               controller.close()
             }
           })
+        )
 
-          listeners = [
-            updateListener,
-            streamToolCallListener,
-            completeListener,
-            errorListener,
-          ]
+        try {
+          await this.ensureNanoPrepared()
+
+          controller.enqueue({
+            type: 'text-start',
+            id: streamId,
+          })
+
+          await getNativeAdkEngine().streamText(
+            streamId,
+            messages,
+            agentConfig,
+            generationOptions,
+            nativeTools
+          )
         } catch (error) {
           cleanup()
           controller.error(new Error(`ADK stream failed: ${error}`))
@@ -614,9 +637,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       },
       cancel: () => {
         cleanup()
-        if (streamId) {
-          getNativeAdkEngine().cancelStream(streamId)
-        }
+        getNativeAdkEngine().cancelStream(streamId)
       },
     })
 
