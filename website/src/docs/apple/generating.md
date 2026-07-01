@@ -299,36 +299,6 @@ const info = await apple.getModelInfo()
 console.log(info.contextSize)
 ```
 
-The provider exposes context policies inspired by Apple's Dynamic Profile
-history utilities:
-
-```typescript
-import { createAppleProvider } from '@react-native-ai/apple'
-
-const summarizerModel = createAppleProvider().languageModel()
-
-const apple = createAppleProvider({
-  context: {
-    summarizeHistory: {
-      threshold: 5000,
-      model: summarizerModel,
-    },
-    rollingWindowMessages: 12,
-    dropCompletedToolCalls: true,
-  },
-})
-```
-
-History policies are applied in a fixed order: completed tool calls are dropped
-first, the rolling window is applied second, and older messages are summarized
-only if the remaining prompt still exceeds the threshold.
-
-`rollingWindowMessages` keeps system messages and the last N non-system
-messages. `dropCompletedToolCalls` removes older completed tool-call/tool-result
-entries while keeping the newest tool-related exchange. `summarizeHistory`
-replaces older conversation turns with a generated summary once the prompt token
-count exceeds the configured threshold.
-
 Use low-level token counting as an estimate, not a fit guarantee:
 
 ```typescript

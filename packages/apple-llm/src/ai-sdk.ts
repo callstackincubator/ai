@@ -24,7 +24,6 @@ import {
   ToolCallOptions,
 } from '@ai-sdk/provider-utils'
 
-import AppleFoundationModels from './AppleFoundationModels'
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
 import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
@@ -53,7 +52,6 @@ export type AppleImagePersonalization = 'automatic' | 'disabled' | 'enabled'
 export interface AppleProviderOptions {
   model?: AppleLanguageModelId
   builtInTools?: AppleBuiltInTool[]
-  context?: AppleContextOptions
   style?: AppleImageStyle
   personalization?: AppleImagePersonalization
 }
@@ -76,27 +74,6 @@ export interface AppleModelInfo {
 export interface AppleLanguageModelOptions {
   model?: AppleLanguageModelId
   availableTools?: AppleToolDefinitionSet
-  context?: AppleContextOptions
-}
-
-export interface AppleSummarizeHistoryOptions {
-  threshold: number
-  model: LanguageModelV3
-}
-
-export interface AppleContextOptions {
-  /**
-   * Summarize older messages when the prompt token count exceeds the threshold.
-   */
-  summarizeHistory?: AppleSummarizeHistoryOptions
-  /**
-   * Keep system messages and only the last N non-system messages.
-   */
-  rollingWindowMessages?: number
-  /**
-   * Remove completed tool-call/tool-result entries from older context.
-   */
-  dropCompletedToolCalls?: boolean
 }
 
 type AppleMessageAttachment = {
@@ -115,14 +92,6 @@ type AppleMessageContentPart = Extract<
   LanguageModelV3Message['content'],
   readonly unknown[]
 >[number]
-
-type LanguageModelLikeResult = Awaited<
-  ReturnType<LanguageModelV3['doGenerate']>
->
-
-type TokenCountCapableLanguageModel = LanguageModelV3 & {
-  countTokens?: (text: string) => Promise<number>
-}
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = ''
@@ -258,18 +227,6 @@ function getAppleProviderOptions(
   return (providerOptions?.apple ?? {}) as AppleProviderOptions
 }
 
-function mergeAppleContextOptions(
-  defaults: AppleContextOptions | undefined,
-  callOptions: AppleContextOptions | undefined
-): AppleContextOptions | undefined {
-  const context = {
-    ...defaults,
-    ...callOptions,
-  }
-
-  return Object.keys(context).length > 0 ? context : undefined
-}
-
 function mergeAppleProviderOptions(
   defaults: AppleLanguageModelOptions,
   callOptions: AppleProviderOptions
@@ -277,134 +234,7 @@ function mergeAppleProviderOptions(
   return {
     model: callOptions.model ?? defaults.model,
     builtInTools: callOptions.builtInTools,
-    context: mergeAppleContextOptions(defaults.context, callOptions.context),
   }
-}
-
-function getNativeAppleProviderOptions(
-  options: AppleProviderOptions
-): Omit<AppleProviderOptions, 'context'> {
-  const nativeOptions = { ...options }
-  delete nativeOptions.context
-  return nativeOptions
-}
-
-async function summarizePromptHistory(
-  prompt: LanguageModelV3Prompt,
-  threshold: number,
-  summarizerModel: LanguageModelV3
-): Promise<LanguageModelV3Prompt> {
-  if (threshold <= 0) {
-    return prompt
-  }
-
-  const promptTokenCount = await countPromptTokens(prompt, summarizerModel)
-
-  if (promptTokenCount <= threshold) {
-    return prompt
-  }
-
-  const systemMessages = prompt.filter((message) => message.role === 'system')
-  const conversationMessages = prompt.filter(
-    (message) => message.role !== 'system'
-  )
-
-  if (conversationMessages.length <= 2) {
-    return prompt
-  }
-
-  const latestMessage = conversationMessages[conversationMessages.length - 1]
-  const messagesToSummarize = conversationMessages.slice(0, -1)
-
-  if (messagesToSummarize.length === 0) {
-    return prompt
-  }
-
-  const summaryPrompt = buildSummaryPrompt(messagesToSummarize)
-  const summaryResult = await summarizerModel.doGenerate({
-    prompt: summaryPrompt,
-    maxOutputTokens: 400,
-  } as LanguageModelV3CallOptions)
-  const summaryText = extractTextFromGenerationResult(summaryResult).trim()
-
-  if (!summaryText) {
-    return prompt
-  }
-
-  return [
-    ...systemMessages,
-    {
-      role: 'assistant',
-      content: [
-        {
-          type: 'text',
-          text: `Summary of earlier conversation:\n${summaryText}`,
-        },
-      ],
-    },
-    latestMessage,
-  ]
-}
-
-async function countPromptTokens(
-  prompt: LanguageModelV3Prompt,
-  model: LanguageModelV3
-): Promise<number> {
-  const serializedPrompt = serializePromptForSummary(prompt)
-  const countTokens =
-    (model as TokenCountCapableLanguageModel).countTokens ??
-    (model.provider === 'apple' ? AppleFoundationModels.countTokens : undefined)
-
-  if (typeof countTokens === 'function') {
-    try {
-      return await countTokens(serializedPrompt)
-    } catch {
-      return estimateTokenCount(serializedPrompt)
-    }
-  }
-
-  return estimateTokenCount(serializedPrompt)
-}
-
-function estimateTokenCount(text: string): number {
-  if (!text.trim()) {
-    return 0
-  }
-
-  return Math.ceil(text.length / 4)
-}
-
-function buildSummaryPrompt(
-  messages: LanguageModelV3Prompt
-): LanguageModelV3Prompt {
-  return [
-    {
-      role: 'system',
-      content:
-        'Summarize the conversation history for continued assistant use. Preserve user goals, constraints, factual details, decisions, unresolved questions, and tool outcomes. Be concise and structured.',
-    },
-    {
-      role: 'user',
-      content: [
-        {
-          type: 'text',
-          text: serializePromptForSummary(messages),
-        },
-      ],
-    },
-  ]
-}
-
-function serializePromptForSummary(messages: LanguageModelV3Prompt): string {
-  return messages
-    .map((message) => {
-      const content = Array.isArray(message.content)
-        ? message.content.map(serializeMessageContentPart).join('\n')
-        : message.content
-
-      return `${message.role.toUpperCase()}: ${content}`
-    })
-    .join('\n\n')
 }
 
 function serializeKnownMessageContentPart(
@@ -427,10 +257,6 @@ function serializeKnownMessageContentPart(
   }
 }
 
-function serializeMessageContentPart(part: AppleMessageContentPart): string {
-  return serializeKnownMessageContentPart(part) ?? `[${part.type}]`
-}
-
 function appendMessageContent(content: string, addition: string) {
   if (!addition) {
     return content
@@ -439,134 +265,9 @@ function appendMessageContent(content: string, addition: string) {
   return content ? `${content}\n${addition}` : addition
 }
 
-function extractTextFromGenerationResult(
-  result: LanguageModelLikeResult
-): string {
-  return result.content
-    .map((part) => (part.type === 'text' ? part.text : ''))
-    .join('')
-}
-
-export function trimAppleMessagesForContext(
-  messages: LanguageModelV3Prompt,
-  options: AppleContextOptions = {}
-): LanguageModelV3Prompt {
-  let nextMessages = messages
-
-  if (options.dropCompletedToolCalls) {
-    nextMessages = dropCompletedToolCallMessages(nextMessages)
-  }
-
-  if (options.rollingWindowMessages && options.rollingWindowMessages > 0) {
-    const systemMessages = nextMessages.filter(
-      (message) => message.role === 'system'
-    )
-    const conversationMessages = nextMessages.filter(
-      (message) => message.role !== 'system'
-    )
-    nextMessages = [
-      ...systemMessages,
-      ...conversationMessages.slice(-options.rollingWindowMessages),
-    ]
-  }
-
-  return nextMessages
-}
-
-function dropCompletedToolCallMessages(
-  messages: LanguageModelV3Prompt
-): LanguageModelV3Prompt {
-  const lastToolRelatedIndex = findLastIndex(messages, isToolRelatedMessage)
-
-  if (lastToolRelatedIndex === -1) {
-    return messages
-  }
-
-  let latestToolExchangeStartIndex = lastToolRelatedIndex
-  while (
-    latestToolExchangeStartIndex > 0 &&
-    isToolRelatedMessage(messages[latestToolExchangeStartIndex - 1])
-  ) {
-    latestToolExchangeStartIndex -= 1
-  }
-
-  return messages.filter((message, index) => {
-    if (index >= latestToolExchangeStartIndex) {
-      return true
-    }
-
-    return !isToolRelatedMessage(message)
-  })
-}
-
-function findLastIndex<T>(
-  items: T[],
-  predicate: (item: T, index: number) => boolean
-) {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (predicate(items[index], index)) {
-      return index
-    }
-  }
-
-  return -1
-}
-
-function isToolRelatedMessage(message: LanguageModelV3Message) {
-  if (message.role === 'tool') {
-    return true
-  }
-
-  if (message.role !== 'assistant') {
-    return false
-  }
-
-  if (!Array.isArray(message.content)) {
-    return false
-  }
-
-  return message.content.some(
-    (part) => part.type === 'tool-call' || part.type === 'tool-result'
-  )
-}
-
-async function applyAppleContextOptions(
-  prompt: LanguageModelV3Prompt,
-  context: AppleContextOptions | undefined
-): Promise<LanguageModelV3Prompt> {
-  if (!context) {
-    return prompt
-  }
-
-  let nextPrompt = prompt
-
-  if (context.dropCompletedToolCalls) {
-    nextPrompt = trimAppleMessagesForContext(nextPrompt, {
-      dropCompletedToolCalls: true,
-    })
-  }
-
-  if (context.rollingWindowMessages && context.rollingWindowMessages > 0) {
-    nextPrompt = trimAppleMessagesForContext(nextPrompt, {
-      rollingWindowMessages: context.rollingWindowMessages,
-    })
-  }
-
-  if (context.summarizeHistory) {
-    nextPrompt = await summarizePromptHistory(
-      nextPrompt,
-      context.summarizeHistory.threshold,
-      context.summarizeHistory.model
-    )
-  }
-
-  return nextPrompt
-}
-
 export function createAppleProvider({
   availableTools,
   model,
-  context,
 }: AppleLanguageModelOptions = {}) {
   const createLanguageModel = (
     options: AppleLanguageModelOptions = {}
@@ -574,7 +275,6 @@ export function createAppleProvider({
     return new AppleLLMChatLanguageModel({
       availableTools: options.availableTools ?? availableTools,
       model: options.model ?? model,
-      context: mergeAppleContextOptions(context, options.context),
     })
   }
   const provider = function (options: AppleLanguageModelOptions = {}) {
@@ -902,11 +602,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       this.options,
       getAppleProviderOptions(options.providerOptions)
     )
-    const prompt = await applyAppleContextOptions(
-      options.prompt,
-      appleOptions.context
-    )
-    const messages = this.prepareMessages(prompt)
+    const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
     for (const tool of tools) {
@@ -920,9 +616,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         topP: options.topP,
         topK: options.topK,
         tools,
-        providerOptions: getNativeAppleProviderOptions(
-          appleOptions
-        ) as unknown as Record<string, unknown>,
+        providerOptions: appleOptions as unknown as Record<string, unknown>,
         schema:
           options.responseFormat?.type === 'json'
             ? options.responseFormat.schema
@@ -980,11 +674,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       this.options,
       getAppleProviderOptions(options.providerOptions)
     )
-    const prompt = await applyAppleContextOptions(
-      options.prompt,
-      appleOptions.context
-    )
-    const messages = this.prepareMessages(prompt)
+    const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
     if (typeof ReadableStream === 'undefined') {
@@ -1098,9 +788,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             topP: options.topP,
             topK: options.topK,
             tools,
-            providerOptions: getNativeAppleProviderOptions(
-              appleOptions
-            ) as unknown as Record<string, unknown>,
+            providerOptions: appleOptions as unknown as Record<string, unknown>,
             schema,
           })
         } catch (error) {

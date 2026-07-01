@@ -21,21 +21,6 @@ const answer = await generateText({
 })
 ```
 
-```ts
-const summarizerModel = apple()
-
-const model = apple({
-  context: {
-    summarizeHistory: {
-      threshold: 5000,
-      model: summarizerModel,
-    },
-    rollingWindowMessages: 10,
-    dropCompletedToolCalls: true,
-  },
-})
-```
-
 ## Features
 
 - ✅ Text generation with Apple Foundation Models
@@ -44,7 +29,6 @@ const model = apple({
 - ✅ Private Cloud Compute language model selection on iOS 27+
 - ✅ Structured outputs
 - ✅ Tool calling
-- ✅ History management helpers for summarization, rolling windows, and completed tool-call pruning
 - ✅ Vision OCR and barcode built-in tools on iOS 27+
 - ✅ Streaming
 - ✅ Image Playground generation through the AI SDK image API

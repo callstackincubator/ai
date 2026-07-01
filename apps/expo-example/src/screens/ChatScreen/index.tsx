@@ -1,9 +1,5 @@
 import type { TrueSheet } from '@lodev09/react-native-true-sheet'
-import {
-  type AppleLanguageModel,
-  type AppleLanguageModelId,
-  createAppleProvider,
-} from '@react-native-ai/apple'
+import type { AppleLanguageModel } from '@react-native-ai/apple'
 import {
   buildGenUISystemPrompt,
   createGenUITools,
@@ -53,9 +49,6 @@ export default function ChatScreen() {
     maxSteps,
     enabledToolIds,
     genUiEnabled,
-    appleHistoryDemoEnabled,
-    appleHistoryWindowEntries,
-    appleHistorySummarizationThreshold,
   } = chatSettings
 
   const [isGenerating, setIsGenerating] = useState(false)
@@ -104,26 +97,7 @@ export default function ChatScreen() {
         ),
         ...genUITools,
       }
-      let model = selectedAdapter.model
-      if (appleHistoryDemoEnabled && model.provider === 'apple') {
-        const modelId = model.modelId as AppleLanguageModelId
-        const appleProvider = createAppleProvider({
-          availableTools: tools,
-          model: modelId,
-          context: {
-            summarizeHistory: {
-              threshold: appleHistorySummarizationThreshold,
-              model: createAppleProvider({
-                model: modelId,
-              }).languageModel(),
-            },
-            rollingWindowMessages: appleHistoryWindowEntries,
-            dropCompletedToolCalls: true,
-          },
-        })
-        model = appleProvider.languageModel()
-      }
-
+      const model = selectedAdapter.model
       if ('updateTools' in model) {
         ;(model as AppleLanguageModel).updateTools(tools)
       }
@@ -209,8 +183,8 @@ export default function ChatScreen() {
     selectedAdapter?.model.provider === 'apple' &&
     selectedModelAvailability === 'yes'
   const emptyStateSubtitle = genUiEnabled
-    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.${appleHistoryDemoEnabled ? ' Apple History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
-    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.${appleHistoryDemoEnabled ? ' Apple History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
+    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`
+    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.`
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
