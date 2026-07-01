@@ -24,6 +24,10 @@ public typealias ToolInvoker = @Sendable (String, String, @escaping (Any?, Error
 
 @objc
 public class AppleLLMImpl: NSObject {
+  private struct ImageURL {
+    let url: URL
+    let needsCleanup: Bool
+  }
   
   private var streamTasks: [String: Task<Void, Never>] = [:]
   
@@ -134,7 +138,10 @@ public class AppleLLMImpl: NSObject {
       Task {
         do {
           let creator = try await ImageCreator()
-          let concepts = try Self.createImagePlaygroundConcepts(from: options)
+          let playgroundConcepts = try Self.createImagePlaygroundConcepts(from: options)
+          defer {
+            Self.removeTemporaryFiles(playgroundConcepts.temporaryFileURLs)
+          }
           let style = Self.createImagePlaygroundStyle(from: options["style"] as? String)
           let limit = max(1, min(options["n"] as? Int ?? 1, 4))
           var images: [String] = []
@@ -142,7 +149,7 @@ public class AppleLLMImpl: NSObject {
 #if compiler(>=6.3)
           let imageOptions = Self.createImagePlaygroundOptions(from: options)
           for try await createdImage in creator.images(
-            for: concepts,
+            for: playgroundConcepts.values,
             style: style,
             options: imageOptions,
             limit: limit
@@ -155,7 +162,11 @@ public class AppleLLMImpl: NSObject {
             }
           }
 #else
-          for try await createdImage in creator.images(for: concepts, style: style, limit: limit) {
+          for try await createdImage in creator.images(
+            for: playgroundConcepts.values,
+            style: style,
+            limit: limit
+          ) {
             let data = try Self.pngData(from: createdImage.cgImage)
             images.append(data.base64EncodedString())
 
@@ -224,7 +235,10 @@ public class AppleLLMImpl: NSObject {
             } else {
 #if compiler(>=6.3)
               if #available(iOS 27, *) {
-                let attachments = try self.createImageAttachments(from: promptAttachments)
+                let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
+                defer {
+                  Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
+                }
                 if let generationSchema {
                   let response = try await session.respond(
                     schema: generationSchema,
@@ -232,7 +246,7 @@ public class AppleLLMImpl: NSObject {
                     options: generationOptions
                   ) {
                     userPrompt
-                    for attachment in attachments {
+                    for attachment in preparedAttachments.values {
                       attachment
                     }
                   }
@@ -240,7 +254,7 @@ public class AppleLLMImpl: NSObject {
                 } else {
                   let response = try await session.respond(options: generationOptions) {
                     userPrompt
-                    for attachment in attachments {
+                    for attachment in preparedAttachments.values {
                       attachment
                     }
                   }
@@ -328,7 +342,10 @@ public class AppleLLMImpl: NSObject {
             } else {
 #if compiler(>=6.3)
               if #available(iOS 27, *) {
-                let attachments = try self.createImageAttachments(from: promptAttachments)
+                let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
+                defer {
+                  Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
+                }
                 if let generationSchema {
                   let responseStream = session.streamResponse(
                     schema: generationSchema,
@@ -336,7 +353,7 @@ public class AppleLLMImpl: NSObject {
                     options: generationOptions
                   ) {
                     userPrompt
-                    for attachment in attachments {
+                    for attachment in preparedAttachments.values {
                       attachment
                     }
                   }
@@ -346,7 +363,7 @@ public class AppleLLMImpl: NSObject {
                 } else {
                   let responseStream = session.streamResponse(options: generationOptions) {
                     userPrompt
-                    for attachment in attachments {
+                    for attachment in preparedAttachments.values {
                       attachment
                     }
                   }
@@ -436,15 +453,15 @@ public class AppleLLMImpl: NSObject {
 #if canImport(FoundationModels)
   @available(iOS 26, *)
   private func modelInfo(for model: SystemLanguageModel, locale: Locale, modelName: String) -> [String: Any] {
+    let isAvailable = model.availability == .available
     var info: [String: Any] = [
       "model": modelName,
-      "isAvailable": model.availability == .available,
-      "availability": availabilityString(model.availability),
+      "isAvailable": isAvailable,
+      "availability": isAvailable ? "available" : "unavailable",
       "supportsLocale": model.supportsLocale(locale),
       "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
       "supportsTokenCounting": false,
       "supportsImagePrompts": false,
-      "supportsPrivateCloudCompute": false,
       "supportsDynamicProfiles": false,
       "supportsVisionTools": false,
     ]
@@ -473,26 +490,21 @@ public class AppleLLMImpl: NSObject {
     modelName: String
   ) async throws -> [String: Any] {
     let contextSize = try await model.contextSize
+    let isAvailable = model.availability == .available
     return [
       "model": modelName,
-      "isAvailable": model.availability == .available,
-      "availability": availabilityString(model.availability),
+      "isAvailable": isAvailable,
+      "availability": isAvailable ? "available" : "unavailable",
       "contextSize": contextSize,
-      "quotaUsage": String(describing: model.quotaUsage),
       "supportsLocale": model.supportsLocale(locale),
       "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
       "supportsTokenCounting": false,
       "supportsImagePrompts": true,
-      "supportsPrivateCloudCompute": true,
       "supportsDynamicProfiles": true,
       "supportsVisionTools": true,
     ]
   }
 #endif
-
-  private func availabilityString(_ availability: Any) -> String {
-    return String(describing: availability)
-  }
 
   @available(iOS 26, *)
   private func languageIdentifier(_ language: Locale.Language) -> String {
@@ -717,25 +729,39 @@ public class AppleLLMImpl: NSObject {
   @available(iOS 27, *)
   private func createImageAttachments(
     from attachments: [[String: Any]]
-  ) throws -> [Attachment<ImageAttachmentContent>] {
-    try attachments.map { attachment in
-      guard let type = attachment["type"] as? String, type == "image" else {
-        throw AppleLLMError.invalidMessage("Unsupported attachment type")
+  ) throws -> (values: [Attachment<ImageAttachmentContent>], temporaryFileURLs: [URL]) {
+    var imageAttachments: [Attachment<ImageAttachmentContent>] = []
+    var temporaryFileURLs: [URL] = []
+
+    do {
+      for attachment in attachments {
+        guard let type = attachment["type"] as? String, type == "image" else {
+          throw AppleLLMError.invalidMessage("Unsupported attachment type")
+        }
+
+        let imageURL = try Self.createImageURL(from: attachment)
+        if imageURL.needsCleanup {
+          temporaryFileURLs.append(imageURL.url)
+        }
+
+        var imageAttachment = Attachment(imageURL: imageURL.url)
+
+        if let label = attachment["label"] as? String, !label.isEmpty {
+          imageAttachment = imageAttachment.label(label)
+        }
+
+        imageAttachments.append(imageAttachment)
       }
-
-      let imageURL = try Self.createImageURL(from: attachment)
-      var imageAttachment = Attachment(imageURL: imageURL)
-
-      if let label = attachment["label"] as? String, !label.isEmpty {
-        imageAttachment = imageAttachment.label(label)
-      }
-
-      return imageAttachment
+    } catch {
+      Self.removeTemporaryFiles(temporaryFileURLs)
+      throw error
     }
+
+    return (imageAttachments, temporaryFileURLs)
   }
 #endif
 
-  private static func createImageURL(from attachment: [String: Any]) throws -> URL {
+  private static func createImageURL(from attachment: [String: Any]) throws -> ImageURL {
     if let urlString = attachment["url"] as? String, !urlString.isEmpty {
       let url = urlString.hasPrefix("/")
         ? URL(fileURLWithPath: urlString)
@@ -745,7 +771,7 @@ public class AppleLLMImpl: NSObject {
         throw AppleLLMError.invalidMessage("Image attachment URLs must be local file URLs")
       }
 
-      return url
+      return ImageURL(url: url, needsCleanup: false)
     }
 
     guard let dataValue = attachment["data"] as? String, !dataValue.isEmpty else {
@@ -767,37 +793,55 @@ public class AppleLLMImpl: NSObject {
       .appendingPathExtension(fileExtension)
 
     try imageData.write(to: fileURL, options: .atomic)
-    return fileURL
+    return ImageURL(url: fileURL, needsCleanup: true)
+  }
+
+  private static func removeTemporaryFiles(_ urls: [URL]) {
+    for url in urls {
+      try? FileManager.default.removeItem(at: url)
+    }
   }
 
 #if canImport(ImagePlayground)
   @available(iOS 26.4, *)
-  private static func createImagePlaygroundConcepts(from options: [String: Any]) throws -> [ImagePlaygroundConcept] {
+  private static func createImagePlaygroundConcepts(
+    from options: [String: Any]
+  ) throws -> (values: [ImagePlaygroundConcept], temporaryFileURLs: [URL]) {
     var concepts: [ImagePlaygroundConcept] = []
+    var temporaryFileURLs: [URL] = []
 
     if let prompt = options["prompt"] as? String, !prompt.isEmpty {
       concepts.append(.text(prompt))
     }
 
-    if let files = options["files"] as? [[String: Any]], !files.isEmpty {
-      guard files.count == 1, let firstFile = files.first else {
-        throw AppleLLMError.invalidMessage("Image Playground supports at most one source image file")
-      }
-      let attachment = try imageAttachmentFromImageModelFile(firstFile)
-      let url = try createImageURL(from: attachment)
+    do {
+      if let files = options["files"] as? [[String: Any]], !files.isEmpty {
+        guard files.count == 1, let firstFile = files.first else {
+          throw AppleLLMError.invalidMessage("Image Playground supports at most one source image file")
+        }
+        let attachment = try imageAttachmentFromImageModelFile(firstFile)
+        let imageURL = try createImageURL(from: attachment)
 
-      guard let imageConcept = ImagePlaygroundConcept.image(url) else {
-        throw AppleLLMError.invalidMessage("Image Playground file must resolve to a local image")
-      }
+        if imageURL.needsCleanup {
+          temporaryFileURLs.append(imageURL.url)
+        }
 
-      concepts.append(imageConcept)
+        guard let imageConcept = ImagePlaygroundConcept.image(imageURL.url) else {
+          throw AppleLLMError.invalidMessage("Image Playground file must resolve to a local image")
+        }
+
+        concepts.append(imageConcept)
+      }
+    } catch {
+      removeTemporaryFiles(temporaryFileURLs)
+      throw error
     }
 
     guard !concepts.isEmpty else {
       throw AppleLLMError.invalidMessage("Image Playground generation requires a prompt or image file")
     }
 
-    return concepts
+    return (concepts, temporaryFileURLs)
   }
 
   private static func imageAttachmentFromImageModelFile(_ file: [String: Any]) throws -> [String: Any] {

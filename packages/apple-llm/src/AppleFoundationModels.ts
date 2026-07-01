@@ -1,3 +1,4 @@
+import type { AppleLanguageModelId } from './ai-sdk'
 import NativeAppleLLM, {
   type AppleGenerationOptions,
   type AppleMessage,
@@ -13,9 +14,16 @@ const nativeAppleLLM = NativeAppleLLM as Spec & {
   generateImages?: (options: object) => Promise<string[]>
 }
 
-const AppleFoundationModels: Spec = {
+type AppleFoundationModelsSpec = Omit<Spec, 'getModelInfo'> & {
+  getModelInfo(
+    locale?: string,
+    model?: AppleLanguageModelId
+  ): ReturnType<Spec['getModelInfo']>
+}
+
+const AppleFoundationModels: AppleFoundationModelsSpec = {
   isAvailable: () => NativeAppleLLM.isAvailable(),
-  getModelInfo: (locale?: string, model?: string) => {
+  getModelInfo: (locale?: string, model?: AppleLanguageModelId) => {
     if (typeof nativeAppleLLM.getModelInfo !== 'function') {
       return Promise.reject(
         new Error(

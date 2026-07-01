@@ -64,11 +64,9 @@ export interface AppleModelInfo {
   supportedLanguages: string[]
   supportsTokenCounting: boolean
   supportsImagePrompts: boolean
-  supportsPrivateCloudCompute: boolean
   supportsDynamicProfiles: boolean
   supportsVisionTools: boolean
   contextSize?: number
-  quotaUsage?: string
 }
 
 export interface AppleLanguageModelOptions {
@@ -88,6 +86,16 @@ type AppleImageModelFile = {
   data: string
 }
 
+type AppleImageSource =
+  | {
+      type: 'data'
+      value: string
+    }
+  | {
+      type: 'url'
+      value: string
+    }
+
 type AppleMessageContentPart = Extract<
   LanguageModelV3Message['content'],
   readonly unknown[]
@@ -101,6 +109,62 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...chunk)
   }
   return btoa(binary)
+}
+
+function normalizeAppleImageSource(
+  data: unknown,
+  featureName: string
+): AppleImageSource {
+  if (data instanceof Uint8Array) {
+    return {
+      type: 'data',
+      value: uint8ArrayToBase64(data),
+    }
+  }
+
+  const value =
+    data instanceof URL
+      ? data.toString()
+      : typeof data === 'string'
+        ? data
+        : null
+
+  if (!value) {
+    throw new Error(`Unsupported ${featureName} image data`)
+  }
+
+  const lowerValue = value.toLowerCase()
+
+  if (lowerValue.startsWith('http://') || lowerValue.startsWith('https://')) {
+    throw new Error(
+      `Remote ${featureName} image URLs are not supported. Provide image data, a data URL, or a local file URL instead.`
+    )
+  }
+
+  if (lowerValue.startsWith('data:')) {
+    return {
+      type: 'data',
+      value,
+    }
+  }
+
+  if (lowerValue.startsWith('file://') || value.startsWith('/')) {
+    return {
+      type: 'url',
+      value,
+    }
+  }
+
+  if (/^[a-z][a-z\d+.-]*:/i.test(value)) {
+    throw new Error(
+      `Unsupported ${featureName} image URL. Provide image data, a data URL, or a local file URL instead.`
+    )
+  }
+
+  return {
+    type: 'data',
+    value,
+  }
 }
 
 function prepareImageAttachment(
@@ -119,39 +183,23 @@ function prepareImageAttachment(
     )
   }
 
-  const data = part.data as unknown
+  const source = normalizeAppleImageSource(
+    part.data as unknown,
+    'Apple Foundation Models'
+  )
 
-  if (data instanceof Uint8Array) {
+  if (source.type === 'data') {
     return {
       type: 'image',
       mediaType,
-      data: uint8ArrayToBase64(data),
-    }
-  }
-
-  const value =
-    data instanceof URL
-      ? data.toString()
-      : typeof data === 'string'
-        ? data
-        : null
-
-  if (!value) {
-    throw new Error('Unsupported Apple Foundation Models image data')
-  }
-
-  if (value.startsWith('data:')) {
-    return {
-      type: 'image',
-      mediaType,
-      data: value,
+      data: source.value,
     }
   }
 
   return {
     type: 'image',
     mediaType,
-    url: value,
+    url: source.value,
   }
 }
 
@@ -160,27 +208,14 @@ function prepareImageModelFiles(
 ): AppleImageModelFile[] {
   return files.map((file) => {
     if (file.type === 'url') {
-      const url = file.url.toString()
-
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        throw new Error(
-          'Remote Apple Image Playground file URLs are not supported. Provide image data, a data URL, or a local file URL instead.'
-        )
-      }
-
-      if (
-        !url.startsWith('data:') &&
-        !url.startsWith('file://') &&
-        !url.startsWith('/')
-      ) {
-        throw new Error(
-          'Unsupported Apple Image Playground file URL. Provide image data, a data URL, or a local file URL instead.'
-        )
-      }
+      const source = normalizeAppleImageSource(
+        file.url,
+        'Apple Image Playground'
+      )
 
       return {
-        mediaType: getImageModelFileUrlMediaType(url),
-        data: url,
+        mediaType: getImageModelFileUrlMediaType(source.value),
+        data: source.value,
       }
     }
 
@@ -191,23 +226,14 @@ function prepareImageModelFiles(
       )
     }
 
-    const data = file.data as unknown
-    const normalizedData =
-      data instanceof Uint8Array
-        ? uint8ArrayToBase64(data)
-        : data instanceof URL
-          ? data.toString()
-          : typeof data === 'string'
-            ? data
-            : null
-
-    if (!normalizedData) {
-      throw new Error('Unsupported Apple Image Playground image data')
-    }
+    const source = normalizeAppleImageSource(
+      file.data as unknown,
+      'Apple Image Playground'
+    )
 
     return {
       mediaType,
-      data: normalizedData,
+      data: source.value,
     }
   })
 }
@@ -281,7 +307,9 @@ export function createAppleProvider({
     return createLanguageModel(options)
   }
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
-  provider.getModelInfo = (options: { locale?: string; model?: string } = {}) =>
+  provider.getModelInfo = (
+    options: { locale?: string; model?: AppleLanguageModelId } = {}
+  ) =>
     NativeAppleLLM.getModelInfo(
       options.locale,
       options.model
