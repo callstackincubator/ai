@@ -47,7 +47,7 @@ class ReactNativeFunctionTool(
     val argumentsJson = AdkJson.encode(args)
     onToolCall(toolCallId, toolId, argumentsJson, toolCallScope)
     val result = AdkToolBridge.awaitResult(toolCallId)
-    return AdkJson.decodeResult(result)
+    return AdkJson.decodeResult(result) ?: throw IllegalArgumentException("Failed to decode result in ReactNativeFunctionTool::execute")
   }
 }
 
