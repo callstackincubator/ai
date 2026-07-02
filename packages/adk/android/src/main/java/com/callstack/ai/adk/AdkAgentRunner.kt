@@ -12,6 +12,7 @@ import com.google.adk.kt.models.mlkit.GenaiPrompt
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
+import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Blob
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.GenerateContentConfig
@@ -147,15 +148,21 @@ class AdkAgentRunner(
       !stream && runId != null -> ToolCallScope(runId = runId)
       else -> null
     }
-    val agentTools = parseTools(tools, toolCallScope)
+    val agentTools = parseTools(tools, toolCallScope, agentConfig.modelType)
     val model = createModel(agentConfig)
     val generateContentConfig = parseGenerationConfig(options)
+    val instructionText =
+      if (agentConfig.modelType == "genai-nano") {
+        buildInstruction(agentConfig.instruction, agentTools)
+      } else {
+        agentConfig.instruction
+      }
 
     val agent = LlmAgent(
       name = agentConfig.name,
       description = agentConfig.description,
       model = model,
-      instruction = agentConfig.instruction?.let { Instruction(it) },
+      instruction = instructionText?.let { Instruction(it) },
       tools = agentTools,
       generateContentConfig = generateContentConfig,
     )
@@ -205,7 +212,7 @@ class AdkAgentRunner(
         ensureNanoPrepared()
         val model = generativeModel
           ?: throw IllegalStateException("Failed to initialize Gemini Nano")
-        GenaiPrompt.create(model, config.modelName)
+        NanoFunctionCallingModel(GenaiPrompt.create(model, config.modelName))
       }
       else -> Gemini(name = config.modelName, apiKey = config.apiKey)
     }
@@ -289,10 +296,15 @@ class AdkAgentRunner(
     return Content(role = role, parts = parts)
   }
 
-  private fun parseTools(tools: ReadableArray?, toolCallScope: ToolCallScope?): List<ReactNativeFunctionTool> {
+  private fun parseTools(
+    tools: ReadableArray?,
+    toolCallScope: ToolCallScope?,
+    modelType: String,
+  ): List<BaseTool> {
     if (tools == null) return emptyList()
 
-    val parsed = mutableListOf<ReactNativeFunctionTool>()
+    val injectPromptDescription = modelType == "genai-nano"
+    val parsed = mutableListOf<BaseTool>()
     for (index in 0 until tools.size()) {
       val tool = tools.getMap(index) ?: continue
       val parametersArray = tool.getArray("parameters")
@@ -312,12 +324,19 @@ class AdkAgentRunner(
         }
       }
 
+      val parameterSchema =
+        tool.getMap("inputSchema")?.let { schemaMap ->
+          runCatching { AdkSchema.fromReadableMap(schemaMap) }.getOrNull()
+        }
+
       parsed.add(
         ReactNativeFunctionTool(
           toolId = tool.getString("id") ?: UUID.randomUUID().toString(),
           name = tool.getString("name") ?: continue,
           description = tool.getString("description") ?: "",
+          parameterSchema = parameterSchema,
           parameters = parameters,
+          injectPromptDescription = injectPromptDescription,
           toolCallScope = toolCallScope,
           onToolCall = onToolCall,
         )
@@ -325,6 +344,32 @@ class AdkAgentRunner(
     }
 
     return parsed
+  }
+
+  private fun buildInstruction(
+    baseInstruction: String?,
+    tools: List<BaseTool>,
+  ): String? {
+    if (tools.isEmpty()) {
+      return baseInstruction
+    }
+
+    val toolSummary =
+      tools.joinToString("\n") { tool ->
+        "- ${tool.name}: ${tool.description}"
+      }
+
+    val toolGuidance =
+      """
+      You have access to the following tools. Use them when they help answer the user:
+      $toolSummary
+      """.trimIndent()
+
+    return if (baseInstruction.isNullOrBlank()) {
+      toolGuidance
+    } else {
+      "$baseInstruction\n\n$toolGuidance"
+    }
   }
 
   private fun parseParameterType(type: String?): com.google.adk.kt.types.Type {

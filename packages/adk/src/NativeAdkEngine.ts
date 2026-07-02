@@ -41,6 +41,7 @@ export interface AdkTool {
   id: string
   name: string
   description: string
+  inputSchema?: UnsafeObject
   parameters?: AdkToolParameter[]
 }
 

@@ -336,9 +336,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
         }
       }
 
-      throw new Error(
-        `Unsupported message role for ADK provider: ${message.role}`
-      )
+      throw new Error(`Unsupported message role for ADK provider`)
     })
   }
 
@@ -389,6 +387,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
             id: generateId(),
             name: tool.name,
             description: tool.description ?? '',
+            inputSchema: tool.inputSchema,
             parameters,
           } satisfies AdkTool,
           execute: async (modelInput: unknown) => {

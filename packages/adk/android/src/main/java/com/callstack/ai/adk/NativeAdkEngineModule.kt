@@ -114,6 +114,11 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
       try {
         var emittedText = ""
         var latestUsage: UsageMetadata? = null
+        // Per-turn state: track accumulated text and whether the current agent turn
+        // is a tool-code turn (Gemini Nano emits ```tool_code blocks instead of native
+        // function calls). We suppress those deltas so the UI never shows them.
+        var currentTurnText = ""
+        var suppressCurrentTurn = false
         val toolCallEmitter = AdkStreamToolCallEmitter(streamId) { args ->
           emitOnStreamToolCall(args)
         }
@@ -125,8 +130,34 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
           toolCallEmitter.handleEvent(event)
 
           val text = event.content?.parts?.mapNotNull { it.text }?.joinToString("") ?: ""
+
+          if (text.isNotEmpty()) {
+            // Detect a new agent turn: text no longer continues the current turn's accumulation.
+            if (currentTurnText.isNotEmpty() && !text.startsWith(currentTurnText)) {
+              currentTurnText = text
+              suppressCurrentTurn = false
+            } else {
+              currentTurnText = text
+            }
+
+            // Suppress this turn if the model is writing a tool_code block (Gemini Nano).
+            if (!suppressCurrentTurn &&
+              (currentTurnText.contains("```tool_code") || currentTurnText.contains("```python"))
+            ) {
+              suppressCurrentTurn = true
+            }
+          }
+
+          // When a tool-calling turn ends, reset per-turn state so the next turn
+          // (the actual answer) starts with a clean slate and streams normally.
+          if (!event.partial && event.functionCalls().isNotEmpty()) {
+            currentTurnText = ""
+            suppressCurrentTurn = false
+            emittedText = ""
+          }
+
           // Partial events carry new text; final events repeat the full response.
-          if (text.isNotEmpty() && !(event.isFinalResponse && !event.partial)) {
+          if (!suppressCurrentTurn && text.isNotEmpty() && !(event.isFinalResponse && !event.partial)) {
             val delta =
               if (text.startsWith(emittedText)) {
                 text.substring(emittedText.length)
