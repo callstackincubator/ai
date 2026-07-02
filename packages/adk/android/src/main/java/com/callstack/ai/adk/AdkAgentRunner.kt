@@ -104,9 +104,17 @@ class AdkAgentRunner(
     runId: String,
   ): AdkRunResult {
     val events = runAgent(messages, config, options, tools, stream = false, runId = runId).toList()
-    val text = events
-      .flatMap { event -> event.content?.parts?.mapNotNull { it.text } ?: emptyList() }
-      .joinToString("")
+    val text =
+      events
+        .lastOrNull { it.isFinalResponse && !it.partial }
+        ?.content
+        ?.parts
+        ?.mapNotNull { it.text }
+        ?.joinToString("")
+        ?.takeIf { it.isNotEmpty() }
+        ?: events
+          .flatMap { event -> event.content?.parts?.mapNotNull { it.text } ?: emptyList() }
+          .joinToString("")
 
     val finishReason = events.lastOrNull()?.finishReason?.name
     val usage = AdkUsage.latestFromEvents(events)

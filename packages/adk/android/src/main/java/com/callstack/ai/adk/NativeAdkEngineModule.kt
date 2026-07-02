@@ -112,7 +112,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
 
     val job = scope.launch {
       try {
-        var previousText = ""
+        var emittedText = ""
         var latestUsage: UsageMetadata? = null
         val toolCallEmitter = AdkStreamToolCallEmitter(streamId) { args ->
           emitOnStreamToolCall(args)
@@ -125,19 +125,23 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
           toolCallEmitter.handleEvent(event)
 
           val text = event.content?.parts?.mapNotNull { it.text }?.joinToString("") ?: ""
-          if (text.isNotEmpty() && text != previousText) {
-            val delta = if (text.startsWith(previousText)) {
-              text.substring(previousText.length)
-            } else {
-              text
-            }
-            previousText = text
+          // Partial events carry new text; final events repeat the full response.
+          if (text.isNotEmpty() && !(event.isFinalResponse && !event.partial)) {
+            val delta =
+              if (text.startsWith(emittedText)) {
+                text.substring(emittedText.length)
+              } else {
+                text
+              }
+            if (delta.isNotEmpty()) {
+              emittedText = if (text.startsWith(emittedText)) text else emittedText + delta
 
-            val updateArgs = Arguments.createMap().apply {
-              putString("streamId", streamId)
-              putString("delta", delta)
+              val updateArgs = Arguments.createMap().apply {
+                putString("streamId", streamId)
+                putString("delta", delta)
+              }
+              emitOnStreamUpdate(updateArgs)
             }
-            emitOnStreamUpdate(updateArgs)
           }
 
           if (event.isFinalResponse && !event.partial) {
