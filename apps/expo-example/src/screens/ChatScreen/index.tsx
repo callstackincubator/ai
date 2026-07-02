@@ -4,6 +4,7 @@ import {
   buildGenUISystemPrompt,
   createGenUITools,
 } from '@react-native-ai/json-ui'
+import { wrapLanguageModelWithHistory } from '@react-native-ai/utils'
 import { stepCountIs, streamText } from 'ai'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -49,6 +50,9 @@ export default function ChatScreen() {
     maxSteps,
     enabledToolIds,
     genUiEnabled,
+    historyDemoEnabled,
+    historyWindowEntries,
+    historySummarizationThreshold,
   } = chatSettings
 
   const [isGenerating, setIsGenerating] = useState(false)
@@ -97,9 +101,19 @@ export default function ChatScreen() {
         ),
         ...genUITools,
       }
-      const model = selectedAdapter.model
+      let model = selectedAdapter.model
       if ('updateTools' in model) {
         ;(model as AppleLanguageModel).updateTools(tools)
+      }
+      if (historyDemoEnabled) {
+        model = wrapLanguageModelWithHistory(model, {
+          summarizeHistory: {
+            threshold: historySummarizationThreshold,
+            model,
+          },
+          rollingWindowMessages: historyWindowEntries,
+          dropCompletedToolCalls: true,
+        })
       }
       setToolExecutionReporter(({ toolName, args, result }) => {
         addToolExecutionMessage(chatId, toolName, args, result)
@@ -183,8 +197,8 @@ export default function ChatScreen() {
     selectedAdapter?.model.provider === 'apple' &&
     selectedModelAvailability === 'yes'
   const emptyStateSubtitle = genUiEnabled
-    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`
-    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.`
+    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
+    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

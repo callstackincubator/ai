@@ -43,6 +43,7 @@
         "@react-native-ai/json-ui": "workspace:*",
         "@react-native-ai/llama": "workspace:*",
         "@react-native-ai/mlc": "workspace:*",
+        "@react-native-ai/utils": "workspace:*",
         "@react-native-async-storage/async-storage": "^2.2.0",
         "@react-native-picker/picker": "2.11.1",
         "@react-navigation/bottom-tabs": "^7.9.0",
@@ -175,6 +176,13 @@
       "optionalPeers": [
         "expo",
       ],
+    },
+    "packages/utils": {
+      "name": "@react-native-ai/utils",
+      "version": "0.12.0",
+      "dependencies": {
+        "@ai-sdk/provider": "^3.0.5",
+      },
     },
   },
   "packages": {
@@ -765,6 +773,8 @@
     "@react-native-ai/llama": ["@react-native-ai/llama@workspace:packages/llama"],
 
     "@react-native-ai/mlc": ["@react-native-ai/mlc@workspace:packages/mlc"],
+
+    "@react-native-ai/utils": ["@react-native-ai/utils@workspace:packages/utils"],
 
     "@react-native-async-storage/async-storage": ["@react-native-async-storage/async-storage@2.2.0", "", { "dependencies": { "merge-options": "^3.0.4" }, "peerDependencies": { "react-native": "^0.0.0-0 || >=0.65 <1.0" } }, "sha512-gvRvjR5JAaUZF8tv2Kcq/Gbt3JHwbKFYfmb445rhOj6NUMx3qPLixmDx5pZAyb9at1bYvJ4/eTUipU5aki45xw=="],
 

@@ -299,6 +299,9 @@ const info = await apple.getModelInfo()
 console.log(info.contextSize)
 ```
 
+For reusable history policies such as summarization, rolling windows, and
+completed tool-call pruning, use `@react-native-ai/utils`.
+
 Use low-level token counting as an estimate, not a fit guarantee:
 
 ```typescript

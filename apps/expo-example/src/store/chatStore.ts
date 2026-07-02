@@ -29,6 +29,9 @@ export type ChatSettings = {
   maxSteps: number
   enabledToolIds: string[]
   genUiEnabled: boolean
+  historyDemoEnabled: boolean
+  historyWindowEntries: number
+  historySummarizationThreshold: number
 }
 
 /** Single element in the generative UI tree (id is the key in elements). */
@@ -118,6 +121,9 @@ const DEFAULT_SETTINGS: ChatSettings = {
   maxSteps: 5,
   enabledToolIds: Object.keys(toolDefinitions),
   genUiEnabled: false,
+  historyDemoEnabled: false,
+  historyWindowEntries: 10,
+  historySummarizationThreshold: 5000,
 }
 
 const chatsAtom = atomWithStorage<Chat[]>('chats', [], storage)

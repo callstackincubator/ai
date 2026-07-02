@@ -21,6 +21,9 @@ const answer = await generateText({
 })
 ```
 
+For reusable history utilities such as summarization, rolling windows, and
+completed tool-call pruning, use `@react-native-ai/utils`.
+
 ## Features
 
 - ✅ Text generation with Apple Foundation Models
