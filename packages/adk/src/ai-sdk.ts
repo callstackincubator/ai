@@ -78,7 +78,7 @@ export function createAdkProvider(
   }
   provider.languageModel = createLanguageModel
   provider.isNanoSupported = () => checkNanoSupported()
-  provider.isAvailable = async (modelType: AdkModelType = 'gemini') => {
+  provider.isAvailable = async (modelType: AdkModelType = 'genai-nano') => {
     if (modelType === 'genai-nano' && !(await checkNanoSupported())) {
       return false
     }
@@ -209,8 +209,8 @@ class AdkChatLanguageModel implements LanguageModelV3 {
   private nanoPreparePromise: Promise<void> | null = null
 
   constructor(options: AdkProviderOptions) {
-    const modelType = options.modelType ?? 'gemini'
-    this.modelId = options.modelName ?? 'gemini-2.5-flash'
+    const modelType = options.modelType ?? 'genai-nano'
+    this.modelId = options.modelName ?? 'gemini-nano'
     this.agentConfig = {
       name: options.name ?? 'react_native_adk_agent',
       description: options.description ?? 'React Native ADK agent',
