@@ -2,8 +2,10 @@
   "name": "@react-native-ai/monorepo",
   "private": true,
   "scripts": {
+    "prepare": "lefthook install",
     "typecheck": "bun run --filter='*' typecheck",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "lint:fix": "eslint \"**/*.{js,ts,tsx}\" --fix",
     "release": "release-it",
     "build": "bun run --filter='@react-native-ai/*' prepare",
     "postinstall": "bash packages/mlc/scripts/fetch-prebuilt.sh"
@@ -30,6 +32,7 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
+    "lefthook": "^1.12.2",
     "prettier": "^3.7.4",
     "react-native-builder-bob": "^0.40.17",
     "release-it": "^19.1.0",
