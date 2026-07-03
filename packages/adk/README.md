@@ -7,6 +7,7 @@ A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://deve
 - Android `minSdkVersion` 26 or greater (required by ML Kit GenAI / Gemini Nano; set in your app, not only in this package)
 - React Native New Architecture
 - Vercel AI SDK v6
+- If using on-device models: a device capable of running Gemini Nano (Android 14+ with AICore); you can consult the [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device) for more details.
 
 Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST`; exclude it in your app packaging. For Expo:
 
@@ -50,7 +51,7 @@ const { text } = await generateText({
 
 ## Features
 
-- Cloud Gemini agents via ADK `LlmAgent` and `InMemoryRunner`
+- Cloud Gemini model via ADK `LlmAgent` and `InMemoryRunner`
 - On-device Gemini Nano via ML Kit GenAI (`genai-nano` model type)
 - Tool calling bridged to JavaScript executors
 - Streaming responses with tool-call stream parts
@@ -90,21 +91,7 @@ const { text } = await generateText({
 
 ## Structured output
 
-JSON mode (`responseFormat: { type: 'json' }`) sets `responseMimeType` to `application/json`. Schema-constrained output is not supported yet — `generateObject` and `responseFormat.schema` throw an explicit error because ADK `GenerateContentConfig` (v0.2.0) does not expose `responseSchema`.
-
-Use `generateText` and parse JSON from the response until schema support is added:
-
-```ts
-import { generateText } from 'ai'
-
-const { text } = await generateText({
-  model: adk.languageModel(),
-  prompt:
-    'Respond with JSON: {"summary": string, "sentiment": "positive"|"neutral"|"negative"}. Review: ...',
-})
-```
-
-Streaming structured JSON is not supported yet.
+Streaming structured JSON is not supported by ADK yet.
 
 ## Cloud Gemini
 
@@ -132,9 +119,9 @@ const { text } = await generateText({
 
 Gemini Nano has two separate availability checks:
 
-| API | Label | Question |
-| --- | --- | --- |
-| `provider.isNanoSupported()` | **Device capability** | Can this device ever run Nano? |
+| API                                  | Label                 | Question                                   |
+| ------------------------------------ | --------------------- | ------------------------------------------ |
+| `provider.isNanoSupported()`         | **Device capability** | Can this device ever run Nano?             |
 | `provider.isAvailable('genai-nano')` | **Runtime readiness** | Can I call `prepareNano()` / generate now? |
 
 If `isNanoSupported()` is `false`, `isAvailable('genai-nano')` is also `false`.
@@ -143,12 +130,12 @@ If `isNanoSupported()` is `false`, `isAvailable('genai-nano')` is also `false`.
 
 Both checks use ML Kit `Generation.getClient().checkStatus()`:
 
-| Status | `isNanoSupported()` | `isAvailable('genai-nano')` | Suggested UX |
-| --- | --- | --- | --- |
-| `0` | `false` | `false` | Hide or disable — not supported |
-| `1` | `true` | `true` | Ready — call `prepareNano()` |
-| `3` | `true` | `true` | Ready to download — call `prepareNano()` |
-| Other non-zero | `true` | `false` | Show disabled — not ready yet |
+| Status         | `isNanoSupported()` | `isAvailable('genai-nano')` | Suggested UX                             |
+| -------------- | ------------------- | --------------------------- | ---------------------------------------- |
+| `0`            | `false`             | `false`                     | Hide or disable — not supported          |
+| `1`            | `true`              | `true`                      | Ready — call `prepareNano()`             |
+| `3`            | `true`              | `true`                      | Ready to download — call `prepareNano()` |
+| Other non-zero | `true`              | `false`                     | Show disabled — not ready yet            |
 
 See [ML Kit GenAI Prompt API](https://developers.google.com/ml-kit/genai) for details.
 

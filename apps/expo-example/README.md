@@ -30,7 +30,7 @@ bun run build:runtime:android
 
 ### ADK (Android)
 
-Google ADK agents are available on Android in the model picker:
+Google ADK local models are available on Android in the model picker:
 
 - **ADK Gemini Flash** — cloud Gemini via ADK (requires API key)
 - **ADK Gemini Nano** — on-device via ML Kit GenAI
@@ -110,7 +110,7 @@ After the message is sent, the profiler should show spans for the
 ## Features
 
 - Apple Intelligence (iOS 17+): Text generation, embeddings, transcription, speech synthesis
-- Google ADK (Android): Cloud Gemini and on-device Gemini Nano agents with tool calling
+- Google ADK (Android): Cloud Gemini and on-device Gemini Nano model with tool calling
 - MLC Models: Run Llama, Phi, Mistral, and Qwen models on-device
 - Tool calling and structured output support
 - Streaming text generation
