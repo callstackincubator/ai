@@ -3,7 +3,7 @@ import { Platform, TurboModuleRegistry } from 'react-native'
 import type {
   EventEmitter,
   UnsafeObject,
-} from 'react-native/Libraries/Types/CodegenTypes'
+} from 'react-native/Libraries/Types/CodegenTypesNamespace'
 
 export type AdkMessageRole = 'assistant' | 'system' | 'user'
 
