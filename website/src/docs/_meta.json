@@ -23,6 +23,13 @@
   },
   {
     "type": "dir",
+    "name": "adk",
+    "label": "ADK",
+    "collapsible": true,
+    "collapsed": false
+  },
+  {
+    "type": "dir",
     "name": "llama",
     "label": "Llama",
     "collapsible": true,
