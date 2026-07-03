@@ -1,3 +1,5 @@
+import { PackageManagerTabs } from '@theme'
+
 # Getting Started
 
 The MLC provider enables you to run large language models directly on-device in React Native applications. This includes popular models like Llama, Phi-3, Mistral, and Qwen that run entirely on-device for privacy, performance, and offline capabilities.
@@ -6,15 +8,11 @@ The MLC provider enables you to run large language models directly on-device in 
 
 Install the MLC provider:
 
-```bash
-npm install @react-native-ai/mlc
-```
+<PackageManagerTabs command="install @react-native-ai/mlc" />
 
-While you can use the MLC provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](../polyfills.md):
+While you can use the MLC provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5+ and [required polyfills](../polyfills.md):
 
-```bash
-npm install ai
-```
+<PackageManagerTabs command="install ai" />
 
 ## Requirements
 
@@ -36,9 +34,7 @@ For Expo projects, add the MLC config plugin to automatically configure the incr
 ```json
 {
   "expo": {
-    "plugins": [
-      "@react-native-ai/mlc"
-    ]
+    "plugins": ["@react-native-ai/mlc"]
   }
 }
 ```
@@ -56,7 +52,7 @@ npx expo prebuild --clean
 If you're not using Expo or prefer manual configuration, add the "Increased Memory Limit" capability in Xcode:
 
 1. Open your iOS project in Xcode
-2. Navigate to your target's **Signing & Capabilities** tab  
+2. Navigate to your target's **Signing & Capabilities** tab
 3. Click **+ Capability** and add "Increased Memory Limit"
 
 ## Basic Usage
@@ -64,18 +60,18 @@ If you're not using Expo or prefer manual configuration, add the "Increased Memo
 Import the MLC provider and use it with the AI SDK:
 
 ```typescript
-import { mlc } from '@react-native-ai/mlc';
-import { generateText } from 'ai';
+import { mlc } from '@react-native-ai/mlc'
+import { generateText } from 'ai'
 
-const model = mlc.languageModel("Llama-3.2-3B-Instruct");
+const model = mlc.languageModel('Llama-3.2-3B-Instruct')
 
-await model.download();
-await model.prepare();
+await model.download()
+await model.prepare()
 
 const result = await generateText({
   model,
-  prompt: 'Explain quantum computing in simple terms'
-});
+  prompt: 'Explain quantum computing in simple terms',
+})
 ```
 
 ## Next Steps
