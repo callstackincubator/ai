@@ -16,6 +16,7 @@
     "@expo/vector-icons": "^15.0.3",
     "@lodev09/react-native-true-sheet": "^3.8.1",
     "@react-native-ai/apple": "workspace:*",
+    "@react-native-ai/adk": "workspace:*",
     "@react-native-ai/dev-tools": "workspace:*",
     "@react-native-ai/json-ui": "workspace:*",
     "@react-native-ai/llama": "workspace:*",

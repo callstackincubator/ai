@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native'
 
+import { hasGoogleApiKey } from '../../config/adk'
 import type { SetupAdapter } from '../../config/providers.common'
 import {
   useDownloadProgress,
@@ -31,7 +32,8 @@ export function ModelItem({
   onSelect,
   isLast,
 }: ModelItemProps) {
-  const { removeModel, availability, downloadModel } = useProviderStore()
+  const { removeModel, availability, downloadModel, nanoUnavailableReason } =
+    useProviderStore()
   const downloadProgress = useDownloadProgress(adapter.modelId)
 
   const selectedModelAvailability = availability.get(adapter.modelId)
@@ -111,10 +113,19 @@ export function ModelItem({
           ) : (
             <Text style={styles.modelStatusText}>
               {selectedModelAvailability === 'yes'
-                ? 'Downloaded'
+                ? adapter.builtIn
+                  ? 'Ready'
+                  : 'Downloaded'
                 : selectedModelAvailability === 'availableForDownload'
                   ? 'Tap to download'
-                  : 'Not available on this device'}
+                  : adapter.modelId === 'adk-gemini-2.5-flash' &&
+                      !hasGoogleApiKey()
+                    ? 'Set EXPO_PUBLIC_GOOGLE_API_KEY'
+                    : adapter.modelId === 'adk-gemini-nano'
+                      ? nanoUnavailableReason === 'not-ready'
+                        ? 'Gemini Nano not ready yet'
+                        : 'Gemini Nano not supported on this device'
+                      : 'Not available on this device'}
             </Text>
           )}
         </View>
