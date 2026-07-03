@@ -1,6 +1,6 @@
 # ADK Provider for Vercel AI SDK
 
-A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk) on Android. Use Gemini Nano and cloud Gemini on Android with tool calling, multi-turn sessions, and optional on-device Gemini Nano inference.
+A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk) on Android. Use on-device Gemini Nano or cloud Gemini with tool calling and multi-turn sessions.
 
 **Requirements:**
 

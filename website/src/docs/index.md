@@ -4,7 +4,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 
 ## Why On-Device AI?
 
-- **Privacy-first:** All processing happens locally-no data leaves the device
+- **Privacy-first:** All processing happens locally - no data leaves the device
 - **Instant responses:** No network latency, immediate AI capabilities
 - **Offline-ready:** Works anywhere, even without internet
 - **Zero server costs:** No API fees or infrastructure to maintain
