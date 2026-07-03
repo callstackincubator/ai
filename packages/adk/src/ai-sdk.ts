@@ -73,18 +73,19 @@ export function createAdkProvider(
   options: AdkProviderOptions = {}
 ): AdkProvider {
   const createLanguageModel = () => new AdkChatLanguageModel(options)
-
-  return Object.assign(() => createLanguageModel(), {
-    languageModel: createLanguageModel,
-    isNanoSupported: () => checkNanoSupported(),
-    isAvailable: async (modelType: AdkModelType = 'gemini') => {
-      if (modelType === 'genai-nano' && !(await checkNanoSupported())) {
-        return false
-      }
-      return getNativeAdkEngine().isAvailable(modelType).then(Boolean)
-    },
-    prepareNano: () => getNativeAdkEngine().prepareNano(),
-  })
+  const provider = function () {
+    return createLanguageModel()
+  }
+  provider.languageModel = createLanguageModel
+  provider.isNanoSupported = () => checkNanoSupported()
+  provider.isAvailable = async (modelType: AdkModelType = 'gemini') => {
+    if (modelType === 'genai-nano' && !(await checkNanoSupported())) {
+      return false
+    }
+    return getNativeAdkEngine().isAvailable(modelType).then(Boolean)
+  }
+  provider.prepareNano = () => getNativeAdkEngine().prepareNano()
+  return provider
 }
 
 export const adk = createAdkProvider()

@@ -27,7 +27,7 @@ export const createAdkLanguageSetupAdapter = (
       'You are a helpful assistant in the Callstack React Native AI demo app.',
     availableTools: tools,
   })
-  const model = provider.languageModel()
+  const model = provider()
 
   return {
     model,

@@ -41,10 +41,8 @@ Then run `npx expo prebuild --clean` so the native Android project picks up the 
 import { adk } from '@react-native-ai/adk'
 import { generateText } from 'ai'
 
-const model = adk.languageModel()
-
 const { text } = await generateText({
-  model,
+  model: adk(),
   prompt: 'What time is it in New York?',
 })
 ```
@@ -72,7 +70,7 @@ Pass file parts in user messages using the standard AI SDK prompt format:
 import { generateText } from 'ai'
 
 const { text } = await generateText({
-  model: adk.languageModel(),
+  model: adk(),
   messages: [
     {
       role: 'user',
@@ -99,16 +97,14 @@ Streaming structured JSON is not supported by ADK yet.
 import { createAdkProvider } from '@react-native-ai/adk'
 import { generateText } from 'ai'
 
-const provider = createAdkProvider({
+const adk = createAdkProvider({
   apiKey: process.env.GOOGLE_API_KEY,
   modelName: 'gemini-2.5-flash',
   instruction: 'You are a helpful assistant.',
 })
 
-const model = provider.languageModel()
-
 const { text } = await generateText({
-  model,
+  model: adk(),
   prompt: 'Summarize on-device AI in one sentence.',
 })
 ```
@@ -121,8 +117,8 @@ Gemini Nano has two separate availability checks:
 
 | API                                  | Label                 | Question                                   |
 | ------------------------------------ | --------------------- | ------------------------------------------ |
-| `provider.isNanoSupported()`         | **Device capability** | Can this device ever run Nano?             |
-| `provider.isAvailable('genai-nano')` | **Runtime readiness** | Can I call `prepareNano()` / generate now? |
+| `adk.isNanoSupported()`              | **Device capability** | Can this device ever run Nano?             |
+| `adk.isAvailable('genai-nano')`      | **Runtime readiness** | Can I call `prepareNano()` / generate now? |
 
 If `isNanoSupported()` is `false`, `isAvailable('genai-nano')` is also `false`.
 
@@ -144,26 +140,26 @@ See [ML Kit GenAI Prompt API](https://developers.google.com/ml-kit/genai) for de
 ```ts
 import { createAdkProvider } from '@react-native-ai/adk'
 
-const provider = createAdkProvider({
+const adk = createAdkProvider({
   modelType: 'genai-nano',
   modelName: 'gemini-nano',
 })
 
-const supported = await provider.isNanoSupported()
+const supported = await adk.isNanoSupported()
 if (!supported) {
   // Device lacks Gemini Nano / AICore support — hide from model picker
   return
 }
 
-const ready = await provider.isAvailable('genai-nano')
+const ready = await adk.isAvailable('genai-nano')
 if (!ready) {
   // Device supports Nano but ML Kit is not ready yet (e.g. downloading)
   // Show disabled — do not mark as "Ready"
   return
 }
 
-await provider.prepareNano()
-const model = provider.languageModel()
+await adk.prepareNano()
+const model = adk()
 ```
 
 Both checks are cheap native calls (no model download). Safe to cache at app startup and re-check after resume.
@@ -188,13 +184,13 @@ const getCurrentTime = tool({
   }),
 })
 
-const provider = createAdkProvider({
+const adk = createAdkProvider({
   apiKey: process.env.GOOGLE_API_KEY,
   availableTools: { getCurrentTime },
 })
 
 const { text } = await generateText({
-  model: provider.languageModel(),
+  model: adk(),
   tools: { getCurrentTime },
   prompt: 'What time is it in Warsaw?',
 })
