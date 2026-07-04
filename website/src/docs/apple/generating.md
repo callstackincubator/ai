@@ -6,6 +6,7 @@ You can generate response using Apple Foundation Models with the Vercel AI SDK's
 
 - **iOS 26+** - Apple Foundation Models is available in iOS 26 or later
 - **Apple Intelligence enabled device** - Device must support Apple Intelligence
+- **iOS 27+ for Private Cloud Compute** - PCC requires iOS 27 or later, a native build compiled with the iOS 27 SDK, an Apple Intelligence device, and Apple's managed Private Cloud Compute entitlement
 
 ## Text Generation
 
@@ -18,6 +19,42 @@ const result = await generateText({
   prompt: 'Explain quantum computing in simple terms'
 });
 ```
+
+## Model Selection
+
+By default, `apple()` uses the on-device `SystemLanguageModel.default` model:
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  prompt: 'Summarize this note'
+});
+```
+
+Use `apple('private-cloud-compute')` to route generation through Apple's Private Cloud Compute model. PCC is useful for larger context windows and stronger reasoning, but it requires iOS 27+, network access, Apple's managed entitlement, and the user's daily PCC quota.
+
+```typescript
+const result = await generateText({
+  model: apple('private-cloud-compute'),
+  prompt: 'Analyze this long document'
+});
+```
+
+You can set PCC reasoning with AI SDK provider options:
+
+```typescript
+const result = await generateText({
+  model: apple('private-cloud-compute'),
+  prompt: 'Compare these project plans and recommend the safest rollout',
+  providerOptions: {
+    apple: {
+      reasoningLevel: 'moderate'
+    }
+  }
+});
+```
+
+Supported reasoning levels are `'light'`, `'moderate'`, and `'deep'`. Reasoning uses Apple's iOS 27 `ContextOptions`, so it is unavailable on iOS 26 even when the on-device system model is available.
 
 ## Streaming
 
@@ -154,9 +191,12 @@ console.log(result.toolResults);
 
 ### Tool calling with structured output
 
-You can also use [`experimental_output`](https://v5.ai-sdk.dev/docs/reference/ai-sdk-core/generate-text#experimental_output) to generate structured output with `generateText`. This is useful when you want to perform tool calls at the same time.
+You can also use [`Output.object`](https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data) to generate structured output with `generateText`. This is useful when you want to perform tool calls at the same time.
 
 ```typescript
+import { Output, generateText } from 'ai';
+import { z } from 'zod';
+
 const response = await generateText({
   model: apple(),
   system: `Help the person with getting weather information.`,
@@ -164,7 +204,7 @@ const response = await generateText({
   tools: {
     getWeather,
   },
-  experimental_output: Output.object({
+  output: Output.object({
     schema: z.object({
       weather: z.string(),
       city: z.string(),
@@ -205,7 +245,7 @@ if (!apple.isAvailable()) {
 
 ## Context Window
 
-Apple Foundation Models have a fixed context window of 4096 tokens. This limit applies to the full request context, including system instructions, previous conversation messages, tool definitions, schemas, and the current user prompt.
+The on-device Apple Foundation Model has a fixed context window of 4096 tokens. The Private Cloud Compute model has a larger 32K context window. These limits apply to the full request context, including system instructions, previous conversation messages, tool definitions, schemas, and the current user prompt.
 
 The `maxTokens` option only limits how many tokens the model can generate in its response. It does not increase the available context window or reserve enough room for a long prompt.
 
@@ -316,6 +356,7 @@ Only documented `AppleLLMErrorCodes.*` values are stable:
 - `AppleLLMErrorCodes.ToolCallError` / `TOOL_CALL_ERROR`
 - `AppleLLMErrorCodes.UnknownToolCallError` / `UNKNOWN_TOOL_CALL_ERROR`
 - `AppleLLMErrorCodes.ContextWindowExceeded` / `CONTEXT_WINDOW_EXCEEDED`
+- `AppleLLMErrorCodes.RateLimited` / `RATE_LIMITED`
 
 These codes mean:
 
@@ -328,6 +369,7 @@ These codes mean:
 - `TOOL_CALL_ERROR`: a tool execution failed.
 - `UNKNOWN_TOOL_CALL_ERROR`: tool execution finished in an unusable or unexpected state.
 - `CONTEXT_WINDOW_EXCEEDED`: the request exceeded the model context window.
+- `RATE_LIMITED`: the request hit Apple's per-user model quota, most commonly with Private Cloud Compute.
 
 Errors that do not have a recognized public Apple LLM code may still be thrown, but they are plain `Error` values and are not part of the stable Apple provider API.
 
@@ -426,6 +468,7 @@ Configure model behavior with generation options:
 - `maxTokens`: Maximum number of tokens to generate
 - `topP` (0-1): Nucleus sampling threshold
 - `topK`: Top-K sampling parameter
+- `providerOptions.apple.reasoningLevel`: PCC reasoning level. Supported values: `'light'`, `'moderate'`, `'deep'`
 
 You can pass selected options with either `generateText` or `generateObject` as follows:
 
@@ -461,6 +504,16 @@ const options = { temperature: 0.7, maxTokens: 100 }
 const result = await AppleFoundationModels.generateText(messages, options)
 ```
 
+You can also select the PCC model and reasoning directly:
+
+```tsx
+const result = await AppleFoundationModels.generateText(messages, {
+  model: 'private-cloud-compute',
+  reasoningLevel: 'moderate',
+  maxTokens: 100,
+})
+```
+
 On iOS 26.4 and newer, you can also count the number of tokens in a string
 before sending it to the model:
 
@@ -477,5 +530,6 @@ guarantee that a generation request will fit in the model context window. The
 full context also includes instructions, previous messages in the transcript,
 tools, schemas, and generated output.
 
-The maximum context window size for Apple's Foundation models is 4096 tokens
-per session. More information can be found [here](https://developer.apple.com/documentation/technotes/tn3193-managing-the-on-device-foundation-model-s-context-window).
+The maximum context window size for the on-device Apple Foundation Model is
+4096 tokens per session. Private Cloud Compute supports a 32K context window.
+More information can be found [here](https://developer.apple.com/documentation/technotes/tn3193-managing-the-on-device-foundation-model-s-context-window).

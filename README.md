@@ -58,6 +58,7 @@ receiving the current app's telemetry stream.
 Native integration with Apple's on-device AI capabilities. **Built-in** - no model downloads required, uses system models.
 
 - **Text Generation** - Apple Foundation Models for chat and completion
+- **Private Cloud Compute** - Opt-in server model for larger context and reasoning on iOS 27+
 - **Embeddings** - NLContextualEmbedding for 512-dimensional semantic vectors
 - **Transcription** - SpeechAnalyzer for fast, accurate speech-to-text
 - **Speech Synthesis** - AVSpeechSynthesizer for natural text-to-speech with system voices
@@ -87,6 +88,17 @@ const { text } = await generateText({
   prompt: 'Explain quantum computing',
 })
 
+// Private Cloud Compute on iOS 27+
+const pcc = await generateText({
+  model: apple('private-cloud-compute'),
+  prompt: 'Analyze this long document',
+  providerOptions: {
+    apple: {
+      reasoningLevel: 'moderate',
+    },
+  },
+})
+
 // Generate embeddings
 const { embedding } = await embed({
   model: apple.textEmbeddingModel(),
@@ -108,12 +120,13 @@ const { audio } = await speech({
 
 #### Availability
 
-| Feature          | iOS Version | Additional Requirements    |
-| ---------------- | ----------- | -------------------------- |
-| Text Generation  | iOS 26+     | Apple Intelligence device  |
-| Embeddings       | iOS 17+     | -                          |
-| Transcription    | iOS 26+     | -                          |
-| Speech Synthesis | iOS 13+     | iOS 17+ for Personal Voice |
+| Feature               | iOS Version | Additional Requirements                                      |
+| --------------------- | ----------- | ------------------------------------------------------------ |
+| Text Generation       | iOS 26+     | Apple Intelligence device                                    |
+| Private Cloud Compute | iOS 27+     | iOS 27 SDK build, Apple Intelligence device, managed entitlement |
+| Embeddings            | iOS 17+     | -                                                            |
+| Transcription         | iOS 26+     | -                                                            |
+| Speech Synthesis      | iOS 13+     | iOS 17+ for Personal Voice                                   |
 
 See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
 

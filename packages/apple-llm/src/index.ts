@@ -1,8 +1,13 @@
+export type { AppleProviderOptions } from './ai-sdk'
 export { apple, createAppleProvider } from './ai-sdk'
 export { default as AppleFoundationModels } from './AppleFoundationModels'
 export type { AppleLLMError, AppleLLMErrorCode } from './errors'
 export { AppleLLMErrorCodes } from './errors'
 export { default as AppleEmbeddings } from './NativeAppleEmbeddings'
+export type {
+  AppleLanguageModelId,
+  AppleReasoningLevel,
+} from './NativeAppleLLM'
 export { default as AppleSpeech, VoiceInfo } from './NativeAppleSpeech'
 export { default as AppleTranscription } from './NativeAppleTranscription'
 export { default as AppleUtils } from './NativeAppleUtils'

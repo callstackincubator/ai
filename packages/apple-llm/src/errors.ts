@@ -12,6 +12,7 @@ export const AppleLLMErrorCodes = {
   ToolCallError: 'TOOL_CALL_ERROR',
   UnknownToolCallError: 'UNKNOWN_TOOL_CALL_ERROR',
   ContextWindowExceeded: 'CONTEXT_WINDOW_EXCEEDED',
+  RateLimited: 'RATE_LIMITED',
 } as const
 
 export type AppleLLMErrorCode =
