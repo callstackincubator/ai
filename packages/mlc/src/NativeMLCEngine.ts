@@ -1,6 +1,6 @@
 import type { TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
-import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes'
+import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypesNamespace'
 
 export interface ModelConfig {
   model_id?: string
