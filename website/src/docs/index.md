@@ -30,6 +30,17 @@ Native integration with Apple's on-device AI capabilities through `@react-native
 
 Production-ready with instant availability on supported iOS devices.
 
+### Apple Core AI
+
+Run app-provided Core AI model bundles through `@react-native-ai/core-ai`:
+
+- **Language Sessions** - Custom Core AI language models with persistent native sessions
+- **AI SDK Adapters** - Language and image generation today, with embedding and transcription surfaces kept explicit until native runners land
+- **Native-only Tasks** - Segmentation, object detection, model inspection, specialization, and model lifecycle calls
+- **Starter Models** - iOS-first examples sourced from Apple’s `coreai-models` registry, kept as docs/example data rather than a package catalog
+
+Requires exported Core AI assets and Apple’s `coreai-models` Swift Package products linked into the host app target.
+
 ### Llama Engine
 
 Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-native-ai/llama`:

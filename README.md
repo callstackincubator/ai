@@ -45,11 +45,12 @@ receiving the current app's telemetry stream.
 
 ## Available Providers
 
-| Provider        | Built-in | Platforms    | Runtime                                                             | Description                                                |
-| --------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [Apple](#apple) | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
-| [Llama](#llama) | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
-| [MLC](#mlc)     | ❌ No    | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm)                        | Run open-source LLMs via MLC runtime                       |
+| Provider            | Built-in | Platforms    | Runtime                                                             | Description                                                |
+| ------------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [Apple](#apple)     | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
+| [Core AI](#core-ai) | ❌ No    | iOS          | [Core AI](https://developer.apple.com/core-ai/)                     | Run app-provided Core AI model bundles                     |
+| [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
+| [MLC](#mlc)         | ❌ No    | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm)                        | Run open-source LLMs via MLC runtime                       |
 
 ---
 
@@ -116,6 +117,47 @@ const { audio } = await speech({
 | Speech Synthesis | iOS 13+     | iOS 17+ for Personal Voice |
 
 See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
+
+---
+
+### Core AI
+
+Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models`](https://github.com/apple/coreai-models). This provider is for custom `.aimodel` assets, not Apple system models.
+
+- **Language Sessions** - Core AI language models with persistent native sessions
+- **AI SDK Adapters** - Language, embeddings, image generation, and transcription where AI SDK has matching interfaces
+- **Native-only APIs** - Segmentation, object detection, depth, super-resolution, model inspection, specialization, and raw `.aimodel` functions
+- **Catalog Metadata** - Starter model metadata from Apple’s registry, including iOS/macOS support
+
+#### Installation
+
+```bash
+npm install @react-native-ai/core-ai
+```
+
+Core AI also requires adding `https://github.com/apple/coreai-models` as a Swift Package dependency in the host iOS app and linking the products you use, such as `CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, and `CoreAIObjectDetection`.
+
+React Native installs the package through CocoaPods, but the Apple helpers are Swift Package products. Expo apps should use a config plugin to patch the generated Xcode project; bare React Native apps should add the package in Xcode or through a predictable project patch.
+
+#### Usage
+
+```typescript
+import { coreAI } from '@react-native-ai/core-ai'
+import { generateText } from 'ai'
+
+const model = coreAI.languageModel({
+  id: 'qwen3-0.6b',
+  source: { type: 'file', uri: qwen3ModelDirectory },
+  variant: 'iOS',
+})
+
+const { text } = await generateText({
+  model,
+  prompt: 'Explain Core AI',
+})
+```
+
+See the [Core AI documentation](https://react-native-ai.dev/docs/core-ai/getting-started) for setup, starter models, and direct native APIs.
 
 ---
 

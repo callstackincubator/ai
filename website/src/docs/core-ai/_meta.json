@@ -1,0 +1,5 @@
+[
+  { "type": "file", "name": "getting-started", "label": "Getting Started" },
+  { "type": "file", "name": "api", "label": "API Surface" },
+  { "type": "file", "name": "models", "label": "Starter Models" }
+]

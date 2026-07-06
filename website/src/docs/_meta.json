@@ -23,6 +23,13 @@
   },
   {
     "type": "dir",
+    "name": "core-ai",
+    "label": "Core AI",
+    "collapsible": true,
+    "collapsed": false
+  },
+  {
+    "type": "dir",
     "name": "llama",
     "label": "Llama",
     "collapsible": true,
