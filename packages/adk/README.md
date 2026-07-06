@@ -99,6 +99,7 @@ import { generateText } from 'ai'
 
 const adk = createAdkProvider({
   apiKey: process.env.GOOGLE_API_KEY,
+  modelType: 'gemini',
   modelName: 'gemini-2.5-flash',
   instruction: 'You are a helpful assistant.',
 })

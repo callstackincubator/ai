@@ -238,6 +238,7 @@ import { generateText } from 'ai'
 
 const adk = createAdkProvider({
   apiKey: process.env.GOOGLE_API_KEY,
+  modelType: 'gemini',
   modelName: 'gemini-2.5-flash',
   instruction: 'You are a helpful assistant.',
 })
@@ -272,15 +273,15 @@ const model = adk.languageModel()
 
 #### Provider Options
 
-| Option           | Type                       | Description                                                                     |
-| ---------------- | -------------------------- | ------------------------------------------------------------------------------- |
-| `name`           | `string`                   | ADK agent name (default: `react_native_adk_agent`)                              |
-| `description`    | `string`                   | Agent description shown to ADK                                                  |
-| `instruction`    | `string`                   | System instruction for the agent                                                |
-| `modelType`      | `'genai-nano' \| 'gemini'` | On-device or cloud backend (default: `genai-nano`)                              |
-| `modelName`      | `string`                   | Model identifier (default: `gemini-nano`; use `gemini-2.5-flash` for cloud)     |
-| `apiKey`         | `string`                   | Google AI API key - required for cloud `gemini` only                            |
-| `availableTools` | `Record<string, Tool>`     | Tools whose `execute` handlers ADK can call from JavaScript                     |
+| Option           | Type                       | Description                                                                 |
+| ---------------- | -------------------------- | --------------------------------------------------------------------------- |
+| `name`           | `string`                   | ADK agent name (default: `react_native_adk_agent`)                          |
+| `description`    | `string`                   | Agent description shown to ADK                                              |
+| `instruction`    | `string`                   | System instruction for the agent                                            |
+| `modelType`      | `'genai-nano' \| 'gemini'` | On-device or cloud backend (default: `genai-nano`)                          |
+| `modelName`      | `string`                   | Model identifier (default: `gemini-nano`; use `gemini-2.5-flash` for cloud) |
+| `apiKey`         | `string`                   | Google AI API key - required for cloud `gemini` only                        |
+| `availableTools` | `Record<string, Tool>`     | Tools whose `execute` handlers ADK can call from JavaScript                 |
 
 ## Next Steps
 

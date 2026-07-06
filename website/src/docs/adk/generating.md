@@ -102,34 +102,7 @@ Tools are orchestrated by ADK natively, which means:
 
 ### Setup
 
-Pass tools to the AI SDK and call `adk()` as usual:
-
-```typescript
-import { adk } from '@react-native-ai/adk'
-import { generateText, tool } from 'ai'
-import { z } from 'zod'
-
-const getCurrentTime = tool({
-  description: 'Get the current time for a city',
-  inputSchema: z.object({
-    city: z.string(),
-  }),
-  execute: async ({ city }) => ({
-    city,
-    time: new Date().toLocaleTimeString(),
-  }),
-})
-
-await adk.prepareNano()
-
-const { text } = await generateText({
-  model: adk(),
-  tools: { getCurrentTime },
-  prompt: 'What time is it in Warsaw?',
-})
-```
-
-ADK also needs tool executors registered on the provider. Use `createAdkProvider` with `availableTools`:
+ADK needs tool executors registered both in the AI SDK and on the provider. Use `createAdkProvider` with `availableTools`, then pass tools to the AI SDK and call `adk()` as usual. Example:
 
 ```typescript
 import { createAdkProvider } from '@react-native-ai/adk'
