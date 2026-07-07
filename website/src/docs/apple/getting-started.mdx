@@ -1,3 +1,5 @@
+import { PackageManagerTabs } from '@theme'
+
 # Getting Started
 
 The Apple provider enables you to use Apple's on-device AI capabilities with the Vercel AI SDK in React Native applications. This includes language models, text embeddings, and other Apple-provided AI features that run entirely on-device for privacy and performance.
@@ -6,15 +8,11 @@ The Apple provider enables you to use Apple's on-device AI capabilities with the
 
 Install the Apple provider:
 
-```bash
-npm install @react-native-ai/apple
-```
+<PackageManagerTabs command="install @react-native-ai/apple" />
 
-While you can use the Apple provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](../polyfills.md):
+While you can use the Apple provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5+ and [required polyfills](../polyfills.md):
 
-```bash
-npm install ai
-```
+<PackageManagerTabs command="install ai" />
 
 ## Requirements
 
@@ -32,11 +30,11 @@ To use Apple Intelligence with the iOS Simulator, you need to enable it on your 
 Import the Apple provider and use it with the AI SDK:
 
 ```typescript
-import { apple } from '@react-native-ai/apple';
-import { generateText } from 'ai';
+import { apple } from '@react-native-ai/apple'
+import { generateText } from 'ai'
 
 const result = await generateText({
   model: apple(),
-  prompt: 'Explain quantum computing in simple terms'
-});
+  prompt: 'Explain quantum computing in simple terms',
+})
 ```

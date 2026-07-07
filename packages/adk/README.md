@@ -1,6 +1,6 @@
 # ADK Provider for Vercel AI SDK
 
-A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk) on Android. Build AI agents with tool calling, multi-turn sessions, and optional on-device Gemini Nano inference.
+A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk) on Android. Use on-device Gemini Nano or cloud Gemini with tool calling and multi-turn sessions.
 
 **Requirements:**
 
@@ -99,6 +99,7 @@ import { generateText } from 'ai'
 
 const adk = createAdkProvider({
   apiKey: process.env.GOOGLE_API_KEY,
+  modelType: 'gemini',
   modelName: 'gemini-2.5-flash',
   instruction: 'You are a helpful assistant.',
 })
@@ -115,10 +116,10 @@ const { text } = await generateText({
 
 Gemini Nano has two separate availability checks:
 
-| API                                  | Label                 | Question                                   |
-| ------------------------------------ | --------------------- | ------------------------------------------ |
-| `adk.isNanoSupported()`              | **Device capability** | Can this device ever run Nano?             |
-| `adk.isAvailable('genai-nano')`      | **Runtime readiness** | Can I call `prepareNano()` / generate now? |
+| API                             | Label                 | Question                                   |
+| ------------------------------- | --------------------- | ------------------------------------------ |
+| `adk.isNanoSupported()`         | **Device capability** | Can this device ever run Nano?             |
+| `adk.isAvailable('genai-nano')` | **Runtime readiness** | Can I call `prepareNano()` / generate now? |
 
 If `isNanoSupported()` is `false`, `isAvailable('genai-nano')` is also `false`.
 

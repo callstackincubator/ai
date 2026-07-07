@@ -1,3 +1,5 @@
+import { PackageManagerTabs } from '@theme'
+
 # Getting Started
 
 The Llama provider enables you to run GGUF models directly on-device in React Native applications using [llama.rn](https://github.com/mybigday/llama.rn). This allows you to download and run any GGUF model from HuggingFace for privacy, performance, and offline capabilities.
@@ -6,15 +8,11 @@ The Llama provider enables you to run GGUF models directly on-device in React Na
 
 Install the Llama provider and its peer dependencies:
 
-```bash
-npm install @react-native-ai/llama llama.rn
-```
+<PackageManagerTabs command="install @react-native-ai/llama llama.rn" />
 
-While you can use the Llama provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5 and [required polyfills](../polyfills.md):
+While you can use the Llama provider standalone, we recommend using it with the Vercel AI SDK for a much better developer experience. The AI SDK provides unified APIs, streaming support, and advanced features. To use with the AI SDK, you'll need v5+ and [required polyfills](../polyfills.md):
 
-```bash
-npm install ai
-```
+<PackageManagerTabs command="install ai" />
 
 ## Requirements
 
@@ -52,11 +50,11 @@ For all other installation tips and tricks, refer to the [llama.rn Expo document
 
 The Llama provider supports multiple model types:
 
-| Model Type | Method | Use Case |
-| --- | --- | --- |
-| Language Model | `llama.languageModel()` | Text generation, chat, reasoning |
+| Model Type      | Method                       | Use Case                            |
+| --------------- | ---------------------------- | ----------------------------------- |
+| Language Model  | `llama.languageModel()`      | Text generation, chat, reasoning    |
 | Embedding Model | `llama.textEmbeddingModel()` | Text embeddings for RAG, similarity |
-| Speech Model | `llama.speechModel()` | Text-to-speech with vocoder |
+| Speech Model    | `llama.speechModel()`        | Text-to-speech with vocoder         |
 
 ## Basic Usage
 
@@ -67,7 +65,9 @@ import { llama, downloadModel } from '@react-native-ai/llama'
 import { streamText } from 'ai'
 
 // Download model from HuggingFace - returns the file path
-const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+const modelPath = await downloadModel(
+  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+)
 
 // Create model instance with the path
 const model = llama.languageModel(modelPath)

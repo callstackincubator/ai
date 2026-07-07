@@ -393,8 +393,8 @@ class AdkAgentRunner(
         name = config.getString("name") ?: "react_native_adk_agent",
         description = config.getString("description") ?: "",
         instruction = config.getString("instruction"),
-        modelType = model.getString("type") ?: "gemini",
-        modelName = model.getString("name") ?: "gemini-2.5-flash",
+        modelType = model.getString("type") ?: "genai-nano",
+        modelName = model.getString("name") ?: "gemini-nano",
         apiKey = model.getString("apiKey"),
       )
     }
