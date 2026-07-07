@@ -89,7 +89,7 @@
     },
     "packages/adk": {
       "name": "@react-native-ai/adk",
-      "version": "0.12.0",
+      "version": "0.12.1",
       "dependencies": {
         "@ai-sdk/provider": "^3.0.5",
         "@ai-sdk/provider-utils": "^4.0.1",
