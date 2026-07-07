@@ -7,16 +7,27 @@
 //
 
 import Foundation
+import ImageIO
 import React
 
 #if canImport(FoundationModels)
 import FoundationModels
+#endif
+#if canImport(ImagePlayground)
+import ImagePlayground
+#endif
+#if compiler(>=6.3) && canImport(Vision)
+import Vision
 #endif
 
 public typealias ToolInvoker = @Sendable (String, String, @escaping (Any?, Error?) -> Void) -> Void
 
 @objc
 public class AppleLLMImpl: NSObject {
+  private struct ImageURL {
+    let url: URL
+    let needsCleanup: Bool
+  }
   
   private var streamTasks: [String: Task<Void, Never>] = [:]
   
@@ -40,6 +51,7 @@ public class AppleLLMImpl: NSObject {
     reject: @escaping (String, String, Error?) -> Void
   ) {
 #if canImport(FoundationModels)
+#if compiler(>=6.3)
     if #available(iOS 26.4, *) {
       guard SystemLanguageModel.default.availability == .available else {
         reject(
@@ -65,6 +77,116 @@ public class AppleLLMImpl: NSObject {
     let error = AppleLLMError.unsupportedOS
     reject("AppleLLM", error.localizedDescription, error)
 #endif
+#else
+    let error = AppleLLMError.unsupportedOS
+    reject("AppleLLM", error.localizedDescription, error)
+#endif
+  }
+
+  @objc
+  public func getModelInfo(
+    _ localeIdentifier: String?,
+    model requestedModel: String?,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(FoundationModels)
+    if #available(iOS 26, *) {
+      let modelName = requestedModel ?? "system"
+      let locale = localeIdentifier.map(Locale.init(identifier:)) ?? Locale.current
+
+      switch modelName {
+      case "system":
+        resolve(modelInfo(for: SystemLanguageModel.default, locale: locale, modelName: modelName))
+      case "private-cloud-compute":
+#if compiler(>=6.3)
+        if #available(iOS 27, *) {
+          let model = PrivateCloudComputeLanguageModel()
+          Task {
+            do {
+              let info = try await modelInfo(for: model, locale: locale, modelName: modelName)
+            resolve(info)
+            } catch {
+              reject("AppleLLM", error.localizedDescription, error)
+            }
+          }
+        } else {
+          rejectWithAppleError(.unsupportedOS, reject: reject)
+        }
+#else
+        rejectWithAppleError(.unsupportedOS, reject: reject)
+#endif
+      default:
+        rejectWithAppleError(.invalidMessage("Unsupported model '\(modelName)'"), reject: reject)
+      }
+    } else {
+      rejectWithAppleError(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectWithAppleError(.unsupportedOS, reject: reject)
+#endif
+  }
+
+  @objc
+  public func generateImages(
+    _ options: [String: Any],
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(ImagePlayground)
+    if #available(iOS 26.4, *) {
+      Task {
+        do {
+          let creator = try await ImageCreator()
+          let playgroundConcepts = try Self.createImagePlaygroundConcepts(from: options)
+          defer {
+            Self.removeTemporaryFiles(playgroundConcepts.temporaryFileURLs)
+          }
+          let style = Self.createImagePlaygroundStyle(from: options["style"] as? String)
+          let limit = max(1, min(options["n"] as? Int ?? 1, 4))
+          var images: [String] = []
+
+#if compiler(>=6.3)
+          let imageOptions = Self.createImagePlaygroundOptions(from: options)
+          for try await createdImage in creator.images(
+            for: playgroundConcepts.values,
+            style: style,
+            options: imageOptions,
+            limit: limit
+          ) {
+            let data = try Self.pngData(from: createdImage.cgImage)
+            images.append(data.base64EncodedString())
+
+            if images.count >= limit {
+              break
+            }
+          }
+#else
+          for try await createdImage in creator.images(
+            for: playgroundConcepts.values,
+            style: style,
+            limit: limit
+          ) {
+            let data = try Self.pngData(from: createdImage.cgImage)
+            images.append(data.base64EncodedString())
+
+            if images.count >= limit {
+              break
+            }
+          }
+#endif
+
+          resolve(images)
+        } catch {
+          reject("AppleLLM", error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectWithAppleError(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectWithAppleError(.unsupportedOS, reject: reject)
+#endif
   }
 
   @objc
@@ -84,30 +206,66 @@ public class AppleLLMImpl: NSObject {
 
       Task {
         do {
-          let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
-          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
-          
-          let session = LanguageModelSession.init(
-            model: SystemLanguageModel.default,
-            tools: tools,
-            transcript: transcript
+          let providerOptions = self.createProviderOptions(from: options)
+          let tools = try self.createTools(from: options, providerOptions: providerOptions, toolInvoker: toolInvoker)
+          let (transcript, userPrompt, promptAttachments) = try self.createTranscriptAndPrompt(
+            from: messages,
+            tools: tools
           )
-          
+
+          let session = try self.createSession(providerOptions: providerOptions, tools: tools, transcript: transcript)
+
           let generationOptions = try self.createGenerationOptions(from: options)
           let generationSchema = try self.createGenerationSchema(from: options)
 
           do {
-            if let generationSchema {
-              let response = try await session.respond(
-                to: userPrompt,
-                schema: generationSchema,
-                includeSchemaInPrompt: true,
-                options: generationOptions
-              )
-              resolve(response.toModelMessages())
+            if promptAttachments.isEmpty {
+              if let generationSchema {
+                let response = try await session.respond(
+                  to: userPrompt,
+                  schema: generationSchema,
+                  includeSchemaInPrompt: true,
+                  options: generationOptions
+                )
+                resolve(response.toModelMessages())
+              } else {
+                let response = try await session.respond(to: userPrompt, options: generationOptions)
+                resolve(response.toModelMessages())
+              }
             } else {
-              let response = try await session.respond(to: userPrompt, options: generationOptions)
-              resolve(response.toModelMessages())
+#if compiler(>=6.3)
+              if #available(iOS 27, *) {
+                let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
+                defer {
+                  Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
+                }
+                if let generationSchema {
+                  let response = try await session.respond(
+                    schema: generationSchema,
+                    includeSchemaInPrompt: true,
+                    options: generationOptions
+                  ) {
+                    userPrompt
+                    for attachment in preparedAttachments.values {
+                      attachment
+                    }
+                  }
+                  resolve(response.toModelMessages())
+                } else {
+                  let response = try await session.respond(options: generationOptions) {
+                    userPrompt
+                    for attachment in preparedAttachments.values {
+                      attachment
+                    }
+                  }
+                  resolve(response.toModelMessages())
+                }
+              } else {
+                throw AppleLLMError.unsupportedOS
+              }
+#else
+              throw AppleLLMError.unsupportedOS
+#endif
             }
           } catch {
             if let appleError = self.mapToAppleLLMError(error, includeGenerationFallback: true) {
@@ -151,34 +309,74 @@ public class AppleLLMImpl: NSObject {
 
       let task = Task {
         do {
-          let tools = try self.createTools(from: options, toolInvoker: toolInvoker)
-          let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
-          
-          let session = LanguageModelSession.init(
-            model: SystemLanguageModel.default,
-            tools: tools,
-            transcript: transcript
+          let providerOptions = self.createProviderOptions(from: options)
+          let tools = try self.createTools(from: options, providerOptions: providerOptions, toolInvoker: toolInvoker)
+          let (transcript, userPrompt, promptAttachments) = try self.createTranscriptAndPrompt(
+            from: messages,
+            tools: tools
           )
-          
+
+          let session = try self.createSession(providerOptions: providerOptions, tools: tools, transcript: transcript)
+
           let generationOptions = try self.createGenerationOptions(from: options)
           let generationSchema = try self.createGenerationSchema(from: options)
 
           do {
-            if let generationSchema {
-              let responseStream = session.streamResponse(
-                to: userPrompt,
-                schema: generationSchema,
-                includeSchemaInPrompt: true,
-                options: generationOptions
-              )
-              for try await chunk in responseStream {
-                onUpdate(streamId, String(describing: chunk.content))
+            if promptAttachments.isEmpty {
+              if let generationSchema {
+                let responseStream = session.streamResponse(
+                  to: userPrompt,
+                  schema: generationSchema,
+                  includeSchemaInPrompt: true,
+                  options: generationOptions
+                )
+                for try await chunk in responseStream {
+                  onUpdate(streamId, String(describing: chunk.content))
+                }
+              } else {
+                let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
+                for try await chunk in responseStream {
+                  onUpdate(streamId, chunk.content)
+                }
               }
             } else {
-              let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
-              for try await chunk in responseStream {
-                onUpdate(streamId, chunk.content)
+#if compiler(>=6.3)
+              if #available(iOS 27, *) {
+                let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
+                defer {
+                  Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
+                }
+                if let generationSchema {
+                  let responseStream = session.streamResponse(
+                    schema: generationSchema,
+                    includeSchemaInPrompt: true,
+                    options: generationOptions
+                  ) {
+                    userPrompt
+                    for attachment in preparedAttachments.values {
+                      attachment
+                    }
+                  }
+                  for try await chunk in responseStream {
+                    onUpdate(streamId, String(describing: chunk.content))
+                  }
+                } else {
+                  let responseStream = session.streamResponse(options: generationOptions) {
+                    userPrompt
+                    for attachment in preparedAttachments.values {
+                      attachment
+                    }
+                  }
+                  for try await chunk in responseStream {
+                    onUpdate(streamId, chunk.content)
+                  }
+                }
+              } else {
+                throw AppleLLMError.unsupportedOS
               }
+#else
+              throw AppleLLMError.unsupportedOS
+#endif
             }
 
             if !Task.isCancelled {
@@ -254,6 +452,114 @@ public class AppleLLMImpl: NSObject {
 
 #if canImport(FoundationModels)
   @available(iOS 26, *)
+  private func modelInfo(for model: SystemLanguageModel, locale: Locale, modelName: String) -> [String: Any] {
+    let isAvailable = model.availability == .available
+    var info: [String: Any] = [
+      "model": modelName,
+      "isAvailable": isAvailable,
+      "availability": isAvailable ? "available" : "unavailable",
+      "supportsLocale": model.supportsLocale(locale),
+      "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
+      "supportsTokenCounting": false,
+      "supportsImagePrompts": false,
+      "supportsDynamicProfiles": false,
+      "supportsVisionTools": false,
+    ]
+
+#if compiler(>=6.3)
+    if #available(iOS 26.4, *) {
+      info["contextSize"] = model.contextSize
+      info["supportsTokenCounting"] = true
+    }
+
+    if #available(iOS 27, *) {
+      info["supportsImagePrompts"] = true
+      info["supportsDynamicProfiles"] = true
+      info["supportsVisionTools"] = true
+    }
+#endif
+
+    return info
+  }
+
+#if compiler(>=6.3)
+  @available(iOS 27, *)
+  private func modelInfo(
+    for model: PrivateCloudComputeLanguageModel,
+    locale: Locale,
+    modelName: String
+  ) async throws -> [String: Any] {
+    let contextSize = try await model.contextSize
+    let isAvailable = model.availability == .available
+    return [
+      "model": modelName,
+      "isAvailable": isAvailable,
+      "availability": isAvailable ? "available" : "unavailable",
+      "contextSize": contextSize,
+      "supportsLocale": model.supportsLocale(locale),
+      "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
+      "supportsTokenCounting": false,
+      "supportsImagePrompts": true,
+      "supportsDynamicProfiles": true,
+      "supportsVisionTools": true,
+    ]
+  }
+#endif
+
+  @available(iOS 26, *)
+  private func languageIdentifier(_ language: Locale.Language) -> String {
+    guard let languageCode = language.languageCode?.identifier else {
+      return language.minimalIdentifier
+    }
+
+    guard let region = language.region?.identifier else {
+      return languageCode
+    }
+
+    return "\(languageCode)-\(region)"
+  }
+
+  @available(iOS 26, *)
+  private func createProviderOptions(from options: [String: Any]) -> [String: Any] {
+    guard let providerOptions = options["providerOptions"] as? [String: Any] else {
+      return [:]
+    }
+
+    return providerOptions
+  }
+
+  @available(iOS 26, *)
+  private func createSession(
+    providerOptions: [String: Any],
+    tools: [any Tool],
+    transcript: Transcript
+  ) throws -> LanguageModelSession {
+    let modelName = providerOptions["model"] as? String ?? "system"
+
+    switch modelName {
+    case "system":
+      return LanguageModelSession(
+        model: SystemLanguageModel.default,
+        tools: tools,
+        transcript: transcript
+      )
+    case "private-cloud-compute":
+#if compiler(>=6.3)
+      if #available(iOS 27, *) {
+        return LanguageModelSession(
+          model: PrivateCloudComputeLanguageModel(),
+          tools: tools,
+          transcript: transcript
+        )
+      }
+#endif
+      throw AppleLLMError.unsupportedOS
+    default:
+      throw AppleLLMError.invalidMessage("Unsupported model '\(modelName)'")
+    }
+  }
+
+  @available(iOS 26, *)
   private func mapKnownAppleLLMError(_ error: Error) -> AppleLLMError? {
     if let appleError = error as? AppleLLMError {
       return appleError
@@ -304,9 +610,13 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 26, *)
-  private func createTools(from options: [String: Any], toolInvoker: @escaping ToolInvoker) throws -> [any Tool] {
+  private func createTools(
+    from options: [String: Any],
+    providerOptions: [String: Any],
+    toolInvoker: @escaping ToolInvoker
+  ) throws -> [any Tool] {
     guard let toolsDict = options["tools"] as? [[String: Any]] else {
-      return []
+      return try createBuiltInTools(from: providerOptions)
     }
     
     var tools: [any Tool] = []
@@ -328,15 +638,41 @@ public class AppleLLMImpl: NSObject {
       )
       tools.append(tool)
     }
+
+    tools.append(contentsOf: try createBuiltInTools(from: providerOptions))
     
     return tools
   }
-  
-  // TODO:
-  //   • Investigate assetIDs parameter usage in Transcript.Response
-  //   • Implement tool calling support
+
   @available(iOS 26, *)
-  private func createTranscriptAndPrompt(from messages: [[String: Any]], tools: [any Tool]) throws -> (Transcript, String) {
+  private func createBuiltInTools(from providerOptions: [String: Any]) throws -> [any Tool] {
+    guard let toolNames = providerOptions["builtInTools"] as? [String], !toolNames.isEmpty else {
+      return []
+    }
+
+#if compiler(>=6.3) && canImport(Vision)
+    if #available(iOS 27, *) {
+      return try toolNames.map { toolName in
+        switch toolName {
+        case "ocr":
+          return OCRTool()
+        case "barcode":
+          return BarcodeReaderTool()
+        default:
+          throw AppleLLMError.invalidMessage("Unsupported built-in tool '\(toolName)'")
+        }
+      }
+    }
+#endif
+
+    throw AppleLLMError.unsupportedOS
+  }
+  
+  @available(iOS 26, *)
+  private func createTranscriptAndPrompt(
+    from messages: [[String: Any]],
+    tools: [any Tool]
+  ) throws -> (Transcript, String, [[String: Any]]) {
     guard !messages.isEmpty else {
       throw AppleLLMError.invalidMessage("Messages array cannot be empty")
     }
@@ -347,6 +683,8 @@ public class AppleLLMImpl: NSObject {
           lastRole == "user" else {
       throw AppleLLMError.invalidMessage("Last message must be from user role")
     }
+
+    let promptAttachments = lastMessage["attachments"] as? [[String: Any]] ?? []
     
     var entries: [Transcript.Entry] = []
     
@@ -356,6 +694,10 @@ public class AppleLLMImpl: NSObject {
       guard let role = message["role"] as? String,
             let content = message["content"] as? String else {
         throw AppleLLMError.invalidMessage("Message must have role and content")
+      }
+
+      if let attachments = message["attachments"] as? [[String: Any]], !attachments.isEmpty {
+        throw AppleLLMError.invalidMessage("Image attachments are only supported on the final user prompt")
       }
       
       let segment = Transcript.Segment.text(
@@ -376,11 +718,229 @@ public class AppleLLMImpl: NSObject {
         let response = Transcript.Response(assetIDs: [], segments: [segment])
         entries.append(.response(response))
       default:
-        throw AppleLLMError.invalidMessage(role)
+        throw AppleLLMError.invalidMessage("Unsupported role '\(role)'. Supported roles are: system, user, assistant")
       }
     }
     
-    return (Transcript(entries: entries), userPrompt)
+    return (Transcript(entries: entries), userPrompt, promptAttachments)
+  }
+
+#if compiler(>=6.3)
+  @available(iOS 27, *)
+  private func createImageAttachments(
+    from attachments: [[String: Any]]
+  ) throws -> (values: [Attachment<ImageAttachmentContent>], temporaryFileURLs: [URL]) {
+    var imageAttachments: [Attachment<ImageAttachmentContent>] = []
+    var temporaryFileURLs: [URL] = []
+
+    do {
+      for attachment in attachments {
+        guard let type = attachment["type"] as? String, type == "image" else {
+          throw AppleLLMError.invalidMessage("Unsupported attachment type")
+        }
+
+        let imageURL = try Self.createImageURL(from: attachment)
+        if imageURL.needsCleanup {
+          temporaryFileURLs.append(imageURL.url)
+        }
+
+        var imageAttachment = Attachment(imageURL: imageURL.url)
+
+        if let label = attachment["label"] as? String, !label.isEmpty {
+          imageAttachment = imageAttachment.label(label)
+        }
+
+        imageAttachments.append(imageAttachment)
+      }
+    } catch {
+      Self.removeTemporaryFiles(temporaryFileURLs)
+      throw error
+    }
+
+    return (imageAttachments, temporaryFileURLs)
+  }
+#endif
+
+  private static func createImageURL(from attachment: [String: Any]) throws -> ImageURL {
+    if let urlString = attachment["url"] as? String, !urlString.isEmpty {
+      let url = urlString.hasPrefix("/")
+        ? URL(fileURLWithPath: urlString)
+        : URL(string: urlString)
+
+      guard let url, url.isFileURL else {
+        throw AppleLLMError.invalidMessage("Image attachment URLs must be local file URLs")
+      }
+
+      return ImageURL(url: url, needsCleanup: false)
+    }
+
+    guard let dataValue = attachment["data"] as? String, !dataValue.isEmpty else {
+      throw AppleLLMError.invalidMessage("Image attachment must include url or data")
+    }
+
+    let mediaType = attachment["mediaType"] as? String
+    let base64Payload = dataValue.contains(",")
+      ? String(dataValue.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false).last ?? "")
+      : dataValue
+
+    guard let imageData = Data(base64Encoded: base64Payload) else {
+      throw AppleLLMError.invalidMessage("Image attachment data must be base64 encoded")
+    }
+
+    let fileExtension = Self.fileExtension(forImageMediaType: mediaType)
+    let fileURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString)
+      .appendingPathExtension(fileExtension)
+
+    try imageData.write(to: fileURL, options: .atomic)
+    return ImageURL(url: fileURL, needsCleanup: true)
+  }
+
+  private static func removeTemporaryFiles(_ urls: [URL]) {
+    for url in urls {
+      try? FileManager.default.removeItem(at: url)
+    }
+  }
+
+#if canImport(ImagePlayground)
+  @available(iOS 26.4, *)
+  private static func createImagePlaygroundConcepts(
+    from options: [String: Any]
+  ) throws -> (values: [ImagePlaygroundConcept], temporaryFileURLs: [URL]) {
+    var concepts: [ImagePlaygroundConcept] = []
+    var temporaryFileURLs: [URL] = []
+
+    if let prompt = options["prompt"] as? String, !prompt.isEmpty {
+      concepts.append(.text(prompt))
+    }
+
+    do {
+      if let files = options["files"] as? [[String: Any]], !files.isEmpty {
+        guard files.count == 1, let firstFile = files.first else {
+          throw AppleLLMError.invalidMessage("Image Playground supports at most one source image file")
+        }
+        let attachment = try imageAttachmentFromImageModelFile(firstFile)
+        let imageURL = try createImageURL(from: attachment)
+
+        if imageURL.needsCleanup {
+          temporaryFileURLs.append(imageURL.url)
+        }
+
+        guard let imageConcept = ImagePlaygroundConcept.image(imageURL.url) else {
+          throw AppleLLMError.invalidMessage("Image Playground file must resolve to a local image")
+        }
+
+        concepts.append(imageConcept)
+      }
+    } catch {
+      removeTemporaryFiles(temporaryFileURLs)
+      throw error
+    }
+
+    guard !concepts.isEmpty else {
+      throw AppleLLMError.invalidMessage("Image Playground generation requires a prompt or image file")
+    }
+
+    return (concepts, temporaryFileURLs)
+  }
+
+  private static func imageAttachmentFromImageModelFile(_ file: [String: Any]) throws -> [String: Any] {
+    var attachment: [String: Any] = [
+      "type": "image",
+      "mediaType": file["mediaType"] as? String ?? "image/png",
+    ]
+
+    if let data = file["data"] as? String {
+      if data.hasPrefix("file://") || data.hasPrefix("/") {
+        attachment["url"] = data
+      } else {
+        attachment["data"] = data
+      }
+    } else {
+      throw AppleLLMError.invalidMessage("Image Playground file data must be a string")
+    }
+
+    return attachment
+  }
+
+  @available(iOS 26.4, *)
+  private static func createImagePlaygroundStyle(from style: String?) -> ImagePlaygroundStyle {
+    switch style {
+    case "animation":
+      return .animation
+    case "illustration":
+      return .illustration
+    case "sketch":
+      return .sketch
+#if compiler(>=6.3)
+    case "any":
+      if #available(iOS 27, *) {
+        return .any
+      }
+      return .illustration
+    case "emoji":
+      if #available(iOS 27, *) {
+        return .emoji
+      }
+      return .illustration
+    case "externalProvider":
+      if #available(iOS 27, *) {
+        return .externalProvider
+      }
+      return .illustration
+#endif
+    default:
+      return .illustration
+    }
+  }
+
+#if compiler(>=6.3)
+  @available(iOS 26.4, *)
+  private static func createImagePlaygroundOptions(from options: [String: Any]) -> ImagePlaygroundOptions {
+    var imageOptions = ImagePlaygroundOptions()
+
+    switch options["personalization"] as? String {
+    case "disabled":
+      imageOptions.personalization = .disabled
+    case "enabled":
+      imageOptions.personalization = .enabled
+    default:
+      imageOptions.personalization = .automatic
+    }
+
+    return imageOptions
+  }
+#endif
+
+  private static func pngData(from image: CGImage) throws -> Data {
+    let data = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else {
+      throw AppleLLMError.generationError("Failed to create PNG image destination")
+    }
+
+    CGImageDestinationAddImage(destination, image, nil)
+
+    guard CGImageDestinationFinalize(destination) else {
+      throw AppleLLMError.generationError("Failed to encode generated image")
+    }
+
+    return data as Data
+  }
+#endif
+
+  private static func fileExtension(forImageMediaType mediaType: String?) -> String {
+    switch mediaType?.lowercased() {
+    case "image/jpeg", "image/jpg":
+      return "jpeg"
+    case "image/heic":
+      return "heic"
+    case "image/webp":
+      return "webp"
+    case "image/gif":
+      return "gif"
+    default:
+      return "png"
+    }
   }
   
   @available(iOS 26, *)

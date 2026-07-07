@@ -23,7 +23,15 @@ type SettingsSheetProps = {
 
 export function SettingsSheet({ ref }: SettingsSheetProps) {
   const { chatSettings, toggleTool, updateChatSettings } = useChatStore()
-  const { temperature, maxSteps, enabledToolIds, genUiEnabled } = chatSettings
+  const {
+    temperature,
+    maxSteps,
+    enabledToolIds,
+    genUiEnabled,
+    historyDemoEnabled,
+    historyWindowEntries,
+    historySummarizationThreshold,
+  } = chatSettings
 
   return (
     <TrueSheet ref={ref} scrollable style={styles.sheetContainerSlidingWrapper}>
@@ -98,6 +106,21 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                   }
                 />
               </View>
+              <View style={styles.settingRowToggleWithBorder}>
+                <View style={styles.settingToggleText}>
+                  <Text style={styles.settingTitle}>History Demo</Text>
+                  <Text style={styles.settingDescription}>
+                    Exercise summarizeHistory, rollingWindow, and
+                    droppingCompletedToolCalls in chat
+                  </Text>
+                </View>
+                <Switch
+                  value={historyDemoEnabled}
+                  onValueChange={(value) =>
+                    updateChatSettings({ historyDemoEnabled: value })
+                  }
+                />
+              </View>
             </View>
           </View>
 
@@ -151,10 +174,67 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                   />
                 </Host>
               </View>
+              {historyDemoEnabled && (
+                <>
+                  <View style={styles.settingRowSliderWithBorder}>
+                    <View style={styles.settingSliderHeader}>
+                      <Text style={styles.settingTitle}>History Window</Text>
+                      <Text style={styles.settingValue}>
+                        {historyWindowEntries}
+                      </Text>
+                    </View>
+                    <Host style={styles.sliderHost}>
+                      <Slider
+                        value={historyWindowEntries}
+                        min={2}
+                        max={20}
+                        steps={18}
+                        onValueChange={(value) =>
+                          updateChatSettings({
+                            historyWindowEntries: Math.round(value),
+                          })
+                        }
+                        style={
+                          Platform.OS === 'android'
+                            ? styles.androidSlider
+                            : undefined
+                        }
+                      />
+                    </Host>
+                  </View>
+                  <View style={styles.settingRowSliderWithBorder}>
+                    <View style={styles.settingSliderHeader}>
+                      <Text style={styles.settingTitle}>Summary Threshold</Text>
+                      <Text style={styles.settingValue}>
+                        {historySummarizationThreshold}
+                      </Text>
+                    </View>
+                    <Host style={styles.sliderHost}>
+                      <Slider
+                        value={historySummarizationThreshold}
+                        min={500}
+                        max={8000}
+                        steps={150}
+                        onValueChange={(value) =>
+                          updateChatSettings({
+                            historySummarizationThreshold: Math.round(value),
+                          })
+                        }
+                        style={
+                          Platform.OS === 'android'
+                            ? styles.androidSlider
+                            : undefined
+                        }
+                      />
+                    </Host>
+                  </View>
+                </>
+              )}
             </View>
             <Text style={styles.settingsFooter}>
-              Temperature controls response randomness. Max steps limits tool
-              call iterations.
+              {historyDemoEnabled
+                ? 'Temperature controls response randomness. Max steps limits tool call iterations. History Demo applies generic history wrappers on top of the current basic chat flow. Summary Threshold uses tokens when available and otherwise falls back to an estimate.'
+                : 'Temperature controls response randomness. Max steps limits tool call iterations.'}
             </Text>
           </View>
         </ScrollView>
@@ -250,6 +330,15 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  settingRowToggleWithBorder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.separator as any,
   },
   settingToggleText: {
     flex: 1,
