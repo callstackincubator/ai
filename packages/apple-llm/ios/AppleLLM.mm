@@ -174,5 +174,9 @@ using namespace JS::NativeAppleLLM;
   return @([_llm isAvailable]);
 }
 
+- (nonnull NSString *)getAvailability {
+  return [_llm getAvailability];
+}
+
 
 @end

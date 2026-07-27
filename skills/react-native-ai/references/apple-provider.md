@@ -47,6 +47,12 @@ if (apple.isAvailable()) {
 }
 ```
 
+Use `apple.getAvailability()` when you need to know *why* it is unavailable:
+`'available' | 'deviceNotEligible' | 'appleIntelligenceNotEnabled' |
+'modelNotReady' | 'unsupportedOS' | 'unknown'`. In particular
+`'appleIntelligenceNotEnabled'` is user-fixable, so prompt them to turn Apple
+Intelligence on in Settings instead of showing a generic error.
+
 ### 3. Model Types
 
 | Type          | Method                       | Use Case                                | Documentation                                            |

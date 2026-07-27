@@ -43,6 +43,7 @@ export function createAppleProvider({
     return createLanguageModel()
   }
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
+  provider.getAvailability = () => NativeAppleLLM.getAvailability()
   provider.languageModel = createLanguageModel
   provider.textEmbeddingModel = (options: AppleEmbeddingOptions = {}) => {
     return new AppleTextEmbeddingModel(options)

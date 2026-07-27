@@ -20,17 +20,37 @@ public class AppleLLMImpl: NSObject {
   
   private var streamTasks: [String: Task<Void, Never>] = [:]
   
-  @objc
-  public func isAvailable() -> Bool {
+  private func currentAvailability() -> AppleAvailability {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      return SystemLanguageModel.default.availability == .available
+      switch SystemLanguageModel.default.availability {
+      case .available:
+        return .available
+      case .unavailable(.deviceNotEligible):
+        return .deviceNotEligible
+      case .unavailable(.appleIntelligenceNotEnabled):
+        return .appleIntelligenceNotEnabled
+      case .unavailable(.modelNotReady):
+        return .modelNotReady
+      case .unavailable:
+        return .unknown
+      }
     } else {
-      return false
+      return .unsupportedOS
     }
 #else
-    return false
+    return .unsupportedOS
 #endif
+  }
+
+  @objc
+  public func getAvailability() -> String {
+    return currentAvailability().rawValue
+  }
+
+  @objc
+  public func isAvailable() -> Bool {
+    return currentAvailability() == .available
   }
 
   @objc
@@ -41,10 +61,11 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26.4, *) {
-      guard SystemLanguageModel.default.availability == .available else {
+      let availability = currentAvailability()
+      guard availability == .available else {
         reject(
           "MODEL_UNAVAILABLE",
-          "Apple Intelligence model is not available",
+          availability.unavailableDescription,
           nil
         )
         return
@@ -77,8 +98,9 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      guard SystemLanguageModel.default.availability == .available else {
-        rejectWithAppleError(.modelUnavailable, reject: reject)
+      let availability = currentAvailability()
+      guard availability == .available else {
+        rejectWithAppleError(.modelUnavailable(availability), reject: reject)
         return
       }
 
@@ -144,8 +166,9 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      guard SystemLanguageModel.default.availability == .available else {
-        emitStreamError(.modelUnavailable, streamId: streamId, onError: onError)
+      let availability = currentAvailability()
+      guard availability == .available else {
+        emitStreamError(.modelUnavailable(availability), streamId: streamId, onError: onError)
         return
       }
 
