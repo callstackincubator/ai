@@ -203,6 +203,47 @@ if (!apple.isAvailable()) {
 }
 ```
 
+### Availability Status
+
+`isAvailable()` only tells you whether you can generate right now. When it
+returns `false`, use `getAvailability()` to find out why, so you can show the
+user something more useful than a generic error:
+
+```typescript
+import { apple, type AppleAvailability } from '@react-native-ai/apple';
+
+function describeAvailability(status: AppleAvailability) {
+  switch (status) {
+    case 'available':
+      return null;
+    case 'appleIntelligenceNotEnabled':
+      // Actionable: the user can fix this in Settings
+      return 'Turn on Apple Intelligence in Settings to use this feature.';
+    case 'modelNotReady':
+      // Temporary: the model is still downloading, worth retrying later
+      return 'Apple Intelligence is still getting ready. Please try again later.';
+    case 'deviceNotEligible':
+    case 'unsupportedOS':
+    case 'unknown':
+      // Not recoverable on this device: fall back to another provider
+      return null;
+  }
+}
+
+const message = describeAvailability(apple.getAvailability());
+```
+
+| Status                        | Meaning                                                       |
+| ----------------------------- | ------------------------------------------------------------- |
+| `available`                   | The model is ready to use                                     |
+| `deviceNotEligible`           | The hardware does not support Apple Intelligence              |
+| `appleIntelligenceNotEnabled` | The user has not turned Apple Intelligence on in Settings     |
+| `modelNotReady`               | Apple Intelligence is on, but the model is not downloaded yet |
+| `unsupportedOS`               | The device runs an OS older than iOS 26                       |
+| `unknown`                     | Apple reported a reason this library does not know about yet  |
+
+`isAvailable()` is equivalent to `getAvailability() === 'available'`.
+
 ## Context Window
 
 Apple Foundation Models have a fixed context window of 4096 tokens. This limit applies to the full request context, including system instructions, previous conversation messages, tool definitions, schemas, and the current user prompt.
@@ -453,6 +494,9 @@ import { AppleFoundationModels } from '@react-native-ai/apple'
 
 // Check if Apple Intelligence is available
 const isAvailable = AppleFoundationModels.isAvailable()
+
+// Or check why it is unavailable
+const availability = AppleFoundationModels.getAvailability()
 
 // Generate text responses
 const messages = [{ role: 'user', content: 'Hello' }]

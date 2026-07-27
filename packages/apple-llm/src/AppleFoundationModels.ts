@@ -13,6 +13,7 @@ const nativeAppleLLM = NativeAppleLLM as Spec & {
 
 const AppleFoundationModels: Spec = {
   isAvailable: () => NativeAppleLLM.isAvailable(),
+  getAvailability: () => NativeAppleLLM.getAvailability(),
   countTokens: (text) => {
     if (typeof nativeAppleLLM.countTokens !== 'function') {
       return Promise.reject(new Error(tokenCountingUnavailableMessage))

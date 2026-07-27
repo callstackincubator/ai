@@ -10,6 +10,27 @@ export interface AppleMessage {
   content: string
 }
 
+/**
+ * Availability of Apple Intelligence, mirroring `SystemLanguageModel.Availability`.
+ *
+ * - `available` - the model is ready to use
+ * - `deviceNotEligible` - the hardware does not support Apple Intelligence
+ * - `appleIntelligenceNotEnabled` - the user has not turned Apple Intelligence
+ *   on, so they can be pointed at Settings
+ * - `modelNotReady` - Apple Intelligence is on but the model is not downloaded
+ *   yet, so it is worth retrying later
+ * - `unsupportedOS` - the device runs an OS older than iOS 26
+ * - `unknown` - Apple reported a reason this version of the library does not
+ *   know about yet
+ */
+export type AppleAvailability =
+  | 'available'
+  | 'deviceNotEligible'
+  | 'appleIntelligenceNotEnabled'
+  | 'modelNotReady'
+  | 'unsupportedOS'
+  | 'unknown'
+
 export interface AppleGenerationOptions {
   temperature?: number
   maxTokens?: number
@@ -36,6 +57,7 @@ export type StreamErrorEvent = {
 
 export interface Spec extends TurboModule {
   isAvailable(): boolean
+  getAvailability(): AppleAvailability
   countTokens(text: string): Promise<number>
   generateText(
     messages: AppleMessage[],
