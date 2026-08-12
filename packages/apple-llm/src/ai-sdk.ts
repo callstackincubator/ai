@@ -23,7 +23,10 @@ import {
 
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
-import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
+import NativeAppleLLM, {
+  type AppleGuardrails,
+  type AppleMessage,
+} from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
@@ -31,7 +34,7 @@ import NativeAppleUtils from './NativeAppleUtils'
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 type ToolDefinitionSet = Record<string, FullToolDefinition>
 
-export type AppleGuardrails = 'default' | 'permissiveContentTransformations'
+export type { AppleGuardrails } from './NativeAppleLLM'
 
 export function createAppleProvider({
   availableTools,
