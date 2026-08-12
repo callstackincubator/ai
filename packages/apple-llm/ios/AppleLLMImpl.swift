@@ -88,7 +88,7 @@ public class AppleLLMImpl: NSObject {
           let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
           
           let session = LanguageModelSession.init(
-            model: SystemLanguageModel.default,
+            model: self.createModel(from: options),
             tools: tools,
             transcript: transcript
           )
@@ -155,7 +155,7 @@ public class AppleLLMImpl: NSObject {
           let (transcript, userPrompt) = try self.createTranscriptAndPrompt(from: messages, tools: tools)
           
           let session = LanguageModelSession.init(
-            model: SystemLanguageModel.default,
+            model: self.createModel(from: options),
             tools: tools,
             transcript: transcript
           )
@@ -384,6 +384,13 @@ public class AppleLLMImpl: NSObject {
   }
   
   @available(iOS 26, *)
+  private func createModel(from options: [String: Any]) -> SystemLanguageModel {
+    if options["guardrails"] as? String == "permissiveContentTransformations" {
+      return SystemLanguageModel(guardrails: .permissiveContentTransformations)
+    }
+    return SystemLanguageModel.default
+  }
+
   private func createGenerationOptions(from options: [String: Any]) throws -> GenerationOptions {
     var temperature: Double?
     var maximumResponseTokens: Int?

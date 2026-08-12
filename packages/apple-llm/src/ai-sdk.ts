@@ -31,13 +31,24 @@ import NativeAppleUtils from './NativeAppleUtils'
 type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
 type ToolDefinitionSet = Record<string, FullToolDefinition>
 
+export type AppleGuardrails = 'default' | 'permissiveContentTransformations'
+
 export function createAppleProvider({
   availableTools,
+  guardrails,
 }: {
   availableTools?: ToolDefinitionSet
+  /**
+   * Guardrails mode for the on-device model. Use
+   * `'permissiveContentTransformations'` to lower guardrail sensitivity for
+   * apps that transform legitimate but sensitive content (for example health
+   * data). Defaults to the system default guardrails.
+   * @see https://developer.apple.com/documentation/foundationmodels/improving-the-safety-of-generative-model-output
+   */
+  guardrails?: AppleGuardrails
 } = {}) {
   const createLanguageModel = () => {
-    return new AppleLLMChatLanguageModel(availableTools)
+    return new AppleLLMChatLanguageModel(availableTools, guardrails)
   }
   const provider = function () {
     return createLanguageModel()
@@ -237,9 +248,14 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   readonly modelId = 'system-default'
 
   private tools: ToolDefinitionSet = {}
+  private guardrails?: AppleGuardrails
 
-  constructor(availableTools: ToolDefinitionSet = {}) {
+  constructor(
+    availableTools: ToolDefinitionSet = {},
+    guardrails?: AppleGuardrails
+  ) {
     this.updateTools(availableTools)
+    this.guardrails = guardrails
   }
 
   async prepare(): Promise<void> {}
@@ -305,6 +321,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
 
     try {
       const response = await NativeAppleLLM.generateText(messages, {
+        guardrails: this.guardrails,
         maxTokens: options.maxOutputTokens,
         temperature: options.temperature,
         topP: options.topP,
@@ -365,6 +382,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
   async doStream(options: LanguageModelV3CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
+    const guardrails = this.guardrails
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
@@ -472,6 +490,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
           listeners = [updateListener, completeListener, errorListener]
 
           NativeAppleLLM.generateStream(streamId, messages, {
+            guardrails,
             maxTokens: options.maxOutputTokens,
             temperature: options.temperature,
             topP: options.topP,

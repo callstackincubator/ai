@@ -11,6 +11,8 @@ export interface AppleMessage {
 }
 
 export interface AppleGenerationOptions {
+  /** Guardrails mode for the underlying SystemLanguageModel. */
+  guardrails?: string
   temperature?: number
   maxTokens?: number
   topP?: number
