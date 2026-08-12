@@ -38,6 +38,24 @@ for await (const delta of textStream) {
 > [!NOTE]
 > Streaming objects is currently not supported.
 
+## Guardrails
+
+Apple Foundation Models apply content guardrails to prompts and responses. Apps
+that transform legitimate but sensitive content (for example health or medical
+data) can hit `guardrailViolation` errors with the default mode. For those
+use-cases, Apple provides a permissive guardrails mode that you can opt into
+when creating the provider:
+
+```typescript
+import { createAppleProvider } from '@react-native-ai/apple';
+
+const apple = createAppleProvider({
+  guardrails: 'permissiveContentTransformations'
+});
+```
+
+See [Improving the safety of generative model output](https://developer.apple.com/documentation/foundationmodels/improving-the-safety-of-generative-model-output#Use-permissive-guardrail-mode-for-sensitive-content) for when this mode is appropriate.
+
 ## Structured Output
 
 Generate structured data that conforms to a specific schema:

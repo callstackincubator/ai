@@ -10,7 +10,11 @@ export interface AppleMessage {
   content: string
 }
 
+export type AppleGuardrails = 'default' | 'permissiveContentTransformations'
+
 export interface AppleGenerationOptions {
+  /** Guardrails mode for the underlying SystemLanguageModel. */
+  guardrails?: AppleGuardrails
   temperature?: number
   maxTokens?: number
   topP?: number

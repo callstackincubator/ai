@@ -115,7 +115,8 @@ using namespace JS::NativeAppleLLM;
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
-    @"tools": options.tools() ?: [NSNull null]
+    @"tools": options.tools() ?: [NSNull null],
+    @"guardrails": options.guardrails() ?: [NSNull null]
   };
   
   auto callToolBlock = ^(NSString *toolId, NSString *arguments, void (^completion)(id, NSError *)) {
@@ -144,6 +145,7 @@ using namespace JS::NativeAppleLLM;
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null],
+    @"guardrails": options.guardrails() ?: [NSNull null],
   };
   
   auto callToolBlock = ^(NSString *toolId, NSString *arguments, void (^completion)(id, NSError *)) {
