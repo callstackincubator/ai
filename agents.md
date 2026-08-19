@@ -32,7 +32,7 @@
 ## Project Structure
 
 - Monorepo with `packages/` (libraries) and `apps/` (example apps)
-- Packages: `@react-native-ai/apple`, `@react-native-ai/llama`, `@react-native-ai/mlc`
+- Packages: `@react-native-ai/apple`, `@react-native-ai/llama`, `@react-native-ai/mlc`, `@react-native-ai/adk` (Google ADK wrapper, Android), `@react-native-ai/dev-tools` (AI SDK profiling), `@react-native-ai/json-ui` (tool-calling based JSON UI)
 - Example app: Expo SDK 54 in `apps/expo-example/`
 
 ## Tech Stack
