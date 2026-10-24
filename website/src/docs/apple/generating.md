@@ -66,7 +66,9 @@ for await (const delta of result.textStream) {
 }
 ```
 
-Streaming structured objects are not currently supported by this provider.
+Structured output (`Output.object`) also works with `streamText`, but Apple
+returns partial objects that are not prefixes of the final JSON, so the provider
+sends the complete object once generation finishes instead of streaming it.
 
 ## Structured Output
 
@@ -337,6 +339,8 @@ Important Apple-specific behavior:
 - Tool calls are provider-executed, so AI SDK step callbacks such as
   `stopWhen`, `onStepStart`, and `onStepEnd` do not run for native Apple
   tool execution.
+- Tool calls and their results are reported with Apple's tool call IDs, in
+  `generateText` content and as stream parts in `streamText`.
 - You can update the registered tools on a model instance with
   `model.updateTools(...)` before generation.
 

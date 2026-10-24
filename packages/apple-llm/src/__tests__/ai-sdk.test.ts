@@ -536,6 +536,70 @@ describe('apple usage', () => {
   })
 })
 
+describe('apple structured output stream', () => {
+  test('sends the final json once the stream completes', async () => {
+    const { stream } = await apple().doStream(
+      createCallOptions({
+        responseFormat: {
+          type: 'json',
+          schema: { type: 'object', properties: { city: { type: 'string' } } },
+        },
+      })
+    )
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamUpdate.emit({ streamId, content: '{"city":"Par"}' })
+    onStreamUpdate.emit({ streamId, content: '{"city":"Paris"}' })
+    onStreamComplete.emit({ streamId })
+
+    expect(
+      (await parts).filter(
+        (part) => part.type !== 'stream-start' && part.type !== 'finish'
+      )
+    ).toEqual([
+      { type: 'text-start', id: streamId },
+      { type: 'text-delta', id: streamId, delta: '{"city":"Paris"}' },
+      { type: 'text-end', id: streamId },
+    ])
+  })
+})
+
+describe('apple with the ai sdk', () => {
+  test('streams structured output and usage through streamText', async () => {
+    const { jsonSchema, Output, streamText } = await import('ai')
+    generateStream.mockImplementationOnce((streamId) => {
+      setTimeout(() => {
+        onStreamUpdate.emit({ streamId, content: '{"city":"Par"}' })
+        onStreamUpdate.emit({ streamId, content: '{"city":"Paris"}' })
+        onStreamComplete.emit({
+          streamId,
+          usage: { inputTokens: 40, outputTokens: 6 },
+        })
+      })
+    })
+
+    const result = streamText({
+      model: apple(),
+      prompt: 'Where is the Eiffel Tower?',
+      output: Output.object({
+        schema: jsonSchema<{ city: string }>({
+          type: 'object',
+          properties: { city: { type: 'string' } },
+          required: ['city'],
+        }),
+      }),
+    })
+
+    expect(await result.output).toEqual({ city: 'Paris' })
+    expect(await result.usage).toMatchObject({
+      inputTokens: 40,
+      outputTokens: 6,
+      totalTokens: 46,
+    })
+  })
+})
+
 describe('apple token counting', () => {
   test('counts tokens through the language model', async () => {
     expect(await apple().countTokens('hello')).toBe(5)

@@ -655,6 +655,19 @@ public class AppleLLMImpl: NSObject {
     providerOptions: [String: Any],
     onUpdate: @escaping (String, [[String: Any]]?) -> Void
   ) async throws -> [String: Any]? {
+    // Reasoning and tool activity are only sent when they change
+    var previousContent: String?
+    var previousEntries: NSArray = []
+    func update(_ content: String, _ entries: [[String: Any]]) {
+      let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
+      guard entriesChanged || content != previousContent else {
+        return
+      }
+      previousContent = content
+      previousEntries = entries as NSArray
+      onUpdate(content, entriesChanged ? entries : nil)
+    }
+
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
       let contextOptions = try createContextOptions(
@@ -680,28 +693,28 @@ public class AppleLLMImpl: NSObject {
         }
         for try await chunk in responseStream {
           usage = chunk.usage
-          onUpdate(String(describing: chunk.content), nil)
+          update(
+            chunk.rawContent.jsonString,
+            AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
+          )
         }
-        return usage.map(Self.usageDictionary)
-      }
-
-      let responseStream = session.streamResponse(
-        options: generationOptions,
-        contextOptions: contextOptions
-      ) {
-        userPrompt
-        for attachment in preparedAttachments.values {
-          attachment
+      } else {
+        let responseStream = session.streamResponse(
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          userPrompt
+          for attachment in preparedAttachments.values {
+            attachment
+          }
         }
-      }
-      // Reasoning and tool activity are only sent when they change
-      var previousEntries: NSArray = []
-      for try await chunk in responseStream {
-        usage = chunk.usage
-        let entries = AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
-        let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
-        previousEntries = entries as NSArray
-        onUpdate(chunk.content, entriesChanged ? entries : nil)
+        for try await chunk in responseStream {
+          usage = chunk.usage
+          update(
+            chunk.content,
+            AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
+          )
+        }
       }
       return usage.map(Self.usageDictionary)
     }
@@ -712,7 +725,17 @@ public class AppleLLMImpl: NSObject {
       throw AppleLLMError.unsupportedOS
     }
 
+    // iOS 26 snapshots have no transcript entries, so tool activity is read from
+    // the session transcript, which grows while the response streams
     let transcriptBefore = session.transcript
+    let newEntries = {
+      AppleLLMTranscriptSerializer.serialize(
+        session.transcript.dropFirst(transcriptBefore.count),
+        includeResponses: false
+      )
+    }
+
+    var content = ""
     if let generationSchema {
       let responseStream = session.streamResponse(
         to: userPrompt,
@@ -721,14 +744,18 @@ public class AppleLLMImpl: NSObject {
         options: generationOptions
       )
       for try await chunk in responseStream {
-        onUpdate(String(describing: chunk.content), nil)
+        content = chunk.rawContent.jsonString
+        update(content, newEntries())
       }
     } else {
       let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
       for try await chunk in responseStream {
-        onUpdate(chunk.content, nil)
+        content = chunk.content
+        update(content, newEntries())
       }
     }
+    // Entries added after the last snapshot
+    update(content, newEntries())
 
     return await countUsage(
       session: session,

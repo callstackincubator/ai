@@ -937,10 +937,6 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         ? options.responseFormat.schema
         : undefined
 
-    if (schema) {
-      throw new Error('Streaming JSON responses is not yet supported.')
-    }
-
     for (const tool of tools) {
       globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
     }
@@ -1048,6 +1044,14 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               }
 
               const nextRawContent = String(data.content ?? '')
+
+              // Partial JSON snapshots are not prefixes of the final JSON, so
+              // structured output is sent once the stream completes
+              if (schema) {
+                previousRawContent = nextRawContent
+                return
+              }
+
               const rawDelta = getSnapshotDelta(
                 previousRawContent,
                 nextRawContent
@@ -1074,6 +1078,15 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           const completeListener = NativeAppleLLM.onStreamComplete((data) => {
             if (data.streamId === streamId) {
               endReasoning()
+              if (schema && previousRawContent) {
+                controller.enqueue({ type: 'text-start', id })
+                controller.enqueue({
+                  type: 'text-delta',
+                  delta: previousRawContent,
+                  id,
+                })
+                textStarted = true
+              }
               if (textStarted) {
                 controller.enqueue({
                   type: 'text-end',
