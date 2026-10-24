@@ -618,8 +618,12 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
         await this.prepare()
       }
 
+      // A typed array can be a view into a larger buffer, so only its bytes are sent
       const transcriptionResult = await NativeAppleTranscription.transcribe(
-        audio.buffer,
+        audio.buffer.slice(
+          audio.byteOffset,
+          audio.byteOffset + audio.byteLength
+        ),
         this.language
       )
 
