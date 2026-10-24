@@ -379,6 +379,52 @@ describe('core ai language model warnings', () => {
   })
 })
 
+describe('core ai structured output', () => {
+  const schema = {
+    type: 'object',
+    properties: { name: { type: 'string' } },
+    required: ['name'],
+  } as const
+
+  test('sends the response format schema for guided generation', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({ responseFormat: { type: 'json', schema } })
+    )
+
+    expect(generateText.mock.calls[0]![3]).toMatchObject({ schema })
+    expect(result.warnings).toEqual([])
+  })
+
+  test('streams structured output', async () => {
+    const { stream } = await createModel().doStream(
+      createCallOptions({ responseFormat: { type: 'json', schema } })
+    )
+    const parts = readAll(stream)
+
+    const streamId = await waitForStreamId()
+    expect(streamText.mock.calls[0]![3]).toMatchObject({ schema })
+    onStreamUpdate.emit({ streamId, content: '{"name":"Ada"}' })
+    onStreamComplete.emit({ streamId, usage })
+
+    const text = (await parts)
+      .filter((part) => part.type === 'text-delta')
+      .map((part) => part.delta)
+      .join('')
+    expect(JSON.parse(text)).toEqual({ name: 'Ada' })
+  })
+
+  test('warns that JSON without a schema is not enforced', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({ responseFormat: { type: 'json' } })
+    )
+
+    expect(generateText.mock.calls[0]![3].schema).toBeUndefined()
+    expect(result.warnings).toMatchObject([
+      { type: 'unsupported', feature: 'responseFormat' },
+    ])
+  })
+})
+
 const reasoningWarning = {
   type: 'unsupported',
   feature: 'reasoning',

@@ -579,6 +579,11 @@ function toCoreAIGenerationOptions(
   return {
     maxTokens: options.maxOutputTokens,
     temperature: options.temperature,
+    // Runs as guided generation, so the output always matches the schema
+    schema:
+      options.responseFormat?.type === 'json'
+        ? options.responseFormat.schema
+        : undefined,
   }
 }
 
@@ -612,11 +617,15 @@ function getCallWarnings(
         'Core AI tool calling is not supported yet, so the tools were not passed to the model.',
     })
   }
-  if (options.responseFormat?.type === 'json') {
+  if (
+    options.responseFormat?.type === 'json' &&
+    !options.responseFormat.schema
+  ) {
     warnings.push({
       type: 'unsupported',
       feature: 'responseFormat',
-      details: 'Core AI language models do not support structured output yet.',
+      details:
+        'Core AI language models only enforce JSON output that has a schema.',
     })
   }
 

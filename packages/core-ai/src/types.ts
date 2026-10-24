@@ -89,6 +89,8 @@ export interface CoreAIMessage {
 export interface CoreAIGenerationOptions {
   temperature?: number
   maxTokens?: number
+  // JSON schema of the structured output
+  schema?: CodegenTypes.UnsafeObject
 }
 
 export type CoreAIGenerationPart =
