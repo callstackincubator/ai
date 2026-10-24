@@ -21,8 +21,14 @@ module React {
 EOF
 
 xcrun swiftc -version
-find "$PACKAGE_DIR/ios" -name '*.swift' -print0 | xargs -0 xcrun -sdk iphoneos swiftc \
-  -typecheck \
-  -swift-version 5 \
-  -I "$STUB_DIR" \
-  -target arm64-apple-ios15.1
+
+# Device and simulator SDKs ship different module overlays, so check both
+for target in "iphoneos:arm64-apple-ios15.1" "iphonesimulator:arm64-apple-ios15.1-simulator"; do
+  sdk="${target%%:*}"
+  echo "Typechecking against $sdk SDK"
+  find "$PACKAGE_DIR/ios" -name '*.swift' -print0 | xargs -0 xcrun -sdk "$sdk" swiftc \
+    -typecheck \
+    -swift-version 5 \
+    -I "$STUB_DIR" \
+    -target "${target#*:}"
+done
