@@ -1,7 +1,13 @@
-import type {
-  LanguageModelV4CallOptions,
-  LanguageModelV4Prompt,
+import {
+  type LanguageModelV4CallOptions,
+  type LanguageModelV4Prompt,
+  UnsupportedFunctionalityError,
 } from '@ai-sdk/provider'
+import {
+  convertToBase64,
+  getTopLevelMediaType,
+  isFullMediaType,
+} from '@ai-sdk/provider-utils'
 import type { CompletionParams } from 'llama.rn'
 
 interface LLMMessagePart {
@@ -21,12 +27,55 @@ interface LLMMessage {
   tool_calls?: any[]
 }
 
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
+type PromptPart = Extract<
+  LanguageModelV4Prompt[number],
+  { content: unknown[] }
+>['content'][number]
+
+function convertFilePartToMedia(
+  part: Extract<PromptPart, { type: 'file' }>
+): LLMMessagePart {
+  if (part.data.type === 'text') {
+    return { type: 'text', text: part.data.text }
   }
-  return btoa(binary)
+
+  const mediaType = part.mediaType.toLowerCase()
+  const topLevelType = getTopLevelMediaType(mediaType)
+
+  if (topLevelType !== 'image' && topLevelType !== 'audio') {
+    throw new UnsupportedFunctionalityError({
+      functionality: `file parts with media type ${part.mediaType}`,
+    })
+  }
+
+  if (part.data.type === 'reference') {
+    throw new UnsupportedFunctionalityError({
+      functionality: 'file parts with provider references',
+    })
+  }
+
+  // llama.rn only decodes base64 from data:image/... and data:audio/... URLs,
+  // so a bare top-level media type (e.g. `image`) still needs a subtype
+  const dataUrlMediaType = isFullMediaType(mediaType)
+    ? mediaType
+    : `${topLevelType}/*`
+  const url =
+    part.data.type === 'data'
+      ? `data:${dataUrlMediaType};base64,${convertToBase64(part.data.data)}`
+      : (part.data.originalUrl ?? part.data.url.href)
+
+  if (topLevelType === 'image') {
+    return { type: 'image_url', image_url: { url } }
+  }
+
+  const format =
+    mediaType.includes('mpeg') || mediaType.includes('mp3') ? 'mp3' : 'wav'
+  return {
+    type: 'input_audio',
+    input_audio: url.startsWith('data:')
+      ? { format, data: url }
+      : { format, url },
+  }
 }
 
 export function prepareMessagesWithMedia(
@@ -34,95 +83,51 @@ export function prepareMessagesWithMedia(
 ): LLMMessage[] {
   const messages: LLMMessage[] = []
 
-  type PromptPart = Extract<
-    LanguageModelV4Prompt[number],
-    { content: unknown[] }
-  >['content'][number]
-
-  const convertFilePartToMedia = (
-    part: Extract<PromptPart, { type: 'file' }>
-  ): LLMMessagePart => {
-    const mediaType = part.mediaType.toLowerCase()
-    const data = part.data as unknown
-
-    const url =
-      data instanceof Uint8Array
-        ? `data:${part.mediaType};base64,${uint8ArrayToBase64(data)}`
-        : data instanceof URL
-          ? data.toString()
-          : typeof data === 'string'
-            ? data
-            : null
-
-    if (!url) {
-      return { type: 'text', text: '' }
-    }
-
-    if (mediaType.startsWith('image/')) {
-      return { type: 'image_url', image_url: { url } }
-    }
-
-    if (mediaType.startsWith('audio/')) {
-      const format = mediaType.includes('wav') ? 'wav' : 'mp3'
-      if (url.startsWith('data:')) {
-        return {
-          type: 'input_audio',
-          input_audio: {
-            format,
-            data: url,
-          },
-        }
-      }
-      return {
-        type: 'input_audio',
-        input_audio: {
-          format,
-          url,
-        },
-      }
-    }
-
-    return { type: 'text', text: '' }
-  }
-
   for (const message of prompt) {
     switch (message.role) {
       case 'system':
-      case 'user':
-        if (typeof message.content === 'string') {
-          messages.push({ role: message.role, content: message.content })
-        } else {
-          for (const part of message.content) {
-            switch (part.type) {
-              case 'text':
-                messages.push({ role: message.role, content: part.text })
-                break
-              case 'file':
-                messages.push({
-                  role: message.role,
-                  content: [convertFilePartToMedia(part)],
-                })
-                break
-              default:
-                throw new Error(
-                  `Unsupported message content type: ${JSON.stringify(part)}`
-                )
-            }
-          }
-        }
+        messages.push({ role: 'system', content: message.content })
         break
+      case 'user': {
+        // Keep text and media in one message, so the chat template places
+        // the media markers next to the text they belong to
+        const content = message.content.map((part): LLMMessagePart => {
+          switch (part.type) {
+            case 'text':
+              return { type: 'text', text: part.text }
+            case 'file':
+              return convertFilePartToMedia(part)
+            default:
+              throw new Error(
+                `Unsupported message content type: ${JSON.stringify(part)}`
+              )
+          }
+        })
+        messages.push({
+          role: 'user',
+          content:
+            content.length === 1 && content[0]!.type === 'text'
+              ? content[0]!.text!
+              : content,
+        })
+        break
+      }
       case 'assistant': {
-        const reasoningContent = message.content.find(
-          (part) => part.type === 'reasoning'
-        )
+        const reasoningContent = message.content
+          .filter((part) => part.type === 'reasoning')
+          .map((part) => part.text)
+          .join('')
         const toolCalls = message.content.filter(
           (part) => part.type === 'tool-call'
         )
-        const content = message.content.filter((part) => part.type === 'text')
+        const content = message.content
+          .filter((part) => part.type === 'text')
+          .map((part) => part.text)
+          .join('')
         messages.push({
           role: 'assistant',
           content,
-          reasoning_content: reasoningContent?.text,
+          reasoning_content: reasoningContent || undefined,
           tool_calls: toolCalls.map((toolCall) => ({
             type: 'function',
             id: toolCall.toolCallId,
