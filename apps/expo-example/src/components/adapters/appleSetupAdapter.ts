@@ -18,11 +18,6 @@ export const createAppleLanguageSetupAdapter = (
       icon: 'auto-awesome',
     },
     builtIn: true,
-    capabilities: {
-      // Foundation Models takes image prompts from iOS 27, but the provider
-      // declares no supportedUrls, so the AI SDK rejects file:// image URLs
-      imageInput: false,
-    },
     isAvailable() {
       return apple.isAvailable() ? 'yes' : 'no'
     },
