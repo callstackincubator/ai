@@ -1,6 +1,7 @@
 import type { LanguageModelV4, SpeechModelV4 } from '@ai-sdk/provider'
 import type { Tool } from '@ai-sdk/provider-utils'
 import { apple, createAppleProvider } from '@react-native-ai/apple'
+import { Platform } from 'react-native'
 
 import type { SetupAdapter } from '../../config/providers.common'
 
@@ -18,6 +19,9 @@ export const createAppleLanguageSetupAdapter = (
       icon: 'auto-awesome',
     },
     builtIn: true,
+    // Image prompts need iOS 27
+    imageInput:
+      Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 27,
     isAvailable() {
       return apple.isAvailable() ? 'yes' : 'no'
     },
