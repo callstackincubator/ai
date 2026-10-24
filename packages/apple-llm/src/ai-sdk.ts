@@ -48,9 +48,11 @@ export type AppleImageStyle =
   | 'illustration'
   | 'sketch'
 export type AppleImagePersonalization = 'automatic' | 'disabled' | 'enabled'
+export type AppleReasoningLevel = 'light' | 'moderate' | 'deep'
 
 export interface AppleProviderOptions {
   model?: AppleLanguageModelId
+  reasoningLevel?: AppleReasoningLevel
   builtInTools?: AppleBuiltInTool[]
   style?: AppleImageStyle
   personalization?: AppleImagePersonalization

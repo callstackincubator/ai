@@ -8,6 +8,7 @@ export type {
   AppleLanguageModelOptions,
   AppleModelInfo,
   AppleProviderOptions,
+  AppleReasoningLevel,
   AppleToolDefinitionSet,
 } from './ai-sdk'
 export { apple, createAppleProvider } from './ai-sdk'

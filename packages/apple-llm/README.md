@@ -30,6 +30,7 @@ completed tool-call pruning, use `@react-native-ai/utils`.
 - ✅ Image prompts on iOS 27+
 - ✅ Runtime model info and context-size metadata
 - ✅ Private Cloud Compute language model selection on iOS 27+
+- ✅ Reasoning level control on iOS 27+
 - ✅ Structured outputs
 - ✅ Tool calling
 - ✅ Vision OCR and barcode built-in tools on iOS 27+
