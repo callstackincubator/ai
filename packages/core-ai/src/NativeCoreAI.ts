@@ -1,9 +1,5 @@
-import type { TurboModule } from 'react-native'
+import type { CodegenTypes, TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
-import type {
-  EventEmitter,
-  UnsafeObject,
-} from 'react-native/Libraries/Types/CodegenTypes'
 
 export interface NativeCoreAIModelConfig {
   id: string
@@ -22,10 +18,10 @@ export interface CoreAIModelInfo {
   family?: string
   task: string
   platforms: string[]
-  functions: UnsafeObject[]
+  functions: CodegenTypes.UnsafeObject[]
   maxContextLength?: number
   modelSizeBytes?: number
-  metadata?: UnsafeObject
+  metadata?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAILoadedModel {
@@ -54,83 +50,83 @@ export type CoreAIStreamErrorEvent = {
 }
 
 export interface Spec extends TurboModule {
-  getCapabilities(): Promise<UnsafeObject>
+  getCapabilities(): Promise<CodegenTypes.UnsafeObject>
 
   inspectModel(config: NativeCoreAIModelConfig): Promise<CoreAIModelInfo>
   loadModel(
     config: NativeCoreAIModelConfig,
-    options?: UnsafeObject
+    options?: CodegenTypes.UnsafeObject
   ): Promise<CoreAILoadedModel>
   unloadModel(modelHandle: string): Promise<void>
   removeModel(config: NativeCoreAIModelConfig): Promise<void>
   specializeModel(
     config: NativeCoreAIModelConfig,
-    options?: UnsafeObject
+    options?: CodegenTypes.UnsafeObject
   ): Promise<CoreAIModelInfo>
 
   createLanguageSession(
     modelHandle: string,
-    options?: UnsafeObject
+    options?: CodegenTypes.UnsafeObject
   ): Promise<string>
   releaseLanguageSession(sessionHandle: string): Promise<void>
   respondToLanguageSession(
     sessionHandle: string,
     prompt: string,
-    options?: UnsafeObject
-  ): Promise<UnsafeObject[]>
+    options?: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject[]>
   streamLanguageSession(
     streamId: string,
     sessionHandle: string,
     prompt: string,
-    options?: UnsafeObject
+    options?: CodegenTypes.UnsafeObject
   ): void
 
   generateText(
     config: NativeCoreAIModelConfig,
     messages: CoreAIMessage[],
-    options?: UnsafeObject
-  ): Promise<UnsafeObject[]>
+    options?: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject[]>
   streamText(
     streamId: string,
     config: NativeCoreAIModelConfig,
     messages: CoreAIMessage[],
-    options?: UnsafeObject
+    options?: CodegenTypes.UnsafeObject
   ): void
   cancelStream(streamId: string): void
 
   embed(
     config: NativeCoreAIModelConfig,
     values: string[],
-    options?: UnsafeObject
-  ): Promise<UnsafeObject>
+    options?: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
   transcribe(
     config: NativeCoreAIModelConfig,
     audioBase64: string,
     mediaType: string,
-    options?: UnsafeObject
-  ): Promise<UnsafeObject>
+    options?: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
   generateImage(
     config: NativeCoreAIModelConfig,
     prompt: string,
-    options?: UnsafeObject
-  ): Promise<UnsafeObject>
+    options?: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
 
   runTask(
     task: string,
     config: NativeCoreAIModelConfig,
-    input: UnsafeObject,
-    options?: UnsafeObject
-  ): Promise<UnsafeObject>
+    input: CodegenTypes.UnsafeObject,
+    options?: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
   runRawFunction(
     modelHandle: string,
     functionName: string,
-    inputs: UnsafeObject,
-    options?: UnsafeObject
-  ): Promise<UnsafeObject>
+    inputs: CodegenTypes.UnsafeObject,
+    options?: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
 
-  onStreamUpdate: EventEmitter<CoreAIStreamUpdateEvent>
-  onStreamComplete: EventEmitter<CoreAIStreamCompleteEvent>
-  onStreamError: EventEmitter<CoreAIStreamErrorEvent>
+  onStreamUpdate: CodegenTypes.EventEmitter<CoreAIStreamUpdateEvent>
+  onStreamComplete: CodegenTypes.EventEmitter<CoreAIStreamCompleteEvent>
+  onStreamError: CodegenTypes.EventEmitter<CoreAIStreamErrorEvent>
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeCoreAI')

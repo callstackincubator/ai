@@ -1,6 +1,5 @@
-import type { TurboModule } from 'react-native'
+import type { CodegenTypes, TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
-import type { UnsafeObject } from 'react-native/Libraries/Types/CodegenTypesNamespace'
 
 import { addWAVHeader } from './utils'
 
@@ -36,7 +35,7 @@ interface AudioResult {
 declare global {
   function __apple__llm__generate_audio__(
     text: string,
-    options: UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<AudioResult>
 }
 

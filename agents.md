@@ -33,14 +33,14 @@
 
 - Monorepo with `packages/` (libraries) and `apps/` (example apps)
 - Packages: `@react-native-ai/apple`, `@react-native-ai/llama`, `@react-native-ai/mlc`
-- Example app: Expo SDK 54 in `apps/expo-example/`
+- Example app: Expo SDK 58 in `apps/expo-example/`
 
 ## Tech Stack
 
-- React 19.1 with React Compiler (no manual `useMemo`/`useCallback` needed)
-- React Native 0.81
-- Expo SDK 54 with native modules
-- Vercel AI SDK v6 (`ai` package) for model abstraction
+- React 19.3 with React Compiler (no manual `useMemo`/`useCallback` needed)
+- React Native 0.88
+- Expo SDK 58 with native modules
+- Vercel AI SDK v7 (`ai` package) for model abstraction
 - TypeScript strict mode
 
 ## UI & Styling

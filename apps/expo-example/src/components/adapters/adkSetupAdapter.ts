@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4 } from '@ai-sdk/provider'
 import type { Tool } from '@ai-sdk/provider-utils'
 import { type AdkModelType, createAdkProvider } from '@react-native-ai/adk'
 
@@ -18,7 +18,7 @@ type AdkAdapterOptions = {
 export const createAdkLanguageSetupAdapter = (
   options: AdkAdapterOptions,
   tools: Record<string, Tool>
-): SetupAdapter<LanguageModelV3> => {
+): SetupAdapter<LanguageModelV4> => {
   const provider = createAdkProvider({
     modelType: options.modelType,
     modelName: options.modelName,

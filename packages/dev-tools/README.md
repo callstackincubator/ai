@@ -13,7 +13,7 @@ DevTools are runtime agnostic, so they work with on-device and remote runtimes.
 ## Installation
 
 ```bash
-npm install @react-native-ai/dev-tools
+npm install @react-native-ai/dev-tools @ai-sdk/otel
 ```
 
 ## Rozenite setup
@@ -41,20 +41,22 @@ export function App() {
 ### 2. Enable AI SDK telemetry on requests
 
 ```ts
-import { generateText } from 'ai';
+import { OpenTelemetry } from '@ai-sdk/otel';
+import { generateText, registerTelemetry } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { getAiSdkTracer } from '@react-native-ai/dev-tools';
 
-const tracer = getAiSdkTracer({
-  serviceName: 'my-app',
-});
+// Register once, at app startup
+registerTelemetry(
+  new OpenTelemetry({
+    tracer: getAiSdkTracer({ serviceName: 'my-app' }),
+  })
+);
 
 await generateText({
   model: openai('gpt-4o-mini'),
   prompt: 'Write a short story about a cat.',
-  experimental_telemetry: {
-    isEnabled: true,
-    tracer,
+  telemetry: {
     functionId: 'unique-identifier-where-the-call-comes-from',
   },
 });

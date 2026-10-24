@@ -1,11 +1,11 @@
-import type { LanguageModelV3StreamPart } from '@ai-sdk/provider'
+import type { LanguageModelV4StreamPart } from '@ai-sdk/provider'
 import { describe, expect, test } from 'bun:test'
 import type { TokenData } from 'llama.rn'
 
 import { createLlamaStreamParser } from '../streamParser'
 
-function runParser(tokens: TokenData[]): LanguageModelV3StreamPart[] {
-  const parts: LanguageModelV3StreamPart[] = []
+function runParser(tokens: TokenData[]): LanguageModelV4StreamPart[] {
+  const parts: LanguageModelV4StreamPart[] = []
   const parser = createLlamaStreamParser({
     enqueue: (part) => parts.push(part),
   })
@@ -43,14 +43,14 @@ describe('createLlamaStreamParser', () => {
       (
         part
       ): part is Extract<
-        LanguageModelV3StreamPart,
+        LanguageModelV4StreamPart,
         { type: 'reasoning-delta' }
       > => part.type === 'reasoning-delta'
     )
     const textDeltas = parts.filter(
       (
         part
-      ): part is Extract<LanguageModelV3StreamPart, { type: 'text-delta' }> =>
+      ): part is Extract<LanguageModelV4StreamPart, { type: 'text-delta' }> =>
         part.type === 'text-delta'
     )
 
@@ -73,14 +73,14 @@ describe('createLlamaStreamParser', () => {
       (
         part
       ): part is Extract<
-        LanguageModelV3StreamPart,
+        LanguageModelV4StreamPart,
         { type: 'reasoning-delta' }
       > => part.type === 'reasoning-delta'
     )
     const textDeltas = parts.filter(
       (
         part
-      ): part is Extract<LanguageModelV3StreamPart, { type: 'text-delta' }> =>
+      ): part is Extract<LanguageModelV4StreamPart, { type: 'text-delta' }> =>
         part.type === 'text-delta'
     )
 
@@ -152,7 +152,7 @@ describe('createLlamaStreamParser', () => {
           (
             part
           ): part is Extract<
-            LanguageModelV3StreamPart,
+            LanguageModelV4StreamPart,
             { type: 'reasoning-delta' }
           > => part.type === 'reasoning-delta'
         )
@@ -166,7 +166,7 @@ describe('createLlamaStreamParser', () => {
           (
             part
           ): part is Extract<
-            LanguageModelV3StreamPart,
+            LanguageModelV4StreamPart,
             { type: 'text-delta' }
           > => part.type === 'text-delta'
         )
@@ -252,7 +252,7 @@ describe('createLlamaStreamParser', () => {
           (
             part
           ): part is Extract<
-            LanguageModelV3StreamPart,
+            LanguageModelV4StreamPart,
             { type: 'reasoning-delta' }
           > => part.type === 'reasoning-delta'
         )
@@ -266,7 +266,7 @@ describe('createLlamaStreamParser', () => {
           (
             part
           ): part is Extract<
-            LanguageModelV3StreamPart,
+            LanguageModelV4StreamPart,
             { type: 'text-delta' }
           > => part.type === 'text-delta'
         )

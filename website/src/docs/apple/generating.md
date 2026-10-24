@@ -2,7 +2,7 @@
 
 Use `@react-native-ai/apple` with the Vercel AI SDK to call Apple Foundation
 Models from React Native. The provider keeps the common text, object,
-streaming, tool, and image APIs aligned with AI SDK v5, and exposes a small
+streaming, tool, and image APIs aligned with AI SDK v7, and exposes a small
 Apple-specific surface for runtime model information and Apple-only options.
 
 ## Requirements
@@ -125,22 +125,17 @@ tools.
 ## Private Cloud Compute
 
 The default `apple()` model uses `SystemLanguageModel.default`. On iOS 27 and
-newer, choose Apple's Private Cloud Compute language model with provider
-options:
+newer, choose Apple's Private Cloud Compute language model by its model ID:
 
 ```typescript
 const result = await generateText({
-  model: apple(),
+  model: apple('private-cloud-compute'),
   prompt: 'Analyze this longer task with more reasoning.',
-  providerOptions: {
-    apple: {
-      model: 'private-cloud-compute',
-    },
-  },
 })
 ```
 
-You can also create a provider with a default model:
+`apple({ model: 'private-cloud-compute' })` is equivalent. You can also create a
+provider with a default model:
 
 ```typescript
 import { createAppleProvider } from '@react-native-ai/apple'
@@ -157,21 +152,21 @@ reached, generation fails with `RATE_LIMITED`.
 ## Reasoning Level
 
 On iOS 27 and newer, set how much reasoning the model should do before
-answering:
+answering with the AI SDK `reasoning` call option:
 
 ```typescript
 const result = await generateText({
   model: apple(),
   prompt: 'Plan a three-day trip to Kyoto.',
-  providerOptions: {
-    apple: {
-      reasoningLevel: 'moderate', // 'light' | 'moderate' | 'deep'
-    },
-  },
+  reasoning: 'medium',
 })
 ```
 
-Setting `reasoningLevel` on older iOS versions fails with `UNSUPPORTED_OS`.
+Apple has three reasoning levels. `minimal` and `low` map to `light`, `medium`
+to `moderate`, and `high` and above to `deep`. `none` and `provider-default`
+keep Apple's default.
+
+Setting `reasoning` on older iOS versions fails with `UNSUPPORTED_OS`.
 
 ## Image Prompts
 
@@ -286,7 +281,7 @@ const result = await generateText({
 Important Apple-specific behavior:
 
 - Tool calls are provider-executed, so AI SDK step callbacks such as
-  `maxSteps`, `onStepStart`, and `onStepFinish` do not run for native Apple
+  `stopWhen`, `onStepStart`, and `onStepEnd` do not run for native Apple
   tool execution.
 - Apple does not provide stable tool call IDs; the provider returns empty IDs.
 - You can update the registered tools on a model instance with
@@ -367,7 +362,7 @@ try {
 }
 ```
 
-For streaming, inspect `fullStream` when you need provider error parts:
+For streaming, inspect `stream` when you need provider error parts:
 
 ```typescript
 import {
@@ -382,7 +377,7 @@ const result = streamText({
   messages,
 })
 
-for await (const part of result.fullStream) {
+for await (const part of result.stream) {
   if (part.type === 'error') {
     const error = part.error as AppleLLMError
 

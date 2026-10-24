@@ -1,13 +1,13 @@
 import type {
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3FilePart,
-  LanguageModelV3FinishReason,
-  LanguageModelV3FunctionTool,
-  LanguageModelV3Prompt,
-  LanguageModelV3ProviderTool,
-  LanguageModelV3StreamPart,
-  LanguageModelV3Usage,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  LanguageModelV4FilePart,
+  LanguageModelV4FinishReason,
+  LanguageModelV4FunctionTool,
+  LanguageModelV4Prompt,
+  LanguageModelV4ProviderTool,
+  LanguageModelV4StreamPart,
+  LanguageModelV4Usage,
 } from '@ai-sdk/provider'
 import {
   generateId,
@@ -55,8 +55,8 @@ async function checkNanoSupported(): Promise<boolean> {
 }
 
 export interface AdkProvider {
-  (): LanguageModelV3
-  languageModel: () => LanguageModelV3
+  (): LanguageModelV4
+  languageModel: () => LanguageModelV4
   /** Device capability check (ML Kit `checkStatus !== 0`). Returns `false` on non-Android. */
   isNanoSupported: () => Promise<boolean>
   /**
@@ -90,10 +90,10 @@ export function createAdkProvider(
 
 export const adk = createAdkProvider()
 
-type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
+type Tool = LanguageModelV4FunctionTool | LanguageModelV4ProviderTool
 type ToolDefinitionSet = Record<string, FullToolDefinition>
 
-const createEmptyUsage = (): LanguageModelV3Usage => ({
+const createEmptyUsage = (): LanguageModelV4Usage => ({
   inputTokens: {
     total: undefined,
     noCache: undefined,
@@ -107,7 +107,7 @@ const createEmptyUsage = (): LanguageModelV3Usage => ({
   },
 })
 
-const mapUsage = (usage?: AdkUsageMetadata): LanguageModelV3Usage => {
+const mapUsage = (usage?: AdkUsageMetadata): LanguageModelV4Usage => {
   if (!usage) {
     return createEmptyUsage()
   }
@@ -134,8 +134,8 @@ const mapUsage = (usage?: AdkUsageMetadata): LanguageModelV3Usage => {
 
 const convertFinishReason = (
   finishReason?: string
-): LanguageModelV3FinishReason => {
-  let unified: LanguageModelV3FinishReason['unified'] = 'other'
+): LanguageModelV4FinishReason => {
+  let unified: LanguageModelV4FinishReason['unified'] = 'other'
 
   if (finishReason === 'STOP' || finishReason === 'stop') {
     unified = 'stop'
@@ -178,18 +178,18 @@ const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
 }
 
 const normalizeFilePart = (
-  part: LanguageModelV3FilePart
+  part: LanguageModelV4FilePart
 ): { data: string; mediaType: string } => {
-  if (part.data instanceof URL) {
+  if (part.data.type !== 'data') {
     throw new Error(
-      'ADK wrapper does not support file URLs yet. Pass base64 or Uint8Array data.'
+      'ADK wrapper does not support file URLs or references yet. Pass base64 or Uint8Array data.'
     )
   }
 
   const data =
-    typeof part.data === 'string'
-      ? part.data.replace(/^data:[^;]+;base64,/, '')
-      : uint8ArrayToBase64(part.data)
+    typeof part.data.data === 'string'
+      ? part.data.data.replace(/^data:[^;]+;base64,/, '')
+      : uint8ArrayToBase64(part.data.data)
 
   return {
     data,
@@ -197,8 +197,8 @@ const normalizeFilePart = (
   }
 }
 
-class AdkChatLanguageModel implements LanguageModelV3 {
-  readonly specificationVersion = 'v3'
+class AdkChatLanguageModel implements LanguageModelV4 {
+  readonly specificationVersion = 'v4'
   readonly supportedUrls = {}
 
   readonly provider = 'adk'
@@ -266,7 +266,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     return this.nanoPreparePromise
   }
 
-  private prepareMessages(messages: LanguageModelV3Prompt): AdkMessage[] {
+  private prepareMessages(messages: LanguageModelV4Prompt): AdkMessage[] {
     return messages.map((message): AdkMessage => {
       if (message.role === 'system') {
         return {
@@ -342,7 +342,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
   }
 
   private prepareGenerationOptions(
-    options: LanguageModelV3CallOptions
+    options: LanguageModelV4CallOptions
   ): AdkGenerationOptions {
     if (
       options.responseFormat?.type === 'json' &&
@@ -400,9 +400,10 @@ class AdkChatLanguageModel implements LanguageModelV3 {
               text,
               schema,
             })
-            const opts: ToolExecutionOptions = {
+            const opts: ToolExecutionOptions<unknown> = {
               toolCallId: generateId(),
               messages: [],
+              context: undefined,
             }
             return this.tools[tool.name]?.execute?.(toolCallArguments, opts)
           },
@@ -472,7 +473,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     })
   }
 
-  async doGenerate(options: LanguageModelV3CallOptions) {
+  async doGenerate(options: LanguageModelV4CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const generationOptions = this.prepareGenerationOptions(options)
     const preparedTools = this.prepareTools(options.tools)
@@ -512,7 +513,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
     }
   }
 
-  async doStream(options: LanguageModelV3CallOptions) {
+  async doStream(options: LanguageModelV4CallOptions) {
     const messages = this.prepareMessages(options.prompt)
     const generationOptions = this.prepareGenerationOptions(options)
     const preparedTools = this.prepareTools(options.tools)
@@ -550,7 +551,7 @@ class AdkChatLanguageModel implements LanguageModelV3 {
       this.unregisterTools(preparedTools)
     }
 
-    const stream = new ReadableStream<LanguageModelV3StreamPart>({
+    const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
         const addListener = (listener: { remove(): void }) => {
           listeners.push(listener)

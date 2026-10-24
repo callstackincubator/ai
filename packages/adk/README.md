@@ -6,7 +6,7 @@ A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://deve
 
 - Android `minSdkVersion` 26 or greater (required by ML Kit GenAI / Gemini Nano; set in your app, not only in this package)
 - React Native New Architecture
-- Vercel AI SDK v6
+- Vercel AI SDK v7
 - If using on-device models: a device capable of running Gemini Nano (Android 14+ with AICore); you can consult the [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device) for more details.
 
 Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST`; exclude it in your app packaging. For Expo:
@@ -56,7 +56,7 @@ const { text } = await generateText({
 - Post-generation token usage via ADK `UsageMetadata`
 - Multimodal user prompts (text + inline images)
 - Structured JSON output via `responseMimeType` (schema constraints not yet supported)
-- Vercel AI SDK v6 `LanguageModelV3` provider
+- Vercel AI SDK v7 `LanguageModelV3` provider
 
 ## Usage metadata
 

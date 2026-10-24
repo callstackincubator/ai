@@ -35,7 +35,7 @@
     "prepare": "bob build"
   },
   "dependencies": {
-    "@ai-sdk/provider": "^3.0.5"
+    "@ai-sdk/provider": "^4.0.33"
   },
   "react-native-builder-bob": {
     "source": "src",

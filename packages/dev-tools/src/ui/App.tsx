@@ -235,15 +235,15 @@ export default function AiSdkProfilerPanel() {
     return resourceGroups.filter((group) => group.spans.some(matchesFilters))
   }, [resourceGroups, filterOperation, filterProvider, filterModel])
 
-  const selectedResource = useMemo(() => {
-    if (!selectedGroupId) {
-      return null
-    }
-    return (
+  // Fall back to the first visible group/span when the selection is filtered out
+  const selectedResource = useMemo(
+    () =>
       filteredResourceGroups.find((group) => group.id === selectedGroupId) ||
-      null
-    )
-  }, [filteredResourceGroups, selectedGroupId])
+      filteredResourceGroups[0] ||
+      null,
+    [filteredResourceGroups, selectedGroupId]
+  )
+  const activeGroupId = selectedResource?.id ?? null
 
   const filteredSteps = useMemo(() => {
     if (!selectedResource) {
@@ -253,9 +253,13 @@ export default function AiSdkProfilerPanel() {
   }, [selectedResource])
 
   const selectedSpan = useMemo(
-    () => filteredSteps.find((span) => span.spanId === selectedSpanId) || null,
+    () =>
+      filteredSteps.find((span) => span.spanId === selectedSpanId) ||
+      filteredSteps[0] ||
+      null,
     [filteredSteps, selectedSpanId]
   )
+  const activeSpanId = selectedSpan?.spanId ?? null
 
   const providerOptions = useMemo(() => {
     const providers = new Set<string>()
@@ -278,33 +282,6 @@ export default function AiSdkProfilerPanel() {
     })
     return Array.from(models)
   }, [spans])
-
-  useEffect(() => {
-    if (filteredResourceGroups.length === 0) {
-      setSelectedGroupId(null)
-      setSelectedSpanId(null)
-      return
-    }
-    const hasSelected = selectedGroupId
-      ? filteredResourceGroups.some((group) => group.id === selectedGroupId)
-      : false
-    if (!hasSelected) {
-      setSelectedGroupId(filteredResourceGroups[0].id)
-    }
-  }, [filteredResourceGroups, selectedGroupId])
-
-  useEffect(() => {
-    if (filteredSteps.length === 0) {
-      setSelectedSpanId(null)
-      return
-    }
-    const hasSelected = selectedSpanId
-      ? filteredSteps.some((span) => span.spanId === selectedSpanId)
-      : false
-    if (!hasSelected) {
-      setSelectedSpanId(filteredSteps[0].spanId)
-    }
-  }, [filteredSteps, selectedSpanId])
 
   const handleToggleRecording = () => {
     if (!client) {
@@ -404,7 +381,7 @@ export default function AiSdkProfilerPanel() {
                   key={group.id}
                   style={{
                     ...styles.row,
-                    ...(selectedGroupId === group.id ? styles.rowSelected : {}),
+                    ...(activeGroupId === group.id ? styles.rowSelected : {}),
                   }}
                   onClick={() => setSelectedGroupId(group.id)}
                 >
@@ -435,9 +412,7 @@ export default function AiSdkProfilerPanel() {
                   key={`${span.traceId}-${span.spanId}`}
                   style={{
                     ...styles.row,
-                    ...(selectedSpanId === span.spanId
-                      ? styles.rowSelected
-                      : {}),
+                    ...(activeSpanId === span.spanId ? styles.rowSelected : {}),
                   }}
                   onClick={() => setSelectedSpanId(span.spanId)}
                 >

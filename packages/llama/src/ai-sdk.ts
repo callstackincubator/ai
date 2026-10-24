@@ -1,16 +1,16 @@
 import type {
-  EmbeddingModelV3,
-  EmbeddingModelV3CallOptions,
-  EmbeddingModelV3Result,
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3Content,
-  LanguageModelV3FinishReason,
-  LanguageModelV3StreamPart,
-  RerankingModelV3,
-  RerankingModelV3CallOptions,
-  SpeechModelV3,
-  SpeechModelV3CallOptions,
+  EmbeddingModelV4,
+  EmbeddingModelV4CallOptions,
+  EmbeddingModelV4Result,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  LanguageModelV4Content,
+  LanguageModelV4FinishReason,
+  LanguageModelV4StreamPart,
+  RerankingModelV4,
+  RerankingModelV4CallOptions,
+  SpeechModelV4,
+  SpeechModelV4CallOptions,
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
@@ -30,8 +30,8 @@ import { createLlamaStreamParser } from './streamParser'
 
 function convertFinishReason(
   result: NativeCompletionResult
-): LanguageModelV3FinishReason {
-  let unified: LanguageModelV3FinishReason['unified'] = 'other'
+): LanguageModelV4FinishReason {
+  let unified: LanguageModelV4FinishReason['unified'] = 'other'
   let raw: string | undefined
 
   if (result.stopped_eos) {
@@ -81,8 +81,8 @@ export interface LlamaModelOptions {
  *
  * @see https://github.com/mybigday/llama.rn
  */
-export class LlamaLanguageModel implements LanguageModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaLanguageModel implements LanguageModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -194,9 +194,9 @@ export class LlamaLanguageModel implements LanguageModelV3 {
   }
 
   /**
-   * Non-streaming text generation (AI SDK LanguageModelV3)
+   * Non-streaming text generation (AI SDK LanguageModelV4)
    */
-  async doGenerate(options: LanguageModelV3CallOptions) {
+  async doGenerate(options: LanguageModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -210,7 +210,7 @@ export class LlamaLanguageModel implements LanguageModelV3 {
     const completionOptions = buildLlamaCompletionOptions(options, messages)
 
     const response = await context.completion(completionOptions)
-    let content: LanguageModelV3Content[] = []
+    let content: LanguageModelV4Content[] = []
 
     if (response.content) {
       content.push({
@@ -266,9 +266,9 @@ export class LlamaLanguageModel implements LanguageModelV3 {
   }
 
   /**
-   * Streaming text generation (AI SDK LanguageModelV3)
+   * Streaming text generation (AI SDK LanguageModelV4)
    */
-  async doStream(options: LanguageModelV3CallOptions) {
+  async doStream(options: LanguageModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -287,7 +287,7 @@ export class LlamaLanguageModel implements LanguageModelV3 {
 
     const completionOptions = buildLlamaCompletionOptions(options, messages)
 
-    const stream = new ReadableStream<LanguageModelV3StreamPart>({
+    const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
         try {
           const streamParser = createLlamaStreamParser({
@@ -368,8 +368,8 @@ export interface LlamaEmbeddingOptions {
 /**
  * llama.rn Embedding Model for AI SDK
  */
-export class LlamaEmbeddingModel implements EmbeddingModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaEmbeddingModel implements EmbeddingModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -440,11 +440,11 @@ export class LlamaEmbeddingModel implements EmbeddingModelV3 {
   }
 
   /**
-   * Generate embeddings (AI SDK EmbeddingModelV3)
+   * Generate embeddings (AI SDK EmbeddingModelV4)
    */
   async doEmbed(
-    options: EmbeddingModelV3CallOptions
-  ): Promise<EmbeddingModelV3Result> {
+    options: EmbeddingModelV4CallOptions
+  ): Promise<EmbeddingModelV4Result> {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -500,8 +500,8 @@ export interface LlamaRerankOptions {
  *
  * @see https://github.com/mybigday/llama.rn
  */
-export class LlamaRerankModel implements RerankingModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaRerankModel implements RerankingModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -564,9 +564,9 @@ export class LlamaRerankModel implements RerankingModelV3 {
   }
 
   /**
-   * Rerank documents based on relevance to query (AI SDK RerankingModelV3)
+   * Rerank documents based on relevance to query (AI SDK RerankingModelV4)
    */
-  async doRerank(options: RerankingModelV3CallOptions) {
+  async doRerank(options: RerankingModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -617,8 +617,8 @@ export interface LlamaSpeechOptions {
 /**
  * llama.rn Speech Model for AI SDK (using vocoder for TTS)
  */
-export class LlamaSpeechModel implements SpeechModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaSpeechModel implements SpeechModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -710,9 +710,9 @@ export class LlamaSpeechModel implements SpeechModelV3 {
   }
 
   /**
-   * Generate speech audio (AI SDK SpeechModelV3)
+   * Generate speech audio (AI SDK SpeechModelV4)
    */
-  async doGenerate(options: SpeechModelV3CallOptions) {
+  async doGenerate(options: SpeechModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -727,20 +727,14 @@ export class LlamaSpeechModel implements SpeechModelV3 {
       )
     }
 
-    const speaker = null // todo: extend to support different speakers and settings
-    const formatted = await context.getFormattedAudioCompletion(
-      speaker,
-      options.text
-    )
-
-    const guideTokens: number[] = await context.getAudioCompletionGuideTokens(
-      options.text
-    )
+    // todo: extend to support different speakers and settings
+    const formatted = await context.getFormattedAudioCompletion({
+      prompt: options.text,
+    })
 
     const completionResult = await context.completion({
       prompt: formatted.prompt,
       grammar: formatted.grammar,
-      guide_tokens: guideTokens,
       temperature: 0.8,
     })
 

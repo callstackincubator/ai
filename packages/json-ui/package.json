@@ -23,7 +23,7 @@
     "prepare": "bob build"
   },
   "dependencies": {
-    "ai": "^6.0.0",
+    "ai": "^7.0.152",
     "zod": "^4.0.0"
   },
   "peerDependencies": {

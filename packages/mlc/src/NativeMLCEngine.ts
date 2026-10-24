@@ -1,6 +1,5 @@
-import type { TurboModule } from 'react-native'
+import type { CodegenTypes, TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
-import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypesNamespace'
 
 export interface ModelConfig {
   model_id?: string
@@ -112,9 +111,9 @@ export interface Spec extends TurboModule {
   prepareModel(modelId: string): Promise<void>
   unloadModel(): Promise<void>
 
-  onChatUpdate: EventEmitter<ChatUpdateEvent>
-  onChatComplete: EventEmitter<ChatCompleteEvent>
-  onDownloadProgress: EventEmitter<DownloadProgress>
+  onChatUpdate: CodegenTypes.EventEmitter<ChatUpdateEvent>
+  onChatComplete: CodegenTypes.EventEmitter<ChatCompleteEvent>
+  onDownloadProgress: CodegenTypes.EventEmitter<DownloadProgress>
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('MLCEngine')
