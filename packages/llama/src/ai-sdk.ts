@@ -53,6 +53,23 @@ function convertFinishReason(
 }
 
 /**
+ * Stops the running completion when the call is aborted, so the native side
+ * stops generating instead of running to completion in the background
+ *
+ * @returns A function that removes the abort listener
+ */
+function stopCompletionOnAbort(
+  context: LlamaContext,
+  abortSignal: AbortSignal | undefined
+): () => void {
+  const stop = () => {
+    context.stopCompletion()
+  }
+  abortSignal?.addEventListener('abort', stop, { once: true })
+  return () => abortSignal?.removeEventListener('abort', stop)
+}
+
+/**
  * Configuration options for llama.rn model initialization
  *
  * @see https://github.com/mybigday/llama.rn
@@ -214,7 +231,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       warnings,
     })
 
-    const response = await context.completion(completionOptions)
+    const removeAbortListener = stopCompletionOnAbort(
+      context,
+      options.abortSignal
+    )
+    const response = await context
+      .completion(completionOptions)
+      .finally(removeAbortListener)
     let content: LanguageModelV4Content[] = []
 
     if (response.content) {
@@ -308,12 +331,15 @@ export class LlamaLanguageModel implements LanguageModelV4 {
             warnings,
           })
 
-          const result = await context.completion(
-            completionOptions,
-            (tokenData) => {
-              streamParser.processToken(tokenData)
-            }
+          const removeAbortListener = stopCompletionOnAbort(
+            context,
+            options.abortSignal
           )
+          const result = await context
+            .completion(completionOptions, (tokenData) => {
+              streamParser.processToken(tokenData)
+            })
+            .finally(removeAbortListener)
 
           streamParser.finish()
 
