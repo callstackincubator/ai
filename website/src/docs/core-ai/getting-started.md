@@ -47,7 +47,7 @@ Constraints from Apple's package:
 - The app needs an **iOS 27 deployment target** (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`).
 - **Device builds only.** The iOS Simulator SDK does not include the `CoreAI` framework, so apps that install this package cannot be built for the simulator.
 
-The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Starter-model docs only list those exposed feature families; embeddings, transcription, depth, super-resolution, and classification still need follow-up native wrappers.
+The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Starter-model docs only list those exposed feature families; embeddings, transcription, depth, super-resolution, and classification are tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
 
 ## First iOS Model
 
