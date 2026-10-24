@@ -2,7 +2,6 @@ import { adk } from '@react-native-ai/adk'
 import { generateId } from 'ai'
 import { atom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithRefresh, loadable } from 'jotai/utils'
-import { Platform } from 'react-native'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { languageAdapters } from '../config/providers'
@@ -43,21 +42,21 @@ const availabilityAtom = atomWithRefresh(async (get) => {
     availability.set(adapter.modelId, adapter.isAvailable())
   }
 
-  if (Platform.OS === 'android') {
-    const supported = await adk.isNanoSupported()
-    if (!supported) {
+  const nano = await adk.getModelInfo()
+  switch (nano.availability) {
+    case 'available':
+      availability.set('adk-gemini-nano', 'yes')
+      break
+    case 'downloadable':
+      availability.set('adk-gemini-nano', 'availableForDownload')
+      break
+    case 'downloading':
+      availability.set('adk-gemini-nano', 'no')
+      nanoUnavailableReason = 'not-ready'
+      break
+    default:
       availability.set('adk-gemini-nano', 'no')
       nanoUnavailableReason = 'unsupported'
-    } else {
-      const ready = await adk.isAvailable('genai-nano')
-      availability.set('adk-gemini-nano', ready ? 'yes' : 'no')
-      if (!ready) {
-        nanoUnavailableReason = 'not-ready'
-      }
-    }
-  } else {
-    availability.set('adk-gemini-nano', 'no')
-    nanoUnavailableReason = 'unsupported'
   }
 
   return { availability, nanoUnavailableReason } satisfies AvailabilityState

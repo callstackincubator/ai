@@ -38,19 +38,32 @@ export const createAdkLanguageSetupAdapter = (
       icon: options.icon,
     },
     builtIn: options.builtIn,
+    imageInput: true,
     isAvailable(): Availability {
       if (options.modelType === 'gemini' && !options.apiKey) {
         return 'no'
       }
       return 'yes'
     },
-    async download() {},
+    async download(onProgress) {
+      let bytesToDownload: number | undefined
+      await provider.prepareNano({
+        onProgress: (progress) => {
+          bytesToDownload = progress.bytesToDownload ?? bytesToDownload
+          if (progress.phase === 'completed') {
+            onProgress(100)
+          } else if (bytesToDownload && progress.bytesDownloaded) {
+            onProgress(
+              Math.round((progress.bytesDownloaded / bytesToDownload) * 100)
+            )
+          }
+        },
+      })
+    },
     async delete() {},
     async unload() {},
     async prepare() {
-      if ('prepare' in model && typeof model.prepare === 'function') {
-        await model.prepare()
-      }
+      await model.prepare()
     },
   }
 }
