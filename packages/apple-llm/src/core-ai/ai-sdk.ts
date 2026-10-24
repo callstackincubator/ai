@@ -15,7 +15,7 @@ import type {
 import { generateId, isCustomReasoning } from '@ai-sdk/provider-utils'
 import type { CodegenTypes } from 'react-native'
 
-import NativeCoreAI from './NativeCoreAI'
+import NativeCoreAI from '../NativeCoreAI'
 import type {
   CoreAIEmbeddingResult,
   CoreAIGenerationOptions,

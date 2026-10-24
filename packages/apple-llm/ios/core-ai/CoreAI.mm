@@ -1,21 +1,21 @@
 //
 //  CoreAI.mm
-//  ReactNativeAICoreAI
+//  AppleLLM
 //
 
-#if __has_include("ReactNativeAICoreAI/ReactNativeAICoreAI-Swift.h")
-#import "ReactNativeAICoreAI/ReactNativeAICoreAI-Swift.h"
+#if __has_include("AppleLLM/AppleLLM-Swift.h")
+#import "AppleLLM/AppleLLM-Swift.h"
 #else
-#import "ReactNativeAICoreAI-Swift.h"
+#import "AppleLLM-Swift.h"
 #endif
 
 #import <React/RCTCallInvokerModule.h>
 #import <React/RCTCallInvoker.h>
 #import <ReactCommon/RCTTurboModule.h>
 
-#import <NativeCoreAI/NativeCoreAI.h>
+#import <NativeAppleLLM/NativeAppleLLM.h>
 
-@interface ReactNativeAICoreAI : NativeCoreAISpecBase <NativeCoreAISpec, RCTCallInvokerModule>
+@interface AppleCoreAI : NativeCoreAISpecBase <NativeCoreAISpec, RCTCallInvokerModule>
 @property (strong, nonatomic) CoreAIImpl *coreAI;
 @end
 
@@ -50,7 +50,7 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
   return dict;
 }
 
-@implementation ReactNativeAICoreAI
+@implementation AppleCoreAI
 
 @synthesize callInvoker;
 

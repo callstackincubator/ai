@@ -3,11 +3,12 @@
 ## Quick Command
 
 ```bash
-npm add @react-native-ai/core-ai
+npm add @react-native-ai/apple
+APPLE_CORE_AI=1 npx pod-install
 ```
 
 ```ts
-import { coreAI } from '@react-native-ai/core-ai'
+import { coreAI } from '@react-native-ai/apple'
 import { generateText } from 'ai'
 
 const model = coreAI.languageModel({
@@ -30,7 +31,7 @@ const { text } = await generateText({ model, prompt: 'Hello' })
 - [ ] React Native New Architecture
 - [ ] iOS 27 deployment target (with Expo, `ios.deploymentTarget: '27.0'` in `expo-build-properties`)
 - [ ] Xcode 27 or newer
-- [ ] A physical device. The iOS Simulator SDK has no `CoreAI` framework, so apps with this package do not build for the simulator
+- [ ] A physical device. The iOS Simulator SDK has no `CoreAI` framework, so apps that link Core AI do not build for the simulator
 - [ ] Vercel AI SDK v7+ (`ai`) if using `generateText` / `streamText` / `generateImage`
 - [ ] Model bundles exported from `apple/coreai-models`
 
@@ -39,14 +40,21 @@ const { text } = await generateText({ model, prompt: 'Hello' })
 ### 1. Install
 
 ```bash
-npm add @react-native-ai/core-ai
+npm add @react-native-ai/apple
 ```
 
-There is no config plugin. The pod links the `coreai-models` Swift package during `pod install`.
+Core AI ships in `@react-native-ai/apple` and is opt-in. There is no config plugin. Set `APPLE_CORE_AI=1` when installing pods (with Expo, when running prebuild), and the `AppleLLM` pod links the `coreai-models` Swift package:
+
+```bash
+APPLE_CORE_AI=1 npx pod-install
+APPLE_CORE_AI=1 npx expo prebuild -p ios
+```
+
+Without it, Apple Intelligence works as before (including simulator builds) and Core AI calls return a setup error.
 
 ### 2. Choose Linked Products (optional)
 
-By default the pod links `CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation` and `CoreAIObjectDetection`. To link fewer, set `CORE_AI_PRODUCTS`:
+`APPLE_CORE_AI=1` links `CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation` and `CoreAIObjectDetection`. To link fewer, set `CORE_AI_PRODUCTS` instead (it also opts in):
 
 ```bash
 CORE_AI_PRODUCTS=CoreAILM npx pod-install
@@ -73,10 +81,10 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 
 ## Common Pitfalls
 
-- **Simulator builds fail**: Core AI is device-only. Exclude the package from simulator builds or test on a device.
+- **Simulator builds fail**: Core AI is device-only. Install pods without `APPLE_CORE_AI` / `CORE_AI_PRODUCTS` for simulator builds, or test on a device.
 - **Unsupported adapters**: `coreAI.embeddingModel(...)` and `coreAI.transcriptionModel(...)` exist but reject with an unsupported error. Depth, super-resolution and raw `.aimodel` calls also reject.
 - **Structured output and tools**: not supported by the language model yet.
-- **Wrong package**: Apple Intelligence (Foundation Models system model) is `@react-native-ai/apple`, not Core AI.
+- **Wrong model**: Apple Intelligence (Foundation Models system model) is `apple(...)`; Core AI bundles are `coreAI.languageModel(...)`. Both come from `@react-native-ai/apple`.
 
 ## Related Skills
 

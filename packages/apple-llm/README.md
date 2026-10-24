@@ -36,6 +36,31 @@ completed tool-call pruning, use `@react-native-ai/utils`.
 - ✅ Vision OCR and barcode built-in tools on iOS 27+
 - ✅ Streaming
 - ✅ Image Playground generation through the AI SDK image API
+- ✅ Opt-in Apple Core AI for app-provided `.aimodel` bundles (`coreAI`)
+
+## Core AI
+
+`coreAI` runs model bundles exported from
+[`apple/coreai-models`](https://github.com/apple/coreai-models). It is opt-in,
+so apps that only use Apple Intelligence keep their deployment target and
+simulator builds. Set `APPLE_CORE_AI=1` when installing pods to link the
+`coreai-models` Swift Package (or list a subset in `CORE_AI_PRODUCTS`). Linked
+Core AI needs an iOS 27 deployment target and a physical device.
+
+```ts
+import { coreAI } from '@react-native-ai/apple'
+import { streamText } from 'ai'
+
+const model = coreAI.languageModel({
+  id: 'qwen3-0.6b',
+  source: { type: 'file', uri: qwen3ModelDirectory },
+  variant: 'iOS',
+})
+
+const result = streamText({ model, prompt: 'Explain Core AI in one sentence.' })
+```
+
+See the [Core AI documentation](https://react-native-ai.dev/docs/core-ai/getting-started).
 
 ## Documentation
 

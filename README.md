@@ -132,16 +132,19 @@ Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models
 
 #### Installation
 
+Core AI ships in `@react-native-ai/apple` and is opt-in. Set `APPLE_CORE_AI=1` when installing pods, so the pod links Apple's `coreai-models` Swift Package products (`CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, `CoreAIObjectDetection`):
+
 ```bash
-npm install @react-native-ai/core-ai
+npm install @react-native-ai/apple
+APPLE_CORE_AI=1 npx pod-install
 ```
 
-The pod links Apple's `coreai-models` Swift Package products (`CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, `CoreAIObjectDetection`) during `pod install`. Apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
+With Core AI linked, apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
 
 #### Usage
 
 ```typescript
-import { coreAI } from '@react-native-ai/core-ai'
+import { coreAI } from '@react-native-ai/apple'
 import { generateText } from 'ai'
 
 const model = coreAI.languageModel({

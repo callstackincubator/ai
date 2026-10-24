@@ -6,9 +6,8 @@ import ImageIO
 import FoundationModels
 #endif
 
-#if canImport(CoreAI)
-import CoreAI
-#endif
+// CoreAI itself is not imported: AppleLLM supports iOS versions without the
+// framework, and only the opt-in coreai-models products below use it
 
 #if canImport(CoreAIDiffusionPipeline)
 import CoreAIDiffusionPipeline

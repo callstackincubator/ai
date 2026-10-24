@@ -7,7 +7,7 @@ Core AI has two API layers.
 Use these when you want portable AI SDK app code:
 
 ```typescript
-import { coreAI } from '@react-native-ai/core-ai'
+import { coreAI } from '@react-native-ai/apple'
 import { embed, transcribe, generateImage, generateText } from 'ai'
 
 const language = coreAI.languageModel({
@@ -38,7 +38,7 @@ Reranking, speech generation, and video generation are intentionally not exposed
 Use direct APIs when Core AI has no AI SDK equivalent or when you need Core AI-specific lifecycle control:
 
 ```typescript
-import { CoreAI, coreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
+import { CoreAI, coreAI, toNativeModelConfig } from '@react-native-ai/apple'
 
 const config = {
   id: 'qwen3-0.6b',

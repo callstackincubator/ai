@@ -35,7 +35,7 @@ mock.module('react-native', () => ({
   },
 }))
 
-const { coreAI } = await import('../ai-sdk')
+const { coreAI } = await import('../core-ai/ai-sdk')
 
 async function readAll(stream: ReadableStream<LanguageModelV4StreamPart>) {
   const parts: LanguageModelV4StreamPart[] = []

@@ -43,14 +43,14 @@ Android-only. See the [ADK docs](./adk/getting-started) for setup and API detail
 
 ### Apple Core AI
 
-Run app-provided Core AI model bundles through `@react-native-ai/core-ai`:
+Run app-provided Core AI model bundles through `coreAI` from `@react-native-ai/apple`:
 
 - **Language Sessions** - Custom Core AI language models with persistent native sessions
 - **AI SDK Adapters** - Language and image generation today, with embedding and transcription surfaces kept explicit until native runners land
 - **Native-only Tasks** - Segmentation, object detection, model inspection, specialization, and model lifecycle calls
 - **Starter Models** - iOS-first examples sourced from Apple’s `coreai-models` registry, kept as docs/example data rather than a package catalog
 
-Requires exported Core AI assets, an iOS 27 deployment target, and a physical device. The pod links Apple’s `coreai-models` Swift Package automatically.
+Requires exported Core AI assets, an iOS 27 deployment target, and a physical device. Core AI is opt-in: set `APPLE_CORE_AI=1` at `pod install` and the pod links Apple’s `coreai-models` Swift Package.
 
 ### Llama Engine
 
