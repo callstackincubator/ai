@@ -50,7 +50,7 @@ Run app-provided Core AI model bundles through `@react-native-ai/core-ai`:
 - **Native-only Tasks** - Segmentation, object detection, model inspection, specialization, and model lifecycle calls
 - **Starter Models** - iOS-first examples sourced from Apple’s `coreai-models` registry, kept as docs/example data rather than a package catalog
 
-Requires exported Core AI assets and Apple’s `coreai-models` Swift Package products linked into the host app target.
+Requires exported Core AI assets, an iOS 27 deployment target, and a physical device. The pod links Apple’s `coreai-models` Swift Package automatically.
 
 ### Llama Engine
 

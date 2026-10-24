@@ -16,7 +16,7 @@ enum CoreAIError: LocalizedError {
     case .missingSource:
       return "Core AI model source is missing. Provide a file URI or bundle resource."
     case .missingSwiftPackage(let product):
-      return "Missing Apple Core AI Swift Package product: \(product). Add https://github.com/apple/coreai-models to the app target and link \(product)."
+      return "Missing Apple Core AI Swift Package product: \(product). Include it in CORE_AI_PRODUCTS and run pod install again."
     case .modelNotLoaded(let handle):
       return "Core AI model is not loaded: \(handle)."
     case .sessionNotFound(let handle):
