@@ -1,9 +1,5 @@
-import type { TurboModule } from 'react-native'
+import type { CodegenTypes, TurboModule } from 'react-native'
 import { Platform, TurboModuleRegistry } from 'react-native'
-import type {
-  EventEmitter,
-  UnsafeObject,
-} from 'react-native/Libraries/Types/CodegenTypesNamespace'
 
 export type AdkMessageRole = 'assistant' | 'system' | 'user'
 
@@ -41,14 +37,14 @@ export interface AdkTool {
   id: string
   name: string
   description: string
-  inputSchema?: UnsafeObject
+  inputSchema?: CodegenTypes.UnsafeObject
   parameters?: AdkToolParameter[]
 }
 
 export interface AdkResponseFormat {
   type: 'json'
   mimeType?: string
-  schema?: UnsafeObject
+  schema?: CodegenTypes.UnsafeObject
 }
 
 export interface AdkGenerationOptions {
@@ -129,11 +125,11 @@ export interface Spec extends TurboModule {
   cancelStream(streamId: string): Promise<void>
   submitToolResult(toolCallId: string, result: string): void
 
-  onStreamUpdate: EventEmitter<StreamUpdateEvent>
-  onStreamComplete: EventEmitter<StreamCompleteEvent>
-  onStreamError: EventEmitter<StreamErrorEvent>
-  onStreamToolCall: EventEmitter<StreamToolCallEvent>
-  onToolCall: EventEmitter<ToolCallEvent>
+  onStreamUpdate: CodegenTypes.EventEmitter<StreamUpdateEvent>
+  onStreamComplete: CodegenTypes.EventEmitter<StreamCompleteEvent>
+  onStreamError: CodegenTypes.EventEmitter<StreamErrorEvent>
+  onStreamToolCall: CodegenTypes.EventEmitter<StreamToolCallEvent>
+  onToolCall: CodegenTypes.EventEmitter<ToolCallEvent>
 }
 
 declare global {

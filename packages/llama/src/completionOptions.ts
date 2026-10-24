@@ -1,6 +1,6 @@
 import type {
-  LanguageModelV3CallOptions,
-  LanguageModelV3Prompt,
+  LanguageModelV4CallOptions,
+  LanguageModelV4Prompt,
 } from '@ai-sdk/provider'
 import type { CompletionParams } from 'llama.rn'
 
@@ -30,12 +30,12 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 export function prepareMessagesWithMedia(
-  prompt: LanguageModelV3Prompt
+  prompt: LanguageModelV4Prompt
 ): LLMMessage[] {
   const messages: LLMMessage[] = []
 
   type PromptPart = Extract<
-    LanguageModelV3Prompt[number],
+    LanguageModelV4Prompt[number],
     { content: unknown[] }
   >['content'][number]
 
@@ -166,7 +166,7 @@ export function prepareMessagesWithMedia(
 }
 
 export function buildLlamaCompletionOptions(
-  options: LanguageModelV3CallOptions,
+  options: LanguageModelV4CallOptions,
   messages: LLMMessage[]
 ): Partial<CompletionParams> {
   const completionOptions: Partial<CompletionParams> = {
