@@ -802,6 +802,11 @@ public class AppleLLMImpl: NSObject {
       return appleError
     }
 
+    // Foundation Models wraps errors thrown by tools
+    if let toolCallError = error as? LanguageModelSession.ToolCallError {
+      return mapKnownAppleLLMError(toolCallError.underlyingError) ?? .toolCallError(toolCallError.underlyingError)
+    }
+
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
       if let languageModelError = error as? LanguageModelError {
