@@ -305,7 +305,11 @@ function getAppleNativeOptions(
     model: defaults.model,
     guardrails: defaults.guardrails,
     reasoningLevel: toAppleReasoningLevel(options.reasoning),
-    builtInTools: appleOptions.builtInTools,
+    // A named tool choice only offers that tool
+    builtInTools:
+      options.toolChoice?.type === 'tool'
+        ? undefined
+        : appleOptions.builtInTools,
   }
 }
 
@@ -486,31 +490,22 @@ function prepareToolChoice(
   toolChoice: LanguageModelV4CallOptions['toolChoice']
 ): {
   tools: Tool[]
-  toolCallingMode?: 'disallowed'
-  warnings: SharedV4Warning[]
+  toolCallingMode?: 'disallowed' | 'required'
 } {
-  // Apple runs tools natively in a loop and the required mode applies to every
-  // step of it, so the model would never stop calling tools to answer
-  const requiredWarning: SharedV4Warning = {
-    type: 'unsupported',
-    feature: 'toolChoice',
-    details:
-      'Apple Foundation Models run tools natively and cannot be required to call a tool.',
-  }
-
   switch (toolChoice?.type) {
     case 'none':
       // Also disables built-in tools on iOS 27
-      return { tools: [], toolCallingMode: 'disallowed', warnings: [] }
+      return { tools: [], toolCallingMode: 'disallowed' }
     case 'required':
-      return { tools, warnings: [requiredWarning] }
+      // Required until the model calls a tool, then it can answer. Needs iOS 27
+      return { tools, toolCallingMode: 'required' }
     case 'tool':
       return {
         tools: tools.filter((tool) => tool.name === toolChoice.toolName),
-        warnings: [requiredWarning],
+        toolCallingMode: 'required',
       }
     default:
-      return { tools, warnings: [] }
+      return { tools }
   }
 }
 
@@ -989,16 +984,13 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doGenerate(options: LanguageModelV4CallOptions) {
-    const { appleOptions, warnings: settingWarnings } =
-      await this.prepareCallOptions(options)
+    const { appleOptions, warnings } = await this.prepareCallOptions(options)
     const requestId = generateId()
     const messages = this.prepareMessages(options.prompt)
-    const {
-      tools: callTools,
-      toolCallingMode,
-      warnings: toolWarnings,
-    } = prepareToolChoice(options.tools, options.toolChoice)
-    const warnings = [...settingWarnings, ...toolWarnings]
+    const { tools: callTools, toolCallingMode } = prepareToolChoice(
+      options.tools,
+      options.toolChoice
+    )
     const tools = this.prepareTools(callTools)
 
     for (const tool of tools) {
@@ -1070,15 +1062,12 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doStream(options: LanguageModelV4CallOptions) {
-    const { appleOptions, warnings: settingWarnings } =
-      await this.prepareCallOptions(options)
+    const { appleOptions, warnings } = await this.prepareCallOptions(options)
     const messages = this.prepareMessages(options.prompt)
-    const {
-      tools: callTools,
-      toolCallingMode,
-      warnings: toolWarnings,
-    } = prepareToolChoice(options.tools, options.toolChoice)
-    const warnings = [...settingWarnings, ...toolWarnings]
+    const { tools: callTools, toolCallingMode } = prepareToolChoice(
+      options.tools,
+      options.toolChoice
+    )
     const tools = this.prepareTools(callTools)
 
     if (typeof ReadableStream === 'undefined') {

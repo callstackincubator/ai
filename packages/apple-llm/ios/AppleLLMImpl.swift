@@ -226,7 +226,12 @@ public class AppleLLMImpl: NSObject {
             tools: tools
           )
 
-          let session = try self.createSession(providerOptions: providerOptions, tools: tools, transcript: transcript)
+          let session = try self.createSession(
+            providerOptions: providerOptions,
+            tools: tools,
+            transcript: transcript,
+            toolCallingMode: options["toolCallingMode"] as? String
+          )
 
           let generationOptions = try self.createGenerationOptions(from: options)
           let generationSchema = try self.createGenerationSchema(from: options)
@@ -291,7 +296,12 @@ public class AppleLLMImpl: NSObject {
             tools: tools
           )
 
-          let session = try self.createSession(providerOptions: providerOptions, tools: tools, transcript: transcript)
+          let session = try self.createSession(
+            providerOptions: providerOptions,
+            tools: tools,
+            transcript: transcript,
+            toolCallingMode: options["toolCallingMode"] as? String
+          )
 
           let generationOptions = try self.createGenerationOptions(from: options)
           let generationSchema = try self.createGenerationSchema(from: options)
@@ -514,7 +524,8 @@ public class AppleLLMImpl: NSObject {
   private func createSession(
     providerOptions: [String: Any],
     tools: [any Tool],
-    transcript: Transcript
+    transcript: Transcript,
+    toolCallingMode: String?
   ) throws -> LanguageModelSession {
     let modelName = providerOptions["model"] as? String ?? "system"
 
@@ -529,6 +540,11 @@ public class AppleLLMImpl: NSObject {
       guard availability == "available" else {
         throw AppleLLMError.modelUnavailable(availability)
       }
+#if compiler(>=6.4)
+      if #available(iOS 27, *), toolCallingMode == "required" {
+        return createRequiredToolCallSession(model: model, tools: tools, transcript: transcript)
+      }
+#endif
       return LanguageModelSession(
         model: model,
         tools: tools,
@@ -542,6 +558,9 @@ public class AppleLLMImpl: NSObject {
         guard availability == "available" else {
           throw AppleLLMError.modelUnavailable(availability)
         }
+        if toolCallingMode == "required" {
+          return createRequiredToolCallSession(model: model, tools: tools, transcript: transcript)
+        }
         return LanguageModelSession(
           model: model,
           tools: tools,
@@ -554,6 +573,35 @@ public class AppleLLMImpl: NSObject {
       throw AppleLLMError.invalidMessage("Unsupported model '\(modelName)'")
     }
   }
+
+#if compiler(>=6.4)
+  /// Apple's required mode applies to every model request in its tool loop, so the model
+  /// would keep calling tools and never answer. The profile only requires the first call
+  @available(iOS 27, *)
+  private func createRequiredToolCallSession(
+    model: some LanguageModel,
+    tools: [any Tool],
+    transcript: Transcript
+  ) -> LanguageModelSession {
+    // A profile declares its own instructions and tools, so they are left out of the history
+    var instructions: [String] = []
+    var history: [Transcript.Entry] = []
+    for entry in transcript {
+      if case .instructions(let entryInstructions) = entry {
+        instructions.append(contentsOf: entryInstructions.segments.map { String(describing: $0) })
+      } else {
+        history.append(entry)
+      }
+    }
+
+    let profile = RequiredToolCallProfile(
+      model: model,
+      instructions: instructions.isEmpty ? nil : instructions.joined(separator: "\n"),
+      tools: tools
+    )
+    return LanguageModelSession(profile: profile, history: history)
+  }
+#endif
 
   @available(iOS 26, *)
   private func respond(
@@ -1407,7 +1455,8 @@ public class AppleLLMImpl: NSObject {
     case "allowed":
       return .allowed
     case "required":
-      return .required
+      // Set by the session's profile, which only requires the first tool call
+      return nil
     case "disallowed":
       return .disallowed
     default:
@@ -1687,6 +1736,46 @@ extension LanguageModelSession.Response {
     return AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: true)
   }
 }
+
+#if compiler(>=6.4)
+@available(iOS 27, *)
+final class ToolCallCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var count = 0
+
+  var value: Int {
+    lock.withLock { count }
+  }
+
+  func increment() {
+    lock.withLock { count += 1 }
+  }
+}
+
+/// Requires a tool call until the model has made one, then lets it answer
+@available(iOS 27, *)
+struct RequiredToolCallProfile<Model: LanguageModel>: LanguageModelSession.DynamicProfile {
+  let model: Model
+  let instructions: String?
+  let tools: [any Tool]
+  let toolCalls = ToolCallCounter()
+
+  var body: some LanguageModelSession.DynamicProfile {
+    Profile {
+      if let instructions {
+        Instructions(instructions)
+      }
+      tools
+    }
+    .model(model)
+    .toolCallingMode(toolCalls.value < 1 ? .required : .allowed)
+    .onToolCall {
+      toolCalls.increment()
+    }
+  }
+}
+
+#endif
 
 @available(iOS 26, *)
 enum AppleLLMTranscriptSerializer {
