@@ -10,7 +10,10 @@ Apple-specific surface for runtime model information and Apple-only options.
 - iOS 26+ for Apple Foundation Models text generation.
 - iOS 26.4+ for token counting and Image Playground image generation.
 - iOS 27+ for multimodal image prompts, Private Cloud Compute language models,
-  Dynamic Profiles, and Vision built-in tools.
+  reasoning levels, Dynamic Profiles, and Vision built-in tools.
+- Apple's managed Private Cloud Compute entitlement for the
+  `private-cloud-compute` model. Private Cloud Compute does not run in the iOS
+  Simulator, so test it on a physical device.
 - An Apple Intelligence-capable device with Apple Intelligence enabled.
 - React Native New Architecture.
 
@@ -148,7 +151,27 @@ const apple = createAppleProvider({
 ```
 
 Call `apple.getModelInfo({ model: 'private-cloud-compute' })` before enabling
-this path. It requires iOS 27 APIs and may report quota usage.
+this path. It requires iOS 27 APIs. When the Private Cloud Compute quota is
+reached, generation fails with `RATE_LIMITED`.
+
+## Reasoning Level
+
+On iOS 27 and newer, set how much reasoning the model should do before
+answering:
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  prompt: 'Plan a three-day trip to Kyoto.',
+  providerOptions: {
+    apple: {
+      reasoningLevel: 'moderate', // 'light' | 'moderate' | 'deep'
+    },
+  },
+})
+```
+
+Setting `reasoningLevel` on older iOS versions fails with `UNSUPPORTED_OS`.
 
 ## Image Prompts
 
@@ -381,6 +404,7 @@ Stable public codes are:
 - `TOOL_CALL_ERROR`
 - `UNKNOWN_TOOL_CALL_ERROR`
 - `CONTEXT_WINDOW_EXCEEDED`
+- `RATE_LIMITED`
 
 ## Direct Native API
 
