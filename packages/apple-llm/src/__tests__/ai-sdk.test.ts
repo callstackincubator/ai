@@ -87,31 +87,67 @@ describe('apple language model', () => {
 })
 
 describe('apple prompt conversion', () => {
-  test('skips reasoning parts from earlier assistant turns', async () => {
+  test('replays assistant turns as structured parts', async () => {
     await apple().doGenerate(
       createCallOptions({
         prompt: [
-          { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+          { role: 'user', content: [{ type: 'text', text: 'weather?' }] },
           {
             role: 'assistant',
             content: [
-              { type: 'reasoning', text: 'thinking' },
-              { type: 'text', text: 'hello' },
+              {
+                type: 'reasoning',
+                text: 'apple thinking',
+                providerOptions: { apple: { signature: 'c2ln' } },
+              },
+              { type: 'reasoning', text: 'other model thinking' },
+              {
+                type: 'tool-call',
+                toolCallId: 'call-1',
+                toolName: 'weather',
+                input: { city: 'Paris' },
+              },
+              {
+                type: 'tool-result',
+                toolCallId: 'call-1',
+                toolName: 'weather',
+                output: { type: 'json', value: { forecast: 'sunny' } },
+              },
+              { type: 'text', text: 'It is sunny' },
             ],
           },
-          { role: 'user', content: [{ type: 'text', text: 'again' }] },
+          { role: 'user', content: [{ type: 'text', text: 'thanks' }] },
         ],
       })
     )
 
     expect(generateText.mock.calls.at(-1)![0]).toEqual([
-      { role: 'user', content: 'hi', attachments: [] },
-      { role: 'assistant', content: 'hello', attachments: [] },
-      { role: 'user', content: 'again', attachments: [] },
+      { role: 'user', content: 'weather?', attachments: [] },
+      {
+        role: 'assistant',
+        content: 'It is sunny',
+        parts: [
+          { type: 'reasoning', text: 'apple thinking', signature: 'c2ln' },
+          {
+            type: 'tool-call',
+            toolCallId: 'call-1',
+            toolName: 'weather',
+            input: '{"city":"Paris"}',
+          },
+          {
+            type: 'tool-result',
+            toolCallId: 'call-1',
+            toolName: 'weather',
+            output: '{"forecast":"sunny"}',
+          },
+          { type: 'text', text: 'It is sunny' },
+        ],
+      },
+      { role: 'user', content: 'thanks', attachments: [] },
     ])
   })
 
-  test('skips tool approval responses in tool messages', async () => {
+  test('replays tool messages and skips tool approval responses', async () => {
     await apple().doGenerate(
       createCallOptions({
         prompt: [
@@ -129,8 +165,15 @@ describe('apple prompt conversion', () => {
                 toolName: 'weather',
                 output: { type: 'text', value: 'sunny' },
               },
+              {
+                type: 'tool-result',
+                toolCallId: 'call-2',
+                toolName: 'delete',
+                output: { type: 'execution-denied', reason: 'Not allowed' },
+              },
             ],
           },
+          { role: 'user', content: [{ type: 'text', text: 'ok' }] },
         ],
       })
     )
@@ -138,9 +181,23 @@ describe('apple prompt conversion', () => {
     expect(generateText.mock.calls.at(-1)![0]).toEqual([
       {
         role: 'tool',
-        content: '[tool-result:weather] {"type":"text","value":"sunny"}',
-        attachments: [],
+        content: '',
+        parts: [
+          {
+            type: 'tool-result',
+            toolCallId: 'call-1',
+            toolName: 'weather',
+            output: 'sunny',
+          },
+          {
+            type: 'tool-result',
+            toolCallId: 'call-2',
+            toolName: 'delete',
+            output: 'Not allowed',
+          },
+        ],
       },
+      { role: 'user', content: 'ok', attachments: [] },
     ])
   })
 })

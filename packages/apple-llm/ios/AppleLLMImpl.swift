@@ -818,6 +818,12 @@ public class AppleLLMImpl: NSObject {
         throw AppleLLMError.invalidMessage("Message must have role and content")
       }
 
+      // Assistant and tool messages carry structured parts
+      if let parts = message["parts"] as? [[String: Any]] {
+        entries.append(contentsOf: try createTranscriptEntries(from: parts))
+        continue
+      }
+
       if let attachments = message["attachments"] as? [[String: Any]], !attachments.isEmpty {
         throw AppleLLMError.invalidMessage("Image attachments are only supported on the final user prompt")
       }
@@ -844,7 +850,90 @@ public class AppleLLMImpl: NSObject {
       }
     }
     
+    // A tool output without its call (e.g. after trimming history) fails generation
+    var knownToolCallIds = Set<String>()
+    entries = entries.filter { entry in
+      switch entry {
+      case .toolCalls(let toolCalls):
+        knownToolCallIds.formUnion(toolCalls.map(\.id))
+        return true
+      case .toolOutput(let toolOutput):
+        return knownToolCallIds.contains(toolOutput.id)
+      default:
+        return true
+      }
+    }
+
     return (Transcript(entries: entries), userPrompt, promptAttachments)
+  }
+
+  @available(iOS 26, *)
+  private func createTranscriptEntries(from parts: [[String: Any]]) throws -> [Transcript.Entry] {
+    var entries: [Transcript.Entry] = []
+    var pendingText: [String] = []
+    var pendingToolCalls: [Transcript.ToolCall] = []
+
+    // Consecutive text parts form one response and consecutive tool calls one entry
+    func flush() {
+      if !pendingText.isEmpty {
+        let segment = Transcript.Segment.text(.init(content: pendingText.joined(separator: "\n")))
+        entries.append(.response(Transcript.Response(assetIDs: [], segments: [segment])))
+        pendingText = []
+      }
+      if !pendingToolCalls.isEmpty {
+        entries.append(.toolCalls(Transcript.ToolCalls(pendingToolCalls)))
+        pendingToolCalls = []
+      }
+    }
+
+    for part in parts {
+      guard let type = part["type"] as? String else {
+        throw AppleLLMError.invalidMessage("Message part must have a type")
+      }
+
+      switch type {
+      case "text":
+        if !pendingToolCalls.isEmpty {
+          flush()
+        }
+        pendingText.append(part["text"] as? String ?? "")
+      case "reasoning":
+        flush()
+#if compiler(>=6.4)
+        if #available(iOS 27, *) {
+          let segment = Transcript.Segment.text(.init(content: part["text"] as? String ?? ""))
+          let signature = (part["signature"] as? String).flatMap { Data(base64Encoded: $0) }
+          entries.append(.reasoning(Transcript.Reasoning(segments: [segment], signature: signature)))
+        }
+#endif
+        // Transcripts before iOS 27 have no reasoning entries, so it is left out
+      case "tool-call":
+        guard let toolCallId = part["toolCallId"] as? String,
+              let toolName = part["toolName"] as? String,
+              let input = part["input"] as? String else {
+          throw AppleLLMError.invalidMessage("Tool call part must have toolCallId, toolName and input")
+        }
+        if !pendingText.isEmpty {
+          flush()
+        }
+        let arguments = try GeneratedContent(json: input)
+        pendingToolCalls.append(Transcript.ToolCall(id: toolCallId, toolName: toolName, arguments: arguments))
+      case "tool-result":
+        guard let toolCallId = part["toolCallId"] as? String,
+              let toolName = part["toolName"] as? String,
+              let output = part["output"] as? String else {
+          throw AppleLLMError.invalidMessage("Tool result part must have toolCallId, toolName and output")
+        }
+        flush()
+        let segment = Transcript.Segment.text(.init(content: output))
+        entries.append(.toolOutput(Transcript.ToolOutput(id: toolCallId, toolName: toolName, segments: [segment])))
+      default:
+        throw AppleLLMError.invalidMessage("Unsupported message part type '\(type)'")
+      }
+    }
+
+    flush()
+    return entries
   }
 
 #if compiler(>=6.4)
