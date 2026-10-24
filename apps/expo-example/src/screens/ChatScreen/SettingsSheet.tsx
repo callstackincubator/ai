@@ -110,8 +110,8 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                 <View style={styles.settingToggleText}>
                   <Text style={styles.settingTitle}>History Demo</Text>
                   <Text style={styles.settingDescription}>
-                    Exercise summarizeHistory, rollingWindow, and
-                    droppingCompletedToolCalls in chat
+                    Summarize history, keep a rolling window, and drop completed
+                    tool calls in chat
                   </Text>
                 </View>
                 <Switch
