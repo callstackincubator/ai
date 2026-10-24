@@ -7,7 +7,7 @@ Use `@react-native-ai/apple` for Apple system models. Use `@react-native-ai/core
 ## Installation
 
 ```bash
-npm install @react-native-ai/core-ai
+npm install @react-native-ai/core-ai @react-native-ai/apple
 ```
 
 To use it with the AI SDK, install `ai` v7 and the [required polyfills](../polyfills.md):
@@ -19,28 +19,63 @@ npm install ai
 ## Requirements
 
 - React Native New Architecture
-- iOS 27 deployment target (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`)
+- iOS 27 deployment target (with Expo, the config plugin sets it)
 - Xcode 27 or newer for building apps with Core AI
 - Exported `.aimodel` bundles from `apple/coreai-models`
 - A physical device. The iOS Simulator SDK has no `CoreAI` framework, so apps that install this package cannot be built for the simulator
 
 ## Native Setup
 
-The pod links Apple's [`coreai-models`](https://github.com/apple/coreai-models) Swift Package (1.0.0 up to the next major version) to itself during `pod install`, so there is no Xcode or config plugin step. By default it links every product the native module uses:
+The pod links Apple's [`coreai-models`](https://github.com/apple/coreai-models) Swift Package (1.0.0 up to the next major version) during `pod install`, so there is no Xcode step. It also depends on the `AppleLLM` pod from `@react-native-ai/apple`, because Core AI language models run through the same Foundation Models session as Apple Intelligence.
 
-- `CoreAILM` for `coreAI.languageModel(...)` and sessions
-- `CoreAIDiffusion` for `coreAI.imageModel(...)`
-- `CoreAISegmentation` for `CoreAI.runTask('segmentation', ...)`
-- `CoreAIObjectDetection` for `CoreAI.runTask('object-detection', ...)`
+Apple's package needs an **iOS 27 deployment target** and has no iOS Simulator support (the Simulator SDK has no `CoreAI` framework), so apps with this package build for **physical devices only**.
 
-To link a smaller set, set `CORE_AI_PRODUCTS` when installing pods (with Expo, when running prebuild):
+### Expo
 
-```bash
-CORE_AI_PRODUCTS=CoreAILM npx pod-install
-CORE_AI_PRODUCTS=CoreAILM npx expo prebuild -p ios
+Add the config plugin to `app.json`, then run `npx expo prebuild`:
+
+```json
+{
+  "expo": {
+    "plugins": ["@react-native-ai/core-ai"]
+  }
+}
 ```
 
-Calling a feature whose product is not linked throws a setup error.
+The plugin sets the iOS deployment target to 27.0 in the Podfile and the Xcode project. If you also set `ios.deploymentTarget` in `expo-build-properties`, make it `27.0` or higher.
+
+### Bare React Native
+
+Set `platform :ios, '27.0'` in `ios/Podfile` and the deployment target of the app target in Xcode to 27.0, then run `npx pod-install`.
+
+### Choosing Tasks
+
+By default the pod links native support for every task the module implements. Each task links one `coreai-models` product:
+
+| Task               | Used by                                   | Linked product          |
+| ------------------ | ----------------------------------------- | ----------------------- |
+| `language`         | `coreAI.languageModel(...)` and sessions  | `CoreAILM`              |
+| `diffusion`        | `coreAI.imageModel(...)`                  | `CoreAIDiffusion`       |
+| `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
+| `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
+
+To link fewer, list the tasks you use. With Expo, pass them to the plugin:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "tasks": ["language"] }]]
+  }
+}
+```
+
+In a bare app, set `CORE_AI_TASKS` (comma-separated) on every `pod install`:
+
+```bash
+CORE_AI_TASKS=language npx pod-install
+```
+
+Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 
 Supported today: text generation, image generation, segmentation, and object detection. Embeddings, transcription, depth, super-resolution, and classification are tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
 

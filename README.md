@@ -134,8 +134,10 @@ Embeddings and transcription are not supported yet ([#237](https://github.com/ca
 #### Installation
 
 ```bash
-npm install @react-native-ai/core-ai
+npm install @react-native-ai/core-ai @react-native-ai/apple
 ```
+
+The pod links Apple's `coreai-models` Swift Package during `pod install` and reuses the Foundation Models helpers from `@react-native-ai/apple`, which is a peer dependency. With Expo, add the `@react-native-ai/core-ai` config plugin.
 
 > [!IMPORTANT]
 > Apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
