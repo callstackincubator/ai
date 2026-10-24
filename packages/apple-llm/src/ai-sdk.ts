@@ -327,6 +327,21 @@ function serializeKnownMessageContentPart(
   }
 }
 
+type AppleStreamEntry =
+  | { type: 'reasoning'; id: string; text: string; signature?: string }
+  | { type: 'tool-call'; toolCallId: string; toolName: string; input: string }
+  | {
+      type: 'tool-result'
+      toolCallId: string
+      toolName: string
+      output: string
+    }
+
+// Native streams send the full text generated so far
+function getSnapshotDelta(previous: string, next: string) {
+  return next.startsWith(previous) ? next.slice(previous.length) : next
+}
+
 type AppleToolCallingMode = 'allowed' | 'required' | 'disallowed'
 
 function prepareToolChoice(
@@ -728,10 +743,22 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           switch (part.type) {
             case 'text':
               return part
+            case 'reasoning':
+              return {
+                type: 'reasoning' as const,
+                text: part.text,
+                ...(part.signature
+                  ? {
+                      providerMetadata: {
+                        apple: { signature: part.signature },
+                      },
+                    }
+                  : {}),
+              }
             case 'tool-call':
               return {
                 type: 'tool-call' as const,
-                toolCallId: '',
+                toolCallId: part.toolCallId,
                 providerExecuted: true,
                 toolName: part.toolName,
                 input: part.input,
@@ -739,7 +766,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             case 'tool-result':
               return {
                 type: 'tool-result' as const,
-                toolCallId: '',
+                toolCallId: part.toolCallId,
                 providerExecuted: true,
                 toolName: part.toolName,
                 result: part.output,
@@ -815,40 +842,124 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       async start(controller) {
         try {
-          streamId = generateId()
-
-          controller.enqueue({
-            type: 'text-start',
-            id: streamId,
-          })
+          const id = (streamId = generateId())
 
           let previousRawContent = ''
+          let textStarted = false
+          // Reasoning text so far by entry id, and the signature of open blocks
+          const reasoningTexts = new Map<string, string>()
+          const openReasoning = new Map<string, string | undefined>()
+          const emittedToolResults = new Set<string>()
+
+          const endReasoning = () => {
+            for (const [reasoningId, signature] of openReasoning) {
+              controller.enqueue({
+                type: 'reasoning-end',
+                id: reasoningId,
+                ...(signature
+                  ? { providerMetadata: { apple: { signature } } }
+                  : {}),
+              })
+            }
+            openReasoning.clear()
+          }
+
+          const handleEntries = (entries: AppleStreamEntry[]) => {
+            for (const entry of entries) {
+              if (entry.type === 'reasoning') {
+                const previousText = reasoningTexts.get(entry.id)
+                if (previousText === undefined) {
+                  controller.enqueue({ type: 'reasoning-start', id: entry.id })
+                  openReasoning.set(entry.id, undefined)
+                } else if (!openReasoning.has(entry.id)) {
+                  continue
+                }
+
+                openReasoning.set(
+                  entry.id,
+                  entry.signature ?? openReasoning.get(entry.id)
+                )
+                reasoningTexts.set(entry.id, entry.text)
+
+                const delta = getSnapshotDelta(previousText ?? '', entry.text)
+                if (delta) {
+                  controller.enqueue({
+                    type: 'reasoning-delta',
+                    id: entry.id,
+                    delta,
+                  })
+                }
+              }
+
+              // Tools run natively, so calls are reported once their output exists
+              if (
+                entry.type === 'tool-result' &&
+                !emittedToolResults.has(entry.toolCallId)
+              ) {
+                const toolCall = entries.find(
+                  (candidate) =>
+                    candidate.type === 'tool-call' &&
+                    candidate.toolCallId === entry.toolCallId
+                )
+
+                endReasoning()
+                controller.enqueue({
+                  type: 'tool-call',
+                  toolCallId: entry.toolCallId,
+                  toolName: entry.toolName,
+                  input: toolCall?.type === 'tool-call' ? toolCall.input : '{}',
+                  providerExecuted: true,
+                })
+                controller.enqueue({
+                  type: 'tool-result',
+                  toolCallId: entry.toolCallId,
+                  toolName: entry.toolName,
+                  result: entry.output,
+                })
+                emittedToolResults.add(entry.toolCallId)
+              }
+            }
+          }
 
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
             if (data.streamId === streamId) {
+              if (data.entries) {
+                handleEntries(data.entries as AppleStreamEntry[])
+              }
+
               const nextRawContent = String(data.content ?? '')
-              const rawDelta = nextRawContent.startsWith(previousRawContent)
-                ? nextRawContent.slice(previousRawContent.length)
-                : nextRawContent
+              const rawDelta = getSnapshotDelta(
+                previousRawContent,
+                nextRawContent
+              )
               previousRawContent = nextRawContent
 
               // Apple native streaming can emit bogus "null" chunks as text.
-              if (rawDelta === 'null') return
+              if (!rawDelta || rawDelta === 'null') return
+
+              if (!textStarted) {
+                endReasoning()
+                controller.enqueue({ type: 'text-start', id })
+                textStarted = true
+              }
 
               controller.enqueue({
                 type: 'text-delta',
                 delta: rawDelta,
-                id: data.streamId,
+                id,
               })
             }
           })
 
           const completeListener = NativeAppleLLM.onStreamComplete((data) => {
             if (data.streamId === streamId) {
-              controller.enqueue({
-                type: 'text-end',
-                id: streamId,
-              })
+              endReasoning()
+              if (textStarted) {
+                controller.enqueue({
+                  type: 'text-end',
+                  id,
+                })
+              }
               controller.enqueue({
                 type: 'finish',
                 finishReason: { unified: 'stop' as const, raw: 'stop' },

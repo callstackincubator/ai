@@ -170,8 +170,12 @@ using namespace JS::NativeAppleLLM;
   [_llm generateStream:streamId
               messages:messages
                options:opts
-              onUpdate:^(NSString *streamId, NSString *content) {
-    [self emitOnStreamUpdate:@{@"streamId": streamId, @"content": content}];
+              onUpdate:^(NSString *streamId, NSString *content, NSArray *entries) {
+    NSMutableDictionary *payload = [@{@"streamId": streamId, @"content": content} mutableCopy];
+    if (entries != nil) {
+      payload[@"entries"] = entries;
+    }
+    [self emitOnStreamUpdate:payload];
   }
             onComplete:^(NSString *streamId) {
     [self emitOnStreamComplete:@{@"streamId": streamId}];
