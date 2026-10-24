@@ -128,6 +128,34 @@ describe('apple tools', () => {
     expect(parts.map((part) => part.type)).toContain('text-delta')
   })
 
+  // Each call depends on the previous result, so the calls run one at a time.
+  // Parallel calls in the same round are not limited
+  it('stops calling tools after maxToolCalls and answers', async () => {
+    const steps: number[] = []
+    const countDown = tool({
+      description:
+        'Counts down by one. Call it again with the number it returns.',
+      inputSchema: z.object({ from: z.number().int() }),
+      execute: async ({ from }) => {
+        steps.push(from)
+        return from > 1
+          ? `Now call countDown with from set to ${from - 1}.`
+          : 'Done.'
+      },
+    })
+
+    const result = await generateText({
+      model: createAppleProvider({ availableTools: { countDown } })(),
+      tools: { countDown },
+      prompt:
+        'Call countDown with from set to 5, and keep following its instructions until it says Done.',
+      providerOptions: { apple: { maxToolCalls: 2 } },
+    })
+
+    expect(steps).toHaveLength(2)
+    expect(result.text.length).toBeGreaterThan(0)
+  })
+
   it('uses tools registered later with updateTools', async () => {
     const calls: string[] = []
     const model = createAppleProvider()()

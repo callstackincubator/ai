@@ -528,6 +528,10 @@ public class AppleLLMImpl: NSObject {
     toolCallingMode: String?
   ) throws -> LanguageModelSession {
     let modelName = providerOptions["model"] as? String ?? "system"
+    let maxToolCalls = providerOptions["maxToolCalls"] as? Int
+    // Disallowed tool calling needs no profile, and also turns off built-in tools
+    let usesToolCallingProfile = toolCallingMode == "required"
+      || (maxToolCalls != nil && toolCallingMode != "disallowed")
 
     // Availability is checked for the requested model, so Private Cloud Compute
     // requests work even when the on-device model is not available
@@ -541,10 +545,20 @@ public class AppleLLMImpl: NSObject {
         throw AppleLLMError.modelUnavailable(availability)
       }
 #if compiler(>=6.4)
-      if #available(iOS 27, *), toolCallingMode == "required" {
-        return createRequiredToolCallSession(model: model, tools: tools, transcript: transcript)
+      if #available(iOS 27, *), usesToolCallingProfile {
+        return createToolCallingSession(
+          model: model,
+          tools: tools,
+          transcript: transcript,
+          required: toolCallingMode == "required",
+          maxToolCalls: maxToolCalls
+        )
       }
 #endif
+      // Limiting tool calls needs the Dynamic Profiles in iOS 27
+      if usesToolCallingProfile, maxToolCalls != nil {
+        throw AppleLLMError.unsupportedOS
+      }
       return LanguageModelSession(
         model: model,
         tools: tools,
@@ -558,8 +572,14 @@ public class AppleLLMImpl: NSObject {
         guard availability == "available" else {
           throw AppleLLMError.modelUnavailable(availability)
         }
-        if toolCallingMode == "required" {
-          return createRequiredToolCallSession(model: model, tools: tools, transcript: transcript)
+        if usesToolCallingProfile {
+          return createToolCallingSession(
+            model: model,
+            tools: tools,
+            transcript: transcript,
+            required: toolCallingMode == "required",
+            maxToolCalls: maxToolCalls
+          )
         }
         return LanguageModelSession(
           model: model,
@@ -576,12 +596,15 @@ public class AppleLLMImpl: NSObject {
 
 #if compiler(>=6.4)
   /// Apple's required mode applies to every model request in its tool loop, so the model
-  /// would keep calling tools and never answer. The profile only requires the first call
+  /// would keep calling tools and never answer. The profile only requires the first call,
+  /// and stops tool calls once maxToolCalls is reached
   @available(iOS 27, *)
-  private func createRequiredToolCallSession(
+  private func createToolCallingSession(
     model: some LanguageModel,
     tools: [any Tool],
-    transcript: Transcript
+    transcript: Transcript,
+    required: Bool,
+    maxToolCalls: Int?
   ) -> LanguageModelSession {
     // A profile declares its own instructions and tools, so they are left out of the history
     var instructions: [String] = []
@@ -594,10 +617,12 @@ public class AppleLLMImpl: NSObject {
       }
     }
 
-    let profile = RequiredToolCallProfile(
+    let profile = ToolCallingProfile(
       model: model,
       instructions: instructions.isEmpty ? nil : instructions.joined(separator: "\n"),
-      tools: tools
+      tools: tools,
+      required: required,
+      maxToolCalls: maxToolCalls
     )
     return LanguageModelSession(profile: profile, history: history)
   }
@@ -1752,13 +1777,24 @@ final class ToolCallCounter: @unchecked Sendable {
   }
 }
 
-/// Requires a tool call until the model has made one, then lets it answer
+/// Requires a tool call until the model has made one, then lets it answer. Once
+/// maxToolCalls is reached, the model has to answer without more tool calls
 @available(iOS 27, *)
-struct RequiredToolCallProfile<Model: LanguageModel>: LanguageModelSession.DynamicProfile {
+struct ToolCallingProfile<Model: LanguageModel>: LanguageModelSession.DynamicProfile {
   let model: Model
   let instructions: String?
   let tools: [any Tool]
+  let required: Bool
+  let maxToolCalls: Int?
   let toolCalls = ToolCallCounter()
+
+  // The mode applies from the next model request, so parallel calls in one round all run
+  var toolCallingMode: GenerationOptions.ToolCallingMode {
+    if let maxToolCalls, toolCalls.value >= maxToolCalls {
+      return .disallowed
+    }
+    return required && toolCalls.value < 1 ? .required : .allowed
+  }
 
   var body: some LanguageModelSession.DynamicProfile {
     Profile {
@@ -1768,7 +1804,7 @@ struct RequiredToolCallProfile<Model: LanguageModel>: LanguageModelSession.Dynam
       tools
     }
     .model(model)
-    .toolCallingMode(toolCalls.value < 1 ? .required : .allowed)
+    .toolCallingMode(toolCallingMode)
     .onToolCall {
       toolCalls.increment()
     }

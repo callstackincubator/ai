@@ -388,6 +388,26 @@ Important Apple-specific behavior:
   `model.updateTools(...)` before generation.
 - On iOS 27, `toolChoice: 'required'` and a named tool make the model call a
   tool before it answers. Earlier versions throw `UNSUPPORTED_OS`.
+- On iOS 27, `providerOptions.apple.maxToolCalls` limits how many tool calls
+  Apple runs in one generation, across all tools including built-in ones. Once
+  it is reached, the model answers without calling more tools. Parallel calls
+  in the same round still run, so the count can go over by a few. Earlier
+  versions throw `UNSUPPORTED_OS`.
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  prompt: 'Compare the weather in Paris, London, and Rome.',
+  tools: {
+    getWeather,
+  },
+  providerOptions: {
+    apple: {
+      maxToolCalls: 2,
+    },
+  },
+})
+```
 
 ## Vision Built-In Tools
 
