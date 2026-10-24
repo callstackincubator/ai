@@ -4,7 +4,7 @@ A Vercel AI SDK provider for llama.rn, enabling on-device inference with GGUF mo
 
 **Requirements:**
 - React Native >= 0.76.0
-- llama.rn >= 0.10.0-rc.0
+- llama.rn >= 0.13.0-rc.8 (required for React Native 0.88)
 - Vercel AI SDK v7
 
 ```ts

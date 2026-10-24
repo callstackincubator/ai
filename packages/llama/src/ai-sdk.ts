@@ -727,20 +727,14 @@ export class LlamaSpeechModel implements SpeechModelV4 {
       )
     }
 
-    const speaker = null // todo: extend to support different speakers and settings
-    const formatted = await context.getFormattedAudioCompletion(
-      speaker,
-      options.text
-    )
-
-    const guideTokens: number[] = await context.getAudioCompletionGuideTokens(
-      options.text
-    )
+    // todo: extend to support different speakers and settings
+    const formatted = await context.getFormattedAudioCompletion({
+      prompt: options.text,
+    })
 
     const completionResult = await context.completion({
       prompt: formatted.prompt,
       grammar: formatted.grammar,
-      guide_tokens: guideTokens,
       temperature: 0.8,
     })
 

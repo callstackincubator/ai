@@ -27,7 +27,7 @@ const { text } = await generateText({ model, prompt: 'Hello' })
 ## Prerequisites
 
 - [ ] React Native >= 0.76.0
-- [ ] llama.rn >= 0.10.0
+- [ ] llama.rn >= 0.13.0-rc.8 (required for React Native 0.88)
 - [ ] Vercel AI SDK v7+ (`ai`)
 - [ ] Android or iOS
 

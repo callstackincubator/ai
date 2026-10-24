@@ -36,7 +36,6 @@
       "dependencies": {
         "@ai-sdk/otel": "^1.0.152",
         "@azure/core-asynciterator-polyfill": "^1.0.2",
-        "@bottom-tabs/react-navigation": "^0.10.2",
         "@expo/ui": "~58.0.23",
         "@expo/vector-icons": "^15.0.3",
         "@lodev09/react-native-true-sheet": "^3.8.1",
@@ -69,11 +68,10 @@
         "expo-symbols": "~58.0.4",
         "expo-system-ui": "~58.0.6",
         "jotai": "^2.12.2",
-        "llama.rn": "^0.12.9",
+        "llama.rn": "0.13.0-rc.8",
         "react": "19.3.0",
         "react-native": "0.88.0",
         "react-native-audio-api": "^0.13.6",
-        "react-native-bottom-tabs": "^0.11.0",
         "react-native-gesture-handler": "~3.3.0",
         "react-native-keyboard-controller": "1.22.7",
         "react-native-reanimated": "4.7.1",
@@ -183,11 +181,11 @@
         "zod": "^4.0.0",
       },
       "devDependencies": {
-        "llama.rn": "^0.12.9",
+        "llama.rn": "0.13.0-rc.8",
         "react-native": "0.88.0",
       },
       "peerDependencies": {
-        "llama.rn": "^0.10.1",
+        "llama.rn": ">=0.13.0-rc.8",
         "react-native": ">=0.76.0",
       },
     },
@@ -218,6 +216,9 @@
       },
     },
   },
+  "trustedDependencies": [
+    "llama.rn",
+  ],
   "packages": {
     "2g": ["2g@1.0.1", "", { "peerDependencies": { "typescript": ">=5.8.0" }, "optionalPeers": ["typescript"], "bin": { "2g": "bin/cli.js" } }, "sha512-+uViadKOS/wwR4pFu5g8TPn3QHpKqoX19JHCnp8k/3cLpImdcXozwvZA6Q/5PeW3AcU8neL8faaMidBcv7o8CA=="],
 
@@ -460,8 +461,6 @@
     "@babel/traverse": ["@babel/traverse@7.29.10", "", { "dependencies": { "@babel/code-frame": "^7.29.7", "@babel/generator": "^7.29.8", "@babel/helper-globals": "^7.29.7", "@babel/parser": "^7.29.9", "@babel/template": "^7.29.7", "@babel/types": "^7.29.8", "debug": "^4.3.1" } }, "sha512-B3lYAs2nkKskbgQ1nfy8Ma9ao9Q1rntTAQHrzzyDuj+TSO+X3le6PfWwqDvodsb+OumE10eMFfuMCTQSQ5iuIQ=="],
 
     "@babel/types": ["@babel/types@7.29.11", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.11", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ=="],
-
-    "@bottom-tabs/react-navigation": ["@bottom-tabs/react-navigation@0.10.2", "", { "dependencies": { "color": "^4.2.3" }, "peerDependencies": { "@react-navigation/native": ">=7", "react": "*", "react-native": "*", "react-native-bottom-tabs": "*" } }, "sha512-/o/RR5yn0AYGTG+1wy2UwMVc04E3Znq5kMy77MU7hXkf8mY1DENHoiSvMNImn5AuKTNzOtjWwBk/dtKQcbMy+w=="],
 
     "@clack/core": ["@clack/core@0.5.0", "", { "dependencies": { "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-p3y0FIOwaYRUPRcMO7+dlmLh8PSRcrjuTndsiA0WAFbWES0mLZlrjVoBRZ9DzkPFJZG6KGkJmoEAY0ZcVWTkow=="],
 
@@ -1941,7 +1940,7 @@
 
     "lines-and-columns": ["lines-and-columns@1.2.4", "", {}, "sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg=="],
 
-    "llama.rn": ["llama.rn@0.12.9", "", { "peerDependencies": { "react": "*", "react-native": "*" }, "bin": { "llama-rn-download-artifacts": "install/download-native-artifacts.js" } }, "sha512-uRsTVARp1KnDkDg00FvOGIrN6SZfMqYVJfCOdxN9FSyGufLC+Aad6oFWZVEO8vmtNqu+JBlsCGevP4sJGifAvg=="],
+    "llama.rn": ["llama.rn@0.13.0-rc.8", "", { "peerDependencies": { "react": "*", "react-native": "*" }, "bin": { "llama-rn-download-artifacts": "install/download-native-artifacts.js" } }, "sha512-hwiGoS6t994DzMimUtjr3xiSLGXcv8wGJInL6FW8dR3ZsChMasM1NROdQ/PBqg4szHtLiafzlTW348e5Zjfz/Q=="],
 
     "load-json-file": ["load-json-file@4.0.0", "", { "dependencies": { "graceful-fs": "^4.1.2", "parse-json": "^4.0.0", "pify": "^3.0.0", "strip-bom": "^3.0.0" } }, "sha512-Kx8hMakjX03tiGTLAIdJ+lL0htKnXjEZN6hk/tozf/WOuYGdZBJrZ+rCJRbVCugsjB3jMLn9746NsQIf5VjBMw=="],
 
@@ -2292,8 +2291,6 @@
     "react-native-audio-api": ["react-native-audio-api@0.13.6", "", { "dependencies": { "semver": "^7.7.3" }, "peerDependencies": { "react": "*", "react-native": "*", "react-native-worklets": ">= 0.7.0" }, "optionalPeers": ["react-native-worklets"], "bin": { "setup-rn-audio-api-web": "scripts/setup-rn-audio-api-web.js" } }, "sha512-055JlxTaajdzcJCzyd+xnH1pJawNkt2NZ3RNoI2vv1QxYRh257W/dcDky/qf4/VMEFdpZFuFfVW1hv75OEh3gA=="],
 
     "react-native-blob-util": ["react-native-blob-util@0.24.5", "", { "dependencies": { "base-64": "0.1.0", "glob": "13.0.0" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-GmhV7sJ0oC1ENLXE5mVe5eUE8JXgNNyylOmpgo6NZhkWzB0tCcV/RNNanpHw6CkAF+WdnPdnpo5G/yrSxX75fg=="],
-
-    "react-native-bottom-tabs": ["react-native-bottom-tabs@0.11.2", "", { "dependencies": { "react-freeze": "^1.0.0", "sf-symbols-typescript": "^2.0.0", "use-latest-callback": "^0.2.1" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-2zvR9DgQgqOKhxGeETkphXANDkMyUKN/i0+M+WF52JQd4q4h+uY3ctLnXNQ4pZf1cEDlWQ6aBtYWe3NJKvDIwA=="],
 
     "react-native-builder-bob": ["react-native-builder-bob@0.44.1", "", { "dependencies": { "@babel/core": "^7.29.7", "@babel/plugin-transform-flow-strip-types": "^7.29.7", "@babel/plugin-transform-strict-mode": "^7.29.7", "@babel/preset-env": "^7.29.7", "@babel/preset-react": "^7.29.7", "@babel/preset-typescript": "^7.29.7", "@jridgewell/sourcemap-codec": "^1.6.0", "arktype": "^2.2.9", "babel-plugin-syntax-hermes-parser": "^0.37.0", "browserslist": "^4.29.4", "cross-spawn": "^7.0.6", "dedent": "^1.7.2", "del": "^9.0.1", "escape-string-regexp": "^5.0.0", "fs-extra": "^11.4.1", "glob": "^13.0.6", "json5": "^2.2.3", "kleur": "^4.1.5", "prompts": "^2.4.2", "typescript": "^6.0.3", "which": "^7.0.0", "yargs": "^18.2.0" }, "bin": { "bob": "bin/bob" } }, "sha512-CqRvOdSynP27CQohCwNte6r2B8cZSZiA24Vuq3f5jloq/aQ1dlbARtuO6a7hjb7Ao06gfqlde7NuJ5oAocb6iw=="],
 
@@ -3030,8 +3027,6 @@
     "@octokit/plugin-paginate-rest/@octokit/types": ["@octokit/types@15.0.2", "", { "dependencies": { "@octokit/openapi-types": "^26.0.0" } }, "sha512-rR+5VRjhYSer7sC51krfCctQhVTmjyUMAaShfPB8mscVa8tSoLyon3coxQmXu0ahJoLVWl8dSGD/3OGZlFV44Q=="],
 
     "@octokit/plugin-rest-endpoint-methods/@octokit/types": ["@octokit/types@15.0.2", "", { "dependencies": { "@octokit/openapi-types": "^26.0.0" } }, "sha512-rR+5VRjhYSer7sC51krfCctQhVTmjyUMAaShfPB8mscVa8tSoLyon3coxQmXu0ahJoLVWl8dSGD/3OGZlFV44Q=="],
-
-    "@react-native-ai/llama/llama.rn": ["llama.rn@0.10.1", "", { "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-l4EJ5+gOAgKYcqzG9M3ORfA9AaiXT/qYtTGkdUxs9Djy+DhjmDir5wMuLxnEjxzzOc8oIsuhlF+peI1zEn8BZw=="],
 
     "@react-native/babel-preset/@babel/core": ["@babel/core@7.28.4", "", { "dependencies": { "@babel/code-frame": "^7.27.1", "@babel/generator": "^7.28.3", "@babel/helper-compilation-targets": "^7.27.2", "@babel/helper-module-transforms": "^7.28.3", "@babel/helpers": "^7.28.4", "@babel/parser": "^7.28.4", "@babel/template": "^7.27.2", "@babel/traverse": "^7.28.4", "@babel/types": "^7.28.4", "@jridgewell/remapping": "^2.3.5", "convert-source-map": "^2.0.0", "debug": "^4.1.0", "gensync": "^1.0.0-beta.2", "json5": "^2.2.3", "semver": "^6.3.1" } }, "sha512-2BCOP7TN8M+gVDj7/ht3hsaO/B/n5oDbiAyyvnRlNOs+u1o+JWNYTQrmpuNp1/Wq2gcFrI01JAW+paEKDMx/CA=="],
 

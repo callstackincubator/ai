@@ -38,6 +38,9 @@
     "release-it": "^19.1.0",
     "typescript": "^5.8.3"
   },
+  "trustedDependencies": [
+    "llama.rn"
+  ],
   "workspaces": [
     "packages/*",
     "apps/*"
