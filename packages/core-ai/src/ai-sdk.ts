@@ -8,10 +8,11 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4FinishReason,
   LanguageModelV4StreamPart,
+  SharedV4Warning,
   TranscriptionModelV4,
   TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
-import { generateId } from '@ai-sdk/provider-utils'
+import { generateId, isCustomReasoning } from '@ai-sdk/provider-utils'
 import type { CodegenTypes } from 'react-native'
 
 import NativeCoreAI from './NativeCoreAI'
@@ -149,7 +150,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
       content: response.map(toLanguageModelContent),
       finishReason: toFinishReason('stop'),
       usage: emptyUsage(),
-      warnings: [],
+      warnings: getCallWarnings(options),
     }
   }
 
@@ -161,6 +162,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     }
 
     const streamId = generateId()
+    const warnings = getCallWarnings(options)
     let listeners: { remove(): void }[] = []
 
     const cleanup = () => {
@@ -170,6 +172,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: (controller) => {
+        controller.enqueue({ type: 'stream-start', warnings })
         controller.enqueue({ type: 'text-start', id: streamId })
 
         let previousContent = ''
@@ -502,6 +505,22 @@ function toCoreAIGenerationOptions(
         : undefined,
     tools: options.tools,
   }
+}
+
+function getCallWarnings(
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] {
+  if (isCustomReasoning(options.reasoning)) {
+    return [
+      {
+        type: 'unsupported',
+        feature: 'reasoning',
+        details:
+          'Core AI language models do not support configuring reasoning.',
+      },
+    ]
+  }
+  return []
 }
 
 function toLanguageModelContent(part: CoreAIGenerationPart) {
