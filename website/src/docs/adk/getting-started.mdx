@@ -75,10 +75,12 @@ android {
 
 ## Available Model Types
 
-| Model Type            | `modelType`  | `modelName`                       | Use Case                                                           |
-| --------------------- | ------------ | --------------------------------- | ------------------------------------------------------------------ |
-| On-device Gemini Nano | `genai-nano` | `gemini-nano` (default)           | Private, offline-capable inference - system-provisioned via AICore |
-| Cloud Gemini          | `gemini`     | Required, e.g. `gemini-2.5-flash` | Cloud inference via the Gemini API                                 |
+| Model Type            | `modelType`  | Default `modelName` | Use Case                                                           |
+| --------------------- | ------------ | ------------------- | ------------------------------------------------------------------ |
+| On-device Gemini Nano | `genai-nano` | `gemini-nano`       | Private, offline-capable inference - system-provisioned via AICore |
+| Cloud Gemini          | `gemini`     | `gemini-2.5-flash`  | Cloud inference via the Gemini API                                 |
+
+When you set `modelName` to anything other than `gemini-nano`, `modelType` defaults to `gemini`.
 
 ## Basic Usage
 
@@ -94,11 +96,18 @@ const { text } = await generateText({
 })
 ```
 
+Pass a model name or options to `adk()` to pick a model per call site, like `apple()`:
+
+```typescript
+const nano = adk()
+const flash = adk({ modelName: 'gemini-2.5-flash', apiKey })
+```
+
 Before you offer Gemini Nano in your UI, check that the device supports it and that it is ready. See [Availability](#availability) below.
 
 ## On-device Gemini Nano
 
-Gemini Nano runs locally via ML Kit GenAI and is provisioned by the Android system through AICore. To set a system instruction, create a provider with `createAdkProvider`:
+Gemini Nano runs locally via ML Kit GenAI and is provisioned by the Android system through AICore. To set a system instruction, create a provider with `createAdkProvider`. ADK passes it to ML Kit as a native system instruction:
 
 ```typescript
 import { createAdkProvider } from '@react-native-ai/adk'
@@ -116,50 +125,64 @@ const { text } = await generateText({
 
 ### Availability
 
-The provider exposes two checks for Gemini Nano:
-
-| API                             | Checks            | Resolves to `true` when                                      |
-| ------------------------------- | ----------------- | ------------------------------------------------------------ |
-| `adk.isNanoSupported()`         | Device capability | The device can run Gemini Nano, even if it is not downloaded |
-| `adk.isAvailable('genai-nano')` | Runtime readiness | Gemini Nano is downloaded, or can be downloaded now          |
-
-`isAvailable()` defaults to `'genai-nano'` and always resolves to `true` for `'gemini'`. When `isNanoSupported()` is `false`, `isAvailable('genai-nano')` is `false` too.
-
-Both checks are cheap native calls that do not download the model. You can cache them at app startup and check again when the app resumes.
-
-Both checks read the ML Kit [`FeatureStatus`](https://developers.google.com/android/reference/com/google/mlkit/genai/common/FeatureStatus) returned by `Generation.getClient().checkStatus()`:
-
-| `FeatureStatus`    | `isNanoSupported()` | `isAvailable('genai-nano')` | Suggested UX                                     |
-| ------------------ | ------------------- | --------------------------- | ------------------------------------------------ |
-| `UNAVAILABLE` (0)  | `false`             | `false`                     | Hide Gemini Nano                                 |
-| `DOWNLOADABLE` (1) | `true`              | `true`                      | Offer Gemini Nano - `prepareNano()` downloads it |
-| `DOWNLOADING` (2)  | `true`              | `false`                     | Show as unavailable until the download finishes  |
-| `AVAILABLE` (3)    | `true`              | `true`                      | Ready                                            |
-
-A typical availability flow:
+`adk.getModelInfo()` reports whether Gemini Nano can be used, based on the ML Kit [`FeatureStatus`](https://developers.google.com/android/reference/com/google/mlkit/genai/common/FeatureStatus):
 
 ```typescript
 import { adk } from '@react-native-ai/adk'
 
-async function loadGeminiNano() {
-  if (!(await adk.isNanoSupported())) {
+const info = await adk.getModelInfo()
+
+switch (info.availability) {
+  case 'available':
+    // Ready to generate
+    break
+  case 'downloadable':
+    // Offer a download - adk.prepareNano() downloads it
+    break
+  case 'downloading':
+    // Show as unavailable until the download finishes
+    break
+  case 'unavailable':
+  case 'unknown':
     // The device cannot run Gemini Nano - hide it from the model picker
-    return null
-  }
-
-  if (!(await adk.isAvailable('genai-nano'))) {
-    // Gemini Nano is still downloading - show it as unavailable
-    return null
-  }
-
-  await adk.prepareNano()
-  return adk()
+    break
 }
 ```
 
+| `availability` | `FeatureStatus`    | Meaning                                      |
+| -------------- | ------------------ | -------------------------------------------- |
+| `available`    | `AVAILABLE` (3)    | Downloaded and ready                         |
+| `downloadable` | `DOWNLOADABLE` (1) | Supported, `prepareNano()` downloads it      |
+| `downloading`  | `DOWNLOADING` (2)  | The system is downloading it                 |
+| `unavailable`  | `UNAVAILABLE` (0)  | Not supported on this device, or not Android |
+| `unknown`      | -                  | ML Kit could not report a status             |
+
+When Gemini Nano is `available`, `getModelInfo()` also returns `baseModelName` and `contextSize` (the input token limit). For cloud Gemini, `getModelInfo({ modelType: 'gemini' })` always reports `available` on Android.
+
+The provider also has two yes/no shortcuts:
+
+| API                             | Resolves to `true` when                                      |
+| ------------------------------- | ------------------------------------------------------------ |
+| `adk.isNanoSupported()`         | The device can run Gemini Nano, even if it is not downloaded |
+| `adk.isAvailable('genai-nano')` | Gemini Nano is `available` or `downloadable`                 |
+
+All of these are cheap native calls that do not download the model. You can cache them at app startup and check again when the app resumes.
+
 ### Preparation
 
-`adk.prepareNano()` downloads and initializes Gemini Nano. Calling `model.prepare()` on a model does the same thing. `generateText()` and `streamText()` prepare the model automatically on first use:
+`adk.prepareNano()` downloads and initializes Gemini Nano, and can report download progress:
+
+```typescript
+import { adk } from '@react-native-ai/adk'
+
+await adk.prepareNano({
+  onProgress: ({ phase, bytesDownloaded, bytesToDownload }) => {
+    // phase is 'started', 'progress' or 'completed'
+  },
+})
+```
+
+Calling `model.prepare()` on a model prepares it too, and `generateText()` and `streamText()` prepare the model automatically on first use:
 
 ```typescript
 import { adk } from '@react-native-ai/adk'
@@ -174,11 +197,41 @@ await model.prepare()
 await generateText({ model, prompt: 'Hello!' })
 ```
 
-Automatic preparation only checks `isNanoSupported()`. Use `isAvailable('genai-nano')` for UI gating, and handle preparation and generation errors in your app.
+Preparation fails with a `MODEL_UNAVAILABLE` error on unsupported devices and `MODEL_DOWNLOADING` when the system is still downloading. See [Errors](#errors).
+
+### Model Selection
+
+ML Kit can run a preview Gemini Nano model or favor speed over quality. Set `nano` on the provider or the model:
+
+```typescript
+import { createAdkProvider } from '@react-native-ai/adk'
+
+const adk = createAdkProvider({
+  nano: { releaseStage: 'preview', preference: 'full' },
+})
+```
+
+| Option         | Values                            | Description                                                   |
+| -------------- | --------------------------------- | ------------------------------------------------------------- |
+| `releaseStage` | `'stable'` (default), `'preview'` | Preview models need the AICore developer preview              |
+| `preference`   | `'fast'`, `'full'`                | `fast` favors latency, `full` favors quality and capabilities |
+
+Availability depends on the selected model, so `getModelInfo()`, `isAvailable()` and `prepareNano()` use the provider's `nano` setting.
+
+### Token Counting
+
+`model.countTokens(text)` counts tokens with the Gemini Nano tokenizer. Compare it with `contextSize` from `getModelInfo()` before you send a long prompt:
+
+```typescript
+const model = adk()
+const tokens = await model.countTokens(longText)
+```
+
+Cloud models do not support token counting.
 
 ## Cloud Gemini
 
-When you need cloud inference - for example on emulators or devices without AICore - create a provider with `modelType: 'gemini'`, a `modelName`, and an API key:
+When you need cloud inference - for example on emulators or devices without AICore - create a provider with `modelType: 'gemini'` and an API key:
 
 ```typescript
 import { createAdkProvider } from '@react-native-ai/adk'
@@ -197,13 +250,13 @@ const { text } = await generateText({
 })
 ```
 
-Cloud models do not need a download or prepare step.
+Cloud models do not need a download or prepare step. ADK retries transient Gemini API failures.
 
 > Do not embed API keys in production client apps. Prefer a backend proxy or secure runtime configuration.
 
 ## Provider Options
 
-`createAdkProvider` returns the same callable interface as the default `adk` export. Call `adk()` or `adk.languageModel()` to construct a language model:
+`createAdkProvider` sets defaults for every model it creates. Call `adk()` or `adk.languageModel()` to construct a language model, optionally overriding any option:
 
 ```typescript
 import { createAdkProvider } from '@react-native-ai/adk'
@@ -214,7 +267,7 @@ const adk = createAdkProvider({
   instruction: 'You are a concise, friendly assistant.',
 })
 
-const model = adk.languageModel()
+const model = adk.languageModel({ instruction: 'Answer in one word.' })
 ```
 
 | Option           | Type                       | Description                                                                                   |
@@ -222,11 +275,41 @@ const model = adk.languageModel()
 | `name`           | `string`                   | ADK agent name (default: `react_native_adk_agent`)                                            |
 | `description`    | `string`                   | Agent description passed to ADK                                                               |
 | `instruction`    | `string`                   | System instruction for the agent                                                              |
-| `modelType`      | `'genai-nano' \| 'gemini'` | On-device or cloud backend (default: `genai-nano`)                                            |
-| `modelName`      | `string`                   | Model identifier (default: `gemini-nano`; required for `gemini`)                              |
+| `modelType`      | `'genai-nano' \| 'gemini'` | On-device or cloud backend (default: `genai-nano`, or `gemini` for other model names)         |
+| `modelName`      | `string`                   | Model identifier (default: `gemini-nano` on device, `gemini-2.5-flash` in the cloud)          |
 | `apiKey`         | `string`                   | Gemini API key - required for `gemini` only                                                   |
 | `availableTools` | `Record<string, Tool>`     | Tools whose `execute` handlers ADK can call. See [Tool Calling](./generating.md#tool-calling) |
+| `nano`           | `AdkNanoModelConfig`       | Gemini Nano model selection. See [Model Selection](#model-selection)                          |
+
+## Errors
+
+Errors thrown by the provider have a `code` from `AdkErrorCodes`:
+
+```typescript
+import { AdkErrorCodes, type AdkError } from '@react-native-ai/adk'
+
+try {
+  await adk.prepareNano()
+} catch (error) {
+  if ((error as AdkError).code === AdkErrorCodes.ModelDownloading) {
+    // Try again later
+  }
+}
+```
+
+| Code                      | Meaning                                                                 |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `UNSUPPORTED_PLATFORM`    | Called on iOS or web                                                    |
+| `MODEL_UNAVAILABLE`       | Gemini Nano is not supported, or AICore needs an update                 |
+| `MODEL_DOWNLOADING`       | The system is still downloading Gemini Nano                             |
+| `DOWNLOAD_FAILED`         | The Gemini Nano download failed                                         |
+| `INVALID_MESSAGE`         | The prompt has an unsupported part, such as a remote file URL           |
+| `INVALID_SCHEMA`          | The response schema cannot be converted for Gemini                      |
+| `CONTEXT_WINDOW_EXCEEDED` | The prompt is too long for the model                                    |
+| `RATE_LIMITED`            | AICore is busy, the app's quota ran out, or the Gemini API returned 429 |
+| `BACKGROUND_USE_BLOCKED`  | Gemini Nano was called while the app was in the background              |
+| `GENERATION_ERROR`        | Any other generation failure                                            |
 
 ## Next Steps
 
-See **[Generating](./generating.md)** for text generation, streaming, tool calling, image prompts, and JSON output.
+See **[Generating](./generating.md)** for text generation, streaming, tool calling, image prompts, reasoning and structured output.
