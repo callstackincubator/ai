@@ -510,7 +510,8 @@ function toCoreAIGenerationOptions(
 function getCallWarnings(
   options: LanguageModelV4CallOptions
 ): SharedV4Warning[] {
-  if (isCustomReasoning(options.reasoning)) {
+  // `none` is already what a model without reasoning control does
+  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
     return [
       {
         type: 'unsupported',

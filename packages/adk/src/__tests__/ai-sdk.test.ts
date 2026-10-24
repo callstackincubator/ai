@@ -128,3 +128,27 @@ describe('adk language model warnings', () => {
     expect(result.warnings).toEqual([])
   })
 })
+
+describe('reasoning none and tool choice warnings', () => {
+  test('does not warn for reasoning none', async () => {
+    const result = await model.doGenerate(
+      createCallOptions({ reasoning: 'none' })
+    )
+
+    expect(result.warnings).toEqual([])
+  })
+
+  test('warns that required tool choice is unsupported', async () => {
+    const result = await model.doGenerate(
+      createCallOptions({ toolChoice: { type: 'required' } })
+    )
+
+    expect(result.warnings).toEqual([
+      {
+        type: 'unsupported',
+        feature: 'toolChoice',
+        details: 'ADK models only support auto and none tool choices.',
+      },
+    ])
+  })
+})

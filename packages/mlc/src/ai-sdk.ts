@@ -59,9 +59,7 @@ const convertToolChoice = (
   if (toolChoice.type === 'none' || toolChoice.type === 'auto') {
     return toolChoice.type
   }
-  console.warn(
-    `Unsupported toolChoice value: ${JSON.stringify(toolChoice)}. Defaulting to 'none'.`
-  )
+  // Reported in the call warnings
   return undefined
 }
 
@@ -87,16 +85,29 @@ const convertFinishReason = (
 const getCallWarnings = (
   options: LanguageModelV4CallOptions
 ): SharedV4Warning[] => {
-  if (isCustomReasoning(options.reasoning)) {
-    return [
-      {
-        type: 'unsupported',
-        feature: 'reasoning',
-        details: 'MLC models do not support configuring reasoning.',
-      },
-    ]
+  const warnings: SharedV4Warning[] = []
+
+  // `none` is already what a model without reasoning control does
+  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'reasoning',
+      details: 'MLC models do not support configuring reasoning.',
+    })
   }
-  return []
+
+  if (
+    options.toolChoice?.type === 'required' ||
+    options.toolChoice?.type === 'tool'
+  ) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'toolChoice',
+      details: 'MLC models only support auto and none tool choices.',
+    })
+  }
+
+  return warnings
 }
 
 class MlcChatLanguageModel implements LanguageModelV4 {
