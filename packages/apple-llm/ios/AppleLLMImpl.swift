@@ -1090,20 +1090,55 @@ public class AppleLLMImpl: NSObject {
       samplingMode = .random(top: topK)
     }
     
+    let toolCallingMode = options["toolCallingMode"] as? String
+
 #if compiler(>=6.4)
-    return GenerationOptions(
+    var generationOptions = GenerationOptions(
       samplingMode: samplingMode,
       temperature: temperature,
       maximumResponseTokens: maximumResponseTokens
     )
+
+    if #available(iOS 27, *) {
+      generationOptions.toolCallingMode = try createToolCallingMode(from: toolCallingMode)
+      return generationOptions
+    }
 #else
-    return GenerationOptions(
+    let generationOptions = GenerationOptions(
       sampling: samplingMode,
       temperature: temperature,
       maximumResponseTokens: maximumResponseTokens
     )
 #endif
+
+    // Before iOS 27 tools are always optional for the model. JS leaves tools out
+    // for "disallowed", so only "required" cannot be honored
+    if toolCallingMode == "required" {
+      throw AppleLLMError.unsupportedOS
+    }
+
+    return generationOptions
   }
+
+#if compiler(>=6.4)
+  @available(iOS 27, *)
+  private func createToolCallingMode(from toolCallingMode: String?) throws -> GenerationOptions.ToolCallingMode? {
+    guard let toolCallingMode else {
+      return nil
+    }
+
+    switch toolCallingMode {
+    case "allowed":
+      return .allowed
+    case "required":
+      return .required
+    case "disallowed":
+      return .disallowed
+    default:
+      throw AppleLLMError.invalidMessage("Unsupported Apple tool calling mode '\(toolCallingMode)'")
+    }
+  }
+#endif
   
   @available(iOS 26, *)
   struct JSITool : Tool {
