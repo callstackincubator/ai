@@ -21,7 +21,9 @@ const generateText = mock(
   async (
     _messages: unknown,
     _options: Record<string, unknown>
-  ): Promise<Record<string, unknown>[]> => [{ type: 'text', text: 'ok' }]
+  ): Promise<Record<string, unknown>> => ({
+    content: [{ type: 'text', text: 'ok' }],
+  })
 )
 const generateStream = mock(
   (_streamId: string, _messages: unknown, _options: unknown) => {}
@@ -354,22 +356,24 @@ async function readAll(stream: ReadableStream<LanguageModelV4StreamPart>) {
 
 describe('apple generated content', () => {
   test('returns reasoning and tool parts with their ids', async () => {
-    generateText.mockImplementationOnce(async () => [
-      { type: 'reasoning', id: 'r1', text: 'thinking', signature: 'c2ln' },
-      {
-        type: 'tool-call',
-        toolCallId: 'call-1',
-        toolName: 'weather',
-        input: '{"city":"Paris"}',
-      },
-      {
-        type: 'tool-result',
-        toolCallId: 'call-1',
-        toolName: 'weather',
-        output: 'sunny',
-      },
-      { type: 'text', text: 'It is sunny' },
-    ])
+    generateText.mockImplementationOnce(async () => ({
+      content: [
+        { type: 'reasoning', id: 'r1', text: 'thinking', signature: 'c2ln' },
+        {
+          type: 'tool-call',
+          toolCallId: 'call-1',
+          toolName: 'weather',
+          input: '{"city":"Paris"}',
+        },
+        {
+          type: 'tool-result',
+          toolCallId: 'call-1',
+          toolName: 'weather',
+          output: 'sunny',
+        },
+        { type: 'text', text: 'It is sunny' },
+      ],
+    }))
 
     const result = await apple().doGenerate(createCallOptions())
 
@@ -467,5 +471,65 @@ describe('apple generated content', () => {
       { type: 'text-delta', id: streamId, delta: ' sunny' },
       { type: 'text-end', id: streamId },
     ])
+  })
+})
+
+describe('apple usage', () => {
+  test('maps native token usage', async () => {
+    generateText.mockImplementationOnce(async () => ({
+      content: [{ type: 'text', text: 'ok' }],
+      usage: {
+        inputTokens: 120,
+        cachedInputTokens: 20,
+        outputTokens: 30,
+        reasoningTokens: 10,
+      },
+    }))
+
+    const result = await apple().doGenerate(createCallOptions())
+
+    expect(result.usage).toEqual({
+      inputTokens: {
+        total: 120,
+        noCache: 100,
+        cacheRead: 20,
+        cacheWrite: undefined,
+      },
+      outputTokens: { total: 30, text: 20, reasoning: 10 },
+    })
+  })
+
+  test('reports unknown usage as undefined instead of zero', async () => {
+    const result = await apple().doGenerate(createCallOptions())
+
+    expect(result.usage).toEqual({
+      inputTokens: {
+        total: undefined,
+        noCache: undefined,
+        cacheRead: undefined,
+        cacheWrite: undefined,
+      },
+      outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+    })
+  })
+
+  test('reports stream usage on finish', async () => {
+    const { stream } = await apple().doStream(createCallOptions())
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamUpdate.emit({ streamId, content: 'ok' })
+    onStreamComplete.emit({
+      streamId,
+      usage: { inputTokens: 12, outputTokens: 3 },
+    })
+
+    const finish = (await parts).find((part) => part.type === 'finish')
+    expect(finish).toMatchObject({
+      usage: {
+        inputTokens: { total: 12, noCache: undefined, cacheRead: undefined },
+        outputTokens: { total: 3, text: undefined, reasoning: undefined },
+      },
+    })
   })
 })

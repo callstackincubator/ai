@@ -12,6 +12,7 @@ import type {
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4ToolResultOutput,
+  LanguageModelV4Usage,
   SharedV4Warning,
   SpeechModelV4,
   SpeechModelV4CallOptions,
@@ -28,7 +29,10 @@ import {
 
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
-import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
+import NativeAppleLLM, {
+  type AppleMessage,
+  type AppleUsage,
+} from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
@@ -445,6 +449,30 @@ function prepareToolChoice(
   }
 }
 
+function toUsage(usage: AppleUsage | undefined): LanguageModelV4Usage {
+  const cachedInputTokens = usage?.cachedInputTokens
+  const reasoningTokens = usage?.reasoningTokens
+  return {
+    inputTokens: {
+      total: usage?.inputTokens,
+      noCache:
+        usage && cachedInputTokens !== undefined
+          ? usage.inputTokens - cachedInputTokens
+          : undefined,
+      cacheRead: cachedInputTokens,
+      cacheWrite: undefined,
+    },
+    outputTokens: {
+      total: usage?.outputTokens,
+      text:
+        usage && reasoningTokens !== undefined
+          ? usage.outputTokens - reasoningTokens
+          : undefined,
+      reasoning: reasoningTokens,
+    },
+  }
+}
+
 function appendMessageContent(content: string, addition: string) {
   if (!addition) {
     return content
@@ -838,7 +866,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       })
 
       return {
-        content: response.map((part) => {
+        content: response.content.map((part) => {
           switch (part.type) {
             case 'text':
               return part
@@ -869,19 +897,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           }
         }),
         finishReason: { unified: 'stop' as const, raw: 'stop' },
-        usage: {
-          inputTokens: {
-            total: 0,
-            noCache: undefined,
-            cacheRead: undefined,
-            cacheWrite: undefined,
-          },
-          outputTokens: {
-            total: 0,
-            text: undefined,
-            reasoning: undefined,
-          },
-        },
+        usage: toUsage(response.usage),
         warnings,
       }
     } finally {
@@ -1058,19 +1074,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               controller.enqueue({
                 type: 'finish',
                 finishReason: { unified: 'stop' as const, raw: 'stop' },
-                usage: {
-                  inputTokens: {
-                    total: 0,
-                    noCache: undefined,
-                    cacheRead: undefined,
-                    cacheWrite: undefined,
-                  },
-                  outputTokens: {
-                    total: 0,
-                    text: undefined,
-                    reasoning: undefined,
-                  },
-                },
+                usage: toUsage(data.usage as AppleUsage | undefined),
               })
               cleanup()
               controller.close()

@@ -370,6 +370,14 @@ const info = await apple.getModelInfo()
 console.log(info.contextSize)
 ```
 
+Each response reports token usage in `result.usage`, which AI SDK features
+such as `prepareStep` and telemetry read:
+
+- iOS 27 reports the usage measured by Foundation Models, for both the
+  on-device model and Private Cloud Compute.
+- iOS 26.4 counts the transcript with the on-device model's tokenizer.
+- Otherwise usage is `undefined`.
+
 For reusable history policies such as summarization, rolling windows, and
 completed tool-call pruning, use `@react-native-ai/utils`.
 
@@ -464,7 +472,7 @@ import { AppleFoundationModels } from '@react-native-ai/apple'
 
 const info = await AppleFoundationModels.getModelInfo('en-US', 'system')
 const tokens = await AppleFoundationModels.countTokens('A short prompt')
-const result = await AppleFoundationModels.generateText(
+const { content, usage } = await AppleFoundationModels.generateText(
   [{ role: 'user', content: 'Hello' }],
   { temperature: 0.7, maxTokens: 100 }
 )
