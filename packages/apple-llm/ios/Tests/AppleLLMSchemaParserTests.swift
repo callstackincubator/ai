@@ -44,4 +44,33 @@ final class AppleLLMSchemaParserTests: XCTestCase {
     XCTAssertEqual(schema["minimum"] as? Int, 3)
     XCTAssertEqual(schema["maximum"] as? Int, 7)
   }
+
+  func testIntegerEnumAllowsOnlyListedValues() throws {
+    let schema = try parse(#"{"type":"integer","enum":[1,2,3]}"#)
+    let choices = try XCTUnwrap(schema["anyOf"] as? [[String: Any]])
+
+    XCTAssertEqual(choices.map { $0["type"] as? String }, ["integer", "integer", "integer"])
+    XCTAssertEqual(choices.map { $0["minimum"] as? Int }, [1, 2, 3])
+    XCTAssertEqual(choices.map { $0["maximum"] as? Int }, [1, 2, 3])
+  }
+
+  func testNumberEnumAllowsOnlyListedValues() throws {
+    let schema = try parse(#"{"type":"number","enum":[0.5,1.5]}"#)
+    let choices = try XCTUnwrap(schema["anyOf"] as? [[String: Any]])
+
+    XCTAssertEqual(choices.map { $0["type"] as? String }, ["number", "number"])
+    XCTAssertEqual(choices.map { $0["minimum"] as? Double }, [0.5, 1.5])
+    XCTAssertEqual(choices.map { $0["maximum"] as? Double }, [0.5, 1.5])
+  }
+
+  func testObjectWithSeveralNumericEnums() throws {
+    let schema = try parse(#"""
+    {"type":"object","properties":{
+      "size":{"type":"integer","enum":[1,2]},
+      "level":{"type":"integer","enum":[3,4]}
+    },"required":["size","level"]}
+    """#)
+
+    XCTAssertNotNil(schema["properties"])
+  }
 }
