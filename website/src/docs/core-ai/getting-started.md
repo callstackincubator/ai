@@ -19,45 +19,33 @@ npm install ai
 ## Requirements
 
 - React Native New Architecture
-- iOS 27 or newer for Core AI runtime APIs. The `coreai-models` package declares iOS 27 as its minimum platform, so an app that links its products must use an iOS 27 deployment target
+- iOS 27 or newer, with an iOS 27 deployment target
 - Xcode 27 or newer for building apps with Core AI
 - Exported `.aimodel` bundles from `apple/coreai-models`
-- The Apple Core AI Models Swift Package linked to the host app target
+- A physical device (the iOS Simulator SDK has no `CoreAI` framework)
 
-## Swift Package Setup
+## Native Setup
 
-Add `https://github.com/apple/coreai-models` (version 1.0.0 or newer, up to the next major version) to the iOS app as a Swift Package dependency, then link the products you use:
+The pod links Apple's [`coreai-models`](https://github.com/apple/coreai-models) Swift Package (1.0.0 up to the next major version) to itself during `pod install`, so there is no Xcode or config plugin step. By default it links every product the native module uses:
 
 - `CoreAILM` for `coreAI.languageModel(...)` and sessions
 - `CoreAIDiffusion` for `coreAI.imageModel(...)`
 - `CoreAISegmentation` for `CoreAI.runTask('segmentation', ...)`
 - `CoreAIObjectDetection` for `CoreAI.runTask('object-detection', ...)`
 
-React Native installs this package through CocoaPods, but CocoaPods will not automatically link those Swift Package products into your app target. Treat SPM as a host-app integration step.
+To link a smaller set, set `CORE_AI_PRODUCTS` when installing pods (with Expo, when running prebuild):
 
-For Expo, add the config plugin. It links all known Apple Core AI Swift Package products by default:
-
-```json
-{
-  "expo": {
-    "plugins": ["@react-native-ai/core-ai"]
-  }
-}
+```bash
+CORE_AI_PRODUCTS=CoreAILM npx pod-install
+CORE_AI_PRODUCTS=CoreAILM npx expo prebuild -p ios
 ```
 
-Pass `products` only when you want to link a smaller set:
+Features whose product is not linked return a clear setup error at runtime.
 
-```json
-{
-  "expo": {
-    "plugins": [["@react-native-ai/core-ai", { "products": ["CoreAILM"] }]]
-  }
-}
-```
+Constraints from Apple's package:
 
-The plugin patches the generated Xcode project with `XCRemoteSwiftPackageReference` and links the selected products. For bare React Native, add the Swift Package in Xcode or use a project patching script that modifies `project.pbxproj` predictably.
-
-The native module checks for missing products and returns clear setup errors instead of failing silently.
+- The app needs an **iOS 27 deployment target** (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`).
+- **Device builds only.** The iOS Simulator SDK does not include the `CoreAI` framework, so apps that install this package cannot be built for the simulator.
 
 The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Starter-model docs only list those exposed feature families; embeddings, transcription, depth, super-resolution, and classification still need follow-up native wrappers.
 
