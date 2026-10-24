@@ -15,12 +15,14 @@ import type {
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
+  type CompletionParams,
   type ContextParams,
   type EmbeddingParams,
   initLlama,
   type LlamaContext,
   type NativeCompletionResult,
   type NativeEmbeddingResult,
+  type TokenData,
 } from 'llama.rn'
 
 import {
@@ -108,6 +110,7 @@ export class LlamaLanguageModel implements LanguageModelV4 {
   private options: LlamaModelOptions
   private context: LlamaContext | null = null
   private multimodalInitialized: boolean = false
+  private pendingCompletion: Promise<unknown> = Promise.resolve()
 
   /**
    * Supported URL patterns
@@ -202,6 +205,9 @@ export class LlamaLanguageModel implements LanguageModelV4 {
    */
   async unload(): Promise<void> {
     if (this.context) {
+      // Releasing the context under a running completion crashes natively
+      await this.context.stopCompletion()
+      await this.pendingCompletion
       if (this.multimodalInitialized) {
         await this.context.releaseMultimodal()
         this.multimodalInitialized = false
@@ -209,6 +215,25 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       await this.context.release()
       this.context = null
     }
+  }
+
+  /**
+   * Runs completions on this model one at a time. An aborted completion keeps
+   * running natively until stopCompletion() takes effect, and llama.rn rejects
+   * a completion started while another one is in progress
+   */
+  private runCompletion(
+    context: LlamaContext,
+    params: Partial<CompletionParams>,
+    abortSignal: AbortSignal | undefined,
+    callback?: (tokenData: TokenData) => void
+  ): Promise<NativeCompletionResult> {
+    const completion = this.pendingCompletion.then(() => {
+      const removeAbortListener = stopCompletionOnAbort(context, abortSignal)
+      return context.completion(params, callback).finally(removeAbortListener)
+    })
+    this.pendingCompletion = completion.catch(() => {})
+    return completion
   }
 
   /**
@@ -231,13 +256,11 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       warnings,
     })
 
-    const removeAbortListener = stopCompletionOnAbort(
+    const response = await this.runCompletion(
       context,
+      completionOptions,
       options.abortSignal
     )
-    const response = await context
-      .completion(completionOptions)
-      .finally(removeAbortListener)
     let content: LanguageModelV4Content[] = []
 
     if (response.content) {
@@ -331,15 +354,14 @@ export class LlamaLanguageModel implements LanguageModelV4 {
             warnings,
           })
 
-          const removeAbortListener = stopCompletionOnAbort(
+          const result = await this.runCompletion(
             context,
-            options.abortSignal
-          )
-          const result = await context
-            .completion(completionOptions, (tokenData) => {
+            completionOptions,
+            options.abortSignal,
+            (tokenData) => {
               streamParser.processToken(tokenData)
-            })
-            .finally(removeAbortListener)
+            }
+          )
 
           streamParser.finish()
 
