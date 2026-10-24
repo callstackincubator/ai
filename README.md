@@ -127,7 +127,7 @@ Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models
 - **Language Sessions** - Core AI language models with persistent native sessions
 - **AI SDK Adapters** - Language, embeddings, image generation, and transcription where AI SDK has matching interfaces
 - **Native-only APIs** - Segmentation, object detection, depth, super-resolution, model inspection, specialization, and raw `.aimodel` functions
-- **Catalog Metadata** - Starter model metadata from Apple’s registry, including iOS/macOS support
+- **Starter Models** - Documented starter bundles for language, image generation, segmentation, and object detection
 
 #### Installation
 
