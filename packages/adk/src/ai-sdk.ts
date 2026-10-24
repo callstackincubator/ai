@@ -175,16 +175,29 @@ const schemaPropertyToAdkParameter = (
 const getCallWarnings = (
   options: LanguageModelV4CallOptions
 ): SharedV4Warning[] => {
-  if (isCustomReasoning(options.reasoning)) {
-    return [
-      {
-        type: 'unsupported',
-        feature: 'reasoning',
-        details: 'ADK models do not support configuring reasoning.',
-      },
-    ]
+  const warnings: SharedV4Warning[] = []
+
+  // `none` is already what a model without reasoning control does
+  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'reasoning',
+      details: 'ADK models do not support configuring reasoning.',
+    })
   }
-  return []
+
+  if (
+    options.toolChoice?.type === 'required' ||
+    options.toolChoice?.type === 'tool'
+  ) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'toolChoice',
+      details: 'ADK models only support auto and none tool choices.',
+    })
+  }
+
+  return warnings
 }
 
 const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
@@ -504,12 +517,6 @@ class AdkChatLanguageModel implements LanguageModelV4 {
     const toolListener = this.createToolCallListener({ runId, ownedToolIds })
 
     try {
-      if (options.toolChoice && options.toolChoice.type === 'required') {
-        console.warn(
-          'ADK wrapper does not support required toolChoice yet. Defaulting to auto.'
-        )
-      }
-
       await this.ensureNanoPrepared()
 
       const response = await getNativeAdkEngine().generateText(

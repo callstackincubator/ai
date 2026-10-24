@@ -117,3 +117,14 @@ describe('core ai language model warnings', () => {
     expect(result.warnings).toEqual([])
   })
 })
+
+describe('reasoning none and tool choice warnings', () => {
+  const model = coreAI({ id: 'model', source: { type: 'bundle', name: 'm' } })
+  test('does not warn for reasoning none', async () => {
+    const result = await model.doGenerate(
+      createCallOptions({ reasoning: 'none' })
+    )
+
+    expect(result.warnings).toEqual([])
+  })
+})
