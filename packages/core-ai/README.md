@@ -40,12 +40,10 @@ CORE_AI_PRODUCTS=CoreAILM npx pod-install
 CORE_AI_PRODUCTS=CoreAILM npx expo prebuild -p ios
 ```
 
-Features whose product is not linked return a clear setup error at runtime.
+Calling a feature whose product is not linked throws a setup error.
 
-Constraints from Apple's package:
-
-- The app needs an **iOS 27 deployment target** (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`).
-- **Device builds only.** The iOS Simulator SDK does not include the `CoreAI` framework, so apps that install this package cannot be built for the simulator.
+> [!IMPORTANT]
+> Apps need an iOS 27 deployment target (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`) and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
 
 ## Usage
 
