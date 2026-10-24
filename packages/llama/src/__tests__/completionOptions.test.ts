@@ -1,4 +1,7 @@
-import type { LanguageModelV4CallOptions } from '@ai-sdk/provider'
+import type {
+  LanguageModelV4CallOptions,
+  SharedV4Warning,
+} from '@ai-sdk/provider'
 import { describe, expect, test } from 'bun:test'
 
 import {
@@ -279,5 +282,88 @@ describe('prepareMessagesWithMedia', () => {
       content: 'Hello there',
       reasoning_content: 'The user says hi.',
     })
+  })
+})
+
+describe('buildLlamaCompletionOptions tools', () => {
+  const inputSchema = {
+    type: 'object' as const,
+    properties: { city: { type: 'string' as const } },
+    required: ['city'],
+  }
+  const tools: LanguageModelV4CallOptions['tools'] = [
+    {
+      type: 'function',
+      name: 'getWeather',
+      description: 'Get the weather',
+      inputSchema,
+    },
+    { type: 'function', name: 'getTime', inputSchema: { type: 'object' } },
+  ]
+
+  test('sends the input schema as OpenAI-style parameters', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      { ...createCallOptions(), tools },
+      []
+    )
+
+    expect(completionOptions.tools).toEqual([
+      {
+        type: 'function',
+        function: {
+          name: 'getWeather',
+          description: 'Get the weather',
+          parameters: inputSchema,
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'getTime',
+          description: undefined,
+          parameters: { type: 'object' },
+        },
+      },
+    ])
+    expect(completionOptions.tool_choice).toBe('auto')
+  })
+
+  test('offers only the named tool and requires it', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      {
+        ...createCallOptions(),
+        tools,
+        toolChoice: { type: 'tool', toolName: 'getTime' },
+      },
+      []
+    )
+
+    expect(completionOptions.tools).toHaveLength(1)
+    expect((completionOptions.tools as any[])[0].function.name).toBe('getTime')
+    expect(completionOptions.tool_choice).toBe('required')
+  })
+
+  test('warns about and skips provider tools', () => {
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(
+      {
+        ...createCallOptions(),
+        tools: [
+          {
+            type: 'provider',
+            id: 'openai.web_search',
+            name: 'search',
+            args: {},
+          },
+        ],
+      },
+      [],
+      { warnings }
+    )
+
+    expect(completionOptions.tools).toEqual([])
+    expect(warnings).toEqual([
+      { type: 'unsupported', feature: 'provider tool openai.web_search' },
+    ])
   })
 })

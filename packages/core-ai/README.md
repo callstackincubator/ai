@@ -27,40 +27,27 @@ real Core AI model/runtime exists.
 
 ## Native Setup
 
-Add `https://github.com/apple/coreai-models` (1.0.0 up to the next major
-version) as a Swift Package dependency in the host iOS app and link the products
-used by your wrappers. The package requires an iOS 27 deployment target:
+The pod links Apple's [`coreai-models`](https://github.com/apple/coreai-models)
+Swift Package (1.0.0 up to the next major version) to itself during `pod install`, so there is no Xcode or config plugin step. By default it links every product the native module uses:
 
-- `CoreAILM` for language models and sessions
-- `CoreAIDiffusion` for image generation
-- `CoreAISegmentation` for segmentation
-- `CoreAIObjectDetection` for object detection
+- `CoreAILM` for `coreAI.languageModel(...)` and sessions
+- `CoreAIDiffusion` for `coreAI.imageModel(...)`
+- `CoreAISegmentation` for `CoreAI.runTask('segmentation', ...)`
+- `CoreAIObjectDetection` for `CoreAI.runTask('object-detection', ...)`
 
-React Native installs this package through CocoaPods, but Apple's helpers are
-Swift Package products. The app target still needs those SPM products linked.
-For Expo, add the config plugin. It links all known Apple Core AI Swift Package
-products by default:
+To link a smaller set, set `CORE_AI_PRODUCTS` when installing pods (with Expo, when running prebuild):
 
-```json
-{
-  "expo": {
-    "plugins": ["@react-native-ai/core-ai"]
-  }
-}
+```bash
+CORE_AI_PRODUCTS=CoreAILM npx pod-install
+CORE_AI_PRODUCTS=CoreAILM npx expo prebuild -p ios
 ```
 
-Pass `products` only when you want to link a smaller set:
+Features whose product is not linked return a clear setup error at runtime.
 
-```json
-{
-  "expo": {
-    "plugins": [["@react-native-ai/core-ai", { "products": ["CoreAILM"] }]]
-  }
-}
-```
+Constraints from Apple's package:
 
-For bare React Native, add the Swift Package in Xcode or with a project patching
-script.
+- The app needs an **iOS 27 deployment target** (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`).
+- **Device builds only.** The iOS Simulator SDK does not include the `CoreAI` framework, so apps that install this package cannot be built for the simulator.
 
 ## Usage
 
@@ -100,12 +87,6 @@ import { CoreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
 await CoreAI.inspectModel(toNativeModelConfig(modelConfig))
 ```
 
-## Model Management TBD
+## Loading Models
 
-Remote Core AI assets still need a first-class download path. Apple’s native
-API loads and specializes local `.aimodel` or `.aimodelc` URLs, so this package
-should add helpers that download model bundles into app storage, return a local
-file source, optionally specialize the model before first use, and persist
-bookmark data for cached specialized assets. Where possible, the downloader and
-storage pieces should be shared with the other React Native AI runtimes instead
-of duplicating provider-specific plumbing.
+Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
