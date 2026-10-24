@@ -224,54 +224,15 @@ public class AppleLLMImpl: NSObject {
           let generationSchema = try self.createGenerationSchema(from: options)
 
           do {
-            if promptAttachments.isEmpty {
-              if let generationSchema {
-                let response = try await session.respond(
-                  to: userPrompt,
-                  schema: generationSchema,
-                  includeSchemaInPrompt: true,
-                  options: generationOptions
-                )
-                resolve(response.toModelMessages())
-              } else {
-                let response = try await session.respond(to: userPrompt, options: generationOptions)
-                resolve(response.toModelMessages())
-              }
-            } else {
-#if compiler(>=6.4)
-              if #available(iOS 27, *) {
-                let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
-                defer {
-                  Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
-                }
-                if let generationSchema {
-                  let response = try await session.respond(
-                    schema: generationSchema,
-                    includeSchemaInPrompt: true,
-                    options: generationOptions
-                  ) {
-                    userPrompt
-                    for attachment in preparedAttachments.values {
-                      attachment
-                    }
-                  }
-                  resolve(response.toModelMessages())
-                } else {
-                  let response = try await session.respond(options: generationOptions) {
-                    userPrompt
-                    for attachment in preparedAttachments.values {
-                      attachment
-                    }
-                  }
-                  resolve(response.toModelMessages())
-                }
-              } else {
-                throw AppleLLMError.unsupportedOS
-              }
-#else
-              throw AppleLLMError.unsupportedOS
-#endif
-            }
+            let response = try await self.respond(
+              with: session,
+              userPrompt: userPrompt,
+              promptAttachments: promptAttachments,
+              generationSchema: generationSchema,
+              generationOptions: generationOptions,
+              providerOptions: providerOptions
+            )
+            resolve(response)
           } catch {
             if let appleError = self.mapToAppleLLMError(error, includeGenerationFallback: true) {
               self.rejectWithAppleError(appleError, reject: reject)
@@ -327,61 +288,15 @@ public class AppleLLMImpl: NSObject {
           let generationSchema = try self.createGenerationSchema(from: options)
 
           do {
-            if promptAttachments.isEmpty {
-              if let generationSchema {
-                let responseStream = session.streamResponse(
-                  to: userPrompt,
-                  schema: generationSchema,
-                  includeSchemaInPrompt: true,
-                  options: generationOptions
-                )
-                for try await chunk in responseStream {
-                  onUpdate(streamId, String(describing: chunk.content))
-                }
-              } else {
-                let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
-                for try await chunk in responseStream {
-                  onUpdate(streamId, chunk.content)
-                }
-              }
-            } else {
-#if compiler(>=6.4)
-              if #available(iOS 27, *) {
-                let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
-                defer {
-                  Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
-                }
-                if let generationSchema {
-                  let responseStream = session.streamResponse(
-                    schema: generationSchema,
-                    includeSchemaInPrompt: true,
-                    options: generationOptions
-                  ) {
-                    userPrompt
-                    for attachment in preparedAttachments.values {
-                      attachment
-                    }
-                  }
-                  for try await chunk in responseStream {
-                    onUpdate(streamId, String(describing: chunk.content))
-                  }
-                } else {
-                  let responseStream = session.streamResponse(options: generationOptions) {
-                    userPrompt
-                    for attachment in preparedAttachments.values {
-                      attachment
-                    }
-                  }
-                  for try await chunk in responseStream {
-                    onUpdate(streamId, chunk.content)
-                  }
-                }
-              } else {
-                throw AppleLLMError.unsupportedOS
-              }
-#else
-              throw AppleLLMError.unsupportedOS
-#endif
+            try await self.streamResponse(
+              with: session,
+              userPrompt: userPrompt,
+              promptAttachments: promptAttachments,
+              generationSchema: generationSchema,
+              generationOptions: generationOptions,
+              providerOptions: providerOptions
+            ) { chunk in
+              onUpdate(streamId, chunk)
             }
 
             if !Task.isCancelled {
@@ -568,10 +483,205 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 26, *)
+  private func respond(
+    with session: LanguageModelSession,
+    userPrompt: String,
+    promptAttachments: [[String: Any]],
+    generationSchema: GenerationSchema?,
+    generationOptions: GenerationOptions,
+    providerOptions: [String: Any]
+  ) async throws -> [[String: Any]] {
+#if compiler(>=6.4)
+    if #available(iOS 27, *) {
+      let contextOptions = try createContextOptions(
+        from: providerOptions,
+        includeSchemaInPrompt: generationSchema == nil ? nil : true
+      )
+      let preparedAttachments = try createImageAttachments(from: promptAttachments)
+      defer {
+        Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
+      }
+
+      if let generationSchema {
+        let response = try await session.respond(
+          schema: generationSchema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          userPrompt
+          for attachment in preparedAttachments.values {
+            attachment
+          }
+        }
+        return response.toModelMessages()
+      }
+
+      let response = try await session.respond(
+        options: generationOptions,
+        contextOptions: contextOptions
+      ) {
+        userPrompt
+        for attachment in preparedAttachments.values {
+          attachment
+        }
+      }
+      return response.toModelMessages()
+    }
+#endif
+
+    // Image prompts and reasoning levels require iOS 27
+    guard promptAttachments.isEmpty, providerOptions["reasoningLevel"] == nil else {
+      throw AppleLLMError.unsupportedOS
+    }
+
+    if let generationSchema {
+      let response = try await session.respond(
+        to: userPrompt,
+        schema: generationSchema,
+        includeSchemaInPrompt: true,
+        options: generationOptions
+      )
+      return response.toModelMessages()
+    }
+
+    let response = try await session.respond(to: userPrompt, options: generationOptions)
+    return response.toModelMessages()
+  }
+
+  @available(iOS 26, *)
+  private func streamResponse(
+    with session: LanguageModelSession,
+    userPrompt: String,
+    promptAttachments: [[String: Any]],
+    generationSchema: GenerationSchema?,
+    generationOptions: GenerationOptions,
+    providerOptions: [String: Any],
+    onUpdate: @escaping (String) -> Void
+  ) async throws {
+#if compiler(>=6.4)
+    if #available(iOS 27, *) {
+      let contextOptions = try createContextOptions(
+        from: providerOptions,
+        includeSchemaInPrompt: generationSchema == nil ? nil : true
+      )
+      let preparedAttachments = try createImageAttachments(from: promptAttachments)
+      defer {
+        Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
+      }
+
+      if let generationSchema {
+        let responseStream = session.streamResponse(
+          schema: generationSchema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          userPrompt
+          for attachment in preparedAttachments.values {
+            attachment
+          }
+        }
+        for try await chunk in responseStream {
+          onUpdate(String(describing: chunk.content))
+        }
+        return
+      }
+
+      let responseStream = session.streamResponse(
+        options: generationOptions,
+        contextOptions: contextOptions
+      ) {
+        userPrompt
+        for attachment in preparedAttachments.values {
+          attachment
+        }
+      }
+      for try await chunk in responseStream {
+        onUpdate(chunk.content)
+      }
+      return
+    }
+#endif
+
+    // Image prompts and reasoning levels require iOS 27
+    guard promptAttachments.isEmpty, providerOptions["reasoningLevel"] == nil else {
+      throw AppleLLMError.unsupportedOS
+    }
+
+    if let generationSchema {
+      let responseStream = session.streamResponse(
+        to: userPrompt,
+        schema: generationSchema,
+        includeSchemaInPrompt: true,
+        options: generationOptions
+      )
+      for try await chunk in responseStream {
+        onUpdate(String(describing: chunk.content))
+      }
+      return
+    }
+
+    let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
+    for try await chunk in responseStream {
+      onUpdate(chunk.content)
+    }
+  }
+
+#if compiler(>=6.4)
+  @available(iOS 27, *)
+  private func createContextOptions(
+    from providerOptions: [String: Any],
+    includeSchemaInPrompt: Bool?
+  ) throws -> ContextOptions {
+    return ContextOptions(
+      includeSchemaInPrompt: includeSchemaInPrompt,
+      reasoningLevel: try createReasoningLevel(from: providerOptions)
+    )
+  }
+
+  @available(iOS 27, *)
+  private func createReasoningLevel(from providerOptions: [String: Any]) throws -> ContextOptions.ReasoningLevel? {
+    guard let reasoningLevel = providerOptions["reasoningLevel"] as? String else {
+      return nil
+    }
+
+    switch reasoningLevel {
+    case "light":
+      return .light
+    case "moderate":
+      return .moderate
+    case "deep":
+      return .deep
+    default:
+      throw AppleLLMError.invalidMessage("Unsupported Apple reasoning level '\(reasoningLevel)'")
+    }
+  }
+#endif
+
+  @available(iOS 26, *)
   private func mapKnownAppleLLMError(_ error: Error) -> AppleLLMError? {
     if let appleError = error as? AppleLLMError {
       return appleError
     }
+
+#if compiler(>=6.4)
+    if #available(iOS 27, *) {
+      if let languageModelError = error as? LanguageModelError {
+        switch languageModelError {
+        case .contextSizeExceeded:
+          return .contextWindowExceeded
+        case .rateLimited:
+          return .rateLimited
+        default:
+          return nil
+        }
+      }
+
+      if let privateCloudComputeError = error as? PrivateCloudComputeLanguageModel.Error,
+         case .quotaLimitReached = privateCloudComputeError {
+        return .rateLimited
+      }
+    }
+#endif
 
     guard let generationError = error as? LanguageModelSession.GenerationError else {
       return nil
