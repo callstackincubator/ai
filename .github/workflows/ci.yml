@@ -36,7 +36,12 @@ jobs:
         run: cd packages/mlc && bun run prepare
     
   build-apple-llm:
-    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        # Xcode 26 (Swift 6.3) and Xcode 27 (Swift 6.4) compile different iOS 27 code paths
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
