@@ -197,8 +197,8 @@ export default function ChatScreen() {
     selectedAdapter?.model.provider === 'apple' &&
     selectedModelAvailability === 'yes'
   const emptyStateSubtitle = genUiEnabled
-    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
-    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also exercises summarizeHistory, rollingWindow, and droppingCompletedToolCalls.' : ''}`
+    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also summarizes history, keeps a rolling window, and drops completed tool calls.' : ''}`
+    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also summarizes history, keeps a rolling window, and drops completed tool calls.' : ''}`
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
