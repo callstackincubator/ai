@@ -111,7 +111,7 @@ For capability-aware UI, ask native for the active model metadata:
 ```typescript
 const info = await apple.getModelInfo({ locale: 'en-US' })
 
-console.log(info.isAvailable)
+console.log(info.availability)
 console.log(info.contextSize)
 console.log(info.supportsImagePrompts)
 console.log(info.supportsVisionTools)
@@ -121,6 +121,29 @@ console.log(info.supportsVisionTools)
 context size when Apple exposes it, and feature flags for token counting,
 image prompts, Private Cloud Compute, Dynamic Profiles, and Vision built-in
 tools.
+
+When the model is unavailable, `availability` tells you why, so you can show
+something more useful than a generic error:
+
+| `availability`                | Model                   | Meaning                                                      |
+| ----------------------------- | ----------------------- | ------------------------------------------------------------ |
+| `available`                   | both                    | The model is ready to use                                    |
+| `deviceNotEligible`           | both                    | The device does not support this model                       |
+| `appleIntelligenceNotEnabled` | `system`                | Apple Intelligence is turned off, ask the user to enable it  |
+| `modelNotReady`               | `system`                | The model is still downloading, try again later              |
+| `systemNotReady`              | `private-cloud-compute` | Private Cloud Compute is not ready yet, try again later      |
+| `unknown`                     | both                    | A reason this version of the library does not know about yet |
+
+```typescript
+const { availability } = await apple.getModelInfo()
+
+if (availability === 'appleIntelligenceNotEnabled') {
+  // Ask the user to turn on Apple Intelligence in Settings.
+}
+```
+
+When Private Cloud Compute is unavailable, `contextSize` is omitted,
+`supportsLocale` is `false` and `supportedLanguages` is empty.
 
 ## Private Cloud Compute
 

@@ -7,6 +7,7 @@ export type {
   AppleLanguageModel,
   AppleLanguageModelId,
   AppleLanguageModelOptions,
+  AppleModelAvailability,
   AppleModelInfo,
   AppleProviderOptions,
   AppleReasoningLevel,

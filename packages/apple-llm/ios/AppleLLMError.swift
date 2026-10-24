@@ -8,7 +8,7 @@
 import Foundation
 
 enum AppleLLMError: Error, LocalizedError {
-  case modelUnavailable
+  case modelUnavailable(String)
   case unsupportedOS
   case generationError(String)
   case streamNotFound(String)
@@ -22,8 +22,8 @@ enum AppleLLMError: Error, LocalizedError {
   
   var errorDescription: String? {
     switch self {
-    case .modelUnavailable:
-      return "Apple Intelligence model is not available"
+    case .modelUnavailable(let reason):
+      return "Apple Intelligence model is not available (\(reason))"
     case .unsupportedOS:
       return "Apple Intelligence not available on this iOS version"
     case .generationError(let message):
