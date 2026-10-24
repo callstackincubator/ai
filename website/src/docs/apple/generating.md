@@ -256,6 +256,10 @@ The provider accepts local file URLs, absolute file paths, base64 image data,
 and image data URLs. Remote HTTP URLs are not sent directly to Apple; download
 them first and pass a local file URL or base64 payload.
 
+Each image is labeled with its `filename` when one is set, and `image-1`,
+`image-2`, ... otherwise. The model sees these labels, so a descriptive filename
+such as `receipt.png` helps it tell apart several images in one prompt.
+
 Apple Foundation Models only reads images on the final user prompt. Images in
 earlier user turns are left out of the history sent to the model. Passing image
 parts on older OS versions throws `AppleLLMErrorCodes.UnsupportedOS`.

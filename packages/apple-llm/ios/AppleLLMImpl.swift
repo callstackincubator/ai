@@ -1083,6 +1083,7 @@ public class AppleLLMImpl: NSObject {
   ) throws -> (values: [Attachment<ImageAttachmentContent>], temporaryFileURLs: [URL]) {
     var imageAttachments: [Attachment<ImageAttachmentContent>] = []
     var temporaryFileURLs: [URL] = []
+    var usedLabels = Set<String>()
 
     do {
       for (index, attachment) in attachments.enumerated() {
@@ -1095,8 +1096,12 @@ public class AppleLLMImpl: NSObject {
           temporaryFileURLs.append(imageURL.url)
         }
 
-        // Vision tools (OCR, barcode) look images up by label, so every image needs one
-        let label = (attachment["label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "image-\(index + 1)"
+        // Vision tools (OCR, barcode) look images up by label, so every image needs a unique one
+        var label = (attachment["label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "image-\(index + 1)"
+        if usedLabels.contains(label) {
+          label = "\(label)-\(index + 1)"
+        }
+        usedLabels.insert(label)
         imageAttachments.append(Attachment(imageURL: imageURL.url).label(label))
       }
     } catch {

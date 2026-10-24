@@ -240,6 +240,36 @@ describe('apple image history', () => {
   })
 })
 
+describe('apple image labels', () => {
+  test('forwards the filename as the attachment label', async () => {
+    await apple().doGenerate(
+      createCallOptions({
+        prompt: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'what is on the invoice?' },
+              {
+                type: 'file',
+                mediaType: 'image/png',
+                filename: 'invoice.png',
+                data: { type: 'data', data: 'iVBORw0KGgo=' },
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    const [message] = generateText.mock.calls.at(-1)![0] as {
+      attachments: unknown[]
+    }[]
+    expect(message.attachments).toEqual([
+      expect.objectContaining({ label: 'invoice.png' }),
+    ])
+  })
+})
+
 describe('apple image urls', () => {
   test('passes local file image urls through instead of downloading them', async () => {
     const { generateText: generate } = await import('ai')

@@ -101,6 +101,7 @@ type AppleMessageAttachment = {
   mediaType: string
   data?: string
   url?: string
+  label?: string
 }
 
 type AppleImageModelFile = {
@@ -214,11 +215,15 @@ function prepareImageAttachment(
     'Apple Foundation Models'
   )
 
+  // The filename becomes the attachment label, which the model and Vision tools use to name the image
+  const label = part.filename
+
   if (source.type === 'data') {
     return {
       type: 'image',
       mediaType,
       data: source.value,
+      label,
     }
   }
 
@@ -226,6 +231,7 @@ function prepareImageAttachment(
     type: 'image',
     mediaType,
     url: source.value,
+    label,
   }
 }
 
