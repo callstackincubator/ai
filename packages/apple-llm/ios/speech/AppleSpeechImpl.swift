@@ -131,7 +131,7 @@ extension AVSpeechSynthesisVoice {
       "identifier": self.identifier,
       "name": self.name,
       "language": self.language,
-      "quality": self.quality,
+      "quality": self.qualityName,
       "isPersonalVoice": false,
       "isNoveltyVoice": false
     ] as [String : Any]
@@ -142,5 +142,17 @@ extension AVSpeechSynthesisVoice {
     }
     
     return data
+  }
+
+  // The enum is not bridged to NSNumber, so React Native would send undefined
+  private var qualityName: String {
+    switch self.quality {
+    case .enhanced:
+      return "enhanced"
+    case .premium:
+      return "premium"
+    default:
+      return "default"
+    }
   }
 }
