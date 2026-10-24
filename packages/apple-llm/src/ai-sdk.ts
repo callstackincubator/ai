@@ -715,7 +715,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   async prepare(): Promise<void> {}
 
   private prepareMessages(messages: LanguageModelV4Prompt): AppleMessage[] {
-    return messages.map((message): AppleMessage => {
+    return messages.map((message, index): AppleMessage => {
       switch (message.role) {
         case 'system':
           return {
@@ -724,9 +724,14 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           }
         case 'user': {
           const attachments: AppleMessageAttachment[] = []
+          // Foundation Models only accept images on the prompt being answered,
+          // so images from earlier turns are left out of the transcript
+          const isFinalPrompt = index === messages.length - 1
           const content = message.content.reduce((acc, part) => {
             if (part.type === 'file') {
-              attachments.push(prepareImageAttachment(part))
+              if (isFinalPrompt) {
+                attachments.push(prepareImageAttachment(part))
+              }
               return acc
             }
             return appendMessageContent(acc, part.text)
