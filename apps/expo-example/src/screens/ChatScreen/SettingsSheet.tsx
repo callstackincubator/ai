@@ -65,7 +65,9 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                     <View style={styles.toolItemTextContainer}>
                       <Text style={styles.toolItemTitle}>{tool.title}</Text>
                       <Text style={styles.toolItemDescription}>
-                        {tool.description}
+                        {typeof tool.description === 'string'
+                          ? tool.description
+                          : null}
                       </Text>
                     </View>
                     {enabled && (
@@ -134,7 +136,12 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                     {temperature.toFixed(1)}
                   </Text>
                 </View>
-                <Host style={styles.sliderHost}>
+                <Host
+                  style={[
+                    styles.sliderHost,
+                    Platform.OS === 'android' && styles.androidSlider,
+                  ]}
+                >
                   <Slider
                     value={temperature}
                     min={0}
@@ -144,11 +151,6 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                         temperature: Math.round(value * 10) / 10,
                       })
                     }
-                    style={
-                      Platform.OS === 'android'
-                        ? styles.androidSlider
-                        : undefined
-                    }
                   />
                 </Host>
               </View>
@@ -157,7 +159,12 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                   <Text style={styles.settingTitle}>Max Steps</Text>
                   <Text style={styles.settingValue}>{maxSteps}</Text>
                 </View>
-                <Host style={styles.sliderHost}>
+                <Host
+                  style={[
+                    styles.sliderHost,
+                    Platform.OS === 'android' && styles.androidSlider,
+                  ]}
+                >
                   <Slider
                     value={maxSteps}
                     min={1}
@@ -165,11 +172,6 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                     steps={19}
                     onValueChange={(value) =>
                       updateChatSettings({ maxSteps: Math.round(value) })
-                    }
-                    style={
-                      Platform.OS === 'android'
-                        ? styles.androidSlider
-                        : undefined
                     }
                   />
                 </Host>
@@ -183,7 +185,12 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                         {historyWindowEntries}
                       </Text>
                     </View>
-                    <Host style={styles.sliderHost}>
+                    <Host
+                      style={[
+                        styles.sliderHost,
+                        Platform.OS === 'android' && styles.androidSlider,
+                      ]}
+                    >
                       <Slider
                         value={historyWindowEntries}
                         min={2}
@@ -193,11 +200,6 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                           updateChatSettings({
                             historyWindowEntries: Math.round(value),
                           })
-                        }
-                        style={
-                          Platform.OS === 'android'
-                            ? styles.androidSlider
-                            : undefined
                         }
                       />
                     </Host>
@@ -209,7 +211,12 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                         {historySummarizationThreshold}
                       </Text>
                     </View>
-                    <Host style={styles.sliderHost}>
+                    <Host
+                      style={[
+                        styles.sliderHost,
+                        Platform.OS === 'android' && styles.androidSlider,
+                      ]}
+                    >
                       <Slider
                         value={historySummarizationThreshold}
                         min={500}
@@ -219,11 +226,6 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                           updateChatSettings({
                             historySummarizationThreshold: Math.round(value),
                           })
-                        }
-                        style={
-                          Platform.OS === 'android'
-                            ? styles.androidSlider
-                            : undefined
                         }
                       />
                     </Host>

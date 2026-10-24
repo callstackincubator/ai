@@ -17,15 +17,10 @@ export function AppleTokenCounter({
   isVisible,
 }: AppleTokenCounterProps) {
   const [tokenCount, setTokenCount] = useState<number | null>(0)
+  const hasInput = input.trim().length > 0
 
   useEffect(() => {
-    if (!isVisible) {
-      setTokenCount(null)
-      return
-    }
-
-    if (!input.trim()) {
-      setTokenCount(0)
+    if (!isVisible || !hasInput) {
       return
     }
 
@@ -44,13 +39,15 @@ export function AppleTokenCounter({
       isActive = false
       clearTimeout(timeoutId)
     }
-  }, [input, isVisible])
+  }, [input, hasInput, isVisible])
 
-  if (!isVisible || tokenCount === null) return null
+  const visibleTokenCount = hasInput ? tokenCount : 0
+
+  if (!isVisible || visibleTokenCount === null) return null
 
   return (
     <Text style={styles.tokenCounter}>
-      {tokenCount}/{APPLE_CONTEXT_WINDOW_TOKENS}
+      {visibleTokenCount}/{APPLE_CONTEXT_WINDOW_TOKENS}
     </Text>
   )
 }

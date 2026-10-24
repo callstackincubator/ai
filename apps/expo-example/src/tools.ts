@@ -1,5 +1,5 @@
 import { tool } from 'ai'
-import * as Calendar from 'expo-calendar'
+import * as Calendar from 'expo-calendar/legacy'
 import { z } from 'zod'
 
 type ToolExecutionReporter = (event: {

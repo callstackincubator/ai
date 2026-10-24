@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4 } from '@ai-sdk/provider'
 import { llama } from '@react-native-ai/llama'
 
 import {
@@ -11,7 +11,7 @@ import { isLlamaModelDownloaded } from '../../utils/llamaStorageUtils'
 
 export const createLlamaLanguageSetupAdapter = (
   hfModelId: string
-): SetupAdapter<LanguageModelV3> => {
+): SetupAdapter<LanguageModelV4> => {
   const modelPath = getModelPath(hfModelId)
   const model = llama.languageModel(modelPath, {
     contextParams: {
