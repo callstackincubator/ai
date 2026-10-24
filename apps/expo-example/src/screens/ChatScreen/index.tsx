@@ -5,12 +5,16 @@ import {
   createGenUITools,
 } from '@react-native-ai/json-ui'
 import { wrapLanguageModelWithHistory } from '@react-native-ai/utils'
-import { isStepCount, streamText } from 'ai'
+import { isStepCount, type ModelMessage, streamText } from 'ai'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
+import {
+  getChatUISpecFromChats,
+  type Message,
+  useChatStore,
+} from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
 import {
@@ -19,7 +23,10 @@ import {
   withToolProxy,
 } from '../../tools'
 import { getAiSdkTelemetry } from '../../utils/aiSdkTelemetry'
-import type { ImageAttachment } from '../../utils/imageAttachments'
+import {
+  getAttachmentUri,
+  type ImageAttachment,
+} from '../../utils/imageAttachments'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -70,6 +77,28 @@ export default function ChatScreen() {
 
   const selectedModelAvailability = availability.get(selectedModelId)
   const imageInputEnabled = selectedAdapter?.capabilities?.imageInput ?? false
+
+  // Images go to the model as file URLs, and only when it accepts them
+  const toModelMessage = ({
+    role,
+    content,
+    attachments,
+  }: Pick<Message, 'role' | 'content' | 'attachments'>): ModelMessage => {
+    if (role !== 'user' || !imageInputEnabled || !attachments?.length) {
+      return { role, content }
+    }
+    return {
+      role,
+      content: [
+        ...(content ? [{ type: 'text' as const, text: content }] : []),
+        ...attachments.map((attachment) => ({
+          type: 'image' as const,
+          image: new URL(getAttachmentUri(attachment)),
+          mediaType: attachment.mediaType,
+        })),
+      ],
+    }
+  }
 
   // Send message and stream AI response
   const handleSend = async (
@@ -131,11 +160,8 @@ export default function ChatScreen() {
         messages: [
           ...baseMessages
             .filter((message) => message.type !== 'toolExecution')
-            .map((message) => ({
-              role: message.role,
-              content: message.content,
-            })),
-          { role: 'user', content: userInput },
+            .map(toModelMessage),
+          toModelMessage({ role: 'user', content: userInput, attachments }),
         ],
         tools,
         temperature,
