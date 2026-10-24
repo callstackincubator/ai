@@ -253,6 +253,13 @@ const model = llama.languageModel(modelPath, {
 })
 ```
 
+:::tip Long conversations
+The whole chat must fit in `n_ctx`. To keep a rolling window and summarize
+older messages, wrap the model with `wrapLanguageModelWithHistory`, which
+counts tokens with the model's tokenizer. See
+[Conversation History](../history.md).
+:::
+
 For multimodal models:
 
 ```typescript

@@ -382,9 +382,10 @@ such as `prepareStep` and telemetry read:
 - iOS 26.4 counts the transcript with the on-device model's tokenizer.
 - Otherwise usage is `undefined`.
 
-For reusable history policies such as summarization, rolling windows, and
-completed tool-call pruning, use `@react-native-ai/utils`. Its summarizer uses
-`countTokens` from the model you pass it.
+To keep long chats inside the context window, wrap the model with
+`wrapLanguageModelWithHistory`. It keeps a rolling window, summarizes older
+messages, and counts tokens with the model's `countTokens`. See
+[Conversation History](../history.md).
 
 Count tokens before sending a request as an estimate, not a fit guarantee:
 
