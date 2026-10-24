@@ -11,7 +11,7 @@ import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
 const modelPath = await downloadModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
 )
 const model = llama.languageModel(modelPath)
 await model.prepare()
@@ -63,7 +63,7 @@ Format: `owner/repo/filename.gguf`
 
 Examples:
 
-- `ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf`
+- `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`
 - `Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf`
 
 ### 4. Storage APIs

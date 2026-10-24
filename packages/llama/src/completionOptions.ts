@@ -1,7 +1,16 @@
-import type {
-  LanguageModelV4CallOptions,
-  LanguageModelV4Prompt,
+import {
+  type LanguageModelV4CallOptions,
+  type LanguageModelV4Prompt,
+  type SharedV4Warning,
+  UnsupportedFunctionalityError,
 } from '@ai-sdk/provider'
+import {
+  convertToBase64,
+  getTopLevelMediaType,
+  isCustomReasoning,
+  isFullMediaType,
+  mapReasoningToProviderBudget,
+} from '@ai-sdk/provider-utils'
 import type { CompletionParams } from 'llama.rn'
 
 interface LLMMessagePart {
@@ -21,12 +30,55 @@ interface LLMMessage {
   tool_calls?: any[]
 }
 
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
+type PromptPart = Extract<
+  LanguageModelV4Prompt[number],
+  { content: unknown[] }
+>['content'][number]
+
+function convertFilePartToMedia(
+  part: Extract<PromptPart, { type: 'file' }>
+): LLMMessagePart {
+  if (part.data.type === 'text') {
+    return { type: 'text', text: part.data.text }
   }
-  return btoa(binary)
+
+  const mediaType = part.mediaType.toLowerCase()
+  const topLevelType = getTopLevelMediaType(mediaType)
+
+  if (topLevelType !== 'image' && topLevelType !== 'audio') {
+    throw new UnsupportedFunctionalityError({
+      functionality: `file parts with media type ${part.mediaType}`,
+    })
+  }
+
+  if (part.data.type === 'reference') {
+    throw new UnsupportedFunctionalityError({
+      functionality: 'file parts with provider references',
+    })
+  }
+
+  // llama.rn only decodes base64 from data:image/... and data:audio/... URLs,
+  // so a bare top-level media type (e.g. `image`) still needs a subtype
+  const dataUrlMediaType = isFullMediaType(mediaType)
+    ? mediaType
+    : `${topLevelType}/*`
+  const url =
+    part.data.type === 'data'
+      ? `data:${dataUrlMediaType};base64,${convertToBase64(part.data.data)}`
+      : (part.data.originalUrl ?? part.data.url.href)
+
+  if (topLevelType === 'image') {
+    return { type: 'image_url', image_url: { url } }
+  }
+
+  const format =
+    mediaType.includes('mpeg') || mediaType.includes('mp3') ? 'mp3' : 'wav'
+  return {
+    type: 'input_audio',
+    input_audio: url.startsWith('data:')
+      ? { format, data: url }
+      : { format, url },
+  }
 }
 
 export function prepareMessagesWithMedia(
@@ -34,95 +86,51 @@ export function prepareMessagesWithMedia(
 ): LLMMessage[] {
   const messages: LLMMessage[] = []
 
-  type PromptPart = Extract<
-    LanguageModelV4Prompt[number],
-    { content: unknown[] }
-  >['content'][number]
-
-  const convertFilePartToMedia = (
-    part: Extract<PromptPart, { type: 'file' }>
-  ): LLMMessagePart => {
-    const mediaType = part.mediaType.toLowerCase()
-    const data = part.data as unknown
-
-    const url =
-      data instanceof Uint8Array
-        ? `data:${part.mediaType};base64,${uint8ArrayToBase64(data)}`
-        : data instanceof URL
-          ? data.toString()
-          : typeof data === 'string'
-            ? data
-            : null
-
-    if (!url) {
-      return { type: 'text', text: '' }
-    }
-
-    if (mediaType.startsWith('image/')) {
-      return { type: 'image_url', image_url: { url } }
-    }
-
-    if (mediaType.startsWith('audio/')) {
-      const format = mediaType.includes('wav') ? 'wav' : 'mp3'
-      if (url.startsWith('data:')) {
-        return {
-          type: 'input_audio',
-          input_audio: {
-            format,
-            data: url,
-          },
-        }
-      }
-      return {
-        type: 'input_audio',
-        input_audio: {
-          format,
-          url,
-        },
-      }
-    }
-
-    return { type: 'text', text: '' }
-  }
-
   for (const message of prompt) {
     switch (message.role) {
       case 'system':
-      case 'user':
-        if (typeof message.content === 'string') {
-          messages.push({ role: message.role, content: message.content })
-        } else {
-          for (const part of message.content) {
-            switch (part.type) {
-              case 'text':
-                messages.push({ role: message.role, content: part.text })
-                break
-              case 'file':
-                messages.push({
-                  role: message.role,
-                  content: [convertFilePartToMedia(part)],
-                })
-                break
-              default:
-                throw new Error(
-                  `Unsupported message content type: ${JSON.stringify(part)}`
-                )
-            }
-          }
-        }
+        messages.push({ role: 'system', content: message.content })
         break
+      case 'user': {
+        // Keep text and media in one message, so the chat template places
+        // the media markers next to the text they belong to
+        const content = message.content.map((part): LLMMessagePart => {
+          switch (part.type) {
+            case 'text':
+              return { type: 'text', text: part.text }
+            case 'file':
+              return convertFilePartToMedia(part)
+            default:
+              throw new Error(
+                `Unsupported message content type: ${JSON.stringify(part)}`
+              )
+          }
+        })
+        messages.push({
+          role: 'user',
+          content:
+            content.length === 1 && content[0]!.type === 'text'
+              ? content[0]!.text!
+              : content,
+        })
+        break
+      }
       case 'assistant': {
-        const reasoningContent = message.content.find(
-          (part) => part.type === 'reasoning'
-        )
+        const reasoningContent = message.content
+          .filter((part) => part.type === 'reasoning')
+          .map((part) => part.text)
+          .join('')
         const toolCalls = message.content.filter(
           (part) => part.type === 'tool-call'
         )
-        const content = message.content.filter((part) => part.type === 'text')
+        const content = message.content
+          .filter((part) => part.type === 'text')
+          .map((part) => part.text)
+          .join('')
         messages.push({
           role: 'assistant',
           content,
-          reasoning_content: reasoningContent?.text,
+          reasoning_content: reasoningContent || undefined,
           tool_calls: toolCalls.map((toolCall) => ({
             type: 'function',
             id: toolCall.toolCallId,
@@ -165,9 +173,59 @@ export function prepareMessagesWithMedia(
   return messages
 }
 
+/**
+ * Maps the provider-agnostic `reasoning` call option to llama.rn thinking
+ * params. Levels become a thinking token budget, sized from
+ * `maxOutputTokens` or, when that is not set, the context size.
+ */
+function getReasoningOptions(
+  options: LanguageModelV4CallOptions,
+  contextSize: number | undefined,
+  warnings: SharedV4Warning[]
+): Partial<CompletionParams> {
+  const { reasoning } = options
+
+  if (reasoning === 'none') {
+    return { enable_thinking: false }
+  }
+
+  if (!isCustomReasoning(reasoning)) {
+    // 'provider-default' keeps the chat template's default
+    return {}
+  }
+
+  const maxOutputTokens = options.maxOutputTokens ?? contextSize
+  if (!maxOutputTokens) {
+    return { enable_thinking: true }
+  }
+
+  return {
+    enable_thinking: true,
+    thinking_budget_tokens: mapReasoningToProviderBudget({
+      reasoning,
+      maxOutputTokens,
+      maxReasoningBudget: maxOutputTokens,
+      warnings,
+    }),
+  }
+}
+
+export interface LlamaCompletionSettings {
+  /**
+   * Context size of the loaded model, used to size the thinking budget when
+   * `maxOutputTokens` is not set
+   */
+  contextSize?: number
+  /**
+   * Collects call warnings
+   */
+  warnings?: SharedV4Warning[]
+}
+
 export function buildLlamaCompletionOptions(
   options: LanguageModelV4CallOptions,
-  messages: LLMMessage[]
+  messages: LLMMessage[],
+  { contextSize, warnings = [] }: LlamaCompletionSettings = {}
 ): Partial<CompletionParams> {
   const completionOptions: Partial<CompletionParams> = {
     messages,
@@ -180,15 +238,39 @@ export function buildLlamaCompletionOptions(
     stop: options.stopSequences,
     seed: options.seed,
     reasoning_format: 'auto',
+    ...getReasoningOptions(options, contextSize, warnings),
+    // providerOptions.llama takes precedence over the `reasoning` call option
     ...(options.providerOptions?.llama ?? {}),
   }
 
   if (options.tools) {
-    completionOptions.tools = options.tools.map(({ type, ...tool }) => ({
-      type,
-      function: tool,
-    }))
-    completionOptions.tool_choice = options.toolChoice?.type ?? 'auto'
+    const { toolChoice } = options
+    // llama.cpp reads OpenAI-style tools, with the schema under `parameters`
+    completionOptions.tools = options.tools.flatMap((tool) => {
+      if (tool.type !== 'function') {
+        warnings.push({
+          type: 'unsupported',
+          feature: `provider tool ${tool.id}`,
+        })
+        return []
+      }
+      if (toolChoice?.type === 'tool' && toolChoice.toolName !== tool.name) {
+        return []
+      }
+      return [
+        {
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema,
+          },
+        },
+      ]
+    })
+    // llama.cpp has no named tool choice, so offer only that tool and require it
+    completionOptions.tool_choice =
+      toolChoice?.type === 'tool' ? 'required' : (toolChoice?.type ?? 'auto')
   }
 
   if (options.responseFormat?.type === 'json') {

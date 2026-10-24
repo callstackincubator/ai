@@ -8,16 +8,14 @@ A Vercel AI SDK provider for llama.rn, enabling on-device inference with GGUF mo
 - Vercel AI SDK v7
 
 ```ts
-import { llama } from '@react-native-ai/llama'
+import { downloadModel, llama } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
-// Create model (format: "owner/repo/filename.gguf")
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+// Download (format: "owner/repo/filename.gguf") and prepare
+const modelPath = await downloadModel(
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
 )
-
-// Download and prepare
-await model.download()
+const model = llama.languageModel(modelPath)
 await model.prepare()
 
 // Generate
@@ -31,6 +29,10 @@ const { text } = await generateText({
 
 - ✅ Text generation with GGUF models
 - ✅ Streaming
+- ✅ Reasoning, controlled with the AI SDK `reasoning` option
+- ✅ Structured output (`Output.object`), enforced with a JSON schema grammar
+- ✅ Tool calling
+- ✅ Vision and audio input with a multimodal projector (`projectorPath`)
 - ✅ On-device inference (iOS & Android)
 - ✅ Model download management
 - ✅ GPU acceleration support

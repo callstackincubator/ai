@@ -9,17 +9,20 @@ import type {
   LanguageModelV4StreamPart,
   RerankingModelV4,
   RerankingModelV4CallOptions,
+  SharedV4Warning,
   SpeechModelV4,
   SpeechModelV4CallOptions,
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
+  type CompletionParams,
   type ContextParams,
   type EmbeddingParams,
   initLlama,
   type LlamaContext,
   type NativeCompletionResult,
   type NativeEmbeddingResult,
+  type TokenData,
 } from 'llama.rn'
 
 import {
@@ -49,6 +52,23 @@ function convertFinishReason(
     unified,
     raw,
   }
+}
+
+/**
+ * Stops the running completion when the call is aborted, so the native side
+ * stops generating instead of running to completion in the background
+ *
+ * @returns A function that removes the abort listener
+ */
+function stopCompletionOnAbort(
+  context: LlamaContext,
+  abortSignal: AbortSignal | undefined
+): () => void {
+  const stop = () => {
+    context.stopCompletion()
+  }
+  abortSignal?.addEventListener('abort', stop, { once: true })
+  return () => abortSignal?.removeEventListener('abort', stop)
 }
 
 /**
@@ -90,6 +110,7 @@ export class LlamaLanguageModel implements LanguageModelV4 {
   private options: LlamaModelOptions
   private context: LlamaContext | null = null
   private multimodalInitialized: boolean = false
+  private pendingCompletion: Promise<unknown> = Promise.resolve()
 
   /**
    * Supported URL patterns
@@ -184,6 +205,9 @@ export class LlamaLanguageModel implements LanguageModelV4 {
    */
   async unload(): Promise<void> {
     if (this.context) {
+      // Releasing the context under a running completion crashes natively
+      await this.context.stopCompletion()
+      await this.pendingCompletion
       if (this.multimodalInitialized) {
         await this.context.releaseMultimodal()
         this.multimodalInitialized = false
@@ -191,6 +215,25 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       await this.context.release()
       this.context = null
     }
+  }
+
+  /**
+   * Runs completions on this model one at a time. An aborted completion keeps
+   * running natively until stopCompletion() takes effect, and llama.rn rejects
+   * a completion started while another one is in progress
+   */
+  private runCompletion(
+    context: LlamaContext,
+    params: Partial<CompletionParams>,
+    abortSignal: AbortSignal | undefined,
+    callback?: (tokenData: TokenData) => void
+  ): Promise<NativeCompletionResult> {
+    const completion = this.pendingCompletion.then(() => {
+      const removeAbortListener = stopCompletionOnAbort(context, abortSignal)
+      return context.completion(params, callback).finally(removeAbortListener)
+    })
+    this.pendingCompletion = completion.catch(() => {})
+    return completion
   }
 
   /**
@@ -207,9 +250,17 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions = buildLlamaCompletionOptions(options, messages)
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(options, messages, {
+      contextSize: this.options.contextParams?.n_ctx,
+      warnings,
+    })
 
-    const response = await context.completion(completionOptions)
+    const response = await this.runCompletion(
+      context,
+      completionOptions,
+      options.abortSignal
+    )
     let content: LanguageModelV4Content[] = []
 
     if (response.content) {
@@ -261,7 +312,7 @@ export class LlamaLanguageModel implements LanguageModelV4 {
           timings: response.timings,
         },
       },
-      warnings: [],
+      warnings,
     }
   }
 
@@ -285,7 +336,11 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions = buildLlamaCompletionOptions(options, messages)
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(options, messages, {
+      contextSize: this.options.contextParams?.n_ctx,
+      warnings,
+    })
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
@@ -296,11 +351,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
           controller.enqueue({
             type: 'stream-start',
-            warnings: [],
+            warnings,
           })
 
-          const result = await context.completion(
+          const result = await this.runCompletion(
+            context,
             completionOptions,
+            options.abortSignal,
             (tokenData) => {
               streamParser.processToken(tokenData)
             }
