@@ -12,7 +12,6 @@
     "lib",
     "ios",
     "*.podspec",
-    "app.plugin.js",
     "!ios/build",
     "!**/__tests__",
     "!**/__fixtures__",
@@ -32,8 +31,6 @@
     "ai",
     "sdk",
     "vercel",
-    "expo",
-    "config-plugin",
     "spm"
   ],
   "repository": {
@@ -58,13 +55,7 @@
     "zod": "^4.2.1"
   },
   "peerDependencies": {
-    "react-native": ">=0.76.0",
-    "expo": "*"
-  },
-  "peerDependenciesMeta": {
-    "expo": {
-      "optional": true
-    }
+    "react-native": ">=0.76.0"
   },
   "react-native-builder-bob": {
     "source": "src",
