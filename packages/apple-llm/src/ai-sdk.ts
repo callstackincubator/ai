@@ -6,12 +6,14 @@ import type {
   ImageModelV4CallOptions,
   LanguageModelV4,
   LanguageModelV4CallOptions,
+  LanguageModelV4FinishReason,
   LanguageModelV4FunctionTool,
   LanguageModelV4Message,
   LanguageModelV4Prompt,
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4ToolResultOutput,
+  LanguageModelV4Usage,
   SharedV4Warning,
   SpeechModelV4,
   SpeechModelV4CallOptions,
@@ -28,7 +30,10 @@ import {
 
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
-import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
+import NativeAppleLLM, {
+  type AppleMessage,
+  type AppleUsage,
+} from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
@@ -445,6 +450,39 @@ function prepareToolChoice(
   }
 }
 
+// Usage is only reported from iOS 27, so it is left undefined before that
+function toUsage(usage: AppleUsage | undefined): LanguageModelV4Usage {
+  return {
+    inputTokens: {
+      total: usage?.inputTokens,
+      noCache: usage ? usage.inputTokens - usage.cachedInputTokens : undefined,
+      cacheRead: usage?.cachedInputTokens,
+      cacheWrite: undefined,
+    },
+    outputTokens: {
+      total: usage?.outputTokens,
+      text: usage ? usage.outputTokens - usage.reasoningTokens : undefined,
+      reasoning: usage?.reasoningTokens,
+    },
+  }
+}
+
+// Foundation Models stops at maxOutputTokens without saying so, so a response
+// that used every allowed token is reported as cut off
+function toFinishReason(
+  usage: AppleUsage | undefined,
+  maxOutputTokens: number | undefined
+): LanguageModelV4FinishReason {
+  if (
+    usage &&
+    maxOutputTokens !== undefined &&
+    usage.outputTokens >= maxOutputTokens
+  ) {
+    return { unified: 'length', raw: undefined }
+  }
+  return { unified: 'stop', raw: 'stop' }
+}
+
 function appendMessageContent(content: string, addition: string) {
   if (!addition) {
     return content
@@ -842,7 +880,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       })
 
       return {
-        content: response.map((part) => {
+        content: response.content.map((part) => {
           switch (part.type) {
             case 'text':
               return part
@@ -872,20 +910,8 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               }
           }
         }),
-        finishReason: { unified: 'stop' as const, raw: 'stop' },
-        usage: {
-          inputTokens: {
-            total: 0,
-            noCache: undefined,
-            cacheRead: undefined,
-            cacheWrite: undefined,
-          },
-          outputTokens: {
-            total: 0,
-            text: undefined,
-            reasoning: undefined,
-          },
-        },
+        finishReason: toFinishReason(response.usage, options.maxOutputTokens),
+        usage: toUsage(response.usage),
         warnings,
       }
     } finally {
@@ -1061,20 +1087,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               }
               controller.enqueue({
                 type: 'finish',
-                finishReason: { unified: 'stop' as const, raw: 'stop' },
-                usage: {
-                  inputTokens: {
-                    total: 0,
-                    noCache: undefined,
-                    cacheRead: undefined,
-                    cacheWrite: undefined,
-                  },
-                  outputTokens: {
-                    total: 0,
-                    text: undefined,
-                    reasoning: undefined,
-                  },
-                },
+                finishReason: toFinishReason(
+                  data.usage,
+                  options.maxOutputTokens
+                ),
+                usage: toUsage(data.usage),
               })
               cleanup()
               controller.close()

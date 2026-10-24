@@ -27,8 +27,17 @@ export type StreamUpdateEvent = {
   entries?: CodegenTypes.UnsafeObject[]
 }
 
+// Token usage reported from iOS 27
+export type AppleUsage = {
+  inputTokens: number
+  cachedInputTokens: number
+  outputTokens: number
+  reasoningTokens: number
+}
+
 export type StreamCompleteEvent = {
   streamId: string
+  usage?: AppleUsage
 }
 
 export type StreamErrorEvent = {
@@ -48,8 +57,8 @@ export interface Spec extends TurboModule {
   generateText(
     messages: AppleMessage[],
     options: AppleGenerationOptions
-  ): Promise<
-    (
+  ): Promise<{
+    content: (
       | { type: 'text'; text: string }
       | {
           type: 'reasoning'
@@ -70,7 +79,8 @@ export interface Spec extends TurboModule {
           output: string
         }
     )[]
-  >
+    usage?: AppleUsage
+  }>
   generateStream(
     streamId: string,
     messages: AppleMessage[],

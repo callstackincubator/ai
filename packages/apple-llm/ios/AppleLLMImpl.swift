@@ -254,7 +254,7 @@ public class AppleLLMImpl: NSObject {
     messages: [[String: Any]],
     options: [String: Any],
     onUpdate: @escaping (String, String, [[String: Any]]?) -> Void,
-    onComplete: @escaping (String) -> Void,
+    onComplete: @escaping (String, [String: Any]?) -> Void,
     onError: @escaping (String, String, String) -> Void,
     toolInvoker: @escaping ToolInvoker
   ) {
@@ -275,7 +275,7 @@ public class AppleLLMImpl: NSObject {
           let generationSchema = try self.createGenerationSchema(from: options)
 
           do {
-            try await self.streamResponse(
+            let usage = try await self.streamResponse(
               with: session,
               userPrompt: userPrompt,
               promptAttachments: promptAttachments,
@@ -287,7 +287,7 @@ public class AppleLLMImpl: NSObject {
             }
 
             if !Task.isCancelled {
-              onComplete(streamId)
+              onComplete(streamId, usage)
             }
           } catch {
             if Task.isCancelled {
@@ -525,7 +525,7 @@ public class AppleLLMImpl: NSObject {
     generationSchema: GenerationSchema?,
     generationOptions: GenerationOptions,
     providerOptions: [String: Any]
-  ) async throws -> [[String: Any]] {
+  ) async throws -> [String: Any] {
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
       let contextOptions = try createContextOptions(
@@ -548,7 +548,7 @@ public class AppleLLMImpl: NSObject {
             attachment
           }
         }
-        return response.toModelMessages()
+        return response.toResult()
       }
 
       let response = try await session.respond(
@@ -560,7 +560,7 @@ public class AppleLLMImpl: NSObject {
           attachment
         }
       }
-      return response.toModelMessages()
+      return response.toResult()
     }
 #endif
 
@@ -576,11 +576,11 @@ public class AppleLLMImpl: NSObject {
         includeSchemaInPrompt: true,
         options: generationOptions
       )
-      return response.toModelMessages()
+      return response.toResult()
     }
 
     let response = try await session.respond(to: userPrompt, options: generationOptions)
-    return response.toModelMessages()
+    return response.toResult()
   }
 
   @available(iOS 26, *)
@@ -592,7 +592,7 @@ public class AppleLLMImpl: NSObject {
     generationOptions: GenerationOptions,
     providerOptions: [String: Any],
     onUpdate: @escaping (String, [[String: Any]]?) -> Void
-  ) async throws {
+  ) async throws -> [String: Any]? {
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
       let contextOptions = try createContextOptions(
@@ -615,10 +615,13 @@ public class AppleLLMImpl: NSObject {
             attachment
           }
         }
+        // Each snapshot carries the usage so far
+        var usage: LanguageModelSession.Usage?
         for try await chunk in responseStream {
           onUpdate(String(describing: chunk.content), nil)
+          usage = chunk.usage
         }
-        return
+        return usage?.toDictionary()
       }
 
       let responseStream = session.streamResponse(
@@ -632,13 +635,15 @@ public class AppleLLMImpl: NSObject {
       }
       // Reasoning and tool activity are only sent when they change
       var previousEntries: NSArray = []
+      var usage: LanguageModelSession.Usage?
       for try await chunk in responseStream {
         let entries = AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
         let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
         previousEntries = entries as NSArray
         onUpdate(chunk.content, entriesChanged ? entries : nil)
+        usage = chunk.usage
       }
-      return
+      return usage?.toDictionary()
     }
 #endif
 
@@ -657,13 +662,15 @@ public class AppleLLMImpl: NSObject {
       for try await chunk in responseStream {
         onUpdate(String(describing: chunk.content), nil)
       }
-      return
+      // Usage is reported from iOS 27
+      return nil
     }
 
     let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
     for try await chunk in responseStream {
       onUpdate(chunk.content, nil)
     }
+    return nil
   }
 
 #if compiler(>=6.4)
@@ -1504,7 +1511,32 @@ extension LanguageModelSession.Response {
   func toModelMessages() -> [[String: Any]] {
     return AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: true)
   }
+
+  func toResult() -> [String: Any] {
+    var result: [String: Any] = ["content": toModelMessages()]
+#if compiler(>=6.4)
+    // Usage is reported from iOS 27
+    if #available(iOS 27, *) {
+      result["usage"] = usage.toDictionary()
+    }
+#endif
+    return result
+  }
 }
+
+#if compiler(>=6.4)
+@available(iOS 27, *)
+extension LanguageModelSession.Usage {
+  func toDictionary() -> [String: Any] {
+    return [
+      "inputTokens": input.totalTokenCount,
+      "cachedInputTokens": input.cachedTokenCount,
+      "outputTokens": output.totalTokenCount,
+      "reasoningTokens": output.reasoningTokenCount,
+    ]
+  }
+}
+#endif
 
 @available(iOS 26, *)
 enum AppleLLMTranscriptSerializer {

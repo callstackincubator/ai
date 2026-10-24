@@ -387,6 +387,24 @@ The full request also includes instructions, tool definitions, schema text,
 attachments, and generated output budget. If Apple reports a context overflow,
 trim or summarize and retry.
 
+## Token Usage
+
+On iOS 27 the provider reports token usage on `generateText` results and
+streaming `finish` events. Earlier versions report it as `undefined`:
+
+```typescript
+const { usage, finishReason } = await generateText({
+  model: apple(),
+  prompt: 'Write a haiku about the sea.',
+  maxOutputTokens: 100,
+})
+
+console.log(usage.inputTokens.total, usage.outputTokens.total)
+```
+
+Apple does not say when a response stops at `maxOutputTokens`, so
+`finishReason` is `'length'` when the response used every allowed token.
+
 ## Error Handling
 
 Use public error codes for app control flow:
