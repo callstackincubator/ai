@@ -31,6 +31,8 @@ AI SDK adapter status:
 
 Structured output needs a JSON schema and runs as guided generation, so the output always matches it. Models whose inference engine cannot do guided generation reject with a `CORE_AI_UNSUPPORTED_CAPABILITY` error. When streaming, the JSON arrives in one piece once it is complete.
 
+The `reasoning` call option sets the model's thinking effort (`minimal`/`low` → `light`, `medium` → `moderate`, `high` and above → `deep`), and `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence. Reasoning comes back as reasoning parts. Core AI ignores `topP`, `topK`, `seed`, stop sequences and penalties, and returns a warning when they are set.
+
 The embedding and transcription adapters are present because AI SDK has matching interfaces and Apple’s registry has starter export recipes. They reject until this package gets task-specific native runners for CLIP/CLAP and wav2vec2/Whisper outputs.
 
 Reranking, speech generation, and video generation are intentionally not exposed as working Core AI adapters yet. AI SDK has model interfaces for reranking and speech, but Apple’s current `coreai-models` registry does not provide a Core AI reranker, TTS model, or video-generation starter. Use `@react-native-ai/apple` for system speech synthesis.

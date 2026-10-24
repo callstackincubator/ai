@@ -15,11 +15,12 @@ import type {
   TranscriptionModelV4,
   TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
-import { generateId, isCustomReasoning } from '@ai-sdk/provider-utils'
+import { generateId } from '@ai-sdk/provider-utils'
 import {
   type AppleStreamEntry,
   createSnapshotStreamHandler,
   prepareAppleMessages,
+  toAppleReasoningLevel,
 } from '@react-native-ai/apple'
 import type { CodegenTypes } from 'react-native'
 
@@ -35,6 +36,8 @@ import type {
   CoreAIMessage,
   CoreAIModelConfig,
   CoreAIModelInfo,
+  CoreAIProviderOptions,
+  CoreAIReasoningLevel,
   CoreAIStreamCompleteEvent,
   CoreAIStreamErrorEvent,
   CoreAIStreamUpdateEvent,
@@ -584,7 +587,24 @@ function toCoreAIGenerationOptions(
       options.responseFormat?.type === 'json'
         ? options.responseFormat.schema
         : undefined,
+    providerOptions: { reasoningLevel: getReasoningLevel(options) },
   }
+}
+
+function getReasoningLevel(
+  options: LanguageModelV4CallOptions
+): CoreAIReasoningLevel | undefined {
+  const coreAIOptions = (options.providerOptions?.['core-ai'] ??
+    {}) as CoreAIProviderOptions
+
+  // providerOptions['core-ai'].reasoningLevel takes precedence over the
+  // provider-agnostic `reasoning` call option. `none` turns thinking off
+  return (
+    coreAIOptions.reasoningLevel ??
+    (options.reasoning === 'none'
+      ? 'none'
+      : toAppleReasoningLevel(options.reasoning))
+  )
 }
 
 function getCallWarnings(
@@ -626,15 +646,6 @@ function getCallWarnings(
       feature: 'responseFormat',
       details:
         'Core AI language models only enforce JSON output that has a schema.',
-    })
-  }
-
-  // `none` is already what a model without reasoning control does
-  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
-    warnings.push({
-      type: 'unsupported',
-      feature: 'reasoning',
-      details: 'Core AI language models do not support configuring reasoning.',
     })
   }
   return warnings

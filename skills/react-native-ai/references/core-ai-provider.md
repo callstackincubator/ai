@@ -65,7 +65,7 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 
 ### 4. Use It
 
-- Language: `coreAI.languageModel(config)` with `generateText` / `streamText`
+- Language: `coreAI.languageModel(config)` with `generateText` / `streamText`. Supports message history, structured output with a schema, and the `reasoning` option (`providerOptions['core-ai'].reasoningLevel` wins)
 - Persistent native sessions: `await model.createSession()`, then `session.respond(...)`
 - Image generation: `coreAI.imageModel(config)` with `generateImage`
 - Segmentation and object detection: `CoreAI.runTask('segmentation' | 'object-detection', ...)`
