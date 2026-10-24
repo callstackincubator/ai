@@ -215,6 +215,38 @@ describe('apple prompt conversion', () => {
   })
 })
 
+describe('apple image history', () => {
+  test('keeps image attachments only on the final user prompt', async () => {
+    const image = {
+      type: 'file' as const,
+      mediaType: 'image/png',
+      data: { type: 'data' as const, data: 'iVBORw0KGgo=' },
+    }
+
+    await apple().doGenerate(
+      createCallOptions({
+        prompt: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'what is this?' }, image],
+          },
+          { role: 'assistant', content: [{ type: 'text', text: 'A cat.' }] },
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'and this?' }, image],
+          },
+        ],
+      })
+    )
+
+    const [first, , last] = generateText.mock.calls.at(-1)![0] as {
+      attachments: unknown[]
+    }[]
+    expect(first.attachments).toEqual([])
+    expect(last.attachments).toHaveLength(1)
+  })
+})
+
 describe('apple tool choice', () => {
   const tools: LanguageModelV4CallOptions['tools'] = [
     {
