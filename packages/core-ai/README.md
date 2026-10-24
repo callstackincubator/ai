@@ -2,6 +2,11 @@
 
 Apple Core AI provider for React Native AI.
 
+> [!WARNING]
+> Work in progress. This package is not published to npm yet, and nothing has
+> run on a device so far ([#236](https://github.com/callstackincubator/ai/issues/236)).
+> Its docs live in [`docs/`](./docs) until it is released.
+
 This package is for app-provided Core AI model bundles exported from
 [`apple/coreai-models`](https://github.com/apple/coreai-models). It is separate
 from `@react-native-ai/apple`, which wraps Apple system capabilities such as
@@ -22,6 +27,21 @@ Core AI exposes two layers:
 
 Reranking, speech generation, and video generation have no adapters, because
 `coreai-models` has no runtime for them yet.
+
+## Installation
+
+```bash
+npm install @react-native-ai/core-ai @react-native-ai/apple
+```
+
+`@react-native-ai/apple` is a peer dependency. To use the AI SDK functions (`generateText`, `streamText`, `generateImage`), also install `ai` v7.
+
+Requirements:
+
+- React Native New Architecture
+- Xcode 27 or newer
+- iOS 27 or newer, on a physical device
+- Model bundles exported with [`apple/coreai-models`](https://github.com/apple/coreai-models) (see [starter models](./docs/models.md))
 
 ## Native Setup
 
@@ -117,3 +137,9 @@ await CoreAI.inspectModel(toNativeModelConfig(modelConfig))
 ## Loading Models
 
 Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
+
+## Documentation
+
+- [Getting started](./docs/getting-started.md): installation, native setup and a first model
+- [API surface](./docs/api.md): AI SDK adapters, native sessions and direct native calls
+- [Starter models](./docs/models.md): models from Apple's registry to try first
