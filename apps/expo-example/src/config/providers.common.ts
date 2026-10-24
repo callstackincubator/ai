@@ -36,6 +36,16 @@ export interface SetupAdapter<TModel> {
 
 // Available language model adapters for text generation.
 export const commonLanguageAdapters: SetupAdapter<LanguageModelV4>[] = [
+  // Vision, audio, reasoning and tool calling
+  createLlamaLanguageSetupAdapter(
+    'ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q4_0.gguf',
+    'ggml-org/gemma-4-E2B-it-GGUF/mmproj-gemma-4-E2B-it-Q8_0.gguf'
+  ),
+  // Vision, reasoning and tool calling, about half the download of Gemma 4 E2B
+  createLlamaLanguageSetupAdapter(
+    'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf',
+    'bartowski/Qwen_Qwen3.5-2B-GGUF/mmproj-Qwen_Qwen3.5-2B-f16.gguf'
+  ),
   createLlamaLanguageSetupAdapter(
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),
