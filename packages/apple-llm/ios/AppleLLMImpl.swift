@@ -1418,11 +1418,20 @@ public class AppleLLMImpl: NSObject {
     static func parseNumberSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
       let type = schemaDict["type"] as! String
       
-      // Handle numeric enums - use string representation since Apple's GenerationGuide.anyOf only supports [String]
-      // The JavaScript side will parse these back to numbers after generation
-      
-      if let enumValues = schemaDict["enum"] as? [String] {
-        return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
+      // Apple's GenerationGuide.anyOf only supports [String], so each numeric enum value
+      // becomes a choice whose range holds just that value
+
+      if let enumValues = schemaDict["enum"] as? [Double] {
+        let choices = enumValues.map { value in
+          type == "integer"
+            ? DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.range(Int(value)...Int(value))])
+            : DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.range(value...value)])
+        }
+        return DynamicGenerationSchema(
+          name: schemaDict["title"] as? String ?? "",
+          description: schemaDict["description"] as? String,
+          anyOf: choices
+        )
       }
       
       if schemaDict["multipleOf"] != nil {
