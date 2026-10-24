@@ -201,11 +201,16 @@ public class AppleEmbeddingsImpl: NSObject {
   }
   
   @available(iOS 17, *)
-  private func generateEmbeddings(for sentence: String, model: NLContextualEmbedding) throws -> [Float] {
+  func generateEmbeddings(for sentence: String, model: NLContextualEmbedding) throws -> [Float] {
     let embedding = try model.embeddingResult(for: sentence, language: nil)
     let dimension = model.dimension
     let sequenceLength = embedding.sequenceLength
-    
+
+    // Empty or whitespace-only text has no tokens, and the mean would divide by zero
+    guard sequenceLength > 0 else {
+      return [Float](repeating: 0.0, count: dimension)
+    }
+
     var meanPooledEmbeddings = [Float](repeating: 0.0, count: dimension)
     var tokenBuffer = [Float](repeating: 0.0, count: dimension)
     

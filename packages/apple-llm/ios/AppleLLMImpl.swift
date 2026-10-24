@@ -802,6 +802,11 @@ public class AppleLLMImpl: NSObject {
       return appleError
     }
 
+    // Foundation Models wraps errors thrown by tools
+    if let toolCallError = error as? LanguageModelSession.ToolCallError {
+      return mapKnownAppleLLMError(toolCallError.underlyingError) ?? .toolCallError(toolCallError.underlyingError)
+    }
+
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
       if let languageModelError = error as? LanguageModelError {
@@ -1517,63 +1522,68 @@ public class AppleLLMImpl: NSObject {
     static func parseNumberSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
       let type = schemaDict["type"] as! String
       
-      // Handle numeric enums - use string representation since Apple's GenerationGuide.anyOf only supports [String]
-      // The JavaScript side will parse these back to numbers after generation
-      
-      if let enumValues = schemaDict["enum"] as? [String] {
-        return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
+      // Apple's GenerationGuide.anyOf only supports [String], so each numeric enum value
+      // becomes a choice whose range holds just that value
+
+      if let enumValues = schemaDict["enum"] as? [Double] {
+        let choices = enumValues.map { value in
+          type == "integer"
+            ? DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.range(Int(value)...Int(value))])
+            : DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.range(value...value)])
+        }
+        return DynamicGenerationSchema(
+          name: schemaDict["title"] as? String ?? "",
+          description: schemaDict["description"] as? String,
+          anyOf: choices
+        )
       }
       
       if schemaDict["multipleOf"] != nil {
         throw AppleLLMError.invalidSchema("MultipleOf is not supported by Apple Foundational models.")
       }
       
-      if let maximum = schemaDict["maximum"] as? Double {
-        if type == "integer" {
-          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(Int(maximum))])
-        } else {
-          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(maximum)])
-        }
-      }
-      
-      if let minimum = schemaDict["minimum"] as? Double {
-        if type == "integer" {
-          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(Int(minimum))])
-        } else {
-          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(minimum)])
-        }
-      }
-      
+      let minimum = schemaDict["minimum"] as? Double
+      let maximum = schemaDict["maximum"] as? Double
+      let exclusiveMinimum = schemaDict["exclusiveMinimum"] as? Double
+      let exclusiveMaximum = schemaDict["exclusiveMaximum"] as? Double
+
       // Apple's GenerationGuide only supports inclusive bounds (≤, ≥)
       // We convert exclusive bounds (< , >) to the nearest inclusive equivalent:
-      // - exclusiveMaximum: value < N → maximum(N-1 for int, N.nextDown for double)
-      // - exclusiveMinimum: value > N → minimum(N+1 for int, N.nextUp for double)
-      
-      if let exclusiveMaximum = schemaDict["exclusiveMaximum"] as? Double {
-        if type == "integer" {
-          let approximateMax = Int(exclusiveMaximum) - 1
-          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.maximum(approximateMax)])
-        } else {
-          let approximateMax = exclusiveMaximum.nextDown
-          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.maximum(approximateMax)])
-        }
-      }
-      
-      if let exclusiveMinimum = schemaDict["exclusiveMinimum"] as? Double {
-        if type == "integer" {
-          let approximateMin = Int(exclusiveMinimum) + 1
-          return DynamicGenerationSchema(type: Int.self, guides: [GenerationGuide.minimum(approximateMin)])
-        } else {
-          let approximateMin = exclusiveMinimum.nextUp
-          return DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.minimum(approximateMin)])
-        }
-      }
-      
+      // - exclusiveMaximum: value < N → maximum(largest int below N, N.nextDown for double)
+      // - exclusiveMinimum: value > N → minimum(smallest int above N, N.nextUp for double)
+      // When both kinds of bound are set on one side, the stricter one wins
+
       if type == "integer" {
-        return DynamicGenerationSchema(type: Int.self, guides: [])
-      } else {
-        return DynamicGenerationSchema(type: Double.self, guides: [])
+        let lowerBound = [
+          minimum.map { Int($0.rounded(.up)) },
+          exclusiveMinimum.map { Int($0.rounded(.down)) + 1 },
+        ].compactMap { $0 }.max()
+        let upperBound = [
+          maximum.map { Int($0.rounded(.down)) },
+          exclusiveMaximum.map { Int($0.rounded(.up)) - 1 },
+        ].compactMap { $0 }.min()
+
+        var guides: [GenerationGuide<Int>] = []
+        if let lowerBound {
+          guides.append(.minimum(lowerBound))
+        }
+        if let upperBound {
+          guides.append(.maximum(upperBound))
+        }
+        return DynamicGenerationSchema(type: Int.self, guides: guides)
       }
+
+      let lowerBound = [minimum, exclusiveMinimum?.nextUp].compactMap { $0 }.max()
+      let upperBound = [maximum, exclusiveMaximum?.nextDown].compactMap { $0 }.min()
+
+      var guides: [GenerationGuide<Double>] = []
+      if let lowerBound {
+        guides.append(.minimum(lowerBound))
+      }
+      if let upperBound {
+        guides.append(.maximum(upperBound))
+      }
+      return DynamicGenerationSchema(type: Double.self, guides: guides)
     }
     
     static func parseBooleanSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {

@@ -382,6 +382,9 @@ such as `prepareStep` and telemetry read:
 - iOS 26.4 counts the transcript with the on-device model's tokenizer.
 - Otherwise usage is `undefined`.
 
+Apple does not say when a response stops at `maxOutputTokens`, so
+`finishReason` is `'length'` when the response used every allowed token.
+
 To keep long chats inside the context window, wrap the model with
 `wrapLanguageModelWithHistory`. It keeps a rolling window, summarizes older
 messages, and counts tokens with the model's `countTokens`. See

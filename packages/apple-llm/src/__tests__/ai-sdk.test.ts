@@ -46,7 +46,9 @@ mock.module('react-native', () => ({
             onStreamComplete,
             onStreamError,
           }
-        : { getCurrentLocale: () => 'en-US' },
+        : name === 'NativeAppleTranscription'
+          ? { prepare: async () => {}, isAvailable: () => true }
+          : { getCurrentLocale: () => 'en-US' },
   },
 }))
 
@@ -534,6 +536,36 @@ describe('apple usage', () => {
       },
     })
   })
+  test('reports length when every allowed token was used', async () => {
+    generateText.mockImplementationOnce(async () => ({
+      content: [],
+      usage: { inputTokens: 63, outputTokens: 14 },
+    }))
+
+    const result = await apple().doGenerate(
+      createCallOptions({ maxOutputTokens: 12 })
+    )
+
+    expect(result.finishReason).toEqual({ unified: 'length', raw: undefined })
+  })
+
+  test('reports length when a stream used every allowed token', async () => {
+    const { stream } = await apple().doStream(
+      createCallOptions({ maxOutputTokens: 12 })
+    )
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamComplete.emit({
+      streamId,
+      usage: { inputTokens: 63, outputTokens: 14 },
+    })
+
+    const finish = (await parts).find((part) => part.type === 'finish')
+    expect(finish).toMatchObject({
+      finishReason: { unified: 'length', raw: undefined },
+    })
+  })
 })
 
 describe('apple structured output stream', () => {
@@ -604,5 +636,25 @@ describe('apple token counting', () => {
   test('counts tokens through the language model', async () => {
     expect(await apple().countTokens('hello')).toBe(5)
     expect(countTokens).toHaveBeenCalledWith('hello')
+  })
+})
+
+describe('apple transcription', () => {
+  test('sends only the bytes of a typed array view', async () => {
+    const transcribe = mock(
+      async (_data: ArrayBufferLike, _language: string) => ({
+        segments: [],
+        duration: 0,
+      })
+    )
+    globalThis.__apple__llm__transcribe__ = transcribe
+
+    const model = apple.transcriptionModel()
+    await model.prepare()
+    const audio = new Uint8Array([0, 1, 2, 3, 4, 5]).subarray(2, 4)
+    await model.doGenerate({ audio, mediaType: 'audio/wav' })
+
+    const sent = new Uint8Array(transcribe.mock.calls[0]![0])
+    expect([...sent]).toEqual([2, 3])
   })
 })

@@ -6,6 +6,7 @@ import type {
   ImageModelV4CallOptions,
   LanguageModelV4,
   LanguageModelV4CallOptions,
+  LanguageModelV4FinishReason,
   LanguageModelV4FunctionTool,
   LanguageModelV4Message,
   LanguageModelV4Prompt,
@@ -479,6 +480,22 @@ function toUsage(usage: AppleUsage | undefined): LanguageModelV4Usage {
   }
 }
 
+// Foundation Models stops at maxOutputTokens without saying so, so a response
+// that used every allowed token is reported as cut off
+function toFinishReason(
+  usage: AppleUsage | undefined,
+  maxOutputTokens: number | undefined
+): LanguageModelV4FinishReason {
+  if (
+    usage &&
+    maxOutputTokens !== undefined &&
+    usage.outputTokens >= maxOutputTokens
+  ) {
+    return { unified: 'length', raw: undefined }
+  }
+  return { unified: 'stop', raw: 'stop' }
+}
+
 function appendMessageContent(content: string, addition: string) {
   if (!addition) {
     return content
@@ -618,8 +635,12 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
         await this.prepare()
       }
 
+      // A typed array can be a view into a larger buffer, so only its bytes are sent
       const transcriptionResult = await NativeAppleTranscription.transcribe(
-        audio.buffer,
+        audio.buffer.slice(
+          audio.byteOffset,
+          audio.byteOffset + audio.byteLength
+        ),
         this.language
       )
 
@@ -909,7 +930,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               }
           }
         }),
-        finishReason: { unified: 'stop' as const, raw: 'stop' },
+        finishReason: toFinishReason(response.usage, options.maxOutputTokens),
         usage: toUsage(response.usage),
         warnings,
       }
@@ -1099,7 +1120,10 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               }
               controller.enqueue({
                 type: 'finish',
-                finishReason: { unified: 'stop' as const, raw: 'stop' },
+                finishReason: toFinishReason(
+                  data.usage as AppleUsage | undefined,
+                  options.maxOutputTokens
+                ),
                 usage: toUsage(data.usage as AppleUsage | undefined),
               })
               cleanup()
