@@ -17,7 +17,7 @@ import { embed } from 'ai'
 const modelPath = await downloadModel('owner/repo/embedding-model.gguf')
 
 // Create embedding model with the path
-const model = llama.textEmbeddingModel(modelPath)
+const model = llama.embeddingModel(modelPath)
 
 await model.prepare()
 
@@ -40,7 +40,7 @@ import { embedMany } from 'ai'
 
 const modelPath = await downloadModel('owner/repo/embedding-model.gguf')
 
-const model = llama.textEmbeddingModel(modelPath)
+const model = llama.embeddingModel(modelPath)
 await model.prepare()
 
 const { embeddings } = await embedMany({
@@ -61,7 +61,7 @@ console.log(embeddings[0].length) // Embedding dimension (e.g., 384, 768)
 Configure the embedding model with specific options:
 
 ```typescript
-const model = llama.textEmbeddingModel(modelPath, {
+const model = llama.embeddingModel(modelPath, {
   normalize: -1, // Normalization mode (default: -1)
   contextParams: {
     n_ctx: 2048, // Context size (default: 2048)

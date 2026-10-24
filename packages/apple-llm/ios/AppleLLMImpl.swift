@@ -548,7 +548,7 @@ public class AppleLLMImpl: NSObject {
             attachment
           }
         }
-        return response.toResult()
+        return Self.generationResult(content: response.toModelMessages(), usage: Self.usageDictionary(response.usage))
       }
 
       let response = try await session.respond(
@@ -560,7 +560,7 @@ public class AppleLLMImpl: NSObject {
           attachment
         }
       }
-      return response.toResult()
+      return Self.generationResult(content: response.toModelMessages(), usage: Self.usageDictionary(response.usage))
     }
 #endif
 
@@ -569,6 +569,8 @@ public class AppleLLMImpl: NSObject {
       throw AppleLLMError.unsupportedOS
     }
 
+    let transcriptBefore = session.transcript
+    let content: [[String: Any]]
     if let generationSchema {
       let response = try await session.respond(
         to: userPrompt,
@@ -576,11 +578,71 @@ public class AppleLLMImpl: NSObject {
         includeSchemaInPrompt: true,
         options: generationOptions
       )
-      return response.toResult()
+      content = response.toModelMessages()
+    } else {
+      let response = try await session.respond(to: userPrompt, options: generationOptions)
+      content = response.toModelMessages()
     }
 
-    let response = try await session.respond(to: userPrompt, options: generationOptions)
-    return response.toResult()
+    let usage = await countUsage(
+      session: session,
+      transcriptBefore: transcriptBefore,
+      userPrompt: userPrompt,
+      providerOptions: providerOptions
+    )
+    return Self.generationResult(content: content, usage: usage)
+  }
+
+  private static func generationResult(content: [[String: Any]], usage: [String: Any]?) -> [String: Any] {
+    var result: [String: Any] = ["content": content]
+    if let usage {
+      result["usage"] = usage
+    }
+    return result
+  }
+
+#if compiler(>=6.4)
+  @available(iOS 27, *)
+  private static func usageDictionary(_ usage: LanguageModelSession.Usage) -> [String: Any] {
+    return [
+      "inputTokens": usage.input.totalTokenCount,
+      "cachedInputTokens": usage.input.cachedTokenCount,
+      "outputTokens": usage.output.totalTokenCount,
+      "reasoningTokens": usage.output.reasoningTokenCount,
+    ]
+  }
+#endif
+
+  /// iOS 26 responses report no usage, so the system model's tokenizer (iOS 26.4)
+  /// counts the transcript before and after the response. Private Cloud Compute
+  /// has no tokenizer, so its usage stays unknown
+  @available(iOS 26, *)
+  private func countUsage(
+    session: LanguageModelSession,
+    transcriptBefore: Transcript,
+    userPrompt: String,
+    providerOptions: [String: Any]
+  ) async -> [String: Any]? {
+#if compiler(>=6.3)
+    guard #available(iOS 26.4, *), (providerOptions["model"] as? String ?? "system") == "system" else {
+      return nil
+    }
+
+    let model = SystemLanguageModel.default
+    guard let historyTokens = try? await model.tokenCount(for: transcriptBefore),
+          let promptTokens = try? await model.tokenCount(for: userPrompt),
+          let totalTokens = try? await model.tokenCount(for: session.transcript) else {
+      return nil
+    }
+
+    let inputTokens = historyTokens + promptTokens
+    return [
+      "inputTokens": inputTokens,
+      "outputTokens": max(totalTokens - inputTokens, 0),
+    ]
+#else
+    return nil
+#endif
   }
 
   @available(iOS 26, *)
@@ -593,6 +655,19 @@ public class AppleLLMImpl: NSObject {
     providerOptions: [String: Any],
     onUpdate: @escaping (String, [[String: Any]]?) -> Void
   ) async throws -> [String: Any]? {
+    // Reasoning and tool activity are only sent when they change
+    var previousContent: String?
+    var previousEntries: NSArray = []
+    func update(_ content: String, _ entries: [[String: Any]]) {
+      let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
+      guard entriesChanged || content != previousContent else {
+        return
+      }
+      previousContent = content
+      previousEntries = entries as NSArray
+      onUpdate(content, entriesChanged ? entries : nil)
+    }
+
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
       let contextOptions = try createContextOptions(
@@ -604,6 +679,7 @@ public class AppleLLMImpl: NSObject {
         Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
       }
 
+      var usage: LanguageModelSession.Usage?
       if let generationSchema {
         let responseStream = session.streamResponse(
           schema: generationSchema,
@@ -615,35 +691,32 @@ public class AppleLLMImpl: NSObject {
             attachment
           }
         }
-        // Each snapshot carries the usage so far
-        var usage: LanguageModelSession.Usage?
         for try await chunk in responseStream {
-          onUpdate(String(describing: chunk.content), nil)
           usage = chunk.usage
+          update(
+            chunk.rawContent.jsonString,
+            AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
+          )
         }
-        return usage?.toDictionary()
-      }
-
-      let responseStream = session.streamResponse(
-        options: generationOptions,
-        contextOptions: contextOptions
-      ) {
-        userPrompt
-        for attachment in preparedAttachments.values {
-          attachment
+      } else {
+        let responseStream = session.streamResponse(
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          userPrompt
+          for attachment in preparedAttachments.values {
+            attachment
+          }
+        }
+        for try await chunk in responseStream {
+          usage = chunk.usage
+          update(
+            chunk.content,
+            AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
+          )
         }
       }
-      // Reasoning and tool activity are only sent when they change
-      var previousEntries: NSArray = []
-      var usage: LanguageModelSession.Usage?
-      for try await chunk in responseStream {
-        let entries = AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
-        let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
-        previousEntries = entries as NSArray
-        onUpdate(chunk.content, entriesChanged ? entries : nil)
-        usage = chunk.usage
-      }
-      return usage?.toDictionary()
+      return usage.map(Self.usageDictionary)
     }
 #endif
 
@@ -652,6 +725,17 @@ public class AppleLLMImpl: NSObject {
       throw AppleLLMError.unsupportedOS
     }
 
+    // iOS 26 snapshots have no transcript entries, so tool activity is read from
+    // the session transcript, which grows while the response streams
+    let transcriptBefore = session.transcript
+    let newEntries = {
+      AppleLLMTranscriptSerializer.serialize(
+        session.transcript.dropFirst(transcriptBefore.count),
+        includeResponses: false
+      )
+    }
+
+    var content = ""
     if let generationSchema {
       let responseStream = session.streamResponse(
         to: userPrompt,
@@ -660,17 +744,25 @@ public class AppleLLMImpl: NSObject {
         options: generationOptions
       )
       for try await chunk in responseStream {
-        onUpdate(String(describing: chunk.content), nil)
+        content = chunk.rawContent.jsonString
+        update(content, newEntries())
       }
-      // Usage is reported from iOS 27
-      return nil
+    } else {
+      let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
+      for try await chunk in responseStream {
+        content = chunk.content
+        update(content, newEntries())
+      }
     }
+    // Entries added after the last snapshot
+    update(content, newEntries())
 
-    let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
-    for try await chunk in responseStream {
-      onUpdate(chunk.content, nil)
-    }
-    return nil
+    return await countUsage(
+      session: session,
+      transcriptBefore: transcriptBefore,
+      userPrompt: userPrompt,
+      providerOptions: providerOptions
+    )
   }
 
 #if compiler(>=6.4)
@@ -1511,32 +1603,7 @@ extension LanguageModelSession.Response {
   func toModelMessages() -> [[String: Any]] {
     return AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: true)
   }
-
-  func toResult() -> [String: Any] {
-    var result: [String: Any] = ["content": toModelMessages()]
-#if compiler(>=6.4)
-    // Usage is reported from iOS 27
-    if #available(iOS 27, *) {
-      result["usage"] = usage.toDictionary()
-    }
-#endif
-    return result
-  }
 }
-
-#if compiler(>=6.4)
-@available(iOS 27, *)
-extension LanguageModelSession.Usage {
-  func toDictionary() -> [String: Any] {
-    return [
-      "inputTokens": input.totalTokenCount,
-      "cachedInputTokens": input.cachedTokenCount,
-      "outputTokens": output.totalTokenCount,
-      "reasoningTokens": output.reasoningTokenCount,
-    ]
-  }
-}
-#endif
 
 @available(iOS 26, *)
 enum AppleLLMTranscriptSerializer {

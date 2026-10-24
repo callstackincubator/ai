@@ -89,12 +89,12 @@ const exists = await isModelDownloaded('owner/repo/model.gguf')
 
 ### 5. Model Types
 
-| Type      | Method                       | Notes                                   | Documentation                                                                        |
-| --------- | ---------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
-| Language  | `llama.languageModel()`      | Text generation, chat                   | https://www.react-native-ai.dev/docs/llama/generating                                |
-| Embedding | `llama.textEmbeddingModel()` | RAG, similarity, prompt size estimation | https://www.react-native-ai.dev/docs/llama/embeddings                                |
-| Rerank    | `llama.rerankModel()`        | Document ranking, RAG                   | https://www.react-native-ai.dev/docs/llama/reranking                                 |
-| Speech    | `llama.speechModel()`        | Requires `vocoderPath` in opts          | https://www.react-native-ai.dev/docs/llama/model-management#creating-model-instances |
+| Type      | Method                   | Notes                                   | Documentation                                                                        |
+| --------- | ------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| Language  | `llama.languageModel()`  | Text generation, chat                   | https://www.react-native-ai.dev/docs/llama/generating                                |
+| Embedding | `llama.embeddingModel()` | RAG, similarity, prompt size estimation | https://www.react-native-ai.dev/docs/llama/embeddings                                |
+| Rerank    | `llama.rerankingModel()` | Document ranking, RAG                   | https://www.react-native-ai.dev/docs/llama/reranking                                 |
+| Speech    | `llama.speechModel()`    | Requires `vocoderPath` in opts          | https://www.react-native-ai.dev/docs/llama/model-management#creating-model-instances |
 
 ### 6. Lifecycle
 

@@ -25,6 +25,7 @@ const generateText = mock(
     content: [{ type: 'text', text: 'ok' }],
   })
 )
+const countTokens = mock(async (text: string) => text.length)
 const generateStream = mock(
   (_streamId: string, _messages: unknown, _options: unknown) => {}
 )
@@ -39,6 +40,7 @@ mock.module('react-native', () => ({
         ? {
             generateText,
             generateStream,
+            countTokens,
             cancelStream: () => {},
             onStreamUpdate,
             onStreamComplete,
@@ -477,39 +479,68 @@ describe('apple generated content', () => {
 })
 
 describe('apple usage', () => {
-  const usage = {
-    inputTokens: 63,
-    cachedInputTokens: 10,
-    outputTokens: 14,
-    reasoningTokens: 4,
-  }
-
-  test('reports native usage', async () => {
-    generateText.mockImplementationOnce(async () => ({ content: [], usage }))
+  test('maps native token usage', async () => {
+    generateText.mockImplementationOnce(async () => ({
+      content: [{ type: 'text', text: 'ok' }],
+      usage: {
+        inputTokens: 120,
+        cachedInputTokens: 20,
+        outputTokens: 30,
+        reasoningTokens: 10,
+      },
+    }))
 
     const result = await apple().doGenerate(createCallOptions())
 
     expect(result.usage).toEqual({
       inputTokens: {
-        total: 63,
-        noCache: 53,
-        cacheRead: 10,
+        total: 120,
+        noCache: 100,
+        cacheRead: 20,
         cacheWrite: undefined,
       },
-      outputTokens: { total: 14, text: 10, reasoning: 4 },
+      outputTokens: { total: 30, text: 20, reasoning: 10 },
     })
-    expect(result.finishReason).toEqual({ unified: 'stop', raw: 'stop' })
   })
 
-  test('leaves usage undefined when native does not report it', async () => {
+  test('reports unknown usage as undefined instead of zero', async () => {
     const result = await apple().doGenerate(createCallOptions())
 
-    expect(result.usage.inputTokens.total).toBeUndefined()
-    expect(result.usage.outputTokens.total).toBeUndefined()
+    expect(result.usage).toEqual({
+      inputTokens: {
+        total: undefined,
+        noCache: undefined,
+        cacheRead: undefined,
+        cacheWrite: undefined,
+      },
+      outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+    })
   })
 
+  test('reports stream usage on finish', async () => {
+    const { stream } = await apple().doStream(createCallOptions())
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamUpdate.emit({ streamId, content: 'ok' })
+    onStreamComplete.emit({
+      streamId,
+      usage: { inputTokens: 12, outputTokens: 3 },
+    })
+
+    const finish = (await parts).find((part) => part.type === 'finish')
+    expect(finish).toMatchObject({
+      usage: {
+        inputTokens: { total: 12, noCache: undefined, cacheRead: undefined },
+        outputTokens: { total: 3, text: undefined, reasoning: undefined },
+      },
+    })
+  })
   test('reports length when every allowed token was used', async () => {
-    generateText.mockImplementationOnce(async () => ({ content: [], usage }))
+    generateText.mockImplementationOnce(async () => ({
+      content: [],
+      usage: { inputTokens: 63, outputTokens: 14 },
+    }))
 
     const result = await apple().doGenerate(
       createCallOptions({ maxOutputTokens: 12 })
@@ -518,28 +549,93 @@ describe('apple usage', () => {
     expect(result.finishReason).toEqual({ unified: 'length', raw: undefined })
   })
 
-  test('reports usage and length when a stream finishes', async () => {
+  test('reports length when a stream used every allowed token', async () => {
     const { stream } = await apple().doStream(
       createCallOptions({ maxOutputTokens: 12 })
     )
     const parts = readAll(stream)
     const streamId = generateStream.mock.calls.at(-1)![0]
 
-    onStreamComplete.emit({ streamId, usage })
-
-    expect((await parts).at(-1)).toEqual({
-      type: 'finish',
-      finishReason: { unified: 'length', raw: undefined },
-      usage: {
-        inputTokens: {
-          total: 63,
-          noCache: 53,
-          cacheRead: 10,
-          cacheWrite: undefined,
-        },
-        outputTokens: { total: 14, text: 10, reasoning: 4 },
-      },
+    onStreamComplete.emit({
+      streamId,
+      usage: { inputTokens: 63, outputTokens: 14 },
     })
+
+    const finish = (await parts).find((part) => part.type === 'finish')
+    expect(finish).toMatchObject({
+      finishReason: { unified: 'length', raw: undefined },
+    })
+  })
+})
+
+describe('apple structured output stream', () => {
+  test('sends the final json once the stream completes', async () => {
+    const { stream } = await apple().doStream(
+      createCallOptions({
+        responseFormat: {
+          type: 'json',
+          schema: { type: 'object', properties: { city: { type: 'string' } } },
+        },
+      })
+    )
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamUpdate.emit({ streamId, content: '{"city":"Par"}' })
+    onStreamUpdate.emit({ streamId, content: '{"city":"Paris"}' })
+    onStreamComplete.emit({ streamId })
+
+    expect(
+      (await parts).filter(
+        (part) => part.type !== 'stream-start' && part.type !== 'finish'
+      )
+    ).toEqual([
+      { type: 'text-start', id: streamId },
+      { type: 'text-delta', id: streamId, delta: '{"city":"Paris"}' },
+      { type: 'text-end', id: streamId },
+    ])
+  })
+})
+
+describe('apple with the ai sdk', () => {
+  test('streams structured output and usage through streamText', async () => {
+    const { jsonSchema, Output, streamText } = await import('ai')
+    generateStream.mockImplementationOnce((streamId) => {
+      setTimeout(() => {
+        onStreamUpdate.emit({ streamId, content: '{"city":"Par"}' })
+        onStreamUpdate.emit({ streamId, content: '{"city":"Paris"}' })
+        onStreamComplete.emit({
+          streamId,
+          usage: { inputTokens: 40, outputTokens: 6 },
+        })
+      })
+    })
+
+    const result = streamText({
+      model: apple(),
+      prompt: 'Where is the Eiffel Tower?',
+      output: Output.object({
+        schema: jsonSchema<{ city: string }>({
+          type: 'object',
+          properties: { city: { type: 'string' } },
+          required: ['city'],
+        }),
+      }),
+    })
+
+    expect(await result.output).toEqual({ city: 'Paris' })
+    expect(await result.usage).toMatchObject({
+      inputTokens: 40,
+      outputTokens: 6,
+      totalTokens: 46,
+    })
+  })
+})
+
+describe('apple token counting', () => {
+  test('counts tokens through the language model', async () => {
+    expect(await apple().countTokens('hello')).toBe(5)
+    expect(countTokens).toHaveBeenCalledWith('hello')
   })
 })
 

@@ -59,6 +59,7 @@ async function checkNanoSupported(): Promise<boolean> {
 
 export interface AdkProvider {
   (): LanguageModelV4
+  readonly specificationVersion: 'v4'
   languageModel: () => LanguageModelV4
   /** Device capability check (ML Kit `checkStatus !== 0`). Returns `false` on non-Android. */
   isNanoSupported: () => Promise<boolean>
@@ -79,6 +80,7 @@ export function createAdkProvider(
   const provider = function () {
     return createLanguageModel()
   }
+  provider.specificationVersion = 'v4' as const
   provider.languageModel = createLanguageModel
   provider.isNanoSupported = () => checkNanoSupported()
   provider.isAvailable = async (modelType: AdkModelType = 'genai-nano') => {

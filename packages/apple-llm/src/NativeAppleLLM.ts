@@ -27,17 +27,19 @@ export type StreamUpdateEvent = {
   entries?: CodegenTypes.UnsafeObject[]
 }
 
-// Token usage reported from iOS 27
+// Token counts from Foundation Models (iOS 27) or the system model's
+// tokenizer (iOS 26.4). Left out when they are unknown
 export type AppleUsage = {
   inputTokens: number
-  cachedInputTokens: number
+  cachedInputTokens?: number
   outputTokens: number
-  reasoningTokens: number
+  reasoningTokens?: number
 }
 
 export type StreamCompleteEvent = {
   streamId: string
-  usage?: AppleUsage
+  // AppleUsage
+  usage?: CodegenTypes.UnsafeObject
 }
 
 export type StreamErrorEvent = {

@@ -194,6 +194,15 @@ export class LlamaLanguageModel implements LanguageModelV4 {
   }
 
   /**
+   * Count tokens in text with the model's tokenizer
+   */
+  async countTokens(text: string): Promise<number> {
+    const context = this.context ?? (await this.prepare())
+    const { tokens } = await context.tokenize(text)
+    return tokens.length
+  }
+
+  /**
    * Get the underlying LlamaContext (for advanced usage)
    */
   getContext(): LlamaContext | null {
@@ -296,13 +305,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
           : convertFinishReason(response),
       usage: {
         inputTokens: {
-          total: response.timings?.prompt_n || 0,
+          total: response.timings?.prompt_n,
           noCache: undefined,
           cacheRead: undefined,
           cacheWrite: undefined,
         },
         outputTokens: {
-          total: response.timings?.predicted_n || 0,
+          total: response.timings?.predicted_n,
           text: undefined,
           reasoning: undefined,
         },
@@ -373,13 +382,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
                 : convertFinishReason(result),
             usage: {
               inputTokens: {
-                total: result.timings?.prompt_n || 0,
+                total: result.timings?.prompt_n,
                 noCache: undefined,
                 cacheRead: undefined,
                 cacheWrite: undefined,
               },
               outputTokens: {
-                total: result.timings?.predicted_n || 0,
+                total: result.timings?.predicted_n,
                 text: undefined,
                 reasoning: undefined,
               },
@@ -824,6 +833,8 @@ export function createLlamaProvider() {
     return provider.languageModel(modelPath, options)
   }
 
+  provider.specificationVersion = 'v4' as const
+
   /**
    * Create a language model instance
    * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
@@ -841,24 +852,30 @@ export function createLlamaProvider() {
    * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
    * @param options - Model configuration options
    */
-  provider.textEmbeddingModel = (
+  provider.embeddingModel = (
     modelPath: string,
     options: LlamaEmbeddingOptions = {}
   ): LlamaEmbeddingModel => {
     return new LlamaEmbeddingModel(modelPath, options)
   }
 
+  /** @deprecated Use `embeddingModel` */
+  provider.textEmbeddingModel = provider.embeddingModel
+
   /**
    * Create a rerank model instance for document ranking
    * @param modelPath - Path to a reranker model file (from downloadModel() or getModelPath())
    * @param options - Model configuration options
    */
-  provider.rerankModel = (
+  provider.rerankingModel = (
     modelPath: string,
     options: LlamaRerankOptions = {}
   ): LlamaRerankModel => {
     return new LlamaRerankModel(modelPath, options)
   }
+
+  /** @deprecated Use `rerankingModel` */
+  provider.rerankModel = provider.rerankingModel
 
   /**
    * Create a speech model instance
