@@ -1,0 +1,4 @@
+module React {
+  header "React.h"
+  export *
+}
