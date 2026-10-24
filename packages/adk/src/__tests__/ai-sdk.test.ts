@@ -1,4 +1,7 @@
-import type { LanguageModelV4CallOptions } from '@ai-sdk/provider'
+import type {
+  LanguageModelV4CallOptions,
+  LanguageModelV4StreamPart,
+} from '@ai-sdk/provider'
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
 const generateText = mock(
@@ -16,7 +19,12 @@ mock.module('react-native', () => ({
   TurboModuleRegistry: {
     getEnforcing: () => ({
       generateText,
+      streamText: async () => {},
       onToolCall: () => ({ remove: () => {} }),
+      onStreamUpdate: () => ({ remove: () => {} }),
+      onStreamToolCall: () => ({ remove: () => {} }),
+      onStreamComplete: () => ({ remove: () => {} }),
+      onStreamError: () => ({ remove: () => {} }),
     }),
   },
 }))
@@ -76,5 +84,47 @@ describe('adk prompt conversion', () => {
         ],
       },
     ])
+  })
+})
+
+const reasoningWarning = {
+  type: 'unsupported',
+  feature: 'reasoning',
+  details: 'ADK models do not support configuring reasoning.',
+}
+
+async function readFirstPart(
+  stream: ReadableStream<LanguageModelV4StreamPart>
+) {
+  const { value } = await stream.getReader().read()
+  return value
+}
+
+describe('adk language model warnings', () => {
+  test('warns that reasoning is unsupported in doGenerate', async () => {
+    const result = await model.doGenerate(
+      createCallOptions({ reasoning: 'high' })
+    )
+
+    expect(result.warnings).toEqual([reasoningWarning])
+  })
+
+  test('warns that reasoning is unsupported in doStream', async () => {
+    const { stream } = await model.doStream(
+      createCallOptions({ reasoning: 'high' })
+    )
+
+    expect(await readFirstPart(stream)).toEqual({
+      type: 'stream-start',
+      warnings: [reasoningWarning],
+    })
+  })
+
+  test('does not warn for provider-default reasoning', async () => {
+    const result = await model.doGenerate(
+      createCallOptions({ reasoning: 'provider-default' })
+    )
+
+    expect(result.warnings).toEqual([])
   })
 })
