@@ -1,41 +1,16 @@
 # ADK Provider for Vercel AI SDK
 
-A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk) on Android. Use on-device Gemini Nano or cloud Gemini with tool calling and multi-turn sessions.
+A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk), enabling on-device Gemini Nano and cloud Gemini in React Native applications on Android.
 
 **Requirements:**
 
-- Android `minSdkVersion` 26 or greater (required by ML Kit GenAI / Gemini Nano; set in your app, not only in this package)
-- React Native New Architecture
+- Android only, with `minSdkVersion` 26+ set in your app
+- A device that supports Gemini Nano through AICore for on-device inference (see [ML Kit GenAI device support](https://developers.google.com/ml-kit/genai#feature-device))
+- A Google AI API key for cloud Gemini
 - Vercel AI SDK v7
-- If using on-device models: a device capable of running Gemini Nano (Android 14+ with AICore); you can consult the [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device) for more details.
+- React Native New Architecture
 
-Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST`; exclude it in your app packaging. For Expo:
-
-```json
-[
-  "expo-build-properties",
-  {
-    "android": {
-      "minSdkVersion": 26,
-      "packagingOptions": {
-        "exclude": ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
-      }
-    }
-  }
-]
-```
-
-For bare React Native, add to `android/app/build.gradle`:
-
-```gradle
-android {
-  packagingOptions {
-    excludes += ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
-  }
-}
-```
-
-Then run `npx expo prebuild --clean` so the native Android project picks up the change.
+Your app also has to exclude duplicate `META-INF` files from Android packaging. See [Getting Started](https://react-native-ai.com/docs/adk/getting-started) for the Expo and bare React Native setup.
 
 ```ts
 import { adk } from '@react-native-ai/adk'
@@ -43,164 +18,29 @@ import { generateText } from 'ai'
 
 const { text } = await generateText({
   model: adk(),
-  prompt: 'What time is it in New York?',
+  prompt: 'Summarize on-device AI in one sentence.',
 })
 ```
 
 ## Features
 
-- Cloud Gemini model via ADK `LlmAgent` and `InMemoryRunner`
-- On-device Gemini Nano via ML Kit GenAI (`genai-nano` model type)
-- Tool calling bridged to JavaScript executors
-- Streaming responses with tool-call stream parts
-- Post-generation token usage via ADK `UsageMetadata`
-- Multimodal user prompts (text + inline images)
-- Structured JSON output via `responseMimeType` (schema constraints not yet supported)
-- Vercel AI SDK v7 `LanguageModelV4` provider
+- ✅ On-device Gemini Nano through ML Kit GenAI
+- ✅ Cloud Gemini through ADK `LlmAgent`
+- ✅ Device capability and readiness checks for Gemini Nano
+- ✅ Streaming
+- ✅ Tool calling, with the agent loop run natively by ADK
+- ✅ Image prompts
+- ✅ JSON output (without schema constraints)
+- ✅ Token usage
 
-## Usage metadata
+## Documentation
 
-ADK returns token usage in response events (`promptTokenCount`, `candidatesTokenCount`, `totalTokenCount`). The provider maps this into AI SDK `usage` on both `generateText` and streaming `finish` events.
-
-## Multimodal input
-
-Pass file parts in user messages using the standard AI SDK prompt format:
-
-```ts
-import { generateText } from 'ai'
-
-const { text } = await generateText({
-  model: adk(),
-  messages: [
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: 'What is in this image?' },
-        {
-          type: 'file',
-          mediaType: 'image/jpeg',
-          data: base64Image,
-        },
-      ],
-    },
-  ],
-})
-```
-
-## Structured output
-
-Streaming structured JSON is not supported by ADK yet.
-
-## Cloud Gemini
-
-```ts
-import { createAdkProvider } from '@react-native-ai/adk'
-import { generateText } from 'ai'
-
-const adk = createAdkProvider({
-  apiKey: process.env.GOOGLE_API_KEY,
-  modelType: 'gemini',
-  modelName: 'gemini-2.5-flash',
-  instruction: 'You are a helpful assistant.',
-})
-
-const { text } = await generateText({
-  model: adk(),
-  prompt: 'Summarize on-device AI in one sentence.',
-})
-```
-
-> Do not embed API keys in production client apps. Prefer a backend proxy or secure runtime configuration.
-
-## On-device Gemini Nano
-
-Gemini Nano has two separate availability checks:
-
-| API                             | Label                 | Question                                   |
-| ------------------------------- | --------------------- | ------------------------------------------ |
-| `adk.isNanoSupported()`         | **Device capability** | Can this device ever run Nano?             |
-| `adk.isAvailable('genai-nano')` | **Runtime readiness** | Can I call `prepareNano()` / generate now? |
-
-If `isNanoSupported()` is `false`, `isAvailable('genai-nano')` is also `false`.
-
-### ML Kit status codes
-
-Both checks use ML Kit `Generation.getClient().checkStatus()`:
-
-| Status         | `isNanoSupported()` | `isAvailable('genai-nano')` | Suggested UX                             |
-| -------------- | ------------------- | --------------------------- | ---------------------------------------- |
-| `0`            | `false`             | `false`                     | Hide or disable — not supported          |
-| `1`            | `true`              | `true`                      | Ready — call `prepareNano()`             |
-| `3`            | `true`              | `true`                      | Ready to download — call `prepareNano()` |
-| Other non-zero | `true`              | `false`                     | Show disabled — not ready yet            |
-
-See [ML Kit GenAI Prompt API](https://developers.google.com/ml-kit/genai) for details.
-
-### Recommended flow
-
-```ts
-import { createAdkProvider } from '@react-native-ai/adk'
-
-const adk = createAdkProvider({
-  modelType: 'genai-nano',
-  modelName: 'gemini-nano',
-})
-
-const supported = await adk.isNanoSupported()
-if (!supported) {
-  // Device lacks Gemini Nano / AICore support — hide from model picker
-  return
-}
-
-const ready = await adk.isAvailable('genai-nano')
-if (!ready) {
-  // Device supports Nano but ML Kit is not ready yet (e.g. downloading)
-  // Show disabled — do not mark as "Ready"
-  return
-}
-
-await adk.prepareNano()
-const model = adk()
-```
-
-Both checks are cheap native calls (no model download). Safe to cache at app startup and re-check after resume.
-
-> **Note:** `model.prepare()`, `generateText()`, and `streamText()` auto-call `prepareNano()` for `genai-nano` models, but only gate on `isNanoSupported()`. For UI gating, always use `isAvailable('genai-nano')` and handle prepare/generation errors in your chat flow.
-
-## Tool calling
-
-```ts
-import { createAdkProvider } from '@react-native-ai/adk'
-import { generateText, tool } from 'ai'
-import { z } from 'zod'
-
-const getCurrentTime = tool({
-  description: 'Get the current time for a city',
-  inputSchema: z.object({
-    city: z.string(),
-  }),
-  execute: async ({ city }) => ({
-    city,
-    time: new Date().toLocaleTimeString(),
-  }),
-})
-
-const adk = createAdkProvider({
-  apiKey: process.env.GOOGLE_API_KEY,
-  availableTools: { getCurrentTime },
-})
-
-const { text } = await generateText({
-  model: adk(),
-  tools: { getCurrentTime },
-  prompt: 'What time is it in Warsaw?',
-})
-```
-
-During streaming, the provider emits AI SDK `tool-input-*` and `tool-call` stream parts when ADK surfaces function calls from the model.
-
-Pass tools through the AI SDK `tools` option as usual; the provider bridges execution to JavaScript while ADK orchestrates the agent loop natively.
+For complete installation instructions and API documentation, visit our [documentation site](https://react-native-ai.com/docs/adk).
 
 ## License
 
 MIT
+
+---
+
+Made with ❤️ and [create-react-native-library](https://github.com/callstack/react-native-builder-bob)
