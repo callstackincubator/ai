@@ -78,8 +78,8 @@ import { apple } from '@react-native-ai/apple'
 import {
   generateText,
   embed,
-  experimental_transcribe as transcribe,
-  experimental_generateSpeech as speech,
+  transcribe,
+  generateSpeech as speech,
 } from 'ai'
 
 // Text generation with Apple Intelligence

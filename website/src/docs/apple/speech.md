@@ -17,7 +17,7 @@ This provider uses Apple's [`AVSpeechSynthesizer`](https://developer.apple.com/d
 
 ```tsx
 import { apple } from '@react-native-ai/apple'
-import { experimental_generateSpeech as speech } from 'ai'
+import { generateSpeech as speech } from 'ai'
 
 const response = await speech({
   model: apple.speechModel(),

@@ -8,7 +8,7 @@ A Vercel AI SDK provider for Apple Foundation Models, enabling access to Apple I
 - iOS 26.4+ for token counting and Image Playground generation
 - iOS 27+ for image prompts, Private Cloud Compute, and Vision built-in tools
 - Apple Intelligence enabled device
-- Vercel AI SDK v5
+- Vercel AI SDK v7
 - React Native New Architecture
 
 ```ts

@@ -20,7 +20,7 @@ const file = await fetch(
 )
 const audio = await file.arrayBuffer()
 
-const response = await experimental_transcribe({
+const response = await transcribe({
   model: apple.transcriptionModel(),
   audio,
 })
@@ -42,7 +42,7 @@ The transcription model supports multiple languages with automatic language dete
 ```tsx
 const model = apple.transcriptionModel({ language: 'fr' })
 
-await experimental_transcribe({
+await transcribe({
   model,
   audio: audioArrayBuffer,
 })
@@ -62,7 +62,7 @@ const model = apple.transcriptionModel({ language: 'en' })
 await model.prepare()
 
 // Now transcription will be faster on first use
-const response = await experimental_transcribe({ model, audio })
+const response = await transcribe({ model, audio })
 ```
 
 > [!TIP]
