@@ -9,6 +9,7 @@ import type {
   LanguageModelV4StreamPart,
   RerankingModelV4,
   RerankingModelV4CallOptions,
+  SharedV4Warning,
   SpeechModelV4,
   SpeechModelV4CallOptions,
 } from '@ai-sdk/provider'
@@ -207,7 +208,11 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions = buildLlamaCompletionOptions(options, messages)
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(options, messages, {
+      contextSize: this.options.contextParams?.n_ctx,
+      warnings,
+    })
 
     const response = await context.completion(completionOptions)
     let content: LanguageModelV4Content[] = []
@@ -261,7 +266,7 @@ export class LlamaLanguageModel implements LanguageModelV4 {
           timings: response.timings,
         },
       },
-      warnings: [],
+      warnings,
     }
   }
 
@@ -285,7 +290,11 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions = buildLlamaCompletionOptions(options, messages)
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(options, messages, {
+      contextSize: this.options.contextParams?.n_ctx,
+      warnings,
+    })
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
@@ -296,7 +305,7 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
           controller.enqueue({
             type: 'stream-start',
-            warnings: [],
+            warnings,
           })
 
           const result = await context.completion(

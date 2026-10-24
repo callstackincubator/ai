@@ -50,6 +50,63 @@ describe('buildLlamaCompletionOptions', () => {
   })
 })
 
+describe('buildLlamaCompletionOptions reasoning', () => {
+  test('disables thinking for reasoning none', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      { ...createCallOptions(), reasoning: 'none' },
+      []
+    )
+
+    expect(completionOptions.enable_thinking).toBe(false)
+    expect(completionOptions.thinking_budget_tokens).toBeUndefined()
+  })
+
+  test('leaves thinking to the chat template by default', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      { ...createCallOptions(), reasoning: 'provider-default' },
+      [],
+      { contextSize: 4096 }
+    )
+
+    expect(completionOptions.enable_thinking).toBeUndefined()
+    expect(completionOptions.thinking_budget_tokens).toBeUndefined()
+  })
+
+  test('maps reasoning levels to a thinking budget from maxOutputTokens', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      { ...createCallOptions(), reasoning: 'medium', maxOutputTokens: 8000 },
+      [],
+      { contextSize: 4096 }
+    )
+
+    expect(completionOptions.enable_thinking).toBe(true)
+    expect(completionOptions.thinking_budget_tokens).toBe(2400)
+  })
+
+  test('sizes the thinking budget from the context size', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      { ...createCallOptions(), reasoning: 'high' },
+      [],
+      { contextSize: 4096 }
+    )
+
+    expect(completionOptions.thinking_budget_tokens).toBe(2458)
+  })
+
+  test('lets providerOptions.llama override the reasoning option', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      {
+        ...createCallOptions({ llama: { enable_thinking: false } }),
+        reasoning: 'high',
+      },
+      [],
+      { contextSize: 4096 }
+    )
+
+    expect(completionOptions.enable_thinking).toBe(false)
+  })
+})
+
 describe('buildLlamaCompletionOptions responseFormat', () => {
   test('passes the JSON schema to llama.rn', () => {
     const schema = {
