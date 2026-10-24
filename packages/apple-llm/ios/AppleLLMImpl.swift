@@ -1085,7 +1085,7 @@ public class AppleLLMImpl: NSObject {
     var temporaryFileURLs: [URL] = []
 
     do {
-      for attachment in attachments {
+      for (index, attachment) in attachments.enumerated() {
         guard let type = attachment["type"] as? String, type == "image" else {
           throw AppleLLMError.invalidMessage("Unsupported attachment type")
         }
@@ -1095,13 +1095,9 @@ public class AppleLLMImpl: NSObject {
           temporaryFileURLs.append(imageURL.url)
         }
 
-        var imageAttachment = Attachment(imageURL: imageURL.url)
-
-        if let label = attachment["label"] as? String, !label.isEmpty {
-          imageAttachment = imageAttachment.label(label)
-        }
-
-        imageAttachments.append(imageAttachment)
+        // Vision tools (OCR, barcode) look images up by label, so every image needs one
+        let label = (attachment["label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "image-\(index + 1)"
+        imageAttachments.append(Attachment(imageURL: imageURL.url).label(label))
       }
     } catch {
       Self.removeTemporaryFiles(temporaryFileURLs)
