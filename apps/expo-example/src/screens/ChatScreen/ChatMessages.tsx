@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
+import type { ImageAttachment } from '../../utils/imageAttachments'
 import { ChatEmptyState } from './ChatEmptyState'
 import { ChatInputBar } from './ChatInputBar'
 import { ChatMessageBubble } from './ChatMessageBubble'
@@ -20,6 +21,7 @@ type ChatMessage = {
   role: string
   content: string
   type?: 'text' | 'toolExecution'
+  attachments?: ImageAttachment[]
   toolExecution?: {
     toolName: string
     payload: unknown
@@ -31,10 +33,11 @@ type ChatMessagesProps = {
   messages: ChatMessage[]
   selectedModelLabel: string
   emptyStateSubtitle: string
-  onSend: (message: string) => void
+  onSend: (message: string, attachments: ImageAttachment[]) => void
   isGenerating: boolean
   genUiEnabled: boolean
   showAppleTokenCount: boolean
+  imageInputEnabled: boolean
 }
 
 export function ChatMessages({
@@ -45,6 +48,7 @@ export function ChatMessages({
   isGenerating,
   genUiEnabled,
   showAppleTokenCount,
+  imageInputEnabled,
 }: ChatMessagesProps) {
   const ref = useRef<ScrollViewInstance>(null)
 
@@ -99,6 +103,7 @@ export function ChatMessages({
                 content={message.content}
                 isUser={message.role === 'user'}
                 messageType={message.type}
+                attachments={message.attachments}
                 toolExecution={message.toolExecution}
               />
             ))}
@@ -122,6 +127,7 @@ export function ChatMessages({
           onSend={onSend}
           isGenerating={isGenerating}
           showAppleTokenCount={showAppleTokenCount}
+          imageInputEnabled={imageInputEnabled}
         />
       </Reanimated.View>
     </>

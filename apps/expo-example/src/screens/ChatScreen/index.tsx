@@ -5,12 +5,16 @@ import {
   createGenUITools,
 } from '@react-native-ai/json-ui'
 import { wrapLanguageModelWithHistory } from '@react-native-ai/utils'
-import { isStepCount, streamText } from 'ai'
+import { isStepCount, type ModelMessage, streamText } from 'ai'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
+import {
+  getChatUISpecFromChats,
+  type Message,
+  useChatStore,
+} from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
 import {
@@ -19,6 +23,10 @@ import {
   withToolProxy,
 } from '../../tools'
 import { getAiSdkTelemetry } from '../../utils/aiSdkTelemetry'
+import {
+  getAttachmentUri,
+  type ImageAttachment,
+} from '../../utils/imageAttachments'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -68,9 +76,35 @@ export default function ChatScreen() {
   )
 
   const selectedModelAvailability = availability.get(selectedModelId)
+  const imageInputEnabled = selectedAdapter?.imageInput ?? false
+
+  // Images go to the model as file URLs
+  const toModelMessage = ({
+    role,
+    content,
+    attachments,
+  }: Pick<Message, 'role' | 'content' | 'attachments'>): ModelMessage => {
+    if (role !== 'user' || !attachments?.length) {
+      return { role, content }
+    }
+    return {
+      role,
+      content: [
+        ...(content ? [{ type: 'text' as const, text: content }] : []),
+        ...attachments.map((attachment) => ({
+          type: 'image' as const,
+          image: new URL(getAttachmentUri(attachment)),
+          mediaType: attachment.mediaType,
+        })),
+      ],
+    }
+  }
 
   // Send message and stream AI response
-  const handleSend = async (userInput: string) => {
+  const handleSend = async (
+    userInput: string,
+    attachments: ImageAttachment[]
+  ) => {
     if (isGenerating || !selectedAdapter) return
 
     // Cancel any previous generation
@@ -80,7 +114,7 @@ export default function ChatScreen() {
 
     const baseMessages = currentChat?.messages ?? []
     const { chatId, messageIds } = addMessages([
-      { role: 'user', content: userInput },
+      { role: 'user', content: userInput, attachments },
       { role: 'assistant', content: '...' },
     ])
     const assistantMessageId = messageIds[1]
@@ -126,11 +160,8 @@ export default function ChatScreen() {
         messages: [
           ...baseMessages
             .filter((message) => message.type !== 'toolExecution')
-            .map((message) => ({
-              role: message.role,
-              content: message.content,
-            })),
-          { role: 'user', content: userInput },
+            .map(toModelMessage),
+          toModelMessage({ role: 'user', content: userInput, attachments }),
         ],
         tools,
         temperature,
@@ -226,6 +257,7 @@ export default function ChatScreen() {
             isGenerating={isGenerating}
             genUiEnabled={genUiEnabled}
             showAppleTokenCount={showAppleTokenCount}
+            imageInputEnabled={imageInputEnabled}
           />
         )}
       </View>

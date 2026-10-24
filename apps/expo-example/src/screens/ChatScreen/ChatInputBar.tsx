@@ -1,32 +1,62 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React, { useState } from 'react'
-import { Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
 
 import { AdaptiveGlass } from '../../components/AdaptiveGlass'
 import { RecordButton } from '../../components/RecordButton'
 import { colors } from '../../theme/colors'
+import {
+  deleteAttachment,
+  type ImageAttachment,
+  type ImageSource,
+  pickImages,
+} from '../../utils/imageAttachments'
 import { AppleTokenCounter } from './AppleTokenCounter'
 import { AttachmentMenu } from './AttachmentMenu'
+import { AttachmentThumbnails } from './AttachmentThumbnails'
 
 type ChatInputBarProps = {
-  onSend: (message: string) => void
+  onSend: (message: string, attachments: ImageAttachment[]) => void
   isGenerating: boolean
   showAppleTokenCount: boolean
+  imageInputEnabled: boolean
 }
 
 export function ChatInputBar({
   onSend,
   isGenerating,
   showAppleTokenCount,
+  imageInputEnabled,
 }: ChatInputBarProps) {
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([])
+  const canSend = input.trim().length > 0 || attachments.length > 0
+
+  const handlePick = async (source: ImageSource) => {
+    try {
+      const picked = await pickImages(source)
+      setAttachments((prev) => [...prev, ...picked])
+    } catch (error) {
+      Alert.alert(
+        'Could not attach image',
+        error instanceof Error ? error.message : undefined
+      )
+    }
+  }
+
+  const handleRemove = (attachment: ImageAttachment) => {
+    deleteAttachment(attachment)
+    setAttachments((prev) =>
+      prev.filter((item) => item.fileName !== attachment.fileName)
+    )
+  }
 
   const handleSend = () => {
-    const trimmed = input.trim()
-    if (!trimmed || isGenerating) return
-    onSend(trimmed)
+    if (!canSend || isGenerating) return
+    onSend(input.trim(), attachments)
     setInput('')
+    setAttachments([])
   }
 
   return (
@@ -34,10 +64,18 @@ export function ChatInputBar({
       <View style={styles.tokenCounterContainer}>
         <AppleTokenCounter input={input} isVisible={showAppleTokenCount} />
       </View>
+      {attachments.length > 0 && (
+        <AttachmentThumbnails
+          attachments={attachments}
+          onRemove={handleRemove}
+        />
+      )}
       <View style={styles.inputRow}>
-        <AdaptiveGlass isInteractive style={styles.plusButton}>
-          <AttachmentMenu />
-        </AdaptiveGlass>
+        {imageInputEnabled && (
+          <AdaptiveGlass isInteractive style={styles.plusButton}>
+            <AttachmentMenu onPick={handlePick} />
+          </AdaptiveGlass>
+        )}
 
         <View style={styles.textInputContainer}>
           <TextInput
@@ -51,7 +89,7 @@ export function ChatInputBar({
           />
         </View>
 
-        {input.trim() ? (
+        {canSend ? (
           <Pressable
             onPress={handleSend}
             disabled={isGenerating}

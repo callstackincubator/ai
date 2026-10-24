@@ -4,6 +4,10 @@ import { atomWithStorage, createJSONStorage } from 'jotai/utils'
 
 import { languageAdapters } from '../config/providers'
 import { toolDefinitions } from '../tools'
+import {
+  deleteAttachment,
+  type ImageAttachment,
+} from '../utils/imageAttachments'
 
 const storage = createJSONStorage<any>(() => AsyncStorage)
 
@@ -16,6 +20,7 @@ export type Message = {
   content: string
   createdAt: string
   type?: MessageType
+  attachments?: ImageAttachment[]
   toolExecution?: {
     toolName: string
     payload: unknown
@@ -159,6 +164,12 @@ export function useChatStore() {
     const shouldUpdateCurrentChat = currentChatId === id
     const remainingChats = chats.filter((chat) => chat.id !== id)
 
+    chats
+      .find((chat) => chat.id === id)
+      ?.messages.forEach((message) =>
+        message.attachments?.forEach(deleteAttachment)
+      )
+
     setChats(remainingChats)
 
     if (shouldUpdateCurrentChat) {
@@ -183,7 +194,7 @@ export function useChatStore() {
           {
             id: chatId,
             title: firstUserMessage
-              ? truncateTitle(firstUserMessage.content)
+              ? truncateTitle(firstUserMessage.content || 'Image')
               : 'New Chat',
             messages: newMessages,
             createdAt: new Date().toISOString(),
