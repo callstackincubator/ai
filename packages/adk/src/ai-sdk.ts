@@ -13,6 +13,7 @@ import {
   generateId,
   jsonSchema,
   parseJSON,
+  resolveFullMediaType,
   type Tool as FullToolDefinition,
   type ToolExecutionOptions,
 } from '@ai-sdk/provider-utils'
@@ -193,7 +194,8 @@ const normalizeFilePart = (
 
   return {
     data,
-    mediaType: part.mediaType,
+    // v4 allows top-level media types such as `image`, which Gemini rejects
+    mediaType: resolveFullMediaType({ part }),
   }
 }
 
