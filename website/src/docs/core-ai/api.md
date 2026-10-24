@@ -8,7 +8,7 @@ Use these when you want portable AI SDK app code:
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
-import { embed, transcribe, generateImage, generateText } from 'ai'
+import { generateText } from 'ai'
 
 const language = coreAI.languageModel({
   id: 'qwen3-0.6b',
@@ -21,17 +21,18 @@ await generateText({ model: language, prompt: 'Hello' })
 
 AI SDK adapter status:
 
-| Capability        | AI SDK API                                    | Core AI API                      | Status                           |
-| ----------------- | --------------------------------------------- | -------------------------------- | -------------------------------- |
-| Language text     | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Native wrapper implemented       |
-| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Not supported yet                |
-| Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Native diffusion wrapper         |
-| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Explicit unsupported error       |
-| Transcription     | `transcribe`                     | `coreAI.transcriptionModel(...)` | Explicit unsupported error       |
+| Capability        | AI SDK API                                    | Core AI API                      | Status                   |
+| ----------------- | --------------------------------------------- | -------------------------------- | ------------------------ |
+| Text generation   | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Supported                |
+| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Not supported yet        |
+| Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Not supported yet        |
+| Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Supported                |
+| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Throws unsupported error |
+| Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Throws unsupported error |
 
-The embedding and transcription adapters are present because AI SDK has matching interfaces and Apple’s registry has starter export recipes. They reject until this package gets task-specific native runners for CLIP/CLAP and wav2vec2/Whisper outputs.
+`coreAI.embeddingModel(...)` and `coreAI.transcriptionModel(...)` exist so the API is in place, but they throw until the package has native runners for CLIP/CLAP and wav2vec2/Whisper models ([#237](https://github.com/callstackincubator/ai/issues/237)).
 
-Reranking, speech generation, and video generation are intentionally not exposed as working Core AI adapters yet. AI SDK has model interfaces for reranking and speech, but Apple’s current `coreai-models` registry does not provide a Core AI reranker, TTS model, or video-generation starter. Use `@react-native-ai/apple` for system speech synthesis.
+There are no adapters for reranking, speech generation, or video generation, because `coreai-models` has no models for them. Use `@react-native-ai/apple` for system speech synthesis.
 
 ## Direct Native APIs
 
@@ -48,9 +49,7 @@ const config = {
 
 await CoreAI.inspectModel(toNativeModelConfig({ ...config, task: 'language' }))
 
-const model = coreAI.languageModel({
-  ...config,
-})
+const model = coreAI.languageModel(config)
 
 await model.prepare()
 
@@ -63,16 +62,16 @@ await session.respond('Create a vocabulary card for "flower".')
 
 Native-only API status:
 
-| Capability           | API                                       | Status                     | Why native-only                                                            |
-| -------------------- | ----------------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
-| Model inspection     | `CoreAI.inspectModel(...)`                | Implemented                | AI SDK does not manage Core AI asset metadata.                             |
-| Specialization       | `CoreAI.specializeModel(...)`             | Metadata stub              | Core AI-specific preparation step.                                         |
-| Persistent sessions  | `model.createSession(...)`                | Implemented for LLMs       | AI SDK owns message history; Core AI sessions own native transcript state. |
-| Segmentation         | `CoreAI.runTask('segmentation', ...)`     | Implemented                | AI SDK image APIs do not model segmentation masks.                         |
-| Object detection     | `CoreAI.runTask('object-detection', ...)` | Implemented                | AI SDK has no detection primitive.                                         |
-| Depth estimation     | `CoreAI.runTask('depth', ...)`            | Explicit unsupported error | AI SDK has no depth primitive.                                             |
-| Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Explicit unsupported error | AI SDK has no image-to-image upscaling primitive.                          |
-| Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Explicit unsupported error | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
+| Capability           | API                                       | Status                                  | Why native-only                                                            |
+| -------------------- | ----------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| Model inspection     | `CoreAI.inspectModel(...)`                | Supported                               | AI SDK does not manage Core AI asset metadata.                             |
+| Specialization       | `CoreAI.specializeModel(...)`             | Returns metadata only, does not compile | Core AI-specific preparation step.                                         |
+| Persistent sessions  | `model.createSession(...)`                | Supported for language models           | AI SDK owns message history; Core AI sessions own native transcript state. |
+| Segmentation         | `CoreAI.runTask('segmentation', ...)`     | Supported                               | AI SDK image APIs do not model segmentation masks.                         |
+| Object detection     | `CoreAI.runTask('object-detection', ...)` | Supported                               | AI SDK has no detection primitive.                                         |
+| Depth estimation     | `CoreAI.runTask('depth', ...)`            | Throws unsupported error                | AI SDK has no depth primitive.                                             |
+| Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Throws unsupported error                | AI SDK has no image-to-image upscaling primitive.                          |
+| Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Throws unsupported error                | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
 
 ## Loading Models
 
@@ -80,4 +79,4 @@ Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them
 
 ## Starter Models
 
-The starter model list in these docs is informational only. The package does not ship a static model catalog; apps should load available models dynamically from their own bundle, download state, or registry integration.
+The package does not ship a model catalog. The [starter models](./models) page is a reference list of models known to work; your app decides which models to bundle or download.
