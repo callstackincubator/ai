@@ -180,18 +180,17 @@ npm install @react-native-ai/llama llama.rn react-native-blob-util
 #### Usage
 
 ```typescript
-import { llama } from '@react-native-ai/llama'
-import { generateText, streamText } from 'ai'
+import { downloadModel, llama } from '@react-native-ai/llama'
+import { generateText } from 'ai'
 
-// Create model instance (Model ID format: "owner/repo/filename.gguf")
-const model = llama.languageModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+// Download from HuggingFace (Model ID format: "owner/repo/filename.gguf")
+const modelPath = await downloadModel(
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf',
+  (progress) => console.log(`Downloading: ${progress.percentage}%`)
 )
 
-// Download from HuggingFace (with progress)
-await model.download((progress) => {
-  console.log(`Downloading: ${progress.percentage}%`)
-})
+// Create model instance
+const model = llama.languageModel(modelPath)
 
 // Initialize model (loads into memory)
 await model.prepare()
@@ -213,7 +212,7 @@ await model.unload()
 
 Any GGUF model from HuggingFace can be used. Use the format `owner/repo/filename.gguf` as the model ID. Popular choices include:
 
-- `ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf`
+- `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`
 - `bartowski/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct-Q4_K_M.gguf`
 - `Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf`
 

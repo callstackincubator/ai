@@ -27,7 +27,7 @@ Before selecting any reference file, classify the user request:
    - if you want features: `transcription`, `speech synthesis`, `embeddings` on Apple devices
    - optionally with capabilities: tool calling
 2. Select **Llama**:
-   - if you intend to use the following technologies: `llama`, `GGUF`, `llama.rn`, `HuggingFace`, `SmolLM`
+   - if you intend to use the following technologies: `llama`, `GGUF`, `llama.rn`, `HuggingFace`, `Qwen`
    - if you want to perform the following operations: `embedding model`, `rerank`, `speech model`
 3. Select **MLC**:
    - if you intend to use a library that allows for custom models and involves build-time model optimizations
