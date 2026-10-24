@@ -14,7 +14,7 @@ import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
 // Download model - returns the file path
-const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
 
 const model = llama.languageModel(modelPath)
 await model.prepare()
@@ -36,7 +36,7 @@ import { llama, downloadModel } from '@react-native-ai/llama'
 import { streamText } from 'ai'
 
 // Download model - returns the file path
-const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
 
 const model = llama.languageModel(modelPath)
 await model.prepare()
@@ -221,7 +221,7 @@ Example with all options:
 import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
-const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
 
 const model = llama.languageModel(modelPath)
 await model.prepare()

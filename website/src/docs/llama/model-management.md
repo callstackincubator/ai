@@ -12,7 +12,7 @@ Here are some popular models that work well on mobile devices:
 
 | Model ID                                                          | Size   | Best For                         |
 | ----------------------------------------------------------------- | ------ | -------------------------------- |
-| `ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf`                    | ~1.8GB | Balanced performance and quality |
+| `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`                    | ~1.4GB | Reasoning and tool calling       |
 | `Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf`   | ~1.9GB | General conversations            |
 | `lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q3_K_M.gguf` | ~2.3GB | High quality responses           |
 
@@ -27,7 +27,7 @@ Models are downloaded from HuggingFace using the storage API. The `downloadModel
 ```typescript
 import { downloadModel } from '@react-native-ai/llama'
 
-const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
 
 console.log('Downloaded to:', modelPath)
 ```
@@ -36,7 +36,7 @@ You can track download progress:
 
 ```typescript
 const modelPath = await downloadModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf',
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf',
   (progress) => {
     console.log(`Download: ${progress.percentage}%`)
   }
@@ -50,7 +50,7 @@ Check if a model is already downloaded:
 ```typescript
 import { isModelDownloaded, getModelPath } from '@react-native-ai/llama'
 
-const modelId = 'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+const modelId = 'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
 
 if (await isModelDownloaded(modelId)) {
   // Model already downloaded, get its path
@@ -66,7 +66,7 @@ Create model instances using the provider methods. Pass the model path (from `do
 import { llama, downloadModel } from '@react-native-ai/llama'
 
 // Download and get the path
-const modelPath = await downloadModel('ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf')
+const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
 
 // Create model with the path
 const languageModel = llama.languageModel(modelPath)
