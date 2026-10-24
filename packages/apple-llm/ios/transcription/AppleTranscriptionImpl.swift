@@ -13,14 +13,6 @@ import UniformTypeIdentifiers
 @objc
 public class AppleTranscriptionImpl: NSObject {
   
-  // Locale identifiers can carry keywords such as "@rg=plzzzz", which
-  // SpeechTranscriber does not match, so strip them before resolving
-  @available(iOS 26, *)
-  private func supportedLocale(for language: String) async -> Locale? {
-    let identifier = language.split(separator: "@", maxSplits: 1).first.map(String.init) ?? language
-    return await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: identifier))
-  }
-
   @available(iOS 26, *)
   private func createTranscriber(for locale: Locale) -> SpeechTranscriber {
     let preset = SpeechTranscriber.Preset.timeIndexedTranscriptionWithAlternatives
@@ -46,7 +38,9 @@ public class AppleTranscriptionImpl: NSObject {
     if #available(iOS 26, *) {
       Task {
         do {
-          guard let supportedLocale = await self.supportedLocale(for: language) else {
+          let locale = Locale(identifier: language)
+          
+          guard let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
             reject("AppleTranscription", "Locale not supported: \(language)", nil)
             return
           }
@@ -96,17 +90,13 @@ public class AppleTranscriptionImpl: NSObject {
         
         Task {
           do {
+            let transcriber = createTranscriber(for: Locale(identifier: language))
+            
+            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            
             defer {
               try? FileManager.default.removeItem(at: fileURL)
             }
-
-            guard let supportedLocale = await self.supportedLocale(for: language) else {
-              reject("AppleTranscription", "Locale not supported: \(language)", nil)
-              return
-            }
-
-            let transcriber = createTranscriber(for: supportedLocale)
-            let analyzer = SpeechAnalyzer(modules: [transcriber])
             
             var segments: [[String: Any]] = []
             
