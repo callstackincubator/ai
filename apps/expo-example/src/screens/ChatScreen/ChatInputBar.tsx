@@ -30,17 +30,13 @@ export function ChatInputBar({
   imageInputEnabled,
 }: ChatInputBarProps) {
   const [input, setInput] = useState('')
-  const [pickedAttachments, setPickedAttachments] = useState<ImageAttachment[]>(
-    []
-  )
-  // Switching to a text-only model drops pending images from the message
-  const attachments = imageInputEnabled ? pickedAttachments : []
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([])
   const canSend = input.trim().length > 0 || attachments.length > 0
 
   const handlePick = async (source: ImageSource) => {
     try {
       const picked = await pickImages(source)
-      setPickedAttachments((prev) => [...prev, ...picked])
+      setAttachments((prev) => [...prev, ...picked])
     } catch (error) {
       Alert.alert(
         'Could not attach image',
@@ -51,7 +47,7 @@ export function ChatInputBar({
 
   const handleRemove = (attachment: ImageAttachment) => {
     deleteAttachment(attachment)
-    setPickedAttachments((prev) =>
+    setAttachments((prev) =>
       prev.filter((item) => item.fileName !== attachment.fileName)
     )
   }
@@ -60,7 +56,7 @@ export function ChatInputBar({
     if (!canSend || isGenerating) return
     onSend(input.trim(), attachments)
     setInput('')
-    setPickedAttachments([])
+    setAttachments([])
   }
 
   return (
