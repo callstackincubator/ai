@@ -1,470 +1,310 @@
 # Generating
 
-You can generate response using Apple Foundation Models with the Vercel AI SDK's `generateText` or `generateObject` function.
+Use `@react-native-ai/apple` with the Vercel AI SDK to call Apple Foundation
+Models from React Native. The provider keeps the common text, object,
+streaming, tool, and image APIs aligned with AI SDK v5, and exposes a small
+Apple-specific surface for runtime model information and Apple-only options.
 
 ## Requirements
 
-- **iOS 26+** - Apple Foundation Models is available in iOS 26 or later
-- **Apple Intelligence enabled device** - Device must support Apple Intelligence
+- iOS 26+ for Apple Foundation Models text generation.
+- iOS 26.4+ for token counting and Image Playground image generation.
+- iOS 27+ for multimodal image prompts, Private Cloud Compute language models,
+  Dynamic Profiles, and Vision built-in tools.
+- An Apple Intelligence-capable device with Apple Intelligence enabled.
+- React Native New Architecture.
+
+Some Apple Intelligence symbols are SDK-gated as well as OS-gated. If you build
+with an older Xcode SDK that does not expose a newer Apple API, the provider
+keeps that feature unavailable instead of failing native compilation.
 
 ## Text Generation
 
 ```typescript
-import { apple } from '@react-native-ai/apple';
-import { generateText } from 'ai';
+import { apple } from '@react-native-ai/apple'
+import { generateText } from 'ai'
 
 const result = await generateText({
   model: apple(),
-  prompt: 'Explain quantum computing in simple terms'
-});
+  prompt: 'Explain quantum computing in simple terms.',
+})
+
+console.log(result.text)
 ```
+
+Configure the model with the normal AI SDK generation options:
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  prompt: 'Write a concise product announcement.',
+  temperature: 0.6,
+  maxTokens: 300,
+  topP: 0.9,
+})
+```
+
+Do not pass both `topP` and `topK` in the same request. Apple Foundation Models
+supports one sampling strategy at a time.
 
 ## Streaming
 
 ```typescript
-import { streamText } from 'ai';
-import { apple } from '@react-native-ai/apple';
-
-const { textStream } = await streamText({
-  model: apple(),
-  prompt: 'Write me a short essay on the meaning of life'
-});
-
-for await (const delta of textStream) {
-  console.log(delta);
-}
-```
-
-> [!NOTE]
-> Streaming objects is currently not supported.
-
-## Structured Output
-
-Generate structured data that conforms to a specific schema:
-
-```typescript
-import { generateObject } from 'ai';
-import { apple } from '@react-native-ai/apple';
-import { z } from 'zod';
-
-const schema = z.object({
-  name: z.string(),
-  age: z.number().int().min(0).max(150),
-  email: z.string().email(),
-  occupation: z.string()
-});
-
-const result = await generateObject({
-  model: apple(),
-  prompt: 'Generate a user profile for a software developer',
-  schema
-});
-
-console.log(result.object);
-// { name: string, age: number, email: string, occupation: string }
-```
-
-## Tool Calling
-
-Enable Apple Foundation Models to use custom tools in your React Native applications.
-
-### Important Apple-Specific Behavior
-
-Tools are executed by Apple, not the Vercel AI SDK, which means:
-
-- **No AI SDK callbacks**: `maxSteps`, `onStepStart`, and `onStepFinish` will not be executed
-- **Pre-register all tools**: You must pass all tools to `createAppleProvider` upfront
-- **Empty toolCallId**: Apple doesn't provide tool call IDs, so they will be empty strings
-
-### Setup
-
-All tools must be registered ahead of time with Apple provider. To do so, you must create one by calling `createAppleProvider`:
-
-```typescript
-import { createAppleProvider } from '@react-native-ai/apple';
-import { generateText, tool } from 'ai';
-import { z } from 'zod';
-
-const getWeather = tool({
-  description: 'Get current weather information',
-  inputSchema: z.object({
-    city: z.string()
-  }),
-  execute: async ({ city }) => {
-    return `Weather in ${city}: Sunny, 25°C`;
-  }
-});
-
-const apple = createAppleProvider({
-  availableTools: {
-    getWeather
-  }
-});
-```
-
-If you want to change the tools at runtime, you can do it as follows:
-
-```typescript
-const apple = createAppleProvider({
-  availableTools: {
-    getWeather
-  }
-});
-const model = apple();
-
-model.updateTools({
-  getWeather,
-  getDate
-});
-```
-
-### Basic Tool Usage
-
-Then, generate output like with any other Vercel AI SDK provider:
-
-```typescript
-const result = await generateText({
-  model: apple(),
-  prompt: 'What is the weather in Paris?',
-  tools: {
-    getWeather
-  }
-});
-```
-
-### Inspecting Tool Calls
-
-You can inspect tool calls and their results after generation:
-
-```typescript
-const result = await generateText({
-  model: apple(),
-  prompt: 'What is the weather in Paris?',
-  tools: { getWeather }
-});
-
-// Inspect tool calls made during generation
-console.log(result.toolCalls);
-// Example: [{ toolCallId: '<< redacted >>', toolName: 'getWeather', input: '{"city":"Paris"}' }]
-
-// Inspect tool results returned
-console.log(result.toolResults);  
-// Example: [{ toolCallId: '<< redacted >>', toolName: 'getWeather', result: 'Weather in Paris: Sunny, 25°C' }]
-```
-
-### Tool calling with structured output
-
-You can also use [`experimental_output`](https://v5.ai-sdk.dev/docs/reference/ai-sdk-core/generate-text#experimental_output) to generate structured output with `generateText`. This is useful when you want to perform tool calls at the same time.
-
-```typescript
-const response = await generateText({
-  model: apple(),
-  system: `Help the person with getting weather information.`,
-  prompt: 'What is the weather in Wroclaw?',
-  tools: {
-    getWeather,
-  },
-  experimental_output: Output.object({
-    schema: z.object({
-      weather: z.string(),
-      city: z.string(),
-    }),
-  }),
-})
-```
-
-### Supported features
-
-We aim to cover most of the OpenAI supported formats, including the following:
-
-- **Objects**: `z.object({})` with nested properties
-- **Arrays**: `z.array()` with `minItems` and `maxItems` constraints
-- **Strings**: `z.string()`
-- **Numbers**: `z.number()` with `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`
-- **Booleans**: `z.boolean()`
-- **Enums**: `z.enum([])` for string and number values
-
-The following features are currently not supported due to underlying model limitations:
-
-- **String formats**: `email()`, `url()`, `uuid()`, `datetime()` etc.
-- **Regular expressions**: Due to a
-- **Unions**: `z.union()`, `z.discriminatedUnion()`
-
-## Availability Check
-
-Always check if Apple Intelligence is available before using the provider:
-
-```typescript
-import { apple } from '@react-native-ai/apple';
-
-if (!apple.isAvailable()) {
-  // Handle fallback logic
-  return;
-}
-```
-
-## Context Window
-
-Apple Foundation Models have a fixed context window of 4096 tokens. This limit applies to the full request context, including system instructions, previous conversation messages, tool definitions, schemas, and the current user prompt.
-
-The `maxTokens` option only limits how many tokens the model can generate in its response. It does not increase the available context window or reserve enough room for a long prompt.
-
-If the full context is too large, Apple may fail generation with a context-window overflow error. The provider does not automatically estimate tokens, remove messages from your prompt, or retry the request, because token estimates can vary by language and different apps need different memory strategies. Handle this at the application level by catching the error and choosing the recovery behavior that fits your product:
-
-- Start a new conversation without the previous transcript, which is Apple's recommended baseline after this error
-- Keep a sliding window of recent messages
-- Summarize older messages and include the summary instead of the full transcript
-- Ask the user to shorten the prompt or start a new chat
-
-```typescript
-import {
-  AppleLLMErrorCodes,
-  type AppleLLMError,
-  apple,
-} from '@react-native-ai/apple';
-import { generateText } from 'ai';
-
-try {
-  const result = await generateText({
-    model: apple(),
-    messages
-  });
-} catch (error) {
-  const appleError = error as AppleLLMError;
-
-  if (appleError.code === AppleLLMErrorCodes.ContextWindowExceeded) {
-    // Apply your app's recovery strategy here.
-    // For example: retry with fewer messages or start a new chat.
-  }
-
-  throw error;
-}
-```
-
-For streaming calls, use `fullStream` when you need to inspect provider error parts:
-
-```typescript
-import {
-  AppleLLMErrorCodes,
-  type AppleLLMError,
-  apple,
-} from '@react-native-ai/apple';
-import { streamText } from 'ai';
+import { apple } from '@react-native-ai/apple'
+import { streamText } from 'ai'
 
 const result = streamText({
   model: apple(),
-  messages
-});
-
-for await (const part of result.fullStream) {
-  if (part.type === 'error') {
-    const error = part.error as AppleLLMError;
-
-    if (error.code === AppleLLMErrorCodes.ContextWindowExceeded) {
-      // Apply your app's recovery strategy here.
-    }
-  }
-}
-```
-
-If you only consume `textStream`, pass `onError` to `streamText`. The AI SDK does not emit error parts through the text-only stream, so capture the error there and handle it after the stream finishes:
-
-```typescript
-import {
-  AppleLLMErrorCodes,
-  type AppleLLMError,
-  apple,
-} from '@react-native-ai/apple';
-import { streamText } from 'ai';
-
-let streamError: unknown;
-const result = streamText({
-  model: apple(),
-  messages,
-  onError: ({ error }) => {
-    streamError = error;
-  },
-});
-
-for await (const delta of result.textStream) {
-  console.log(delta);
-}
-
-if (streamError) {
-  const error = streamError as AppleLLMError;
-
-  if (error.code === AppleLLMErrorCodes.ContextWindowExceeded) {
-    // Apply your app's recovery strategy here.
-  }
-
-  throw streamError;
-}
-```
-
-## Public Error Codes
-
-Apple Foundation Models exposes a deliberate public error-code surface through `AppleLLMError.code`. Use `error.code` for application control flow and treat `error.message` as display/debug text rather than a compatibility contract.
-
-Only documented `AppleLLMErrorCodes.*` values are stable:
-
-- `AppleLLMErrorCodes.ModelUnavailable` / `MODEL_UNAVAILABLE`
-- `AppleLLMErrorCodes.UnsupportedOS` / `UNSUPPORTED_OS`
-- `AppleLLMErrorCodes.GenerationError` / `GENERATION_ERROR`
-- `AppleLLMErrorCodes.InvalidMessage` / `INVALID_MESSAGE`
-- `AppleLLMErrorCodes.ConflictingSamplingMethods` / `CONFLICTING_SAMPLING_METHODS`
-- `AppleLLMErrorCodes.InvalidSchema` / `INVALID_SCHEMA`
-- `AppleLLMErrorCodes.ToolCallError` / `TOOL_CALL_ERROR`
-- `AppleLLMErrorCodes.UnknownToolCallError` / `UNKNOWN_TOOL_CALL_ERROR`
-- `AppleLLMErrorCodes.ContextWindowExceeded` / `CONTEXT_WINDOW_EXCEEDED`
-
-These codes mean:
-
-- `MODEL_UNAVAILABLE`: Apple Intelligence is unavailable on the current device or configuration.
-- `UNSUPPORTED_OS`: the current runtime does not support the required Apple Foundation Models API.
-- `GENERATION_ERROR`: Foundation Models generation failed for an uncategorized provider-side reason.
-- `INVALID_MESSAGE`: the prompt/message structure is invalid for this provider.
-- `CONFLICTING_SAMPLING_METHODS`: both `topP` and `topK` were provided.
-- `INVALID_SCHEMA`: the provided schema or tool schema cannot be used by Apple Foundation Models.
-- `TOOL_CALL_ERROR`: a tool execution failed.
-- `UNKNOWN_TOOL_CALL_ERROR`: tool execution finished in an unusable or unexpected state.
-- `CONTEXT_WINDOW_EXCEEDED`: the request exceeded the model context window.
-
-Errors that do not have a recognized public Apple LLM code may still be thrown, but they are plain `Error` values and are not part of the stable Apple provider API.
-
-### Handling `generateText` errors
-
-```typescript
-import {
-  AppleLLMErrorCodes,
-  type AppleLLMError,
-  apple,
-} from '@react-native-ai/apple';
-import { generateText } from 'ai';
-
-try {
-  await generateText({
-    model: apple(),
-    messages,
-  })
-} catch (error) {
-  if (
-    error instanceof Error &&
-    'code' in error &&
-    error.code === AppleLLMErrorCodes.ModelUnavailable
-  ) {
-    // Show fallback UI or disable Apple-specific features.
-  }
-
-  throw error
-}
-```
-
-### Handling streaming errors with `fullStream`
-
-```typescript
-import {
-  AppleLLMErrorCodes,
-  type AppleLLMError,
-  apple,
-} from '@react-native-ai/apple';
-import { streamText } from 'ai';
-
-const result = streamText({
-  model: apple(),
-  messages,
-})
-
-for await (const part of result.fullStream) {
-  if (
-    part.type === 'error' &&
-    part.error instanceof Error &&
-    'code' in part.error &&
-    part.error.code === AppleLLMErrorCodes.InvalidSchema
-  ) {
-    // Handle invalid schema input.
-  }
-}
-```
-
-### Handling streaming errors with `textStream` and `onError`
-
-```typescript
-import {
-  AppleLLMErrorCodes,
-  type AppleLLMError,
-  apple,
-} from '@react-native-ai/apple';
-import { streamText } from 'ai';
-
-let streamError: unknown
-const result = streamText({
-  model: apple(),
-  messages,
-  onError: ({ error }) => {
-    streamError = error
-  },
+  prompt: 'Draft a short release note.',
 })
 
 for await (const delta of result.textStream) {
   console.log(delta)
 }
+```
 
-if (
-  streamError instanceof Error &&
-  'code' in streamError &&
-  streamError.code === AppleLLMErrorCodes.ToolCallError
-) {
-  // Handle tool failure.
+Streaming structured objects are not currently supported by this provider.
+
+## Structured Output
+
+Use `generateObject` when you want Apple guided generation through the AI SDK:
+
+```typescript
+import { apple } from '@react-native-ai/apple'
+import { generateObject } from 'ai'
+import { z } from 'zod'
+
+const result = await generateObject({
+  model: apple(),
+  prompt: 'Create a compact user profile for a software developer.',
+  schema: z.object({
+    name: z.string(),
+    role: z.string(),
+    seniority: z.enum(['junior', 'mid', 'senior']),
+  }),
+})
+
+console.log(result.object)
+```
+
+Supported schema shapes include objects, arrays, strings, numbers, booleans,
+and enums. String formats, regular expressions, and unions are not currently
+mapped to Apple Foundation Models.
+
+## Availability And Model Info
+
+Check availability before using the Apple Intelligence wrapper backend or showing Apple-only UI:
+
+```typescript
+import { apple } from '@react-native-ai/apple'
+
+if (!apple.isAvailable()) {
+  // Show fallback UI or use another provider.
 }
 ```
 
-## Available Options
-
-Configure model behavior with generation options:
-
-- `temperature` (0-1): Controls randomness. Higher values = more creative, lower = more focused
-- `maxTokens`: Maximum number of tokens to generate
-- `topP` (0-1): Nucleus sampling threshold
-- `topK`: Top-K sampling parameter
-
-You can pass selected options with either `generateText` or `generateObject` as follows:
+For capability-aware UI, ask native for the active model metadata:
 
 ```typescript
-import { apple } from '@react-native-ai/apple';
-import { generateText } from 'ai';
+const info = await apple.getModelInfo({ locale: 'en-US' })
+
+console.log(info.isAvailable)
+console.log(info.contextSize)
+console.log(info.supportsImagePrompts)
+console.log(info.supportsVisionTools)
+```
+
+`getModelInfo` returns availability, locale support, supported languages,
+context size when Apple exposes it, and feature flags for token counting,
+image prompts, Private Cloud Compute, Dynamic Profiles, and Vision built-in
+tools.
+
+## Private Cloud Compute
+
+The default `apple()` model uses `SystemLanguageModel.default`. On iOS 27 and
+newer, choose Apple's Private Cloud Compute language model with provider
+options:
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  prompt: 'Analyze this longer task with more reasoning.',
+  providerOptions: {
+    apple: {
+      model: 'private-cloud-compute',
+    },
+  },
+})
+```
+
+You can also create a provider with a default model:
+
+```typescript
+import { createAppleProvider } from '@react-native-ai/apple'
+
+const apple = createAppleProvider({
+  model: 'private-cloud-compute',
+})
+```
+
+Call `apple.getModelInfo({ model: 'private-cloud-compute' })` before enabling
+this path. It requires iOS 27 APIs and may report quota usage.
+
+## Image Prompts
+
+On iOS 27 and newer, Apple Foundation Models can analyze images alongside text
+prompts. Pass images through the AI SDK message format:
+
+```typescript
+import { apple } from '@react-native-ai/apple'
+import { generateText } from 'ai'
 
 const result = await generateText({
   model: apple(),
-  prompt: 'Write a creative story',
-  temperature: 0.8,
-  maxTokens: 500,
-  topP: 0.9,
-});
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Describe this image for accessibility.' },
+        {
+          type: 'file',
+          mediaType: 'image/jpeg',
+          data: 'file:///path/to/photo.jpg',
+        },
+      ],
+    },
+  ],
+})
+
+console.log(result.text)
 ```
 
-## Direct API Access
+The provider accepts local file URLs, absolute file paths, base64 image data,
+and image data URLs. Remote HTTP URLs are not sent directly to Apple; download
+them first and pass a local file URL or base64 payload.
 
-For advanced use cases, you can access the native Apple Foundation Models API directly:
+Image attachments are currently supported on the final user prompt. Passing
+image parts on older OS versions throws `AppleLLMErrorCodes.UnsupportedOS`.
 
-### AppleFoundationModels
+## Image Generation
 
-```tsx
-import { AppleFoundationModels } from '@react-native-ai/apple'
+Use the AI SDK image API with Apple's Image Playground framework:
 
-// Check if Apple Intelligence is available
-const isAvailable = AppleFoundationModels.isAvailable()
+```typescript
+import { apple } from '@react-native-ai/apple'
+import { generateImage } from 'ai'
 
-// Generate text responses
-const messages = [{ role: 'user', content: 'Hello' }]
-const options = { temperature: 0.7, maxTokens: 100 }
+const result = await generateImage({
+  model: apple.imageModel({
+    style: 'illustration',
+    personalization: 'disabled',
+  }),
+  prompt: 'A friendly robot watering balcony herbs',
+  n: 1,
+})
 
-const result = await AppleFoundationModels.generateText(messages, options)
+const base64Png = result.images[0].base64
 ```
 
-On iOS 26.4 and newer, you can also count the number of tokens in a string
-before sending it to the model:
+The provider uses `ImageCreator` on iOS 26.4 and newer and returns PNG images.
+Supported styles are `animation`, `illustration`, and `sketch`; iOS 27 adds
+`any`, `emoji`, and `externalProvider`. Apple supports at most one source image
+concept for generation, so pass no more than one file. Personalization is
+applied when the app is built with an SDK that exposes `ImagePlaygroundOptions`.
 
-```tsx
+Per-call Apple options can override model defaults:
+
+```typescript
+const result = await generateImage({
+  model: apple.imageModel(),
+  prompt: 'A hand-drawn icon for a notes app',
+  providerOptions: {
+    apple: {
+      style: 'sketch',
+      personalization: 'disabled',
+    },
+  },
+})
+```
+
+## Tool Calling
+
+Apple executes tools inside the Foundation Models session. Register JavaScript
+tools up front so native can call them by name:
+
+```typescript
+import { createAppleProvider } from '@react-native-ai/apple'
+import { generateText, tool } from 'ai'
+import { z } from 'zod'
+
+const getWeather = tool({
+  description: 'Get current weather information.',
+  inputSchema: z.object({
+    city: z.string(),
+  }),
+  execute: async ({ city }) => `Weather in ${city}: sunny`,
+})
+
+const apple = createAppleProvider({
+  availableTools: {
+    getWeather,
+  },
+})
+
+const result = await generateText({
+  model: apple(),
+  prompt: 'What is the weather in Paris?',
+  tools: {
+    getWeather,
+  },
+})
+```
+
+Important Apple-specific behavior:
+
+- Tool calls are provider-executed, so AI SDK step callbacks such as
+  `maxSteps`, `onStepStart`, and `onStepFinish` do not run for native Apple
+  tool execution.
+- Apple does not provide stable tool call IDs; the provider returns empty IDs.
+- You can update the registered tools on a model instance with
+  `model.updateTools(...)` before generation.
+
+## Vision Built-In Tools
+
+iOS 27 adds Foundation Models integration with Vision's OCR and barcode tools.
+Enable them through Apple provider options:
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  messages,
+  providerOptions: {
+    apple: {
+      builtInTools: ['ocr', 'barcode'],
+    },
+  },
+})
+```
+
+These tools require iOS 27. On older systems the provider throws
+`AppleLLMErrorCodes.UnsupportedOS`.
+
+## Context Window
+
+Apple's available context depends on the model and OS version. Prefer runtime
+metadata over hard-coded values:
+
+```typescript
+const info = await apple.getModelInfo()
+console.log(info.contextSize)
+```
+
+For reusable history policies such as summarization, rolling windows, and
+completed tool-call pruning, use `@react-native-ai/utils`.
+
+Use low-level token counting as an estimate, not a fit guarantee:
+
+```typescript
 import { AppleFoundationModels } from '@react-native-ai/apple'
 
 const tokenCount = await AppleFoundationModels.countTokens(
@@ -472,10 +312,99 @@ const tokenCount = await AppleFoundationModels.countTokens(
 )
 ```
 
-Token counting is useful for estimating prompt size, but it is not a complete
-guarantee that a generation request will fit in the model context window. The
-full context also includes instructions, previous messages in the transcript,
-tools, schemas, and generated output.
+The full request also includes instructions, tool definitions, schema text,
+attachments, and generated output budget. If Apple reports a context overflow,
+trim or summarize and retry.
 
-The maximum context window size for Apple's Foundation models is 4096 tokens
-per session. More information can be found [here](https://developer.apple.com/documentation/technotes/tn3193-managing-the-on-device-foundation-model-s-context-window).
+## Error Handling
+
+Use public error codes for app control flow:
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple'
+import { generateText } from 'ai'
+
+try {
+  await generateText({
+    model: apple(),
+    messages,
+  })
+} catch (error) {
+  const appleError = error as AppleLLMError
+
+  if (appleError.code === AppleLLMErrorCodes.ContextWindowExceeded) {
+    // Retry with a smaller transcript or a summary.
+  }
+
+  throw error
+}
+```
+
+For streaming, inspect `fullStream` when you need provider error parts:
+
+```typescript
+import {
+  AppleLLMErrorCodes,
+  type AppleLLMError,
+  apple,
+} from '@react-native-ai/apple'
+import { streamText } from 'ai'
+
+const result = streamText({
+  model: apple(),
+  messages,
+})
+
+for await (const part of result.fullStream) {
+  if (part.type === 'error') {
+    const error = part.error as AppleLLMError
+
+    if (error.code === AppleLLMErrorCodes.ModelUnavailable) {
+      // Show fallback UI.
+    }
+  }
+}
+```
+
+Stable public codes are:
+
+- `MODEL_UNAVAILABLE`
+- `UNSUPPORTED_OS`
+- `GENERATION_ERROR`
+- `INVALID_MESSAGE`
+- `CONFLICTING_SAMPLING_METHODS`
+- `INVALID_SCHEMA`
+- `TOOL_CALL_ERROR`
+- `UNKNOWN_TOOL_CALL_ERROR`
+- `CONTEXT_WINDOW_EXCEEDED`
+
+## Direct Native API
+
+Prefer the AI SDK models for generation. Use `AppleFoundationModels` only when
+you need low-level native access:
+
+```typescript
+import { AppleFoundationModels } from '@react-native-ai/apple'
+
+const info = await AppleFoundationModels.getModelInfo('en-US', 'system')
+const tokens = await AppleFoundationModels.countTokens('A short prompt')
+const result = await AppleFoundationModels.generateText(
+  [{ role: 'user', content: 'Hello' }],
+  { temperature: 0.7, maxTokens: 100 }
+)
+```
+
+Low-level `generateImages` is available for advanced callers, but
+`apple.imageModel()` is the recommended Image Playground integration because it
+matches the AI SDK image API.
+
+## Apple Documentation
+
+- [Apple Intelligence](https://developer.apple.com/apple-intelligence/)
+- [Foundation Models](https://developer.apple.com/documentation/FoundationModels)
+- [Image Playground](https://developer.apple.com/documentation/imageplayground)
+- [Managing the on-device foundation model's context window](https://developer.apple.com/documentation/technotes/tn3193-managing-the-on-device-foundation-model-s-context-window)

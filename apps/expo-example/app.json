@@ -35,10 +35,12 @@
         }
       ],
       "react-native-bottom-tabs",
+      "./plugins/withPodDeploymentTarget",
       [
         "expo-build-properties",
         {
           "ios": {
+            "deploymentTarget": "15.1",
             "extraPods": [
               {
                 "name": "SDWebImage",

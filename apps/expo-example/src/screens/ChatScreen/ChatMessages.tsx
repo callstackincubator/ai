@@ -29,6 +29,7 @@ type ChatMessage = {
 type ChatMessagesProps = {
   messages: ChatMessage[]
   selectedModelLabel: string
+  emptyStateSubtitle: string
   onSend: (message: string) => void
   isGenerating: boolean
   genUiEnabled: boolean
@@ -38,6 +39,7 @@ type ChatMessagesProps = {
 export function ChatMessages({
   messages,
   selectedModelLabel,
+  emptyStateSubtitle,
   onSend,
   isGenerating,
   genUiEnabled,
@@ -86,11 +88,7 @@ export function ChatMessages({
         {messages.length === 0 ? (
           <ChatEmptyState
             title="What can I help you with?"
-            subtitle={
-              genUiEnabled
-                ? `Start a conversation with ${selectedModelLabel}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`
-                : `Start a conversation with ${selectedModelLabel}. Ask questions, get creative, or explore ideas.`
-            }
+            subtitle={emptyStateSubtitle}
           />
         ) : (
           <View style={styles.messageList}>
