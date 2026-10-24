@@ -8,7 +8,7 @@ import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
-import com.google.adk.kt.models.mlkit.GenaiPrompt
+import com.google.adk.kt.mlkit.GenaiPrompt
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
@@ -19,7 +19,7 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.UsageMetadata
-import com.google.adk.kt.utils.mlkit.GenerativeModelHelpers
+import com.google.adk.kt.mlkit.GenerativeModelHelpers
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
 import kotlinx.coroutines.flow.Flow

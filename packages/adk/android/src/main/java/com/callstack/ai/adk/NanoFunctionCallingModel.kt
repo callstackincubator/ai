@@ -3,7 +3,7 @@ package com.callstack.ai.adk
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
-import com.google.adk.kt.models.mlkit.GenaiPrompt
+import com.google.adk.kt.mlkit.GenaiPrompt
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.Part
