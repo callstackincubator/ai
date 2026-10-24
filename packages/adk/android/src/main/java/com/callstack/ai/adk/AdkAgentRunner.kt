@@ -1,14 +1,18 @@
 package com.callstack.ai.adk
 
+import android.content.Context
+import android.net.Uri
 import android.util.Base64
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.google.adk.kt.agents.Instruction
 import com.google.adk.kt.agents.LlmAgent
+import com.google.adk.kt.agents.RunConfig
+import com.google.adk.kt.agents.StreamingMode
 import com.google.adk.kt.events.Event
+import com.google.adk.kt.mlkit.GenaiPrompt
 import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
-import com.google.adk.kt.mlkit.GenaiPrompt
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
@@ -18,84 +22,203 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import com.google.adk.kt.types.ThinkingConfig
 import com.google.adk.kt.types.UsageMetadata
-import com.google.adk.kt.mlkit.GenerativeModelHelpers
+import com.google.mlkit.genai.common.DownloadStatus
+import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
+import com.google.mlkit.genai.prompt.ModelPreference
+import com.google.mlkit.genai.prompt.ModelReleaseStage
+import com.google.mlkit.genai.prompt.TextPart
+import com.google.mlkit.genai.prompt.generateContentRequest
+import com.google.mlkit.genai.prompt.generationConfig
+import com.google.mlkit.genai.prompt.modelConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+
+data class AdkToolCallRecord(val toolCallId: String, val toolName: String, val input: String)
+
+data class AdkToolResultRecord(val toolCallId: String, val toolName: String, val output: String)
 
 data class AdkRunResult(
   val content: String,
+  val reasoning: String?,
+  val toolCalls: List<AdkToolCallRecord>,
+  val toolResults: List<AdkToolResultRecord>,
   val finishReason: String?,
   val usage: UsageMetadata?,
 )
 
+data class AdkModelInfo(
+  val availability: String,
+  val baseModelName: String? = null,
+  val contextSize: Int? = null,
+)
+
+/** Gemini Nano model selection, see ML Kit `ModelConfig`. */
+data class NanoConfig(
+  val releaseStage: String? = null,
+  val preference: String? = null,
+) {
+  companion object {
+    fun from(map: ReadableMap?): NanoConfig =
+      NanoConfig(
+        releaseStage = map?.getString("releaseStage"),
+        preference = map?.getString("preference"),
+      )
+  }
+}
+
+fun Part.isThought(): Boolean = thought == true
+
+fun Event.textParts(thoughts: Boolean): String =
+  content?.parts?.filter { it.isThought() == thoughts }?.mapNotNull { it.text }?.joinToString("")
+    ?: ""
+
 class AdkAgentRunner(
+  private val context: Context,
   private val onToolCall: (
     toolCallId: String,
     toolId: String,
     arguments: String,
     scope: ToolCallScope?,
   ) -> Unit,
+  private val onDownloadProgress: (
+    phase: String,
+    bytesDownloaded: Long?,
+    bytesToDownload: Long?,
+  ) -> Unit,
 ) {
-  private var generativeModel: GenerativeModel? = null
+  private val nanoModels = ConcurrentHashMap<NanoConfig, GenerativeModel>()
   private val nanoPrepareMutex = Mutex()
 
-  suspend fun prepareNano() {
-    if (!isNanoSupported()) {
-      throw IllegalStateException(
-        "Gemini Nano is not supported on this device or device hasn't fetched the latest configuration to support it",
-      )
+  private fun nanoClient(config: NanoConfig): GenerativeModel {
+    if (config.releaseStage == null && config.preference == null) {
+      return Generation.getClient()
     }
+
+    return Generation.getClient(
+      generationConfig {
+        modelConfig = modelConfig {
+          config.releaseStage?.let {
+            releaseStage =
+              if (it == "preview") ModelReleaseStage.PREVIEW else ModelReleaseStage.STABLE
+          }
+          config.preference?.let {
+            preference = if (it == "fast") ModelPreference.FAST else ModelPreference.FULL
+          }
+        }
+      },
+    )
+  }
+
+  private suspend fun nanoStatus(config: NanoConfig): Int =
+    try {
+      nanoClient(config).checkStatus()
+    } catch (_: Exception) {
+      FeatureStatus.UNAVAILABLE
+    }
+
+  /** Downloads Gemini Nano when needed, reporting progress, then warms it up. */
+  suspend fun prepareNano(config: NanoConfig) {
     nanoPrepareMutex.withLock {
-      generativeModel = GenerativeModelHelpers.initGenerativeModel()
-    }
-  }
+      if (nanoModels.containsKey(config)) return
 
-  private suspend fun ensureNanoPrepared() {
-    if (generativeModel != null) {
-      return
-    }
-    prepareNano()
-  }
-
-  /**
-   * Whether this device supports on-device Gemini Nano at all (ML Kit checkStatus != 0).
-   * Does not download models or run full initialization.
-   */
-  suspend fun isNanoSupported(): Boolean {
-    return try {
-      when (Generation.getClient().checkStatus()) {
-        0 -> false
-        else -> true
+      val model = nanoClient(config)
+      when (val status = model.checkStatus()) {
+        FeatureStatus.UNAVAILABLE ->
+          throw AdkErrors.AdkException(
+            AdkErrors.MODEL_UNAVAILABLE,
+            "Gemini Nano is not supported on this device or the device has not fetched the latest configuration to support it",
+          )
+        FeatureStatus.DOWNLOADABLE, FeatureStatus.DOWNLOADING -> download(model, status)
       }
-    } catch (_: Exception) {
-      false
+      model.warmup()
+      nanoModels[config] = model
     }
   }
 
-  /**
-   * Whether Gemini Nano is ready to use now (downloaded or ready to download).
-   * Returns false when [isNanoSupported] is false.
-   */
-  suspend fun isNanoAvailable(): Boolean {
-    if (!isNanoSupported()) {
-      return false
-    }
-
-    return try {
-      when (Generation.getClient().checkStatus()) {
-        1, 3 -> true
-        else -> false
+  private suspend fun download(model: GenerativeModel, status: Int) {
+    try {
+      model.download().collect { downloadStatus ->
+        when (downloadStatus) {
+          is DownloadStatus.DownloadStarted ->
+            onDownloadProgress("started", 0, downloadStatus.bytesToDownload)
+          is DownloadStatus.DownloadProgress ->
+            onDownloadProgress("progress", downloadStatus.totalBytesDownloaded, null)
+          is DownloadStatus.DownloadCompleted -> onDownloadProgress("completed", null, null)
+          is DownloadStatus.DownloadFailed ->
+            throw AdkErrors.AdkException(
+              AdkErrors.DOWNLOAD_FAILED,
+              "Gemini Nano download failed: ${downloadStatus.e.message}",
+              downloadStatus.e,
+            )
+        }
       }
-    } catch (_: Exception) {
-      false
+    } catch (error: GenAiException) {
+      if (status == FeatureStatus.DOWNLOADING) {
+        throw AdkErrors.AdkException(
+          AdkErrors.MODEL_DOWNLOADING,
+          "Gemini Nano is still downloading",
+          error,
+        )
+      }
+      throw error
     }
   }
+
+  private suspend fun preparedNano(config: NanoConfig): GenerativeModel {
+    nanoModels[config]?.let { return it }
+    prepareNano(config)
+    return nanoModels.getValue(config)
+  }
+
+  /** Whether this device supports Gemini Nano at all. Does not download the model. */
+  suspend fun isNanoSupported(config: NanoConfig): Boolean =
+    nanoStatus(config) != FeatureStatus.UNAVAILABLE
+
+  /** Whether Gemini Nano is downloaded or can be downloaded now. */
+  suspend fun isNanoAvailable(config: NanoConfig): Boolean =
+    when (nanoStatus(config)) {
+      FeatureStatus.DOWNLOADABLE, FeatureStatus.AVAILABLE -> true
+      else -> false
+    }
+
+  suspend fun getModelInfo(modelType: String, config: NanoConfig): AdkModelInfo {
+    if (modelType != "genai-nano") {
+      return AdkModelInfo(availability = "available")
+    }
+
+    val model = nanoClient(config)
+    val status =
+      try {
+        model.checkStatus()
+      } catch (_: Exception) {
+        return AdkModelInfo(availability = "unknown")
+      }
+
+    return when (status) {
+      FeatureStatus.UNAVAILABLE -> AdkModelInfo(availability = "unavailable")
+      FeatureStatus.DOWNLOADABLE -> AdkModelInfo(availability = "downloadable")
+      FeatureStatus.DOWNLOADING -> AdkModelInfo(availability = "downloading")
+      FeatureStatus.AVAILABLE ->
+        AdkModelInfo(
+          availability = "available",
+          baseModelName = runCatching { model.getBaseModelName() }.getOrNull(),
+          contextSize = runCatching { model.getTokenLimit() }.getOrNull(),
+        )
+      else -> AdkModelInfo(availability = "unknown")
+    }
+  }
+
+  suspend fun countTokens(text: String, config: NanoConfig): Int =
+    preparedNano(config).countTokens(generateContentRequest(TextPart(text)) {}).totalTokens
 
   suspend fun generateText(
     messages: ReadableArray,
@@ -105,21 +228,49 @@ class AdkAgentRunner(
     runId: String,
   ): AdkRunResult {
     val events = runAgent(messages, config, options, tools, stream = false, runId = runId).toList()
+    val completeEvents = events.filterNot { it.partial }
     val text =
-      events
-        .lastOrNull { it.isFinalResponse && !it.partial }
-        ?.content
-        ?.parts
-        ?.mapNotNull { it.text }
-        ?.joinToString("")
+      completeEvents
+        .lastOrNull { it.isFinalResponse }
+        ?.textParts(thoughts = false)
         ?.takeIf { it.isNotEmpty() }
-        ?: events
-          .flatMap { event -> event.content?.parts?.mapNotNull { it.text } ?: emptyList() }
-          .joinToString("")
+        ?: completeEvents.joinToString("") { it.textParts(thoughts = false) }
+    val reasoning =
+      completeEvents
+        .map { it.textParts(thoughts = true) }
+        .filter { it.isNotEmpty() }
+        .joinToString("\n\n")
+        .ifEmpty { null }
 
-    val finishReason = events.lastOrNull()?.finishReason?.name
-    val usage = AdkUsage.latestFromEvents(events)
-    return AdkRunResult(content = text, finishReason = finishReason, usage = usage)
+    val toolCalls =
+      completeEvents.flatMap { event ->
+        event.functionCalls().map { call ->
+          AdkToolCallRecord(
+            toolCallId = call.id ?: UUID.randomUUID().toString(),
+            toolName = call.name,
+            input = AdkJson.encode(call.args),
+          )
+        }
+      }
+    val toolResults =
+      completeEvents.flatMap { event ->
+        event.functionResponses().map { response ->
+          AdkToolResultRecord(
+            toolCallId = response.id ?: "",
+            toolName = response.name,
+            output = AdkJson.encode(response.response),
+          )
+        }
+      }
+
+    return AdkRunResult(
+      content = text,
+      reasoning = reasoning,
+      toolCalls = toolCalls,
+      toolResults = toolResults,
+      finishReason = events.lastOrNull()?.finishReason?.name,
+      usage = AdkUsage.latestFromEvents(events),
+    )
   }
 
   suspend fun streamText(
@@ -198,22 +349,14 @@ class AdkAgentRunner(
       userId = userId,
       sessionId = sessionId,
       newMessage = lastMessage.content,
-      runConfig = com.google.adk.kt.agents.RunConfig(streamingMode = if (stream) {
-        com.google.adk.kt.agents.StreamingMode.SSE
-      } else {
-        com.google.adk.kt.agents.StreamingMode.NONE
-      }),
+      runConfig = RunConfig(streamingMode = if (stream) StreamingMode.SSE else StreamingMode.NONE),
     )
   }
 
   private suspend fun createModel(config: AgentConfig): Model {
     return when (config.modelType) {
-      "genai-nano" -> {
-        ensureNanoPrepared()
-        val model = generativeModel
-          ?: throw IllegalStateException("Failed to initialize Gemini Nano")
-        NanoFunctionCallingModel(GenaiPrompt.create(model, config.modelName))
-      }
+      "genai-nano" ->
+        NanoFunctionCallingModel(GenaiPrompt.create(preparedNano(config.nano), config.modelName))
       else -> Gemini(name = config.modelName, apiKey = config.apiKey)
     }
   }
@@ -225,23 +368,50 @@ class AdkAgentRunner(
     if (options == null) return null
 
     val responseFormat = options.getMap("responseFormat")
-    if (responseFormat?.hasKey("schema") == true) {
-      throw IllegalArgumentException(
-        "ADK GenerateContentConfig does not support responseFormat.schema yet",
-      )
-    }
+    val responseSchema =
+      responseFormat?.getMap("schema")?.let { schema ->
+        try {
+          AdkSchema.fromReadableMap(schema)
+        } catch (error: Exception) {
+          throw AdkErrors.AdkException(
+            AdkErrors.INVALID_SCHEMA,
+            "Unsupported response schema: ${error.message}",
+            error,
+          )
+        }
+      }
 
     val responseMimeType = when {
       responseFormat?.hasKey("mimeType") == true -> responseFormat.getString("mimeType")
       responseFormat?.getString("type") == "json" -> "application/json"
       else -> null
     }
+
+    val thinkingConfig =
+      options.getMap("thinking")?.let { thinking ->
+        ThinkingConfig(
+          includeThoughts = thinking.hasKey("includeThoughts") && thinking.getBoolean("includeThoughts"),
+          thinkingBudget = thinking.takeIf { it.hasKey("budget") }?.getDouble("budget")?.toInt(),
+        )
+      }
+
     return GenerateContentConfig(
       temperature = options.takeIf { it.hasKey("temperature") }?.getDouble("temperature")?.toFloat(),
       maxOutputTokens = options.takeIf { it.hasKey("maxTokens") }?.getInt("maxTokens"),
       topP = options.takeIf { it.hasKey("topP") }?.getDouble("topP")?.toFloat(),
       topK = options.takeIf { it.hasKey("topK") }?.getDouble("topK")?.toFloat()?.toInt(),
+      seed = options.takeIf { it.hasKey("seed") }?.getDouble("seed")?.toInt(),
+      stopSequences =
+        options.getArray("stopSequences")?.let { array ->
+          (0 until array.size()).mapNotNull { index -> array.getString(index) }
+        },
+      presencePenalty =
+        options.takeIf { it.hasKey("presencePenalty") }?.getDouble("presencePenalty")?.toFloat(),
+      frequencyPenalty =
+        options.takeIf { it.hasKey("frequencyPenalty") }?.getDouble("frequencyPenalty")?.toFloat(),
       responseMimeType = responseMimeType,
+      responseSchema = responseSchema,
+      thinkingConfig = thinkingConfig,
     )
   }
 
@@ -281,9 +451,10 @@ class AdkAgentRunner(
       when (part.getString("type")) {
         "text" -> part.getString("text")?.let { parts.add(Part(text = it)) }
         "file" -> {
-          val data = part.getString("data") ?: continue
           val mimeType = part.getString("mimeType") ?: "application/octet-stream"
-          val bytes = Base64.decode(data, Base64.DEFAULT)
+          val bytes = part.getString("data")?.let { Base64.decode(it, Base64.DEFAULT) }
+            ?: part.getString("uri")?.let { readUri(it) }
+            ?: continue
           parts.add(Part(inlineData = Blob(mimeType = mimeType, data = bytes)))
         }
       }
@@ -295,6 +466,10 @@ class AdkAgentRunner(
 
     return Content(role = role, parts = parts)
   }
+
+  private fun readUri(uri: String): ByteArray =
+    context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
+      ?: throw IllegalArgumentException("Cannot read file: $uri")
 
   private fun parseTools(
     tools: ReadableArray?,
@@ -396,6 +571,7 @@ class AdkAgentRunner(
         modelType = model.getString("type") ?: "genai-nano",
         modelName = model.getString("name") ?: "gemini-nano",
         apiKey = model.getString("apiKey"),
+        nano = NanoConfig.from(model.getMap("nano")),
       )
     }
   }
@@ -408,6 +584,7 @@ data class AgentConfig(
   val modelType: String,
   val modelName: String,
   val apiKey: String?,
+  val nano: NanoConfig,
 )
 
 /** ADK content role — one of [Role.USER], [Role.MODEL], or [Role.SYSTEM]. */

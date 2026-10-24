@@ -13,6 +13,8 @@ object AdkUsage {
       usage.promptTokenCount?.let { putInt("promptTokenCount", it) }
       usage.candidatesTokenCount?.let { putInt("candidatesTokenCount", it) }
       usage.totalTokenCount?.let { putInt("totalTokenCount", it) }
+      usage.thoughtsTokenCount?.let { putInt("thoughtsTokenCount", it) }
+      usage.cachedContentTokenCount?.let { putInt("cachedContentTokenCount", it) }
     }
   }
 
