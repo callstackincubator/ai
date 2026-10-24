@@ -6,13 +6,21 @@ import type {
   ImageModelV4CallOptions,
   LanguageModelV4,
   LanguageModelV4CallOptions,
+  LanguageModelV4Content,
   LanguageModelV4FinishReason,
+  LanguageModelV4Prompt,
   LanguageModelV4StreamPart,
+  LanguageModelV4Usage,
   SharedV4Warning,
   TranscriptionModelV4,
   TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
 import { generateId, isCustomReasoning } from '@ai-sdk/provider-utils'
+import {
+  type AppleStreamEntry,
+  createSnapshotStreamHandler,
+  prepareAppleMessages,
+} from '@react-native-ai/apple'
 import type { CodegenTypes } from 'react-native'
 
 import NativeCoreAI from './NativeCoreAI'
@@ -20,6 +28,7 @@ import type {
   CoreAIEmbeddingResult,
   CoreAIGenerationOptions,
   CoreAIGenerationPart,
+  CoreAIGenerationResult,
   CoreAIImageGenerationOptions,
   CoreAIImageGenerationResult,
   CoreAILoadedModel,
@@ -30,6 +39,7 @@ import type {
   CoreAIStreamErrorEvent,
   CoreAIStreamUpdateEvent,
   CoreAITranscriptionResult,
+  CoreAIUsage,
 } from './types'
 import { toNativeModelConfig } from './types'
 
@@ -79,6 +89,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
   readonly config: CoreAIModelConfig
 
   private loadedModel?: CoreAILoadedModel
+  private loading?: Promise<CoreAILoadedModel>
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'language' }
@@ -95,15 +106,14 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     ) as Promise<CoreAIModelInfo>
   }
 
+  /**
+   * Loads the model once. Later calls, including generateText and streamText,
+   * reuse it until unload()
+   */
   async prepare(
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAIModelInfo> {
-    const loadedModel = (await NativeCoreAI.loadModel(
-      toNativeModelConfig(this.config),
-      options
-    )) as CoreAILoadedModel
-    this.loadedModel = loadedModel
-    return loadedModel.info
+    return (await this.load(options)).info
   }
 
   async specialize(
@@ -115,23 +125,29 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     ) as Promise<CoreAIModelInfo>
   }
 
+  /**
+   * Releases the native model and the sessions created from it
+   */
   async unload(): Promise<void> {
-    if (!this.loadedModel) {
+    const loading = this.loading
+    if (!loading) {
       return
     }
-    await NativeCoreAI.unloadModel(this.loadedModel.modelHandle)
+    this.loading = undefined
     this.loadedModel = undefined
+    await NativeCoreAI.unloadModel((await loading).modelHandle)
   }
 
   async remove(): Promise<void> {
     await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
+    this.loading = undefined
     this.loadedModel = undefined
   }
 
   async createSession(
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAILanguageSession> {
-    const model = await this.ensureLoaded()
+    const model = await this.load()
     const sessionHandle = await NativeCoreAI.createLanguageSession(
       model.modelHandle,
       options
@@ -140,17 +156,38 @@ export class CoreAILanguageModel implements LanguageModelV4 {
   }
 
   async doGenerate(options: LanguageModelV4CallOptions) {
-    const response = (await NativeCoreAI.generateText(
-      toNativeModelConfig(this.config),
-      prepareMessages(options.prompt),
-      toCoreAIGenerationOptions(options)
-    )) as CoreAIGenerationPart[]
+    const { modelHandle } = await this.load()
+    const { messages, warnings } = prepareCall(options)
+    const { abortSignal } = options
+    if (abortSignal?.aborted) {
+      throw toAbortError(abortSignal)
+    }
 
-    return {
-      content: response.map(toLanguageModelContent),
-      finishReason: toFinishReason('stop'),
-      usage: emptyUsage(),
-      warnings: getCallWarnings(options),
+    const requestId = generateId()
+    const cancel = () => NativeCoreAI.cancelStream(requestId)
+    abortSignal?.addEventListener('abort', cancel, { once: true })
+
+    try {
+      const response = (await NativeCoreAI.generateText(
+        requestId,
+        modelHandle,
+        messages,
+        toCoreAIGenerationOptions(options)
+      )) as CoreAIGenerationResult
+
+      return {
+        content: response.content.flatMap(toLanguageModelContent),
+        finishReason: toFinishReason('stop'),
+        usage: toUsage(response.usage),
+        warnings,
+      }
+    } catch (error) {
+      if (abortSignal?.aborted) {
+        throw toAbortError(abortSignal)
+      }
+      throw error
+    } finally {
+      abortSignal?.removeEventListener('abort', cancel)
     }
   }
 
@@ -161,47 +198,49 @@ export class CoreAILanguageModel implements LanguageModelV4 {
       )
     }
 
+    const { modelHandle } = await this.load()
+    const { messages, warnings } = prepareCall(options)
+    const { abortSignal } = options
     const streamId = generateId()
-    const warnings = getCallWarnings(options)
     let listeners: { remove(): void }[] = []
+    let onAbort: (() => void) | undefined
 
     const cleanup = () => {
       listeners.forEach((listener) => listener.remove())
       listeners = []
+      if (onAbort) {
+        abortSignal?.removeEventListener('abort', onAbort)
+      }
     }
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: (controller) => {
         controller.enqueue({ type: 'stream-start', warnings })
-        controller.enqueue({ type: 'text-start', id: streamId })
 
-        let previousContent = ''
+        const snapshots = createSnapshotStreamHandler(
+          controller,
+          streamId,
+          'core-ai'
+        )
 
         const updateListener = NativeCoreAI.onStreamUpdate(
           (event: CoreAIStreamUpdateEvent) => {
             if (event.streamId === streamId) {
-              // Native emits the full response so far on every update
-              const delta = event.content.startsWith(previousContent)
-                ? event.content.slice(previousContent.length)
-                : event.content
-              previousContent = event.content
-
-              controller.enqueue({
-                type: 'text-delta',
-                id: streamId,
-                delta,
-              })
+              snapshots.update(
+                event.content,
+                event.entries as AppleStreamEntry[] | undefined
+              )
             }
           }
         )
         const completeListener = NativeCoreAI.onStreamComplete(
           (event: CoreAIStreamCompleteEvent) => {
             if (event.streamId === streamId) {
-              controller.enqueue({ type: 'text-end', id: streamId })
+              snapshots.end()
               controller.enqueue({
                 type: 'finish',
                 finishReason: toFinishReason('stop'),
-                usage: emptyUsage(),
+                usage: toUsage(event.usage as CoreAIUsage | undefined),
               })
               cleanup()
               controller.close()
@@ -220,12 +259,23 @@ export class CoreAILanguageModel implements LanguageModelV4 {
             }
           }
         )
-
         listeners = [updateListener, completeListener, errorListener]
+
+        onAbort = () => {
+          cleanup()
+          NativeCoreAI.cancelStream(streamId)
+          controller.error(toAbortError(abortSignal!))
+        }
+        if (abortSignal?.aborted) {
+          onAbort()
+          return
+        }
+        abortSignal?.addEventListener('abort', onAbort, { once: true })
+
         NativeCoreAI.streamText(
           streamId,
-          toNativeModelConfig(this.config),
-          prepareMessages(options.prompt),
+          modelHandle,
+          messages,
           toCoreAIGenerationOptions(options)
         )
       },
@@ -244,11 +294,22 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     }
   }
 
-  private async ensureLoaded(): Promise<CoreAILoadedModel> {
-    if (!this.loadedModel) {
-      await this.prepare()
-    }
-    return this.loadedModel!
+  private load(
+    options: CodegenTypes.UnsafeObject = {}
+  ): Promise<CoreAILoadedModel> {
+    this.loading ??= (
+      NativeCoreAI.loadModel(
+        toNativeModelConfig(this.config),
+        options
+      ) as Promise<CoreAILoadedModel>
+    ).then(
+      (loadedModel) => (this.loadedModel = loadedModel),
+      (error) => {
+        this.loading = undefined
+        throw error
+      }
+    )
+    return this.loading
   }
 }
 
@@ -468,27 +529,48 @@ function streamLanguageSession(
   return Promise.resolve(stream)
 }
 
-export function prepareMessages(messages: unknown): CoreAIMessage[] {
-  if (!Array.isArray(messages)) {
-    return []
+const UNSUPPORTED_SETTINGS = [
+  'topP',
+  'topK',
+  'seed',
+  'presencePenalty',
+  'frequencyPenalty',
+] as const
+
+/**
+ * Converts the prompt into messages replayed natively as the session
+ * transcript, and warns about the options Core AI ignores
+ */
+function prepareCall(options: LanguageModelV4CallOptions): {
+  messages: CoreAIMessage[]
+  warnings: SharedV4Warning[]
+} {
+  const warnings = getCallWarnings(options)
+
+  // Core AI language models have no vision input yet
+  let hasFiles = false
+  const prompt = options.prompt.map((message) => {
+    if (message.role !== 'user') {
+      return message
+    }
+    const content = message.content.filter((part) => part.type !== 'file')
+    hasFiles ||= content.length !== message.content.length
+    return { ...message, content }
+  }) as LanguageModelV4Prompt
+
+  if (hasFiles) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'file parts',
+      details:
+        'Core AI language models do not accept files yet, so they were left out of the prompt.',
+    })
   }
 
-  return messages.map((message: any): CoreAIMessage => {
-    const content = Array.isArray(message.content)
-      ? message.content.reduce((acc: string, part: any) => {
-          if (part.type === 'text') {
-            return acc + part.text
-          }
-          console.warn('Unsupported Core AI message content type:', part)
-          return acc
-        }, '')
-      : String(message.content ?? '')
-
-    return {
-      role: message.role,
-      content,
-    }
-  })
+  return {
+    messages: prepareAppleMessages(prompt) as CoreAIMessage[],
+    warnings,
+  }
 }
 
 function toCoreAIGenerationOptions(
@@ -497,58 +579,77 @@ function toCoreAIGenerationOptions(
   return {
     maxTokens: options.maxOutputTokens,
     temperature: options.temperature,
-    topP: options.topP,
-    topK: options.topK,
-    schema:
-      options.responseFormat?.type === 'json'
-        ? options.responseFormat.schema
-        : undefined,
-    tools: options.tools,
   }
 }
 
 function getCallWarnings(
   options: LanguageModelV4CallOptions
 ): SharedV4Warning[] {
+  const warnings: SharedV4Warning[] = []
+
+  // Core AI only reads temperature and maximum response tokens
+  for (const setting of UNSUPPORTED_SETTINGS) {
+    if (options[setting] !== undefined) {
+      warnings.push({
+        type: 'unsupported',
+        feature: setting,
+        details: 'Core AI language models ignore this setting.',
+      })
+    }
+  }
+  if (options.stopSequences?.length) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'stopSequences',
+      details: 'Core AI language models ignore this setting.',
+    })
+  }
+  if (options.tools?.length) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'tools',
+      details:
+        'Core AI tool calling is not supported yet, so the tools were not passed to the model.',
+    })
+  }
+  if (options.responseFormat?.type === 'json') {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'responseFormat',
+      details: 'Core AI language models do not support structured output yet.',
+    })
+  }
+
   // `none` is already what a model without reasoning control does
   if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
-    return [
-      {
-        type: 'unsupported',
-        feature: 'reasoning',
-        details:
-          'Core AI language models do not support configuring reasoning.',
-      },
-    ]
+    warnings.push({
+      type: 'unsupported',
+      feature: 'reasoning',
+      details: 'Core AI language models do not support configuring reasoning.',
+    })
   }
-  return []
+  return warnings
 }
 
-function toLanguageModelContent(part: CoreAIGenerationPart) {
+function toLanguageModelContent(
+  part: CoreAIGenerationPart
+): LanguageModelV4Content[] {
   switch (part.type) {
     case 'text':
-      return part
+      return [{ type: 'text', text: part.text }]
     case 'reasoning':
-      return {
-        type: 'reasoning' as const,
-        text: part.text,
-      }
-    case 'tool-call':
-      return {
-        type: 'tool-call' as const,
-        toolCallId: generateId(),
-        providerExecuted: true,
-        toolName: part.toolName,
-        input: part.input,
-      }
-    case 'tool-result':
-      return {
-        type: 'tool-result' as const,
-        toolCallId: generateId(),
-        providerExecuted: true,
-        toolName: part.toolName,
-        result: part.output,
-      }
+      return [
+        {
+          type: 'reasoning',
+          text: part.text,
+          providerMetadata: {
+            'core-ai': part.signature ? { signature: part.signature } : {},
+          },
+        },
+      ]
+    default:
+      // No tools are passed to Core AI models, so there are no tool parts
+      return []
   }
 }
 
@@ -561,20 +662,29 @@ function toFinishReason(
   }
 }
 
-function emptyUsage() {
+function toUsage(usage: CoreAIUsage | undefined): LanguageModelV4Usage {
   return {
     inputTokens: {
-      total: undefined,
-      noCache: undefined,
-      cacheRead: undefined,
+      total: usage?.inputTokens,
+      noCache: usage && usage.inputTokens - usage.cachedInputTokens,
+      cacheRead: usage?.cachedInputTokens,
       cacheWrite: undefined,
     },
     outputTokens: {
-      total: undefined,
-      text: undefined,
-      reasoning: undefined,
+      total: usage?.outputTokens,
+      text: usage && usage.outputTokens - usage.reasoningTokens,
+      reasoning: usage?.reasoningTokens,
     },
   }
+}
+
+function toAbortError(signal: AbortSignal): Error {
+  if (signal.reason instanceof Error) {
+    return signal.reason
+  }
+  const error = new Error('The operation was aborted.')
+  error.name = 'AbortError'
+  return error
 }
 
 function toBase64(data: Uint8Array | string): string {
