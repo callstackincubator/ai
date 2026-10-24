@@ -171,7 +171,18 @@ const result = await generateText({
 })
 ```
 
+The AI SDK `reasoning` call option maps to the same levels (`minimal` and
+`low` to `light`, `medium` to `moderate`, `high` and above to `deep`), and
+`providerOptions.apple.reasoningLevel` takes precedence over it.
+
 Setting `reasoningLevel` on older iOS versions fails with `UNSUPPORTED_OS`.
+The on-device system model can reject reasoning levels as an unsupported
+capability; Private Cloud Compute supports them.
+
+Reasoning is returned as `reasoning` content (streamed as reasoning parts on
+iOS 27). Its `providerMetadata.apple` marks it as Apple reasoning, so it is
+replayed in later turns; reasoning from other providers is left out of the
+transcript.
 
 ## Image Prompts
 
@@ -288,7 +299,15 @@ Important Apple-specific behavior:
 - Tool calls are provider-executed, so AI SDK step callbacks such as
   `stopWhen`, `onStepStart`, and `onStepEnd` do not run for native Apple
   tool execution.
-- Apple does not provide stable tool call IDs; the provider returns empty IDs.
+- Tool calls and results carry the Foundation Models transcript IDs. When
+  streaming on iOS 27, they are emitted as provider-executed `tool-call` and
+  `tool-result` parts once the tool has run.
+- Earlier tool calls and results in the conversation are replayed as
+  transcript entries, including results of tools executed by other providers.
+- `toolChoice: 'none'` disables tool calls. `required` and a specific tool are
+  not supported, because the required mode applies to every step of the native
+  tool loop; a specific tool only narrows the available tools, and both report
+  an unsupported warning.
 - You can update the registered tools on a model instance with
   `model.updateTools(...)` before generation.
 
