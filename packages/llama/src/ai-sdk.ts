@@ -6,7 +6,6 @@ import type {
   LanguageModelV3CallOptions,
   LanguageModelV3Content,
   LanguageModelV3FinishReason,
-  LanguageModelV3Prompt,
   LanguageModelV3StreamPart,
   RerankingModelV3,
   RerankingModelV3CallOptions,
@@ -15,35 +14,19 @@ import type {
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
-  type CompletionParams,
   type ContextParams,
   type EmbeddingParams,
   initLlama,
   type LlamaContext,
   type NativeCompletionResult,
   type NativeEmbeddingResult,
-  type TokenData,
 } from 'llama.rn'
 
-type LLMState = 'text' | 'reasoning' | 'tool-call' | 'none'
-
-interface LLMMessagePart {
-  type: 'text' | 'image_url' | 'input_audio'
-  text?: string
-  image_url?: { url: string }
-  input_audio?:
-    | { format: string; data: string }
-    | { format: string; url: string }
-}
-
-// Taken from https://github.com/mybigday/llama.rn/blob/main/example/src/utils/llmMessages.ts
-interface LLMMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string | LLMMessagePart[]
-  reasoning_content?: string
-  tool_call_id?: string
-  tool_calls?: any[]
-}
+import {
+  buildLlamaCompletionOptions,
+  prepareMessagesWithMedia,
+} from './completionOptions'
+import { createLlamaStreamParser } from './streamParser'
 
 function convertFinishReason(
   result: NativeCompletionResult
@@ -69,162 +52,6 @@ function convertFinishReason(
 }
 
 /**
- * Convert Uint8Array to base64 string
- */
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
-
-/**
- * Prepare messages with multimodal support for llama.rn
- *
- * Supports:
- * - Images: JPEG, PNG, BMP, GIF, TGA, HDR, PIC, PNM
- * - Audio: WAV, MP3
- * - Base64 data URLs and local file paths (file:///)
- * - Note: HTTP URLs are not yet supported
- *
- * @see https://github.com/mybigday/llama.rn#multimodal-vision--audio
- */
-function prepareMessagesWithMedia(prompt: LanguageModelV3Prompt): LLMMessage[] {
-  const messages: LLMMessage[] = []
-
-  type PromptPart = Extract<
-    LanguageModelV3Prompt[number],
-    { content: unknown[] }
-  >['content'][number]
-
-  const convertFilePartToMedia = (
-    part: Extract<PromptPart, { type: 'file' }>
-  ): LLMMessagePart => {
-    const mediaType = part.mediaType.toLowerCase()
-    const data = part.data as unknown
-
-    const url =
-      data instanceof Uint8Array
-        ? `data:${part.mediaType};base64,${uint8ArrayToBase64(data)}`
-        : data instanceof URL
-          ? data.toString()
-          : typeof data === 'string'
-            ? data
-            : null
-
-    if (!url) {
-      return { type: 'text', text: '' }
-    }
-
-    if (mediaType.startsWith('image/')) {
-      return { type: 'image_url', image_url: { url } }
-    }
-
-    if (mediaType.startsWith('audio/')) {
-      const format = mediaType.includes('wav') ? 'wav' : 'mp3'
-      if (url.startsWith('data:')) {
-        return {
-          type: 'input_audio',
-          input_audio: {
-            format,
-            data: url,
-          },
-        }
-      }
-      return {
-        type: 'input_audio',
-        input_audio: {
-          format,
-          url,
-        },
-      }
-    }
-
-    return { type: 'text', text: '' }
-  }
-
-  for (const message of prompt) {
-    switch (message.role) {
-      case 'system':
-      case 'user':
-        if (typeof message.content === 'string') {
-          messages.push({ role: message.role, content: message.content })
-        } else {
-          for (const part of message.content) {
-            switch (part.type) {
-              case 'text':
-                messages.push({ role: message.role, content: part.text })
-                break
-              case 'file':
-                messages.push({
-                  role: message.role,
-                  content: [convertFilePartToMedia(part)],
-                })
-                break
-              default:
-                throw new Error(
-                  `Unsupported message content type: ${JSON.stringify(part)}`
-                )
-            }
-          }
-        }
-        break
-      case 'assistant': {
-        const reasoningContent = message.content.find(
-          (part) => part.type === 'reasoning'
-        )
-        const toolCalls = message.content.filter(
-          (part) => part.type === 'tool-call'
-        )
-        const content = message.content.filter((part) => part.type === 'text')
-        messages.push({
-          role: 'assistant',
-          content,
-          reasoning_content: reasoningContent?.text,
-          tool_calls: toolCalls.map((toolCall) => ({
-            type: 'function',
-            id: toolCall.toolCallId,
-            function: {
-              name: toolCall.toolName,
-              arguments: JSON.stringify(toolCall.input),
-            },
-          })),
-        })
-        const toolResults = message.content.filter(
-          (part) => part.type === 'tool-result'
-        )
-        if (toolResults.length > 0) {
-          console.warn(
-            '[llama] Model executed tools are not supported. Skipping:',
-            toolResults
-          )
-        }
-        break
-      }
-      case 'tool': {
-        const toolResults = message.content.filter(
-          (part) => part.type === 'tool-result'
-        )
-        for (const toolResult of toolResults) {
-          messages.push({
-            role: 'tool',
-            tool_call_id: toolResult.toolCallId,
-            content:
-              toolResult.output.type === 'execution-denied'
-                ? (toolResult.output.reason ?? 'Execution denied')
-                : JSON.stringify(toolResult.output.value),
-          })
-        }
-        break
-      }
-    }
-  }
-
-  return messages
-}
-
-/**
  * Configuration options for llama.rn model initialization
  *
  * @see https://github.com/mybigday/llama.rn
@@ -246,12 +73,6 @@ export interface LlamaModelOptions {
    */
   contextParams?: Partial<ContextParams>
 }
-
-const START_OF_THINKING_PLACEHOLDER = '<think>'
-const END_OF_THINKING_PLACEHOLDER = '</think>'
-
-const START_OF_TOOL_CALL_PLACEHOLDER = '<tool_call>'
-const END_OF_TOOL_CALL_PLACEHOLDER = '</tool_call>'
 
 /**
  * llama.rn Language Model for AI SDK
@@ -386,33 +207,7 @@ export class LlamaLanguageModel implements LanguageModelV3 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions: Partial<CompletionParams> = {
-      messages,
-      temperature: options.temperature,
-      n_predict: options.maxOutputTokens,
-      top_p: options.topP,
-      top_k: options.topK,
-      penalty_present: options.presencePenalty,
-      penalty_freq: options.frequencyPenalty,
-      stop: options.stopSequences,
-      seed: options.seed,
-      reasoning_format: 'auto',
-    }
-
-    if (options.responseFormat?.type === 'json') {
-      completionOptions.response_format = {
-        type: 'json_object',
-        schema: options.responseFormat.schema,
-      }
-    }
-
-    if (options.tools) {
-      completionOptions.tools = options.tools.map(({ type, ...tool }) => ({
-        type,
-        function: tool,
-      }))
-      completionOptions.tool_choice = options.toolChoice?.type ?? 'auto'
-    }
+    const completionOptions = buildLlamaCompletionOptions(options, messages)
 
     const response = await context.completion(completionOptions)
     let content: LanguageModelV3Content[] = []
@@ -490,141 +285,28 @@ export class LlamaLanguageModel implements LanguageModelV3 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions: Partial<CompletionParams> = {
-      messages,
-      temperature: options.temperature,
-      n_predict: options.maxOutputTokens,
-      top_p: options.topP,
-      top_k: options.topK,
-      penalty_present: options.presencePenalty,
-      penalty_freq: options.frequencyPenalty,
-      stop: options.stopSequences,
-      seed: options.seed,
-    }
-
-    if (options.tools) {
-      completionOptions.tools = options.tools.map(({ type, ...tool }) => ({
-        type,
-        function: tool,
-      }))
-      completionOptions.tool_choice = options.toolChoice?.type ?? 'auto'
-    }
-
-    if (options.responseFormat?.type === 'json') {
-      completionOptions.response_format = {
-        type: 'json_object',
-        schema: options.responseFormat.schema,
-      }
-    }
+    const completionOptions = buildLlamaCompletionOptions(options, messages)
 
     const stream = new ReadableStream<LanguageModelV3StreamPart>({
       start: async (controller) => {
         try {
-          let currentChunkId = generateId()
-
-          let state: LLMState = 'none' as LLMState
+          const streamParser = createLlamaStreamParser({
+            enqueue: (part) => controller.enqueue(part),
+          })
 
           controller.enqueue({
             type: 'stream-start',
             warnings: [],
           })
 
-          const finishCurrentBlock = () => {
-            if (state === 'text') {
-              controller.enqueue({
-                type: 'text-end',
-                id: currentChunkId,
-              })
-            }
-            if (state === 'reasoning') {
-              controller.enqueue({
-                type: 'reasoning-end',
-                id: currentChunkId,
-              })
-            }
-            state = 'none'
-          }
-
           const result = await context.completion(
             completionOptions,
-            (tokenData: TokenData) => {
-              const { token } = tokenData
-
-              switch (token) {
-                case START_OF_THINKING_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  state = 'reasoning'
-                  currentChunkId = generateId()
-                  controller.enqueue({
-                    type: 'reasoning-start',
-                    id: currentChunkId,
-                  })
-                  break
-                }
-                case START_OF_TOOL_CALL_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  state = 'tool-call'
-                  break
-                }
-                case END_OF_TOOL_CALL_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  for (const toolCall of tokenData.tool_calls ?? []) {
-                    controller.enqueue({
-                      type: 'tool-call',
-                      toolCallId: toolCall.id ?? generateId(),
-                      toolName: toolCall.function.name,
-                      input: toolCall.function.arguments,
-                    })
-                  }
-                  break
-                }
-                case END_OF_THINKING_PLACEHOLDER: {
-                  finishCurrentBlock()
-                  break
-                }
-                default:
-                  switch (state) {
-                    case 'none': {
-                      state = 'text'
-                      currentChunkId = generateId()
-                      controller.enqueue({
-                        type: 'text-start',
-                        id: currentChunkId,
-                      })
-                      controller.enqueue({
-                        type: 'text-delta',
-                        id: currentChunkId,
-                        delta: token,
-                      })
-                      break
-                    }
-                    case 'text': {
-                      controller.enqueue({
-                        type: 'text-delta',
-                        id: currentChunkId,
-                        delta: token,
-                      })
-                      break
-                    }
-                    case 'reasoning': {
-                      controller.enqueue({
-                        type: 'reasoning-delta',
-                        id: currentChunkId,
-                        delta: token,
-                      })
-                      break
-                    }
-                    case 'tool-call': {
-                      // Ignore tokens while in tool-call state; tool call data
-                      // is handled via tokenData.tool_calls at the end marker.
-                      break
-                    }
-                  }
-              }
+            (tokenData) => {
+              streamParser.processToken(tokenData)
             }
           )
 
-          finishCurrentBlock()
+          streamParser.finish()
 
           controller.enqueue({
             type: 'finish',

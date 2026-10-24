@@ -4,7 +4,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 
 ## Why On-Device AI?
 
-- **Privacy-first:** All processing happens locally—no data leaves the device
+- **Privacy-first:** All processing happens locally - no data leaves the device
 - **Instant responses:** No network latency, immediate AI capabilities
 - **Offline-ready:** Works anywhere, even without internet
 - **Zero server costs:** No API fees or infrastructure to maintain
@@ -30,6 +30,17 @@ Native integration with Apple's on-device AI capabilities through `@react-native
 
 Production-ready with instant availability on supported iOS devices.
 
+### Google ADK
+
+Run Gemini Nano on-device on Android using Google's Agent Development Kit through `@react-native-ai/adk`. Gemini Nano is system-provisioned via AICore - no API key, no model files to bundle. Cloud Gemini is also available when you need a larger model.
+
+- **On-device Gemini Nano** - Private, offline-capable inference via ML Kit GenAI, provisioned by the system
+- **Cloud Gemini** — Optional cloud inference via ADK `LlmAgent` and Google AI API
+- **Tool calling** - Native ADK agent loop with JavaScript tool executors
+- **Streaming** - Real-time text and tool-call stream parts
+
+Android-only. See the [ADK docs](./adk/getting-started) for setup and API details.
+
 ### Llama Engine
 
 Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-native-ai/llama`:
@@ -54,14 +65,10 @@ Run any open-source LLM locally using MLC's optimized runtime through `@react-na
 
 Build UIs from tool-calling models with `@react-native-ai/json-ui`:
 
-- **Tool-based spec** — Model calls tools to add/set/delete nodes and props
-- **GenerativeUIView** — Renders the spec in React Native; override styles or supply a custom node renderer
-- **Small-model friendly** — Designed for on-device models with limited context
+- **Tool-based spec** - Model calls tools to add/set/delete nodes and props
+- **GenerativeUIView** - Renders the spec in React Native; override styles or supply a custom node renderer
+- **Small-model friendly** - Designed for on-device models with limited context
 
 See the [JSON UI docs](./json-ui/getting-started) for setup and API.
-
-### Google (Coming Soon)
-
-Support for Google's on-device models is planned for future releases.
 
 Get started by choosing the approach that fits your needs!

@@ -1,15 +1,24 @@
+import { adk } from '@react-native-ai/adk'
 import { generateId } from 'ai'
-import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomWithRefresh } from 'jotai/utils'
+import { atom, useAtomValue, useSetAtom } from 'jotai'
+import { atomWithRefresh, loadable } from 'jotai/utils'
+import { Platform } from 'react-native'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { languageAdapters } from '../config/providers'
-import { type Availability } from '../config/providers.common'
+import type { Availability } from '../config/providers.common'
 
 export type CustomModel = {
   id: string
   name: string
   url: string
+}
+
+export type NanoUnavailableReason = 'unsupported' | 'not-ready'
+
+type AvailabilityState = {
+  availability: Map<string, Availability>
+  nanoUnavailableReason: NanoUnavailableReason | null
 }
 
 // todo: persist custom models in storage (synchronous)
@@ -22,20 +31,51 @@ const adaptersAtom = atom((get) => {
   return [...languageAdapters, ...customModels]
 })
 
-const availabilityAtom = atomWithRefresh((get) => {
+const availabilityAtom = atomWithRefresh(async (get) => {
   const adapters = get(adaptersAtom)
-  const map = new Map<string, Availability>()
+  const availability = new Map<string, Availability>()
+  let nanoUnavailableReason: NanoUnavailableReason | null = null
+
   for (const adapter of adapters) {
-    map.set(adapter.modelId, adapter.isAvailable())
+    if (adapter.modelId === 'adk-gemini-nano') {
+      continue
+    }
+    availability.set(adapter.modelId, adapter.isAvailable())
   }
-  return map
+
+  if (Platform.OS === 'android') {
+    const supported = await adk.isNanoSupported()
+    if (!supported) {
+      availability.set('adk-gemini-nano', 'no')
+      nanoUnavailableReason = 'unsupported'
+    } else {
+      const ready = await adk.isAvailable('genai-nano')
+      availability.set('adk-gemini-nano', ready ? 'yes' : 'no')
+      if (!ready) {
+        nanoUnavailableReason = 'not-ready'
+      }
+    }
+  } else {
+    availability.set('adk-gemini-nano', 'no')
+    nanoUnavailableReason = 'unsupported'
+  }
+
+  return { availability, nanoUnavailableReason } satisfies AvailabilityState
 })
 
 const downloadProgressAtom = atom<Record<string, number>>({})
 
+const availabilityLoadableAtom = loadable(availabilityAtom)
+
 export function useProviderStore() {
   const adapters = useAtomValue(adaptersAtom)
-  const [availability, refreshAvailability] = useAtom(availabilityAtom)
+  const availabilityLoadable = useAtomValue(availabilityLoadableAtom)
+  const refreshAvailability = useSetAtom(availabilityAtom)
+
+  const availabilityState: AvailabilityState =
+    availabilityLoadable.state === 'hasData'
+      ? availabilityLoadable.data
+      : { availability: new Map(), nanoUnavailableReason: null }
 
   const setCustomModels = useSetAtom(customModelsAtom)
   const setDownloadProgress = useSetAtom(downloadProgressAtom)
@@ -97,7 +137,8 @@ export function useProviderStore() {
 
   return {
     adapters,
-    availability,
+    availability: availabilityState.availability,
+    nanoUnavailableReason: availabilityState.nanoUnavailableReason,
     removeModel,
     addCustomModel,
     downloadModel,

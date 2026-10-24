@@ -31,6 +31,12 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ['**/__tests__/**/*.{ts,tsx,js,jsx}'],
+    settings: {
+      'import/core-modules': ['bun:test'],
+    },
+  },
   // Configure Prettier
   {
     rules: {

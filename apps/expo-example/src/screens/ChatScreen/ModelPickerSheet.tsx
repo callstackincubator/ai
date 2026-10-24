@@ -2,7 +2,7 @@ import type { LanguageModelV3 } from '@ai-sdk/provider'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { SymbolView } from 'expo-symbols'
-import React, { RefObject, Suspense, useState } from 'react'
+import React, { type RefObject, Suspense, useState } from 'react'
 import {
   Pressable,
   ScrollView,
@@ -22,9 +22,11 @@ type ModelPickerSheetProps = {
   ref: RefObject<TrueSheet | null>
 }
 
+const PROVIDER_ORDER = ['adk', 'apple', 'llama', 'mlc']
+
 export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
   const { chatSettings, updateChatSettings } = useChatStore()
-  const { adapters, addCustomModel } = useProviderStore()
+  const { adapters, addCustomModel, availability } = useProviderStore()
 
   const [customUrl, setCustomUrl] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
@@ -37,6 +39,27 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
     group.push(adapter)
     adaptersByProvider.set(key, group)
   }
+
+  const hasAvailableAdk = adapters.some(
+    (adapter) =>
+      adapter.model.provider === 'adk' &&
+      availability.get(adapter.modelId) === 'yes'
+  )
+
+  const sortedProviderEntries = Array.from(adaptersByProvider.entries()).sort(
+    ([a], [b]) => {
+      if (hasAvailableAdk) {
+        if (a === 'adk') return -1
+        if (b === 'adk') return 1
+      }
+      const aIndex = PROVIDER_ORDER.indexOf(a)
+      const bIndex = PROVIDER_ORDER.indexOf(b)
+      return (
+        (aIndex === -1 ? PROVIDER_ORDER.length : aIndex) -
+        (bIndex === -1 ? PROVIDER_ORDER.length : bIndex)
+      )
+    }
+  )
 
   const handleModelSelect = (id: string) => {
     updateChatSettings({ modelId: id })
@@ -58,38 +81,36 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Choose Model</Text>
           </View>
-          {Array.from(adaptersByProvider.entries()).map(
-            ([providerLabel, adapters], index) => (
-              <View
-                key={providerLabel}
-                style={index > 0 && styles.modelListSpacing}
-              >
-                <Text style={styles.sectionLabel}>{providerLabel}</Text>
-                <View style={styles.modelList}>
-                  {adapters.map((adapter, adapterIndex) => (
-                    <Suspense
-                      key={adapter.modelId}
-                      fallback={
-                        <ModelItemFallback
-                          label={adapter.display.label}
-                          accentColor={adapter.display.accentColor}
-                          isLast={adapterIndex === adapters.length - 1}
-                        />
-                      }
-                    >
-                      <ModelItem
-                        adapter={adapter}
-                        isSelected={selectedModelId === adapter.modelId}
-                        onSelect={handleModelSelect}
-                        isFirst={adapterIndex === 0}
+          {sortedProviderEntries.map(([providerLabel, adapters], index) => (
+            <View
+              key={providerLabel}
+              style={index > 0 && styles.modelListSpacing}
+            >
+              <Text style={styles.sectionLabel}>{providerLabel}</Text>
+              <View style={styles.modelList}>
+                {adapters.map((adapter, adapterIndex) => (
+                  <Suspense
+                    key={adapter.modelId}
+                    fallback={
+                      <ModelItemFallback
+                        label={adapter.display.label}
+                        accentColor={adapter.display.accentColor}
                         isLast={adapterIndex === adapters.length - 1}
                       />
-                    </Suspense>
-                  ))}
-                </View>
+                    }
+                  >
+                    <ModelItem
+                      adapter={adapter}
+                      isSelected={selectedModelId === adapter.modelId}
+                      onSelect={handleModelSelect}
+                      isFirst={adapterIndex === 0}
+                      isLast={adapterIndex === adapters.length - 1}
+                    />
+                  </Suspense>
+                ))}
               </View>
-            )
-          )}
+            </View>
+          ))}
           <View style={styles.customModelSection}>
             {showCustomInput ? (
               <>

@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    eslint:
+      glob: '*.{js,ts,tsx,mjs}'
+      exclude: 'website/**'
+      run: bunx eslint --fix {staged_files}
+      stage_fixed: true
+    typecheck:
+      run: bun run typecheck
+
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx commitlint --edit {1}

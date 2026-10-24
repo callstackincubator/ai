@@ -3,7 +3,7 @@ import { TurboModuleRegistry } from 'react-native'
 import type {
   EventEmitter,
   UnsafeObject,
-} from 'react-native/Libraries/Types/CodegenTypes'
+} from 'react-native/Libraries/Types/CodegenTypesNamespace'
 
 export interface AppleMessage {
   role: 'assistant' | 'system' | 'tool' | 'user'

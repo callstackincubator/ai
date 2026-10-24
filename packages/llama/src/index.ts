@@ -12,6 +12,10 @@ export {
   LlamaRerankModel,
   LlamaSpeechModel,
 } from './ai-sdk'
+export {
+  buildLlamaCompletionOptions,
+  prepareMessagesWithMedia,
+} from './completionOptions'
 export type {
   CompletionParams,
   ContextParams,
