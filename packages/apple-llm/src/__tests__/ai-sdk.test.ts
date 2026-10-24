@@ -55,3 +55,62 @@ describe('apple language model', () => {
     ).toBeUndefined()
   })
 })
+
+describe('apple prompt conversion', () => {
+  test('skips reasoning parts from earlier assistant turns', async () => {
+    await apple().doGenerate(
+      createCallOptions({
+        prompt: [
+          { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'reasoning', text: 'thinking' },
+              { type: 'text', text: 'hello' },
+            ],
+          },
+          { role: 'user', content: [{ type: 'text', text: 'again' }] },
+        ],
+      })
+    )
+
+    expect(generateText.mock.calls.at(-1)![0]).toEqual([
+      { role: 'user', content: 'hi', attachments: [] },
+      { role: 'assistant', content: 'hello', attachments: [] },
+      { role: 'user', content: 'again', attachments: [] },
+    ])
+  })
+
+  test('skips tool approval responses in tool messages', async () => {
+    await apple().doGenerate(
+      createCallOptions({
+        prompt: [
+          {
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-approval-response',
+                approvalId: 'approval-1',
+                approved: true,
+              },
+              {
+                type: 'tool-result',
+                toolCallId: 'call-1',
+                toolName: 'weather',
+                output: { type: 'text', value: 'sunny' },
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    expect(generateText.mock.calls.at(-1)![0]).toEqual([
+      {
+        role: 'tool',
+        content: '[tool-result:weather] {"type":"text","value":"sunny"}',
+        attachments: [],
+      },
+    ])
+  })
+})

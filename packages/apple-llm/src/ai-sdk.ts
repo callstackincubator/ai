@@ -310,6 +310,16 @@ function serializeKnownMessageContentPart(
   if (part.type === 'tool-result') {
     return `[tool-result:${part.toolName}] ${JSON.stringify(part.output)}`
   }
+
+  // Reasoning from earlier turns and tool approval responses have no Apple
+  // Foundation Models transcript equivalent, so they are left out
+  if (
+    part.type === 'reasoning' ||
+    part.type === 'reasoning-file' ||
+    part.type === 'tool-approval-response'
+  ) {
+    return ''
+  }
 }
 
 function appendMessageContent(content: string, addition: string) {
