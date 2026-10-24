@@ -71,6 +71,14 @@
           "androidFSTypes": ["mediaPlayback"]
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to attach images to chat messages.",
+          "cameraPermission": "The app needs access to your camera to take photos for chat messages.",
+          "microphonePermission": false
+        }
+      ],
       "llama.rn"
     ]
   }
