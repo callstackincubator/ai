@@ -833,6 +833,8 @@ export function createLlamaProvider() {
     return provider.languageModel(modelPath, options)
   }
 
+  provider.specificationVersion = 'v4' as const
+
   /**
    * Create a language model instance
    * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
@@ -850,24 +852,30 @@ export function createLlamaProvider() {
    * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
    * @param options - Model configuration options
    */
-  provider.textEmbeddingModel = (
+  provider.embeddingModel = (
     modelPath: string,
     options: LlamaEmbeddingOptions = {}
   ): LlamaEmbeddingModel => {
     return new LlamaEmbeddingModel(modelPath, options)
   }
 
+  /** @deprecated Use `embeddingModel` */
+  provider.textEmbeddingModel = provider.embeddingModel
+
   /**
    * Create a rerank model instance for document ranking
    * @param modelPath - Path to a reranker model file (from downloadModel() or getModelPath())
    * @param options - Model configuration options
    */
-  provider.rerankModel = (
+  provider.rerankingModel = (
     modelPath: string,
     options: LlamaRerankOptions = {}
   ): LlamaRerankModel => {
     return new LlamaRerankModel(modelPath, options)
   }
+
+  /** @deprecated Use `rerankingModel` */
+  provider.rerankModel = provider.rerankingModel
 
   /**
    * Create a speech model instance

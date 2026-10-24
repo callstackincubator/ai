@@ -507,6 +507,7 @@ export function createAppleProvider({
   ) {
     return createLanguageModel(options)
   }
+  provider.specificationVersion = 'v4' as const
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
   provider.getModelInfo = (
     options: { locale?: string; model?: AppleLanguageModelId } = {}
@@ -516,9 +517,11 @@ export function createAppleProvider({
       options.model
     ) as Promise<AppleModelInfo>
   provider.languageModel = createLanguageModel
-  provider.textEmbeddingModel = (options: AppleEmbeddingOptions = {}) => {
+  provider.embeddingModel = (options: AppleEmbeddingOptions = {}) => {
     return new AppleTextEmbeddingModel(options)
   }
+  /** @deprecated Use `embeddingModel` */
+  provider.textEmbeddingModel = provider.embeddingModel
   provider.imageModel = (options: AppleImageModelOptions = {}) => {
     return new AppleImageModel(options)
   }

@@ -91,7 +91,7 @@ const { text } = await generateText({
 
 // Generate embeddings
 const { embedding } = await embed({
-  model: apple.textEmbeddingModel(),
+  model: apple.embeddingModel(),
   value: 'Hello world',
 })
 
@@ -166,11 +166,11 @@ Run any GGUF model on-device using [llama.rn](https://github.com/mybigday/llama.
 
 #### Supported Features
 
-| Feature         | Method                       | Description                                   |
-| --------------- | ---------------------------- | --------------------------------------------- |
-| Text Generation | `llama.languageModel()`      | Chat, completion, streaming, reasoning models |
-| Embeddings      | `llama.textEmbeddingModel()` | Text embeddings for RAG and similarity search |
-| Speech          | `llama.speechModel()`        | Text-to-speech with vocoder models            |
+| Feature         | Method                   | Description                                   |
+| --------------- | ------------------------ | --------------------------------------------- |
+| Text Generation | `llama.languageModel()`  | Chat, completion, streaming, reasoning models |
+| Embeddings      | `llama.embeddingModel()` | Text embeddings for RAG and similarity search |
+| Speech          | `llama.speechModel()`    | Text-to-speech with vocoder models            |
 
 #### Installation
 

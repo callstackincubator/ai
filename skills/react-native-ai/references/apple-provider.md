@@ -57,7 +57,7 @@ the user in Settings.
 | Type          | Method                       | Use Case                                | Documentation                                            |
 | ------------- | ---------------------------- | --------------------------------------- | -------------------------------------------------------- |
 | Language      | `apple.languageModel()`      | Text generation, chat                   | https://www.react-native-ai.dev/docs/apple/generating    |
-| Embedding     | `apple.textEmbeddingModel()` | RAG, similarity, prompt size estimation | https://www.react-native-ai.dev/docs/apple/embeddings    |
+| Embedding     | `apple.embeddingModel()`     | RAG, similarity, prompt size estimation | https://www.react-native-ai.dev/docs/apple/embeddings    |
 | Transcription | `apple.transcriptionModel()` | Speech-to-text                          | https://www.react-native-ai.dev/docs/apple/transcription |
 | Speech        | `apple.speechModel()`        | Text-to-speech                          | https://www.react-native-ai.dev/docs/apple/speech        |
 
