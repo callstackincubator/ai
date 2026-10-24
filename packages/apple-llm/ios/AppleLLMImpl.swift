@@ -204,11 +204,6 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      guard SystemLanguageModel.default.availability == .available else {
-        rejectWithAppleError(.modelUnavailable, reject: reject)
-        return
-      }
-
       Task {
         do {
           let providerOptions = self.createProviderOptions(from: options)
@@ -268,11 +263,6 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      guard SystemLanguageModel.default.availability == .available else {
-        emitStreamError(.modelUnavailable, streamId: streamId, onError: onError)
-        return
-      }
-
       let task = Task {
         do {
           let providerOptions = self.createProviderOptions(from: options)
@@ -459,8 +449,13 @@ public class AppleLLMImpl: NSObject {
   ) throws -> LanguageModelSession {
     let modelName = providerOptions["model"] as? String ?? "system"
 
+    // Availability is checked for the requested model, so Private Cloud Compute
+    // requests work even when the on-device model is not available
     switch modelName {
     case "system":
+      guard SystemLanguageModel.default.availability == .available else {
+        throw AppleLLMError.modelUnavailable
+      }
       return LanguageModelSession(
         model: SystemLanguageModel.default,
         tools: tools,
@@ -469,8 +464,12 @@ public class AppleLLMImpl: NSObject {
     case "private-cloud-compute":
 #if compiler(>=6.4)
       if #available(iOS 27, *) {
+        let model = PrivateCloudComputeLanguageModel()
+        guard model.availability == .available else {
+          throw AppleLLMError.modelUnavailable
+        }
         return LanguageModelSession(
-          model: PrivateCloudComputeLanguageModel(),
+          model: model,
           tools: tools,
           transcript: transcript
         )
