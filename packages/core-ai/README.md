@@ -25,27 +25,56 @@ Reranking, speech generation, and video generation have no adapters, because
 
 ## Native Setup
 
-The pod links Apple's [`coreai-models`](https://github.com/apple/coreai-models)
-Swift Package (1.0.0 up to the next major version) to itself during `pod install`, so there is no Xcode or config plugin step. By default it links every product the native module uses:
+The pod links Apple's [`coreai-models`](https://github.com/apple/coreai-models) Swift Package (1.0.0 up to the next major version) during `pod install`, so there is no Xcode step. It also depends on the `AppleLLM` pod from `@react-native-ai/apple`, because Core AI language models run through the same Foundation Models session as Apple Intelligence.
 
-- `CoreAILM` for `coreAI.languageModel(...)` and sessions
-- `CoreAIDiffusion` for `coreAI.imageModel(...)`
-- `CoreAISegmentation` for `CoreAI.runTask('segmentation', ...)`
-- `CoreAIObjectDetection` for `CoreAI.runTask('object-detection', ...)`
+Apple's package needs an **iOS 27 deployment target** and has no iOS Simulator support (the Simulator SDK has no `CoreAI` framework), so apps with this package build for **physical devices only**.
 
-To link a smaller set, set `CORE_AI_PRODUCTS` when installing pods (with Expo, when running prebuild):
+### Expo
 
-```bash
-CORE_AI_PRODUCTS=CoreAILM npx pod-install
-CORE_AI_PRODUCTS=CoreAILM npx expo prebuild -p ios
+Add the config plugin to `app.json`, then run `npx expo prebuild`:
+
+```json
+{
+  "expo": {
+    "plugins": ["@react-native-ai/core-ai"]
+  }
+}
 ```
 
-Features whose product is not linked return a clear setup error at runtime.
+The plugin sets the iOS deployment target to 27.0 in the Podfile and the Xcode project. If you also set `ios.deploymentTarget` in `expo-build-properties`, make it `27.0` or higher.
 
-Constraints from Apple's package:
+### Bare React Native
 
-- The app needs an **iOS 27 deployment target** (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`).
-- **Device builds only.** The iOS Simulator SDK does not include the `CoreAI` framework, so apps that install this package cannot be built for the simulator.
+Set `platform :ios, '27.0'` in `ios/Podfile` and the deployment target of the app target in Xcode to 27.0, then run `npx pod-install`.
+
+### Choosing Tasks
+
+By default the pod links native support for every task the module implements. Each task links one `coreai-models` product:
+
+| Task               | Used by                                   | Linked product          |
+| ------------------ | ----------------------------------------- | ----------------------- |
+| `language`         | `coreAI.languageModel(...)` and sessions  | `CoreAILM`              |
+| `diffusion`        | `coreAI.imageModel(...)`                  | `CoreAIDiffusion`       |
+| `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
+| `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
+
+To link fewer, list the tasks you use. With Expo, pass them to the plugin:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "tasks": ["language"] }]]
+  }
+}
+```
+
+In a bare app, set `CORE_AI_TASKS` (comma-separated) on every `pod install`:
+
+```bash
+CORE_AI_TASKS=language npx pod-install
+```
+
+Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 
 ## Usage
 

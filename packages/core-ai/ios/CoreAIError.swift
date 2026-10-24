@@ -18,7 +18,7 @@ enum CoreAIError: LocalizedError {
     case .missingSource:
       return "Core AI model source is missing. Provide a file URI or bundle resource."
     case .missingSwiftPackage(let product):
-      return "Missing Apple Core AI Swift Package product: \(product). Include it in CORE_AI_PRODUCTS and run pod install again."
+      return "Missing Apple Core AI Swift Package product: \(product). Add the \"\(Self.task(linkedBy: product))\" task to the Expo config plugin's tasks option (or to CORE_AI_TASKS) and run pod install again."
     case .modelNotLoaded(let handle):
       return "Core AI model is not loaded: \(handle)."
     case .sessionNotFound(let handle):
@@ -31,6 +31,22 @@ enum CoreAIError: LocalizedError {
       return "Core AI request was cancelled."
     case .unsupportedCapability(let message):
       return message
+    }
+  }
+
+  /// Task name that links a coreai-models product, as in ReactNativeAICoreAI.podspec
+  private static func task(linkedBy product: String) -> String {
+    switch product {
+    case "CoreAILM":
+      return "language"
+    case "CoreAIDiffusion":
+      return "diffusion"
+    case "CoreAISegmentation":
+      return "segmentation"
+    case "CoreAIObjectDetection":
+      return "object-detection"
+    default:
+      return product
     }
   }
 

@@ -12,6 +12,7 @@
     "lib",
     "ios",
     "*.podspec",
+    "app.plugin.js",
     "!ios/build",
     "!**/__tests__",
     "!**/__fixtures__",
@@ -31,7 +32,9 @@
     "ai",
     "sdk",
     "vercel",
-    "spm"
+    "spm",
+    "expo",
+    "config-plugin"
   ],
   "repository": {
     "type": "git",
@@ -56,7 +59,13 @@
   },
   "peerDependencies": {
     "@react-native-ai/apple": "^0.12.0",
+    "expo": "*",
     "react-native": ">=0.76.0"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@react-native-ai/apple": "workspace:*"

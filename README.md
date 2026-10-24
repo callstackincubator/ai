@@ -133,10 +133,10 @@ Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models
 #### Installation
 
 ```bash
-npm install @react-native-ai/core-ai
+npm install @react-native-ai/core-ai @react-native-ai/apple
 ```
 
-The pod links Apple's `coreai-models` Swift Package products (`CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, `CoreAIObjectDetection`) during `pod install`. Apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
+The pod links Apple's `coreai-models` Swift Package products (`CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, `CoreAIObjectDetection`) during `pod install`, and reuses the Foundation Models helpers from `@react-native-ai/apple`, which is a peer dependency. Apps need an iOS 27 deployment target (with Expo, add the `@react-native-ai/core-ai` config plugin) and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
 
 #### Usage
 

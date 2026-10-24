@@ -3,7 +3,7 @@
 ## Quick Command
 
 ```bash
-npm add @react-native-ai/core-ai
+npm add @react-native-ai/core-ai @react-native-ai/apple
 ```
 
 ```ts
@@ -28,7 +28,7 @@ const { text } = await generateText({ model, prompt: 'Hello' })
 ## Prerequisites
 
 - [ ] React Native New Architecture
-- [ ] iOS 27 deployment target (with Expo, `ios.deploymentTarget: '27.0'` in `expo-build-properties`)
+- [ ] iOS 27 deployment target (with Expo, the `@react-native-ai/core-ai` config plugin sets it)
 - [ ] Xcode 27 or newer
 - [ ] A physical device. The iOS Simulator SDK has no `CoreAI` framework, so apps with this package do not build for the simulator
 - [ ] Vercel AI SDK v7+ (`ai`) if using `generateText` / `streamText` / `generateImage`
@@ -39,21 +39,38 @@ const { text } = await generateText({ model, prompt: 'Hello' })
 ### 1. Install
 
 ```bash
-npm add @react-native-ai/core-ai
+npm add @react-native-ai/core-ai @react-native-ai/apple
 ```
 
-There is no config plugin. The pod links the `coreai-models` Swift package during `pod install`.
+`@react-native-ai/apple` is a peer dependency: the pod reuses its Foundation Models helpers for language models. The pod links the `coreai-models` Swift package during `pod install`.
 
-### 2. Choose Linked Products (optional)
+With Expo, add the config plugin. It sets the iOS 27 deployment target:
 
-By default the pod links `CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation` and `CoreAIObjectDetection`. To link fewer, set `CORE_AI_PRODUCTS`:
+```json
+{ "expo": { "plugins": ["@react-native-ai/core-ai"] } }
+```
+
+In a bare app, set `platform :ios, '27.0'` in the `Podfile` and the Xcode project's deployment target.
+
+### 2. Choose Linked Tasks (optional)
+
+By default the pod links native support for every task: `language` (`CoreAILM`), `diffusion` (`CoreAIDiffusion`), `segmentation` (`CoreAISegmentation`) and `object-detection` (`CoreAIObjectDetection`). To link fewer with Expo, pass `tasks` to the config plugin:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "tasks": ["language"] }]]
+  }
+}
+```
+
+In a bare app, set `CORE_AI_TASKS` on every `pod install`:
 
 ```bash
-CORE_AI_PRODUCTS=CoreAILM npx pod-install
-CORE_AI_PRODUCTS=CoreAILM npx expo prebuild -p ios
+CORE_AI_TASKS=language npx pod-install
 ```
 
-Features whose product is not linked return a setup error at runtime.
+Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 
 ### 3. Export and Ship a Model
 

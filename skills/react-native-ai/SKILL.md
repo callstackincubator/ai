@@ -83,7 +83,7 @@ npm install
 
 # Provider-specific install
 npm add @react-native-ai/apple
-npm add @react-native-ai/core-ai
+npm add @react-native-ai/core-ai @react-native-ai/apple
 npm add @react-native-ai/llama llama.rn
 npm add @react-native-ai/mlc
 npm add @react-native-ai/ncnn-wrapper
