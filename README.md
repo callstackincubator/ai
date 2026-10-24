@@ -7,9 +7,9 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 ## Features
 
 - 🚀 **Instant AI** - Use built-in system models immediately without downloads
-- 🔒 **Privacy-first** - All processing happens on-device, data stays local
-- 🎯 **Vercel AI SDK compatible** - Drop-in replacement with familiar APIs
-- 🎨 **Complete toolkit** - Text generation, embeddings, transcription, speech synthesis
+- 🔒 **Privacy-first** - Inference runs on-device, so data stays local. Cloud models are opt-in
+- 🎯 **Vercel AI SDK compatible** - Use `generateText`, `streamText`, `embed` and other AI SDK functions with local models
+- 🎨 **Beyond text** - Embeddings, transcription, speech synthesis and image generation
 
 ## AI SDK Compatibility
 
@@ -39,10 +39,9 @@ includes native-development Rozenite wiring for this plugin. Run the example
 app, open React Native DevTools, and select `AI SDK Profiler` to inspect chat
 spans emitted by the Vercel AI SDK.
 
-If the `AI SDK Profiler` panel is visible but remains empty after sending a chat
-message, close that React Native DevTools window and open a fresh one. In
-practice, a stale debugger session can keep the Rozenite panel mounted without
-receiving the current app's telemetry stream.
+If the `AI SDK Profiler` panel stays empty after you send a message, close the
+React Native DevTools window and open a new one. A stale debugger session can
+keep the panel mounted without receiving telemetry.
 
 ## Available Providers
 
@@ -50,6 +49,7 @@ receiving the current app's telemetry stream.
 | ------------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
 | [Apple](#apple)     | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
 | [Core AI](#core-ai) | ❌ No    | iOS          | [Core AI](https://developer.apple.com/core-ai/)                     | Run app-provided Core AI model bundles                     |
+| [ADK](#google-adk)  | ✅ Yes   | Android      | [Google ADK](https://developer.android.com/ai/adk)                  | On-device Gemini Nano, with optional cloud Gemini          |
 | [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
 | [MLC](#mlc)         | ❌ No    | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm)                        | Run open-source LLMs via MLC runtime                       |
 
@@ -91,12 +91,12 @@ const { text } = await generateText({
 
 // Generate embeddings
 const { embedding } = await embed({
-  model: apple.textEmbeddingModel(),
+  model: apple.embeddingModel(),
   value: 'Hello world',
 })
 
 // Transcribe audio
-const { text } = await transcribe({
+const { text: transcript } = await transcribe({
   model: apple.transcriptionModel(),
   audio: audioBuffer,
 })
@@ -123,12 +123,13 @@ See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-sta
 
 ### Core AI
 
-Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models`](https://github.com/apple/coreai-models). This provider is for custom `.aimodel` assets, not Apple system models.
+Run your own Core AI model bundles (`.aimodel`) exported with [`apple/coreai-models`](https://github.com/apple/coreai-models). For Apple's built-in system models, use [Apple](#apple) instead.
 
-- **Language Sessions** - Core AI language models with persistent native sessions
-- **AI SDK Adapters** - Language and image generation. Embedding and transcription adapters exist but reject with an unsupported error until native runners land ([#237](https://github.com/callstackincubator/ai/issues/237))
-- **Native-only APIs** - Model inspection, segmentation, and object detection
-- **Starter Models** - Documented starter bundles for language, image generation, segmentation, and object detection
+- **Text Generation** - `generateText` and `streamText`, plus persistent native sessions
+- **Image Generation** - `generateImage` with diffusion models such as FLUX.2 and Sana Sprint
+- **Segmentation and Object Detection** - Direct native APIs, since the AI SDK has no equivalent
+
+Embeddings and transcription are not supported yet ([#237](https://github.com/callstackincubator/ai/issues/237)).
 
 #### Installation
 
@@ -136,7 +137,8 @@ Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models
 npm install @react-native-ai/core-ai
 ```
 
-The pod links Apple's `coreai-models` Swift Package products (`CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, `CoreAIObjectDetection`) during `pod install`. Apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
+> [!IMPORTANT]
+> Apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
 
 #### Usage
 
@@ -160,17 +162,56 @@ See the [Core AI documentation](https://react-native-ai.dev/docs/core-ai/getting
 
 ---
 
+### Google ADK
+
+Run Gemini Nano on-device on Android through Google's [Agent Development Kit](https://developer.android.com/ai/adk). **Built-in** - Gemini Nano is provisioned by the system via AICore, so there are no model files to bundle and no API key. Cloud Gemini is available as an option.
+
+- **Text Generation** - `generateText` and `streamText` with on-device Gemini Nano
+- **Tool Calling** - Native ADK agent loop with JavaScript tool executors
+- **Cloud Gemini** - Optional cloud inference via ADK `LlmAgent` when you need a larger model
+
+#### Installation
+
+```bash
+npm install @react-native-ai/adk
+```
+
+> [!IMPORTANT]
+> Requires Android `minSdkVersion` 26 and a physical device with AICore support (Android 14+) for Gemini Nano. Your app also needs packaging excludes for duplicate `META-INF` files, see the [getting started guide](https://react-native-ai.dev/docs/adk/getting-started).
+
+#### Usage
+
+```typescript
+import { adk } from '@react-native-ai/adk'
+import { generateText } from 'ai'
+
+if (!(await adk.isAvailable())) {
+  throw new Error('Gemini Nano is not available on this device')
+}
+
+await adk.prepareNano()
+
+const { text } = await generateText({
+  model: adk(),
+  prompt: 'Explain quantum computing',
+})
+```
+
+See the [ADK documentation](https://react-native-ai.dev/docs/adk/getting-started) for device checks, cloud Gemini, and tool calling.
+
+---
+
 ### Llama
 
 Run any GGUF model on-device using [llama.rn](https://github.com/mybigday/llama.rn). **Requires download** - models are downloaded from HuggingFace.
 
 #### Supported Features
 
-| Feature         | Method                       | Description                                   |
-| --------------- | ---------------------------- | --------------------------------------------- |
-| Text Generation | `llama.languageModel()`      | Chat, completion, streaming, reasoning models |
-| Embeddings      | `llama.textEmbeddingModel()` | Text embeddings for RAG and similarity search |
-| Speech          | `llama.speechModel()`        | Text-to-speech with vocoder models            |
+| Feature         | Method                   | Description                                   |
+| --------------- | ------------------------ | --------------------------------------------- |
+| Text Generation | `llama.languageModel()`  | Chat, completion, streaming, reasoning models |
+| Embeddings      | `llama.embeddingModel()` | Text embeddings for RAG and similarity search |
+| Speech          | `llama.speechModel()`    | Text-to-speech with vocoder models            |
 
 #### Installation
 
@@ -265,9 +306,19 @@ const { text } = await generateText({
 > [!NOTE]
 > MLC requires iOS devices with sufficient memory (1-8GB depending on model). The prebuilt runtime supports the models listed above. For other models or custom configurations, you'll need to recompile the MLC runtime from source.
 
+## JSON UI
+
+`@react-native-ai/json-ui` lets a tool-calling model build React Native UI. The model calls tools that add, update, and delete nodes in a JSON spec, and `GenerativeUIView` renders it. It's designed for small on-device models with limited context.
+
+```bash
+npm install @react-native-ai/json-ui
+```
+
+See the [JSON UI documentation](https://react-native-ai.dev/docs/json-ui/getting-started).
+
 ## Documentation
 
-Comprehensive guides and API references are available at [react-native-ai.dev](https://react-native-ai.dev).
+Guides and API reference are available at [react-native-ai.dev](https://react-native-ai.dev).
 
 ## Contributing
 
@@ -279,7 +330,7 @@ This repository provides agent skills to help you integrate and use the packages
 
 `npx skills add https://github.com/callstackincubator/react-native-ai --skill react-native-ai-skills`
 
-or manually by copying the `skills/` directory in your `.cursor/` directory.
+or manually by copying the `skills/` directory into your agent's skills directory (for example `.cursor/skills/`).
 
 ## Made with ❤️ at Callstack
 

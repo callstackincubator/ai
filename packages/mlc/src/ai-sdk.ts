@@ -18,11 +18,20 @@ import NativeMLCEngine, {
   type Message,
 } from './NativeMLCEngine'
 
-export const mlc = {
-  languageModel: (modelId: string = 'Llama-3.2-3B-Instruct') => {
+export function createMlcProvider() {
+  const provider = function (modelId?: string) {
+    return provider.languageModel(modelId)
+  }
+
+  provider.specificationVersion = 'v4' as const
+  provider.languageModel = (modelId: string = 'Llama-3.2-3B-Instruct') => {
     return new MlcChatLanguageModel(modelId)
-  },
+  }
+
+  return provider
 }
+
+export const mlc = createMlcProvider()
 
 const convertToolsToNativeFormat = (
   tools: (LanguageModelV4FunctionTool | LanguageModelV4ProviderTool)[]

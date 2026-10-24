@@ -208,8 +208,12 @@ static NSString *AppleLLMToolRejectionMessage(jsi::Runtime &rt, const jsi::Value
     }
     [self emitOnStreamUpdate:payload];
   }
-            onComplete:^(NSString *streamId) {
-    [self emitOnStreamComplete:@{@"streamId": streamId}];
+            onComplete:^(NSString *streamId, NSDictionary *usage) {
+    NSMutableDictionary *payload = [@{@"streamId": streamId} mutableCopy];
+    if (usage != nil) {
+      payload[@"usage"] = usage;
+    }
+    [self emitOnStreamComplete:payload];
   }
                onError:^(NSString *streamId, NSString *code, NSString *error) {
     NSMutableDictionary *payload = [@{@"streamId": streamId, @"error": error} mutableCopy];

@@ -10,7 +10,7 @@ Use `@react-native-ai/apple` for Apple system models. Use `@react-native-ai/core
 npm install @react-native-ai/core-ai
 ```
 
-If you use the AI SDK, install `ai` v7 and the required polyfills:
+To use it with the AI SDK, install `ai` v7 and the [required polyfills](../polyfills.md):
 
 ```bash
 npm install ai
@@ -19,10 +19,10 @@ npm install ai
 ## Requirements
 
 - React Native New Architecture
-- iOS 27 or newer, with an iOS 27 deployment target
+- iOS 27 deployment target (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`)
 - Xcode 27 or newer for building apps with Core AI
 - Exported `.aimodel` bundles from `apple/coreai-models`
-- A physical device (the iOS Simulator SDK has no `CoreAI` framework)
+- A physical device. The iOS Simulator SDK has no `CoreAI` framework, so apps that install this package cannot be built for the simulator
 
 ## Native Setup
 
@@ -40,14 +40,9 @@ CORE_AI_PRODUCTS=CoreAILM npx pod-install
 CORE_AI_PRODUCTS=CoreAILM npx expo prebuild -p ios
 ```
 
-Features whose product is not linked return a clear setup error at runtime.
+Calling a feature whose product is not linked throws a setup error.
 
-Constraints from Apple's package:
-
-- The app needs an **iOS 27 deployment target** (with Expo, set `ios.deploymentTarget` to `27.0` in `expo-build-properties`).
-- **Device builds only.** The iOS Simulator SDK does not include the `CoreAI` framework, so apps that install this package cannot be built for the simulator.
-
-The current native implementation wires language sessions, diffusion image generation, image segmentation, and object detection. Starter-model docs only list those exposed feature families; embeddings, transcription, depth, super-resolution, and classification are tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
+Supported today: text generation, image generation, segmentation, and object detection. Embeddings, transcription, depth, super-resolution, and classification are tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
 
 ## First iOS Model
 

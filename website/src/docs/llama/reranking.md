@@ -19,7 +19,7 @@ const modelPath = await downloadModel(
 )
 
 // Create rerank model with the path
-const model = llama.rerankModel(modelPath)
+const model = llama.rerankingModel(modelPath)
 
 await model.prepare()
 
@@ -62,7 +62,7 @@ const { ranking } = await rerank({
 Configure the rerank model with specific options:
 
 ```typescript
-const model = llama.rerankModel(modelPath, {
+const model = llama.rerankingModel(modelPath, {
   normalize: 1, // Score normalization (default: from model config)
   contextParams: {
     n_ctx: 2048, // Context size (default: 2048)

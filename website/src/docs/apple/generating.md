@@ -66,7 +66,9 @@ for await (const delta of result.textStream) {
 }
 ```
 
-Streaming structured objects are not currently supported by this provider.
+Structured output (`Output.object`) also works with `streamText`, but Apple
+returns partial objects that are not prefixes of the final JSON, so the provider
+sends the complete object once generation finishes instead of streaming it.
 
 ## Structured Output
 
@@ -337,6 +339,8 @@ Important Apple-specific behavior:
 - Tool calls are provider-executed, so AI SDK step callbacks such as
   `stopWhen`, `onStepStart`, and `onStepEnd` do not run for native Apple
   tool execution.
+- Tool calls and their results are reported with Apple's tool call IDs, in
+  `generateText` content and as stream parts in `streamText`.
 - You can update the registered tools on a model instance with
   `model.updateTools(...)` before generation.
 
@@ -370,18 +374,31 @@ const info = await apple.getModelInfo()
 console.log(info.contextSize)
 ```
 
-For reusable history policies such as summarization, rolling windows, and
-completed tool-call pruning, use `@react-native-ai/utils`.
+Each response reports token usage in `result.usage`, which AI SDK features
+such as `prepareStep` and telemetry read:
 
-Use low-level token counting as an estimate, not a fit guarantee:
+- iOS 27 reports the usage measured by Foundation Models, for both the
+  on-device model and Private Cloud Compute.
+- iOS 26.4 counts the transcript with the on-device model's tokenizer.
+- Otherwise usage is `undefined`.
+
+For reusable history policies such as summarization, rolling windows, and
+completed tool-call pruning, use `@react-native-ai/utils`. Its summarizer uses
+`countTokens` from the model you pass it.
+
+Count tokens before sending a request as an estimate, not a fit guarantee:
 
 ```typescript
-import { AppleFoundationModels } from '@react-native-ai/apple'
-
-const tokenCount = await AppleFoundationModels.countTokens(
+const model = apple()
+const tokenCount = await model.countTokens(
   'Summarize this text in three bullet points.'
 )
 ```
+
+Token counting requires iOS 26.4 and an available on-device model. Private
+Cloud Compute has no token counting API, so `countTokens` on a Private Cloud
+Compute model still uses the on-device model's tokenizer, whose count may not
+match the server model.
 
 The full request also includes instructions, tool definitions, schema text,
 attachments, and generated output budget. If Apple reports a context overflow,
@@ -464,7 +481,7 @@ import { AppleFoundationModels } from '@react-native-ai/apple'
 
 const info = await AppleFoundationModels.getModelInfo('en-US', 'system')
 const tokens = await AppleFoundationModels.countTokens('A short prompt')
-const result = await AppleFoundationModels.generateText(
+const { content, usage } = await AppleFoundationModels.generateText(
   [{ role: 'user', content: 'Hello' }],
   { temperature: 0.7, maxTokens: 100 }
 )

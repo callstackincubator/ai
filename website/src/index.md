@@ -22,18 +22,18 @@ features:
     details: Run large language models directly on mobile devices without requiring cloud infrastructure or internet connectivity.
     icon: <img src="/device.svg" />
   - title: Vercel AI SDK compatibility
-    details: Seamless integration with Vercel AI SDK, allowing you to use familiar functions like streamText and generateText with local models.
+    details: Use Vercel AI SDK functions like streamText and generateText with local models.
     icon: <img src="/code.svg" />
   - title: Apple Foundation Models
-    details: Native support for Apple's Foundation Models on iOS 26+ devices with Apple Intelligence, providing seamless integration with Apple's on-device AI capabilities.
+    details: Use Apple's Foundation Models on iOS 26+ devices with Apple Intelligence, with no model downloads.
     icon: <img src="/apple.svg" />
-  - title: MLC LLM Engine powered
-    details: Built on top of MLC LLM Engine, providing optimized performance and efficient model execution on mobile devices.
+  - title: Multiple runtimes
+    details: Run models with Apple Foundation Models, Apple Core AI, Gemini Nano, llama.rn or MLC LLM behind the same AI SDK interface.
     icon: <img src="/zap.svg" />
-  - title: Cross-platform support
-    details: Full support for both iOS and Android platforms with platform-specific optimizations and configurations.
+  - title: iOS and Android
+    details: Llama and MLC run on both platforms. Apple Foundation Models and Core AI are iOS-only, and Gemini Nano via ADK is Android-only.
     icon: <img src="/smartphone.svg" />
   - title: Privacy-first approach
-    details: All AI processing happens locally on the device, ensuring user data privacy and eliminating the need for cloud-based AI services.
+    details: Inference runs locally on the device, so user data stays on it. Cloud models, like ADK's optional cloud Gemini, are opt-in.
     icon: <img src="/shield.svg" />
 ---

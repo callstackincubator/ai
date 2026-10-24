@@ -4,7 +4,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 
 ## Why On-Device AI?
 
-- **Privacy-first:** All processing happens locally - no data leaves the device
+- **Privacy-first:** Inference runs locally, so data stays on the device. Cloud models are opt-in
 - **Instant responses:** No network latency, immediate AI capabilities
 - **Offline-ready:** Works anywhere, even without internet
 - **Zero server costs:** No API fees or infrastructure to maintain
@@ -19,7 +19,11 @@ Learn more in the [DevTools documentation](./dev-tools).
 
 ## Available Providers
 
-### Apple Intelligence
+### Built-in Models
+
+These use models that ship with the operating system. There's nothing to download, so they work immediately on supported devices.
+
+#### Apple Intelligence
 
 Native integration with Apple's on-device AI capabilities through `@react-native-ai/apple`:
 
@@ -28,31 +32,34 @@ Native integration with Apple's on-device AI capabilities through `@react-native
 - **Transcription** - SpeechAnalyzer for fast, accurate speech-to-text
 - **Speech Synthesis** - AVSpeechSynthesizer for natural text-to-speech
 
-Production-ready with instant availability on supported iOS devices.
+No model downloads. Works on supported iOS devices out of the box.
 
-### Google ADK
+#### Google Gemini
 
-Run Gemini Nano on-device on Android using Google's Agent Development Kit through `@react-native-ai/adk`. Gemini Nano is system-provisioned via AICore - no API key, no model files to bundle. Cloud Gemini is also available when you need a larger model.
+Native integration with Gemini on Android through `@react-native-ai/adk`, built on Google's Agent Development Kit:
 
-- **On-device Gemini Nano** - Private, offline-capable inference via ML Kit GenAI, provisioned by the system
-- **Cloud Gemini** — Optional cloud inference via ADK `LlmAgent` and Google AI API
-- **Tool calling** - Native ADK agent loop with JavaScript tool executors
-- **Streaming** - Real-time text and tool-call stream parts
+- **On-device** - Gemini Nano, provisioned by the system via AICore
+- **Cloud** - Larger Gemini models through the Google AI API, when you need them
+- **Tool Calling** - ADK agent loop with JavaScript tool executors
+- **Streaming** - Text and tool-call stream parts
 
-Android-only. See the [ADK docs](./adk/getting-started) for setup and API details.
+No model downloads or API key for on-device use. Works on supported Android devices out of the box. See the [ADK docs](./adk/getting-started).
 
-### Apple Core AI
+### Bring Your Own Model
 
-Run app-provided Core AI model bundles through `@react-native-ai/core-ai`:
+These run open-source models that you download or bundle with your app.
 
-- **Language Sessions** - Custom Core AI language models with persistent native sessions
-- **AI SDK Adapters** - Language and image generation today, with embedding and transcription surfaces kept explicit until native runners land
-- **Native-only Tasks** - Segmentation, object detection, model inspection, specialization, and model lifecycle calls
-- **Starter Models** - iOS-first examples sourced from Apple’s `coreai-models` registry, kept as docs/example data rather than a package catalog
+#### Apple Core AI
 
-Requires exported Core AI assets, an iOS 27 deployment target, and a physical device. The pod links Apple’s `coreai-models` Swift Package automatically.
+Run open-source models on Apple's on-device runtime, Core AI, through `@react-native-ai/core-ai`:
 
-### Llama Engine
+- **Text Generation** - `generateText` and `streamText`, plus persistent native sessions
+- **Image Generation** - `generateImage` with diffusion models
+- **Segmentation and Object Detection** - Direct native APIs, since the AI SDK has no equivalent
+
+Models are exported with Apple's `coreai-models`. Requires an iOS 27 deployment target and a physical device. See the [Core AI docs](./core-ai/getting-started) and [starter models](./core-ai/models).
+
+#### Llama Engine
 
 Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-native-ai/llama`:
 
@@ -60,9 +67,9 @@ Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-nat
 - **Model Management** - Automatic downloading and caching from HuggingFace
 - **Customizable** - Support for context size, threads, and GGUF-specific parameters
 
-Cross-platform parity with optimized performance on both iOS and Android.
+Works on iOS and Android.
 
-### MLC Engine (Work in Progress)
+#### MLC Engine (Work in Progress)
 
 Run any open-source LLM locally using MLC's optimized runtime through `@react-native-ai/mlc`:
 
@@ -72,7 +79,7 @@ Run any open-source LLM locally using MLC's optimized runtime through `@react-na
 > [!NOTE]
 > MLC support is experimental and not recommended for production use yet.
 
-### JSON UI
+## JSON UI
 
 Build UIs from tool-calling models with `@react-native-ai/json-ui`:
 
@@ -81,5 +88,3 @@ Build UIs from tool-calling models with `@react-native-ai/json-ui`:
 - **Small-model friendly** - Designed for on-device models with limited context
 
 See the [JSON UI docs](./json-ui/getting-started) for setup and API.
-
-Get started by choosing the approach that fits your needs!

@@ -27,8 +27,19 @@ export type StreamUpdateEvent = {
   entries?: CodegenTypes.UnsafeObject[]
 }
 
+// Token counts from Foundation Models (iOS 27) or the system model's
+// tokenizer (iOS 26.4). Left out when they are unknown
+export type AppleUsage = {
+  inputTokens: number
+  cachedInputTokens?: number
+  outputTokens: number
+  reasoningTokens?: number
+}
+
 export type StreamCompleteEvent = {
   streamId: string
+  // AppleUsage
+  usage?: CodegenTypes.UnsafeObject
 }
 
 export type StreamErrorEvent = {
@@ -48,8 +59,8 @@ export interface Spec extends TurboModule {
   generateText(
     messages: AppleMessage[],
     options: AppleGenerationOptions
-  ): Promise<
-    (
+  ): Promise<{
+    content: (
       | { type: 'text'; text: string }
       | {
           type: 'reasoning'
@@ -70,7 +81,8 @@ export interface Spec extends TurboModule {
           output: string
         }
     )[]
-  >
+    usage?: AppleUsage
+  }>
   generateStream(
     streamId: string,
     messages: AppleMessage[],
