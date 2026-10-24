@@ -5,7 +5,7 @@ import {
   createGenUITools,
 } from '@react-native-ai/json-ui'
 import { wrapLanguageModelWithHistory } from '@react-native-ai/utils'
-import { stepCountIs, streamText } from 'ai'
+import { isStepCount, streamText } from 'ai'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -37,7 +37,9 @@ export default function ChatScreen() {
     updateChatUISpec,
   } = useChatStore()
   const chatsRef = useRef(chats)
-  chatsRef.current = chats
+  useEffect(() => {
+    chatsRef.current = chats
+  }, [chats])
   const getSpec = useCallback(
     (chatId: string) => getChatUISpecFromChats(chatsRef.current, chatId),
     []
@@ -132,9 +134,9 @@ export default function ChatScreen() {
         ],
         tools,
         temperature,
-        stopWhen: stepCountIs(maxSteps),
+        stopWhen: isStepCount(maxSteps),
         abortSignal: signal,
-        experimental_telemetry: getAiSdkTelemetry('chat-screen-stream-text'),
+        telemetry: getAiSdkTelemetry('chat-screen-stream-text'),
         system: genUiEnabled
           ? buildGenUISystemPrompt({
               additionalInstructions:
