@@ -395,8 +395,10 @@ const tokenCount = await model.countTokens(
 )
 ```
 
-Token counting requires iOS 26.4 and uses the on-device model's tokenizer, so
-for Private Cloud Compute it is an approximation.
+Token counting requires iOS 26.4 and an available on-device model. Private
+Cloud Compute has no token counting API, so `countTokens` on a Private Cloud
+Compute model still uses the on-device model's tokenizer, whose count may not
+match the server model.
 
 The full request also includes instructions, tool definitions, schema text,
 attachments, and generated output budget. If Apple reports a context overflow,

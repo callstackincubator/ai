@@ -45,7 +45,8 @@ export interface AppleLanguageModel extends LanguageModelV4 {
   updateTools: (tools: AppleToolDefinitionSet) => void
   /**
    * Counts tokens in text with the on-device model's tokenizer (iOS 26.4+).
-   * Private Cloud Compute has no tokenizer, so this approximates its count
+   * Private Cloud Compute has no token counting API, so Private Cloud Compute
+   * models also count with the on-device tokenizer, which may not match
    */
   countTokens: (text: string) => Promise<number>
 }
