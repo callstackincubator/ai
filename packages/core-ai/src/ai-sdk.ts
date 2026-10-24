@@ -564,13 +564,13 @@ function toFinishReason(
 function emptyUsage() {
   return {
     inputTokens: {
-      total: 0,
+      total: undefined,
       noCache: undefined,
       cacheRead: undefined,
       cacheWrite: undefined,
     },
     outputTokens: {
-      total: 0,
+      total: undefined,
       text: undefined,
       reasoning: undefined,
     },

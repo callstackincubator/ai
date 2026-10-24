@@ -296,13 +296,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
           : convertFinishReason(response),
       usage: {
         inputTokens: {
-          total: response.timings?.prompt_n || 0,
+          total: response.timings?.prompt_n,
           noCache: undefined,
           cacheRead: undefined,
           cacheWrite: undefined,
         },
         outputTokens: {
-          total: response.timings?.predicted_n || 0,
+          total: response.timings?.predicted_n,
           text: undefined,
           reasoning: undefined,
         },
@@ -373,13 +373,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
                 : convertFinishReason(result),
             usage: {
               inputTokens: {
-                total: result.timings?.prompt_n || 0,
+                total: result.timings?.prompt_n,
                 noCache: undefined,
                 cacheRead: undefined,
                 cacheWrite: undefined,
               },
               outputTokens: {
-                total: result.timings?.predicted_n || 0,
+                total: result.timings?.predicted_n,
                 text: undefined,
                 reasoning: undefined,
               },
