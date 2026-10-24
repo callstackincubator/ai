@@ -2,6 +2,10 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
+// Prompt, option and transcript helpers shared with Apple Intelligence, since
+// Core AI language models run through the same LanguageModelSession
+@_spi(CoreAI) import AppleLLM
+
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -28,9 +32,10 @@ import CoreAIObjectDetector
 
 @objc
 public class CoreAIImpl: NSObject {
+  private let lock = NSLock()
   private var loadedModels: [String: Any] = [:]
-  private var languageSessions: [String: Any] = [:]
-  private var streamTasks: [String: Task<Void, Never>] = [:]
+  private var languageSessions: [String: LanguageSessionEntry] = [:]
+  private var tasks: [String: Task<Void, Never>] = [:]
 
   @objc
   public func getCapabilities(
@@ -113,10 +118,12 @@ public class CoreAIImpl: NSObject {
     }
 
     let handle = makeHandle("model")
-    loadedModels[handle] = [
-      "config": config,
-      "options": options ?? [:]
-    ]
+    locked {
+      loadedModels[handle] = [
+        "config": config,
+        "options": options ?? [:]
+      ]
+    }
     resolve([
       "modelHandle": handle,
       "info": modelInfo(config: config)
@@ -129,7 +136,16 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    loadedModels.removeValue(forKey: modelHandle)
+    let model = locked { () -> Any? in
+      languageSessions = languageSessions.filter { $0.value.modelHandle != modelHandle }
+      return loadedModels.removeValue(forKey: modelHandle)
+    }
+#if canImport(FoundationModels) && canImport(CoreAILanguageModels)
+    if #available(iOS 27, macOS 27, *), let languageModel = model as? CoreAILanguageModel {
+      // Models loaded from the same bundle share the engine and reload it lazily
+      languageModel.unload()
+    }
+#endif
     resolve(nil)
   }
 
@@ -170,15 +186,16 @@ public class CoreAIImpl: NSObject {
   ) {
 #if canImport(FoundationModels) && canImport(CoreAILanguageModels)
     if #available(iOS 27, macOS 27, *) {
-      guard let model = loadedModels[modelHandle] as? CoreAILanguageModel else {
-        let error = CoreAIError.modelNotLoaded(modelHandle)
-        reject(error.code, error.localizedDescription, error)
+      guard let model = locked({ loadedModels[modelHandle] }) as? CoreAILanguageModel else {
+        rejectCoreAI(.modelNotLoaded(modelHandle), reject: reject)
         return
       }
 
-      let session = LanguageModelSession(model: model)
+      let session = LanguageModelSession(model: model, instructions: options?["instructions"] as? String)
       let sessionHandle = makeHandle("session")
-      languageSessions[sessionHandle] = session
+      locked {
+        languageSessions[sessionHandle] = LanguageSessionEntry(modelHandle: modelHandle, session: session)
+      }
       resolve(sessionHandle)
     } else {
       rejectCoreAI(.unsupportedOS, reject: reject)
@@ -194,7 +211,9 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    languageSessions.removeValue(forKey: sessionHandle)
+    locked {
+      _ = languageSessions.removeValue(forKey: sessionHandle)
+    }
     resolve(nil)
   }
 
@@ -208,16 +227,15 @@ public class CoreAIImpl: NSObject {
   ) {
 #if canImport(FoundationModels) && canImport(CoreAILanguageModels)
     if #available(iOS 27, macOS 27, *) {
-      guard let session = languageSessions[sessionHandle] as? LanguageModelSession else {
-        let error = CoreAIError.sessionNotFound(sessionHandle)
-        reject(error.code, error.localizedDescription, error)
+      guard let session = locked({ languageSessions[sessionHandle]?.session }) as? LanguageModelSession else {
+        rejectCoreAI(.sessionNotFound(sessionHandle), reject: reject)
         return
       }
 
       Task {
         do {
           let response = try await session.respond(to: prompt)
-          resolve([["type": "text", "text": String(describing: response)]])
+          resolve(response.toModelMessages())
         } catch {
           reject(errorCode(error), error.localizedDescription, error)
         }
@@ -236,35 +254,26 @@ public class CoreAIImpl: NSObject {
     sessionHandle: String,
     prompt: String,
     options: [String: Any]?,
-    onUpdate: @escaping (String, String) -> Void,
-    onComplete: @escaping (String) -> Void,
+    onUpdate: @escaping (String, String, [[String: Any]]?) -> Void,
+    onComplete: @escaping (String, [String: Any]?) -> Void,
     onError: @escaping (String, String, String) -> Void
   ) {
 #if canImport(FoundationModels) && canImport(CoreAILanguageModels)
     if #available(iOS 27, macOS 27, *) {
-      guard let session = languageSessions[sessionHandle] as? LanguageModelSession else {
+      guard let session = locked({ languageSessions[sessionHandle]?.session }) as? LanguageModelSession else {
         emitError(.sessionNotFound(sessionHandle), streamId: streamId, onError: onError)
         return
       }
 
-      let task = Task {
-        do {
-          let responseStream = session.streamResponse(to: prompt)
-          for try await chunk in responseStream {
-            if Task.isCancelled {
-              return
-            }
-            onUpdate(streamId, String(describing: chunk.content))
-          }
-          onComplete(streamId)
-        } catch {
-          if !Task.isCancelled {
-            onError(streamId, errorCode(error), error.localizedDescription)
-          }
+      startTask(streamId, onError: onError) {
+        var usage: [String: Any]?
+        for try await chunk in session.streamResponse(to: prompt) {
+          try Task.checkCancellation()
+          onUpdate(streamId, chunk.content, nil)
+          usage = Self.serializeUsage(chunk.usage)
         }
-        self.streamTasks.removeValue(forKey: streamId)
+        onComplete(streamId, usage)
       }
-      streamTasks[streamId] = task
     } else {
       emitError(.unsupportedOS, streamId: streamId, onError: onError)
     }
@@ -273,79 +282,76 @@ public class CoreAIImpl: NSObject {
 #endif
   }
 
+  /// Answers the last user message of an AI SDK prompt. Earlier messages are
+  /// replayed as the session transcript, so every call gets a new session on
+  /// the loaded model
   @objc
   public func generateText(
-    _ config: [String: Any],
+    _ requestId: String,
+    modelHandle: String,
     messages: [[String: Any]],
     options: [String: Any]?,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    loadLanguageModel(config, resolve: { loaded in
-      guard let loadedDict = loaded as? [String: Any],
-            let modelHandle = loadedDict["modelHandle"] as? String else {
-        let error = CoreAIError.invalidInput("Core AI language model did not return a handle.")
-        reject(error.code, error.localizedDescription, error)
+#if canImport(FoundationModels) && canImport(CoreAILanguageModels)
+    if #available(iOS 27, macOS 27, *) {
+      guard let model = locked({ loadedModels[modelHandle] }) as? CoreAILanguageModel else {
+        rejectCoreAI(.modelNotLoaded(modelHandle), reject: reject)
         return
       }
 
-      self.createLanguageSession(modelHandle, options: options, resolve: { session in
-        guard let sessionHandle = session as? String else {
-          let error = CoreAIError.invalidInput("Core AI language session did not return a handle.")
-          reject(error.code, error.localizedDescription, error)
-          return
-        }
-
-        let prompt = self.lastUserPrompt(messages)
-        self.respondToLanguageSession(sessionHandle, prompt: prompt, options: options, resolve: resolve, reject: reject)
-      }, reject: reject)
-    }, reject: reject)
+      startTask(requestId, onError: { _, code, message in
+        reject(code, message, nil)
+      }) {
+        let request = try LanguageModelRequest(model: model, messages: messages, options: options ?? [:])
+        resolve(try await request.respond())
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAILM"), reject: reject)
+#endif
   }
 
   @objc
   public func streamText(
     _ streamId: String,
-    config: [String: Any],
+    modelHandle: String,
     messages: [[String: Any]],
     options: [String: Any]?,
-    onUpdate: @escaping (String, String) -> Void,
-    onComplete: @escaping (String) -> Void,
+    onUpdate: @escaping (String, String, [[String: Any]]?) -> Void,
+    onComplete: @escaping (String, [String: Any]?) -> Void,
     onError: @escaping (String, String, String) -> Void
   ) {
-    loadLanguageModel(config, resolve: { loaded in
-      guard let loadedDict = loaded as? [String: Any],
-            let modelHandle = loadedDict["modelHandle"] as? String else {
-        self.emitError(.invalidInput("Core AI language model did not return a handle."), streamId: streamId, onError: onError)
+#if canImport(FoundationModels) && canImport(CoreAILanguageModels)
+    if #available(iOS 27, macOS 27, *) {
+      guard let model = locked({ loadedModels[modelHandle] }) as? CoreAILanguageModel else {
+        emitError(.modelNotLoaded(modelHandle), streamId: streamId, onError: onError)
         return
       }
 
-      self.createLanguageSession(modelHandle, options: options, resolve: { session in
-        guard let sessionHandle = session as? String else {
-          self.emitError(.invalidInput("Core AI language session did not return a handle."), streamId: streamId, onError: onError)
-          return
+      startTask(streamId, onError: onError) {
+        let request = try LanguageModelRequest(model: model, messages: messages, options: options ?? [:])
+        let usage = try await request.stream { content, entries in
+          onUpdate(streamId, content, entries)
         }
-
-        self.streamLanguageSession(
-          streamId,
-          sessionHandle: sessionHandle,
-          prompt: self.lastUserPrompt(messages),
-          options: options,
-          onUpdate: onUpdate,
-          onComplete: onComplete,
-          onError: onError
-        )
-      }, reject: { code, message, _ in
-        onError(streamId, code, message)
-      })
-    }, reject: { code, message, _ in
-      onError(streamId, code, message)
-    })
+        onComplete(streamId, usage)
+      }
+    } else {
+      emitError(.unsupportedOS, streamId: streamId, onError: onError)
+    }
+#else
+    emitError(.missingSwiftPackage("CoreAILM"), streamId: streamId, onError: onError)
+#endif
   }
 
+  /// Cancels a running stream or generateText request
   @objc
   public func cancelStream(_ streamId: String) {
-    streamTasks[streamId]?.cancel()
-    streamTasks.removeValue(forKey: streamId)
+    let task = locked { tasks.removeValue(forKey: streamId) }
+    task?.cancel()
   }
 
   @objc
@@ -455,7 +461,7 @@ public class CoreAIImpl: NSObject {
           do {
             let model = try await CoreAILanguageModel(resourcesAt: sourceURL)
             let handle = self.makeHandle("model")
-            self.loadedModels[handle] = model
+            self.locked { self.loadedModels[handle] = model }
             resolve([
               "modelHandle": handle,
               "info": self.modelInfo(config: config)
@@ -489,7 +495,7 @@ public class CoreAIImpl: NSObject {
           do {
             let pipeline = try await self.makeDiffusionPipeline(at: sourceURL, options: options)
             let handle = self.makeHandle("model")
-            self.loadedModels[handle] = pipeline
+            self.locked { self.loadedModels[handle] = pipeline }
             resolve([
               "modelHandle": handle,
               "info": self.modelInfo(config: config)
@@ -524,7 +530,7 @@ public class CoreAIImpl: NSObject {
           do {
             let segmenter = try await ImageSegmenter(resourcesAt: sourceURL.path, parameters: parameters)
             let handle = self.makeHandle("model")
-            self.loadedModels[handle] = segmenter
+            self.locked { self.loadedModels[handle] = segmenter }
             resolve([
               "modelHandle": handle,
               "info": self.modelInfo(config: config)
@@ -558,7 +564,7 @@ public class CoreAIImpl: NSObject {
           do {
             let detector = try await ObjectDetector(resourcesAt: sourceURL.path)
             let handle = self.makeHandle("model")
-            self.loadedModels[handle] = detector
+            self.locked { self.loadedModels[handle] = detector }
             resolve([
               "modelHandle": handle,
               "info": self.modelInfo(config: config)
@@ -705,10 +711,6 @@ public class CoreAIImpl: NSObject {
       info["modelSizeBytes"] = size
     }
     return info
-  }
-
-  private func lastUserPrompt(_ messages: [[String: Any]]) -> String {
-    return messages.last(where: { ($0["role"] as? String) == "user" })?["content"] as? String ?? ""
   }
 
   private func makeHandle(_ prefix: String) -> String {
@@ -983,6 +985,112 @@ extension CoreAIImpl {
     ].mapValues(Double.init)
   }
 }
+
+extension CoreAIImpl {
+  private struct LanguageSessionEntry {
+    let modelHandle: String
+    let session: Any
+  }
+
+  // TurboModule methods and Swift tasks reach the shared state from different threads
+  private func locked<T>(_ body: () throws -> T) rethrows -> T {
+    lock.lock()
+    defer { lock.unlock() }
+    return try body()
+  }
+
+  /// Runs work in a task that cancelStream can cancel, and reports its error
+  private func startTask(
+    _ id: String,
+    onError: @escaping (String, String, String) -> Void,
+    _ work: @escaping () async throws -> Void
+  ) {
+    let task = Task {
+      do {
+        try await work()
+      } catch {
+        let reportedError = Task.isCancelled ? CoreAIError.cancelled : error
+        onError(id, errorCode(reportedError), reportedError.localizedDescription)
+      }
+      _ = self.locked { self.tasks.removeValue(forKey: id) }
+    }
+    locked { tasks[id] = task }
+  }
+}
+
+#if canImport(FoundationModels) && canImport(CoreAILanguageModels)
+@available(iOS 27, macOS 27, *)
+extension CoreAIImpl {
+  fileprivate static func serializeUsage(_ usage: LanguageModelSession.Usage) -> [String: Any] {
+    return [
+      "inputTokens": usage.input.totalTokenCount,
+      "cachedInputTokens": usage.input.cachedTokenCount,
+      "outputTokens": usage.output.totalTokenCount,
+      "reasoningTokens": usage.output.reasoningTokenCount,
+    ]
+  }
+}
+
+/// One AI SDK call on a Core AI language model. Core AI models are Foundation
+/// Models LanguageModels, so this reuses the Apple Foundation Models helpers
+@available(iOS 27, macOS 27, *)
+private struct LanguageModelRequest {
+  let session: LanguageModelSession
+  let prompt: String
+  let generationOptions: GenerationOptions
+  let contextOptions: ContextOptions
+
+  init(model: CoreAILanguageModel, messages: [[String: Any]], options: [String: Any]) throws {
+    // Tool calling is not wired up for Core AI yet, so the session has no tools
+    let (transcript, prompt, attachments) = try AppleLLMImpl.createTranscriptAndPrompt(from: messages, tools: [])
+    guard attachments.isEmpty else {
+      throw CoreAIError.invalidInput("Core AI language models do not accept image prompts yet.")
+    }
+
+    self.session = LanguageModelSession(model: model, tools: [], transcript: transcript)
+    self.prompt = prompt
+    self.generationOptions = try AppleLLMImpl.createGenerationOptions(from: options)
+    self.contextOptions = try AppleLLMImpl.createContextOptions(
+      from: options["providerOptions"] as? [String: Any] ?? [:],
+      includeSchemaInPrompt: nil
+    )
+  }
+
+  func respond() async throws -> [String: Any] {
+    let prompt = self.prompt
+    let response = try await session.respond(options: generationOptions, contextOptions: contextOptions) {
+      prompt
+    }
+    return ["content": response.toModelMessages(), "usage": CoreAIImpl.serializeUsage(response.usage)]
+  }
+
+  /// Sends snapshots of the response text, plus the reasoning entries when they
+  /// change, and returns the usage of the response
+  func stream(onUpdate: @escaping (String, [[String: Any]]?) -> Void) async throws -> [String: Any]? {
+    let prompt = self.prompt
+    var previousEntries: NSArray = []
+    var usage: LanguageModelSession.Usage?
+
+    func update(_ content: String, _ transcriptEntries: ArraySlice<Transcript.Entry>) {
+      let entries = AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: false)
+      let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
+      previousEntries = entries as NSArray
+      onUpdate(content, entriesChanged ? entries : nil)
+    }
+
+    let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
+      prompt
+    }
+    for try await chunk in responseStream {
+      try Task.checkCancellation()
+      update(chunk.content, chunk.transcriptEntries)
+      usage = chunk.usage
+    }
+
+    return usage.map(CoreAIImpl.serializeUsage)
+  }
+}
+#endif
 
 private func errorCode(_ error: Error) -> String {
   if let coreAIError = error as? CoreAIError {

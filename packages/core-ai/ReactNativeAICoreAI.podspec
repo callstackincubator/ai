@@ -20,6 +20,10 @@ Pod::Spec.new do |s|
 
   install_modules_dependencies(s)
 
+  # Core AI language models run through Foundation Models' LanguageModelSession,
+  # so the prompt and transcript helpers come from @react-native-ai/apple
+  s.dependency "AppleLLM"
+
   # Link Apple's Core AI Swift Package products to this pod's target so the
   # native module can import them. Set CORE_AI_PRODUCTS (comma-separated) at
   # pod install time to link a subset.
