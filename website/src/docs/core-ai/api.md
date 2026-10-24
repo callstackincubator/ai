@@ -24,7 +24,7 @@ AI SDK adapter status:
 | Capability        | AI SDK API                                    | Core AI API                      | Status                           |
 | ----------------- | --------------------------------------------- | -------------------------------- | -------------------------------- |
 | Language text     | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Native wrapper implemented       |
-| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Routed through language sessions |
+| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Not supported yet                |
 | Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Native diffusion wrapper         |
 | Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Explicit unsupported error       |
 | Transcription     | `transcribe`                     | `coreAI.transcriptionModel(...)` | Explicit unsupported error       |

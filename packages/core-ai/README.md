@@ -11,19 +11,17 @@ Foundation Models, NLContextualEmbedding, SpeechAnalyzer, and AVSpeechSynthesize
 
 Core AI exposes two layers:
 
-- AI SDK adapters where AI SDK has a matching model interface: language models,
-  image generation, text embeddings, and transcription.
-- Direct native APIs for Core AI-specific capabilities: model loading,
-  persistent language sessions, model inspection, specialization, segmentation,
-  object detection, depth, super-resolution, and raw `.aimodel` functions.
+- AI SDK adapters: language models and image generation. Text embedding and
+  transcription adapters exist, because Apple has starter export recipes for
+  them, but they reject with an unsupported error until native runners land
+  ([#237](https://github.com/callstackincubator/ai/issues/237)).
+- Direct native APIs: model loading, persistent language sessions, model
+  inspection, segmentation, and object detection. `specializeModel` returns
+  metadata only. Depth, super-resolution, and raw `.aimodel` function calls
+  reject with an unsupported error.
 
-The first native wrappers cover language sessions, diffusion image generation,
-segmentation, and object detection. Embeddings, transcription, depth,
-super-resolution, classification, reranking, speech generation, video
-generation, and arbitrary raw tensor calls stay explicit: embeddings and
-transcription keep AI SDK-shaped adapters because Apple has starter export
-recipes, while reranking, speech, and video have no provider helpers until a
-real Core AI model/runtime exists.
+Reranking, speech generation, and video generation have no adapters, because
+`coreai-models` has no runtime for them yet.
 
 ## Native Setup
 
