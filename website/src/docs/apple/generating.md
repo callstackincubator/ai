@@ -379,17 +379,20 @@ such as `prepareStep` and telemetry read:
 - Otherwise usage is `undefined`.
 
 For reusable history policies such as summarization, rolling windows, and
-completed tool-call pruning, use `@react-native-ai/utils`.
+completed tool-call pruning, use `@react-native-ai/utils`. Its summarizer uses
+`countTokens` from the model you pass it.
 
-Use low-level token counting as an estimate, not a fit guarantee:
+Count tokens before sending a request as an estimate, not a fit guarantee:
 
 ```typescript
-import { AppleFoundationModels } from '@react-native-ai/apple'
-
-const tokenCount = await AppleFoundationModels.countTokens(
+const model = apple()
+const tokenCount = await model.countTokens(
   'Summarize this text in three bullet points.'
 )
 ```
+
+Token counting requires iOS 26.4 and uses the on-device model's tokenizer, so
+for Private Cloud Compute it is an approximation.
 
 The full request also includes instructions, tool definitions, schema text,
 attachments, and generated output budget. If Apple reports a context overflow,

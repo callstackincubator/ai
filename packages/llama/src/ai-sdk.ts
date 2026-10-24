@@ -194,6 +194,15 @@ export class LlamaLanguageModel implements LanguageModelV4 {
   }
 
   /**
+   * Count tokens in text with the model's tokenizer
+   */
+  async countTokens(text: string): Promise<number> {
+    const context = this.context ?? (await this.prepare())
+    const { tokens } = await context.tokenize(text)
+    return tokens.length
+  }
+
+  /**
    * Get the underlying LlamaContext (for advanced usage)
    */
   getContext(): LlamaContext | null {

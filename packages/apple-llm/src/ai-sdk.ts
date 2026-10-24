@@ -43,6 +43,11 @@ export type AppleToolDefinitionSet = Record<string, FullToolDefinition>
 export interface AppleLanguageModel extends LanguageModelV4 {
   prepare: () => Promise<void>
   updateTools: (tools: AppleToolDefinitionSet) => void
+  /**
+   * Counts tokens in text with the on-device model's tokenizer (iOS 26.4+).
+   * Private Cloud Compute has no tokenizer, so this approximates its count
+   */
+  countTokens: (text: string) => Promise<number>
 }
 export type AppleLanguageModelId = 'system' | 'private-cloud-compute'
 export type AppleBuiltInTool = 'ocr' | 'barcode'
@@ -758,6 +763,10 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async prepare(): Promise<void> {}
+
+  countTokens(text: string): Promise<number> {
+    return NativeAppleLLM.countTokens(text)
+  }
 
   private prepareMessages(messages: LanguageModelV4Prompt): AppleMessage[] {
     return messages.map((message, index): AppleMessage => {

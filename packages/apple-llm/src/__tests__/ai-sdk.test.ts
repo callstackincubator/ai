@@ -25,6 +25,7 @@ const generateText = mock(
     content: [{ type: 'text', text: 'ok' }],
   })
 )
+const countTokens = mock(async (text: string) => text.length)
 const generateStream = mock(
   (_streamId: string, _messages: unknown, _options: unknown) => {}
 )
@@ -39,6 +40,7 @@ mock.module('react-native', () => ({
         ? {
             generateText,
             generateStream,
+            countTokens,
             cancelStream: () => {},
             onStreamUpdate,
             onStreamComplete,
@@ -531,5 +533,12 @@ describe('apple usage', () => {
         outputTokens: { total: 3, text: undefined, reasoning: undefined },
       },
     })
+  })
+})
+
+describe('apple token counting', () => {
+  test('counts tokens through the language model', async () => {
+    expect(await apple().countTokens('hello')).toBe(5)
+    expect(countTokens).toHaveBeenCalledWith('hello')
   })
 })
