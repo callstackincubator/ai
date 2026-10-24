@@ -232,7 +232,8 @@ public class CoreAIImpl: NSObject {
           let response = try await session.respond(to: prompt)
           resolve(response.toModelMessages())
         } catch {
-          reject(errorCode(error), error.localizedDescription, error)
+          let coreAIError = Self.mapLanguageModelError(error)
+          reject(errorCode(coreAIError), coreAIError.localizedDescription, coreAIError)
         }
       }
     } else {
@@ -1004,12 +1005,26 @@ extension CoreAIImpl {
       do {
         try await work()
       } catch {
-        let reportedError = Task.isCancelled ? CoreAIError.cancelled : error
+        let reportedError = Task.isCancelled ? CoreAIError.cancelled : Self.mapLanguageModelError(error)
         onError(id, errorCode(reportedError), reportedError.localizedDescription)
       }
       _ = self.locked { self.tasks.removeValue(forKey: id) }
     }
     locked { tasks[id] = task }
+  }
+
+  private static func mapLanguageModelError(_ error: Error) -> Error {
+#if canImport(FoundationModels) && canImport(CoreAILanguageModels)
+    if #available(iOS 27, macOS 27, *),
+       let languageModelError = error as? LanguageModelError,
+       case .unsupportedCapability(let unsupported) = languageModelError,
+       unsupported.capability == .guidedGeneration {
+      return CoreAIError.unsupportedCapability(
+        "This Core AI model does not support guided generation, which structured output (responseFormat with a schema) needs. Its inference engine has no per-step logits."
+      )
+    }
+#endif
+    return error
   }
 }
 
@@ -1034,6 +1049,7 @@ private struct LanguageModelRequest {
   let prompt: String
   let generationOptions: GenerationOptions
   let contextOptions: ContextOptions
+  let schema: GenerationSchema?
 
   init(model: CoreAILanguageModel, messages: [[String: Any]], options: [String: Any]) throws {
     // Tool calling is not wired up for Core AI yet, so the session has no tools
@@ -1042,17 +1058,34 @@ private struct LanguageModelRequest {
       throw CoreAIError.invalidInput("Core AI language models do not accept image prompts yet.")
     }
 
+    let schema = try AppleLLMImpl.createGenerationSchema(from: options)
     self.session = LanguageModelSession(model: model, tools: [], transcript: transcript)
     self.prompt = prompt
     self.generationOptions = try AppleLLMImpl.createGenerationOptions(from: options)
     self.contextOptions = try AppleLLMImpl.createContextOptions(
       from: options["providerOptions"] as? [String: Any] ?? [:],
-      includeSchemaInPrompt: nil
+      includeSchemaInPrompt: schema == nil ? nil : true
     )
+    self.schema = schema
   }
 
   func respond() async throws -> [String: Any] {
     let prompt = self.prompt
+
+    if let schema {
+      let response = try await session.respond(
+        schema: schema,
+        options: generationOptions,
+        contextOptions: contextOptions
+      ) {
+        prompt
+      }
+      // The JSON comes from the generated content rather than the response entry
+      let content = AppleLLMTranscriptSerializer.serialize(response.transcriptEntries, includeResponses: false)
+        + [["type": "text", "text": response.rawContent.jsonString]]
+      return ["content": content, "usage": CoreAIImpl.serializeUsage(response.usage)]
+    }
+
     let response = try await session.respond(options: generationOptions, contextOptions: contextOptions) {
       prompt
     }
@@ -1073,13 +1106,32 @@ private struct LanguageModelRequest {
       onUpdate(content, entriesChanged ? entries : nil)
     }
 
-    let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
-      prompt
-    }
-    for try await chunk in responseStream {
-      try Task.checkCancellation()
-      update(chunk.content, chunk.transcriptEntries)
-      usage = chunk.usage
+    if let schema {
+      let responseStream = session.streamResponse(
+        schema: schema,
+        options: generationOptions,
+        contextOptions: contextOptions
+      ) {
+        prompt
+      }
+      var json = ""
+      for try await chunk in responseStream {
+        try Task.checkCancellation()
+        // Partial JSON is not a prefix of the final JSON, so it is sent once complete
+        update("", chunk.transcriptEntries)
+        json = chunk.rawContent.jsonString
+        usage = chunk.usage
+      }
+      onUpdate(json, nil)
+    } else {
+      let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
+        prompt
+      }
+      for try await chunk in responseStream {
+        try Task.checkCancellation()
+        update(chunk.content, chunk.transcriptEntries)
+        usage = chunk.usage
+      }
     }
 
     return usage.map(CoreAIImpl.serializeUsage)

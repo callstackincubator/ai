@@ -83,7 +83,8 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 
 - **Simulator builds fail**: Core AI is device-only. Install pods without `APPLE_CORE_AI` / `CORE_AI_PRODUCTS` for simulator builds, or test on a device.
 - **Unsupported adapters**: `coreAI.embeddingModel(...)` and `coreAI.transcriptionModel(...)` exist but reject with an unsupported error. Depth, super-resolution and raw `.aimodel` calls also reject.
-- **Structured output and tools**: not supported by the language model yet.
+- **Structured output**: needs a JSON schema (guided generation), and models whose engine cannot do guided generation reject with `CORE_AI_UNSUPPORTED_CAPABILITY`. Streamed JSON arrives once complete.
+- **Tools**: not supported by the language model yet. Tools are not passed to the model and the call returns a warning.
 - **Wrong model**: Apple Intelligence (Foundation Models system model) is `apple(...)`; Core AI bundles are `coreAI.languageModel(...)`. Both come from `@react-native-ai/apple`.
 
 ## Related Skills
