@@ -112,8 +112,8 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
                 <View style={styles.settingToggleText}>
                   <Text style={styles.settingTitle}>History Demo</Text>
                   <Text style={styles.settingDescription}>
-                    Summarize history, keep a rolling window, and drop completed
-                    tool calls in chat
+                    Keep a rolling window, summarize older messages, and drop
+                    completed tool calls in chat
                   </Text>
                 </View>
                 <Switch
@@ -235,7 +235,7 @@ export function SettingsSheet({ ref }: SettingsSheetProps) {
             </View>
             <Text style={styles.settingsFooter}>
               {historyDemoEnabled
-                ? 'Temperature controls response randomness. Max steps limits tool call iterations. History Demo applies generic history wrappers on top of the current basic chat flow. Summary Threshold uses tokens when available and otherwise falls back to an estimate.'
+                ? 'Temperature controls response randomness. Max steps limits tool call iterations. History Window keeps the latest messages and summarizes older ones. Above Summary Threshold tokens, everything before your latest message is summarized. Apple and llama.rn models count tokens with their tokenizer, other models use an estimate.'
                 : 'Temperature controls response randomness. Max steps limits tool call iterations.'}
             </Text>
           </View>

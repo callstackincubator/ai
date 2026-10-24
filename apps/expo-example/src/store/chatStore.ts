@@ -128,7 +128,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
   genUiEnabled: false,
   historyDemoEnabled: false,
   historyWindowEntries: 10,
-  historySummarizationThreshold: 5000,
+  historySummarizationThreshold: 3000,
 }
 
 const chatsAtom = atomWithStorage<Chat[]>('chats', [], storage)
