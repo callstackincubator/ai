@@ -2,7 +2,6 @@ import type { LanguageModelV4, SpeechModelV4 } from '@ai-sdk/provider'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { createLlamaSpeechSetupAdapter } from '../components/adapters/llamaSpeechSetupAdapter'
-import { createMLCLanguageSetupAdapter } from '../components/adapters/mlcModelSetupAdapter'
 
 export type Availability = 'yes' | 'no' | 'availableForDownload'
 
@@ -46,10 +45,6 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV4>[] = [
   createLlamaLanguageSetupAdapter(
     'speakleash/Bielik-1.5B-v3.0-Instruct-GGUF/Bielik-1.5B-v3.0-Instruct.Q8_0.gguf'
   ),
-  createMLCLanguageSetupAdapter('Llama-3.2-1B-Instruct'),
-  createMLCLanguageSetupAdapter('Llama-3.2-3B-Instruct'),
-  createMLCLanguageSetupAdapter('Phi-3.5-mini-instruct'),
-  createMLCLanguageSetupAdapter('Qwen2-1.5B-Instruct'),
 ]
 
 // Available speech model adapters for text-to-speech.
