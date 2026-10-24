@@ -1,6 +1,8 @@
 # Starter Models
 
-Apple's repo publishes export recipes, not official ready-made `.aimodel` downloads. This table links the prebuilt Core AI bundles we found online; remaining starter models should use the Apple export recipe until we publish our own hosted bundles, for example from a Callstack Hugging Face org.
+Apple's `coreai-models` repo publishes export recipes, not prebuilt `.aimodel` files. Where a community-hosted prebuilt bundle exists, the table links it. These are third-party uploads, not published by Apple or Callstack. For the other models, export the bundle yourself with the Apple recipe. Hosted bundles are tracked in [#238](https://github.com/callstackincubator/ai/issues/238).
+
+The Platform column lists the platforms Apple's recipe exports for. `@react-native-ai/core-ai` runs on iOS only, so macOS-only models are listed for reference.
 
 | Type               | Model                                                                                                | Platform    | Prebuilt Core AI bundle                                                                                                                                                                                                                                                      | Apple export recipe                                                                          |
 | ------------------ | ---------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
