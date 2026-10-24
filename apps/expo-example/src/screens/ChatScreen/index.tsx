@@ -78,13 +78,13 @@ export default function ChatScreen() {
   const selectedModelAvailability = availability.get(selectedModelId)
   const imageInputEnabled = selectedAdapter?.imageInput ?? false
 
-  // Images go to the model as file URLs, and only when it accepts them
+  // Images go to the model as file URLs
   const toModelMessage = ({
     role,
     content,
     attachments,
   }: Pick<Message, 'role' | 'content' | 'attachments'>): ModelMessage => {
-    if (role !== 'user' || !imageInputEnabled || !attachments?.length) {
+    if (role !== 'user' || !attachments?.length) {
       return { role, content }
     }
     return {
