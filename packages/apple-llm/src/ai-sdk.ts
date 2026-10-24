@@ -317,7 +317,7 @@ function getAppleNativeOptions(
   }
 }
 
-function toAppleReasoningLevel(
+export function toAppleReasoningLevel(
   reasoning: LanguageModelV4CallOptions['reasoning']
 ): AppleReasoningLevel | undefined {
   switch (reasoning) {
@@ -474,7 +474,7 @@ function toAppleMessageParts(
   }
 }
 
-type AppleStreamEntry =
+export type AppleStreamEntry =
   | { type: 'reasoning'; id: string; text: string; signature?: string }
   | { type: 'tool-call'; toolCallId: string; toolName: string; input: string }
   | {
@@ -485,8 +485,148 @@ type AppleStreamEntry =
     }
 
 // Native streams send the full text generated so far
-function getSnapshotDelta(previous: string, next: string) {
+export function getSnapshotDelta(previous: string, next: string) {
   return next.startsWith(previous) ? next.slice(previous.length) : next
+}
+
+/**
+ * Turns Foundation Models stream snapshots (the response text so far, plus the
+ * reasoning and tool entries so far) into AI SDK stream parts. Shared with
+ * @react-native-ai/core-ai, whose models stream through the same
+ * LanguageModelSession
+ *
+ * @param providerKey Key of the provider metadata on reasoning parts
+ * @param bufferText Hold the text back and send it in end(), for structured
+ * output, whose partial JSON snapshots are not prefixes of the final JSON
+ */
+export function createSnapshotStreamHandler(
+  controller: ReadableStreamDefaultController<LanguageModelV4StreamPart>,
+  id: string,
+  providerKey: string,
+  { bufferText = false }: { bufferText?: boolean } = {}
+) {
+  let previousRawContent = ''
+  let textStarted = false
+  // Reasoning text so far by entry id, and the signature of open blocks
+  const reasoningTexts = new Map<string, string>()
+  const openReasoning = new Map<string, string | undefined>()
+  const emittedToolResults = new Set<string>()
+
+  const endReasoning = () => {
+    for (const [reasoningId, signature] of openReasoning) {
+      controller.enqueue({
+        type: 'reasoning-end',
+        id: reasoningId,
+        providerMetadata: {
+          [providerKey]: signature ? { signature } : {},
+        },
+      })
+    }
+    openReasoning.clear()
+  }
+
+  const handleEntries = (entries: AppleStreamEntry[]) => {
+    for (const entry of entries) {
+      if (entry.type === 'reasoning') {
+        const previousText = reasoningTexts.get(entry.id)
+        if (previousText === undefined) {
+          controller.enqueue({ type: 'reasoning-start', id: entry.id })
+          openReasoning.set(entry.id, undefined)
+        } else if (!openReasoning.has(entry.id)) {
+          continue
+        }
+
+        openReasoning.set(
+          entry.id,
+          entry.signature ?? openReasoning.get(entry.id)
+        )
+        reasoningTexts.set(entry.id, entry.text)
+
+        const delta = getSnapshotDelta(previousText ?? '', entry.text)
+        if (delta) {
+          controller.enqueue({
+            type: 'reasoning-delta',
+            id: entry.id,
+            delta,
+          })
+        }
+      }
+
+      // Tools run natively, so calls are reported once their output exists
+      if (
+        entry.type === 'tool-result' &&
+        !emittedToolResults.has(entry.toolCallId)
+      ) {
+        const toolCall = entries.find(
+          (candidate) =>
+            candidate.type === 'tool-call' &&
+            candidate.toolCallId === entry.toolCallId
+        )
+
+        endReasoning()
+        controller.enqueue({
+          type: 'tool-call',
+          toolCallId: entry.toolCallId,
+          toolName: entry.toolName,
+          input: toolCall?.type === 'tool-call' ? toolCall.input : '{}',
+          providerExecuted: true,
+        })
+        controller.enqueue({
+          type: 'tool-result',
+          toolCallId: entry.toolCallId,
+          toolName: entry.toolName,
+          result: entry.output,
+        })
+        emittedToolResults.add(entry.toolCallId)
+      }
+    }
+  }
+
+  return {
+    update(content: string, entries?: AppleStreamEntry[]) {
+      if (entries) {
+        handleEntries(entries)
+      }
+
+      if (bufferText) {
+        previousRawContent = content
+        return
+      }
+
+      const rawDelta = getSnapshotDelta(previousRawContent, content)
+      previousRawContent = content
+
+      // Apple native streaming can emit bogus "null" chunks as text.
+      if (!rawDelta || rawDelta === 'null') return
+
+      if (!textStarted) {
+        endReasoning()
+        controller.enqueue({ type: 'text-start', id })
+        textStarted = true
+      }
+
+      controller.enqueue({
+        type: 'text-delta',
+        delta: rawDelta,
+        id,
+      })
+    },
+    end() {
+      endReasoning()
+      if (bufferText && previousRawContent) {
+        controller.enqueue({ type: 'text-start', id })
+        controller.enqueue({
+          type: 'text-delta',
+          delta: previousRawContent,
+          id,
+        })
+        textStarted = true
+      }
+      if (textStarted) {
+        controller.enqueue({ type: 'text-end', id })
+      }
+    },
+  }
 }
 
 function prepareToolChoice(
@@ -559,6 +699,56 @@ function appendMessageContent(content: string, addition: string) {
   }
 
   return content ? `${content}\n${addition}` : addition
+}
+
+/**
+ * Converts an AI SDK prompt into messages that are replayed natively as a
+ * Foundation Models transcript. Shared with @react-native-ai/core-ai
+ */
+export function prepareAppleMessages(
+  messages: LanguageModelV4Prompt
+): AppleMessage[] {
+  return messages.map((message, index): AppleMessage => {
+    switch (message.role) {
+      case 'system':
+        return {
+          role: message.role,
+          content: message.content,
+        }
+      case 'user': {
+        const attachments: AppleMessageAttachment[] = []
+        // Foundation Models only accept images on the prompt being answered,
+        // so images from earlier turns are left out of the transcript
+        const isFinalPrompt = index === messages.length - 1
+        const content = message.content.reduce((acc, part) => {
+          if (part.type === 'file') {
+            if (isFinalPrompt) {
+              attachments.push(prepareImageAttachment(part, attachments.length))
+            }
+            return acc
+          }
+          return appendMessageContent(acc, part.text)
+        }, '')
+
+        return {
+          role: message.role,
+          content,
+          attachments,
+        }
+      }
+      default: {
+        const parts = message.content.flatMap(toAppleMessageParts)
+
+        return {
+          role: message.role,
+          content: parts
+            .flatMap((part) => (part.type === 'text' ? [part.text] : []))
+            .join('\n'),
+          parts,
+        }
+      }
+    }
+  })
 }
 
 export function createAppleProvider({
@@ -903,52 +1093,6 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     return { appleOptions, warnings }
   }
 
-  private prepareMessages(messages: LanguageModelV4Prompt): AppleMessage[] {
-    return messages.map((message, index): AppleMessage => {
-      switch (message.role) {
-        case 'system':
-          return {
-            role: message.role,
-            content: message.content,
-          }
-        case 'user': {
-          const attachments: AppleMessageAttachment[] = []
-          // Foundation Models only accept images on the prompt being answered,
-          // so images from earlier turns are left out of the transcript
-          const isFinalPrompt = index === messages.length - 1
-          const content = message.content.reduce((acc, part) => {
-            if (part.type === 'file') {
-              if (isFinalPrompt) {
-                attachments.push(
-                  prepareImageAttachment(part, attachments.length)
-                )
-              }
-              return acc
-            }
-            return appendMessageContent(acc, part.text)
-          }, '')
-
-          return {
-            role: message.role,
-            content,
-            attachments,
-          }
-        }
-        default: {
-          const parts = message.content.flatMap(toAppleMessageParts)
-
-          return {
-            role: message.role,
-            content: parts
-              .flatMap((part) => (part.type === 'text' ? [part.text] : []))
-              .join('\n'),
-            parts,
-          }
-        }
-      }
-    })
-  }
-
   private prepareTools(tools: Tool[] = []) {
     return tools.map((tool) => {
       if (tool.type === 'function') {
@@ -990,7 +1134,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   async doGenerate(options: LanguageModelV4CallOptions) {
     const { appleOptions, warnings } = await this.prepareCallOptions(options)
     const requestId = generateId()
-    const messages = this.prepareMessages(options.prompt)
+    const messages = prepareAppleMessages(options.prompt)
     const { tools: callTools, toolCallingMode } = prepareToolChoice(
       options.tools,
       options.toolChoice
@@ -1067,7 +1211,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   async doStream(options: LanguageModelV4CallOptions) {
     const { appleOptions, warnings } = await this.prepareCallOptions(options)
-    const messages = this.prepareMessages(options.prompt)
+    const messages = prepareAppleMessages(options.prompt)
     const { tools: callTools, toolCallingMode } = prepareToolChoice(
       options.tools,
       options.toolChoice
@@ -1108,139 +1252,27 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
           controller.enqueue({ type: 'stream-start', warnings })
 
-          let previousRawContent = ''
-          let textStarted = false
-          // Reasoning text so far by entry id, and the signature of open blocks
-          const reasoningTexts = new Map<string, string>()
-          const openReasoning = new Map<string, string | undefined>()
-          const emittedToolResults = new Set<string>()
-
-          const endReasoning = () => {
-            for (const [reasoningId, signature] of openReasoning) {
-              controller.enqueue({
-                type: 'reasoning-end',
-                id: reasoningId,
-                providerMetadata: {
-                  apple: signature ? { signature } : {},
-                },
-              })
-            }
-            openReasoning.clear()
-          }
-
-          const handleEntries = (entries: AppleStreamEntry[]) => {
-            for (const entry of entries) {
-              if (entry.type === 'reasoning') {
-                const previousText = reasoningTexts.get(entry.id)
-                if (previousText === undefined) {
-                  controller.enqueue({ type: 'reasoning-start', id: entry.id })
-                  openReasoning.set(entry.id, undefined)
-                } else if (!openReasoning.has(entry.id)) {
-                  continue
-                }
-
-                openReasoning.set(
-                  entry.id,
-                  entry.signature ?? openReasoning.get(entry.id)
-                )
-                reasoningTexts.set(entry.id, entry.text)
-
-                const delta = getSnapshotDelta(previousText ?? '', entry.text)
-                if (delta) {
-                  controller.enqueue({
-                    type: 'reasoning-delta',
-                    id: entry.id,
-                    delta,
-                  })
-                }
-              }
-
-              // Tools run natively, so calls are reported once their output exists
-              if (
-                entry.type === 'tool-result' &&
-                !emittedToolResults.has(entry.toolCallId)
-              ) {
-                const toolCall = entries.find(
-                  (candidate) =>
-                    candidate.type === 'tool-call' &&
-                    candidate.toolCallId === entry.toolCallId
-                )
-
-                endReasoning()
-                controller.enqueue({
-                  type: 'tool-call',
-                  toolCallId: entry.toolCallId,
-                  toolName: entry.toolName,
-                  input: toolCall?.type === 'tool-call' ? toolCall.input : '{}',
-                  providerExecuted: true,
-                })
-                controller.enqueue({
-                  type: 'tool-result',
-                  toolCallId: entry.toolCallId,
-                  toolName: entry.toolName,
-                  result: entry.output,
-                })
-                emittedToolResults.add(entry.toolCallId)
-              }
-            }
-          }
+          const snapshots = createSnapshotStreamHandler(
+            controller,
+            id,
+            'apple',
+            // Partial JSON snapshots are not prefixes of the final JSON, so
+            // structured output is sent once the stream completes
+            { bufferText: Boolean(schema) }
+          )
 
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
             if (data.streamId === streamId) {
-              if (data.entries) {
-                handleEntries(data.entries as AppleStreamEntry[])
-              }
-
-              const nextRawContent = String(data.content ?? '')
-
-              // Partial JSON snapshots are not prefixes of the final JSON, so
-              // structured output is sent once the stream completes
-              if (schema) {
-                previousRawContent = nextRawContent
-                return
-              }
-
-              const rawDelta = getSnapshotDelta(
-                previousRawContent,
-                nextRawContent
+              snapshots.update(
+                String(data.content ?? ''),
+                data.entries as AppleStreamEntry[] | undefined
               )
-              previousRawContent = nextRawContent
-
-              // Apple native streaming can emit bogus "null" chunks as text.
-              if (!rawDelta || rawDelta === 'null') return
-
-              if (!textStarted) {
-                endReasoning()
-                controller.enqueue({ type: 'text-start', id })
-                textStarted = true
-              }
-
-              controller.enqueue({
-                type: 'text-delta',
-                delta: rawDelta,
-                id,
-              })
             }
           })
 
           const completeListener = NativeAppleLLM.onStreamComplete((data) => {
             if (data.streamId === streamId) {
-              endReasoning()
-              if (schema && previousRawContent) {
-                controller.enqueue({ type: 'text-start', id })
-                controller.enqueue({
-                  type: 'text-delta',
-                  delta: previousRawContent,
-                  id,
-                })
-                textStarted = true
-              }
-              if (textStarted) {
-                controller.enqueue({
-                  type: 'text-end',
-                  id,
-                })
-              }
+              snapshots.end()
               controller.enqueue({
                 type: 'finish',
                 finishReason: toFinishReason(
