@@ -244,11 +244,33 @@ export function buildLlamaCompletionOptions(
   }
 
   if (options.tools) {
-    completionOptions.tools = options.tools.map(({ type, ...tool }) => ({
-      type,
-      function: tool,
-    }))
-    completionOptions.tool_choice = options.toolChoice?.type ?? 'auto'
+    const { toolChoice } = options
+    // llama.cpp reads OpenAI-style tools, with the schema under `parameters`
+    completionOptions.tools = options.tools.flatMap((tool) => {
+      if (tool.type !== 'function') {
+        warnings.push({
+          type: 'unsupported',
+          feature: `provider tool ${tool.id}`,
+        })
+        return []
+      }
+      if (toolChoice?.type === 'tool' && toolChoice.toolName !== tool.name) {
+        return []
+      }
+      return [
+        {
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema,
+          },
+        },
+      ]
+    })
+    // llama.cpp has no named tool choice, so offer only that tool and require it
+    completionOptions.tool_choice =
+      toolChoice?.type === 'tool' ? 'required' : (toolChoice?.type ?? 'auto')
   }
 
   if (options.responseFormat?.type === 'json') {
