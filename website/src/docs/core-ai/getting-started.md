@@ -19,16 +19,14 @@ npm install ai
 ## Requirements
 
 - React Native New Architecture
-- iOS 27 or newer for Core AI runtime APIs
+- iOS 27 or newer for Core AI runtime APIs. The `coreai-models` package declares iOS 27 as its minimum platform, so an app that links its products must use an iOS 27 deployment target
 - Xcode 27 or newer for building apps with Core AI
 - Exported `.aimodel` bundles from `apple/coreai-models`
 - The Apple Core AI Models Swift Package linked to the host app target
 
 ## Swift Package Setup
 
-Add `https://github.com/apple/coreai-models` to the iOS app as a Swift Package dependency, then link the products you use:
-
-This is the intended integration path, but it still needs full verification in an Xcode 27 / iOS 27 host app with Apple Core AI products linked into the app target.
+Add `https://github.com/apple/coreai-models` (version 1.0.0 or newer, up to the next major version) to the iOS app as a Swift Package dependency, then link the products you use:
 
 - `CoreAILM` for `coreAI.languageModel(...)` and sessions
 - `CoreAIDiffusion` for `coreAI.imageModel(...)`

@@ -27,12 +27,9 @@ real Core AI model/runtime exists.
 
 ## Native Setup
 
-Add `https://github.com/apple/coreai-models` as a Swift Package dependency in
-the host iOS app and link the products used by your wrappers:
-
-This is the intended integration path, but it still needs full verification in
-an Xcode 27 / iOS 27 host app with Apple Core AI products linked into the app
-target.
+Add `https://github.com/apple/coreai-models` (1.0.0 up to the next major
+version) as a Swift Package dependency in the host iOS app and link the products
+used by your wrappers. The package requires an iOS 27 deployment target:
 
 - `CoreAILM` for language models and sessions
 - `CoreAIDiffusion` for image generation
@@ -57,9 +54,7 @@ Pass `products` only when you want to link a smaller set:
 ```json
 {
   "expo": {
-    "plugins": [
-      ["@react-native-ai/core-ai", { "products": ["CoreAILM"] }]
-    ]
+    "plugins": [["@react-native-ai/core-ai", { "products": ["CoreAILM"] }]]
   }
 }
 ```
