@@ -135,9 +135,7 @@ Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models
 npm install @react-native-ai/core-ai
 ```
 
-Core AI also requires adding `https://github.com/apple/coreai-models` as a Swift Package dependency in the host iOS app and linking the products you use, such as `CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, and `CoreAIObjectDetection`.
-
-React Native installs the package through CocoaPods, but the Apple helpers are Swift Package products. Expo apps should use a config plugin to patch the generated Xcode project; bare React Native apps should add the package in Xcode or through a predictable project patch.
+The pod links Apple's `coreai-models` Swift Package products (`CoreAILM`, `CoreAIDiffusion`, `CoreAISegmentation`, `CoreAIObjectDetection`) during `pod install`. Apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
 
 #### Usage
 
