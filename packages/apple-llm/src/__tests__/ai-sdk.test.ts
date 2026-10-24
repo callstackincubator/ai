@@ -536,6 +536,36 @@ describe('apple usage', () => {
       },
     })
   })
+  test('reports length when every allowed token was used', async () => {
+    generateText.mockImplementationOnce(async () => ({
+      content: [],
+      usage: { inputTokens: 63, outputTokens: 14 },
+    }))
+
+    const result = await apple().doGenerate(
+      createCallOptions({ maxOutputTokens: 12 })
+    )
+
+    expect(result.finishReason).toEqual({ unified: 'length', raw: undefined })
+  })
+
+  test('reports length when a stream used every allowed token', async () => {
+    const { stream } = await apple().doStream(
+      createCallOptions({ maxOutputTokens: 12 })
+    )
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamComplete.emit({
+      streamId,
+      usage: { inputTokens: 63, outputTokens: 14 },
+    })
+
+    const finish = (await parts).find((part) => part.type === 'finish')
+    expect(finish).toMatchObject({
+      finishReason: { unified: 'length', raw: undefined },
+    })
+  })
 })
 
 describe('apple structured output stream', () => {

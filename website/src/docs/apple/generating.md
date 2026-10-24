@@ -382,6 +382,9 @@ such as `prepareStep` and telemetry read:
 - iOS 26.4 counts the transcript with the on-device model's tokenizer.
 - Otherwise usage is `undefined`.
 
+Apple does not say when a response stops at `maxOutputTokens`, so
+`finishReason` is `'length'` when the response used every allowed token.
+
 For reusable history policies such as summarization, rolling windows, and
 completed tool-call pruning, use `@react-native-ai/utils`. Its summarizer uses
 `countTokens` from the model you pass it.
