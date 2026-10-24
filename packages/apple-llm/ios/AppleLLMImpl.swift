@@ -16,8 +16,13 @@ import FoundationModels
 #if canImport(ImagePlayground)
 import ImagePlayground
 #endif
-#if compiler(>=6.4) && canImport(Vision)
+// OCRTool and BarcodeReaderTool live in the Vision + FoundationModels cross-import
+// overlay, which the iOS Simulator SDK does not ship.
+#if compiler(>=6.4) && canImport(_Vision_FoundationModels)
 import Vision
+private let supportsVisionTools = true
+#else
+private let supportsVisionTools = false
 #endif
 
 public typealias ToolInvoker = @Sendable (String, String, @escaping (Any?, Error?) -> Void) -> Void
@@ -475,7 +480,7 @@ public class AppleLLMImpl: NSObject {
     if #available(iOS 27, *) {
       info["supportsImagePrompts"] = true
       info["supportsDynamicProfiles"] = true
-      info["supportsVisionTools"] = true
+      info["supportsVisionTools"] = supportsVisionTools
     }
 #endif
 
@@ -504,7 +509,7 @@ public class AppleLLMImpl: NSObject {
       "supportsTokenCounting": false,
       "supportsImagePrompts": true,
       "supportsDynamicProfiles": true,
-      "supportsVisionTools": true,
+      "supportsVisionTools": supportsVisionTools,
     ]
   }
 #endif
@@ -653,7 +658,7 @@ public class AppleLLMImpl: NSObject {
       return []
     }
 
-#if compiler(>=6.4) && canImport(Vision)
+#if compiler(>=6.4) && canImport(_Vision_FoundationModels)
     if #available(iOS 27, *) {
       return try toolNames.map { toolName in
         switch toolName {
