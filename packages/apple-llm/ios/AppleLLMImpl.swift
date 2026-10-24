@@ -16,7 +16,7 @@ import FoundationModels
 #if canImport(ImagePlayground)
 import ImagePlayground
 #endif
-#if compiler(>=6.3) && canImport(Vision)
+#if compiler(>=6.4) && canImport(Vision)
 import Vision
 #endif
 
@@ -99,7 +99,7 @@ public class AppleLLMImpl: NSObject {
       case "system":
         resolve(modelInfo(for: SystemLanguageModel.default, locale: locale, modelName: modelName))
       case "private-cloud-compute":
-#if compiler(>=6.3)
+#if compiler(>=6.4)
         if #available(iOS 27, *) {
           let model = PrivateCloudComputeLanguageModel()
           Task {
@@ -233,7 +233,7 @@ public class AppleLLMImpl: NSObject {
                 resolve(response.toModelMessages())
               }
             } else {
-#if compiler(>=6.3)
+#if compiler(>=6.4)
               if #available(iOS 27, *) {
                 let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
                 defer {
@@ -340,7 +340,7 @@ public class AppleLLMImpl: NSObject {
                 }
               }
             } else {
-#if compiler(>=6.3)
+#if compiler(>=6.4)
               if #available(iOS 27, *) {
                 let preparedAttachments = try self.createImageAttachments(from: promptAttachments)
                 defer {
@@ -482,7 +482,7 @@ public class AppleLLMImpl: NSObject {
     return info
   }
 
-#if compiler(>=6.3)
+#if compiler(>=6.4)
   @available(iOS 27, *)
   private func modelInfo(
     for model: PrivateCloudComputeLanguageModel,
@@ -490,14 +490,17 @@ public class AppleLLMImpl: NSObject {
     modelName: String
   ) async throws -> [String: Any] {
     let contextSize = try await model.contextSize
+    let supportsLocale = try await model.supportsLocale(locale)
+    let supportedLanguages = try await model.supportedLanguages
     let isAvailable = model.availability == .available
     return [
       "model": modelName,
       "isAvailable": isAvailable,
       "availability": isAvailable ? "available" : "unavailable",
       "contextSize": contextSize,
-      "supportsLocale": model.supportsLocale(locale),
-      "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
+      "supportsLocale": supportsLocale,
+      "supportedLanguages": supportedLanguages.map(languageIdentifier).sorted(),
+      // PrivateCloudComputeLanguageModel has no tokenCount(for:) API, only SystemLanguageModel does
       "supportsTokenCounting": false,
       "supportsImagePrompts": true,
       "supportsDynamicProfiles": true,
@@ -544,7 +547,7 @@ public class AppleLLMImpl: NSObject {
         transcript: transcript
       )
     case "private-cloud-compute":
-#if compiler(>=6.3)
+#if compiler(>=6.4)
       if #available(iOS 27, *) {
         return LanguageModelSession(
           model: PrivateCloudComputeLanguageModel(),
@@ -650,7 +653,7 @@ public class AppleLLMImpl: NSObject {
       return []
     }
 
-#if compiler(>=6.3) && canImport(Vision)
+#if compiler(>=6.4) && canImport(Vision)
     if #available(iOS 27, *) {
       return try toolNames.map { toolName in
         switch toolName {
@@ -725,7 +728,7 @@ public class AppleLLMImpl: NSObject {
     return (Transcript(entries: entries), userPrompt, promptAttachments)
   }
 
-#if compiler(>=6.3)
+#if compiler(>=6.4)
   @available(iOS 27, *)
   private func createImageAttachments(
     from attachments: [[String: Any]]
@@ -872,12 +875,14 @@ public class AppleLLMImpl: NSObject {
       return .illustration
     case "sketch":
       return .sketch
-#if compiler(>=6.3)
+#if compiler(>=6.4)
     case "any":
       if #available(iOS 27, *) {
         return .any
       }
       return .illustration
+#endif
+#if compiler(>=6.3)
     case "emoji":
       if #available(iOS 27, *) {
         return .emoji
@@ -970,11 +975,19 @@ public class AppleLLMImpl: NSObject {
       samplingMode = .random(top: topK)
     }
     
+#if compiler(>=6.4)
+    return GenerationOptions(
+      samplingMode: samplingMode,
+      temperature: temperature,
+      maximumResponseTokens: maximumResponseTokens
+    )
+#else
     return GenerationOptions(
       sampling: samplingMode,
       temperature: temperature,
       maximumResponseTokens: maximumResponseTokens
     )
+#endif
   }
   
   @available(iOS 26, *)
