@@ -76,7 +76,7 @@ export default function ChatScreen() {
   )
 
   const selectedModelAvailability = availability.get(selectedModelId)
-  const imageInputEnabled = selectedAdapter?.capabilities?.imageInput ?? false
+  const imageInputEnabled = selectedAdapter?.imageInput ?? false
 
   // Images go to the model as file URLs, and only when it accepts them
   const toModelMessage = ({
