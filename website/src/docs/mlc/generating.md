@@ -1,6 +1,6 @@
 # Generating
 
-You can generate responses using MLC models with the Vercel AI SDK's `generateText`, `streamText`, or `generateObject` functions.
+You can generate responses using MLC models with the Vercel AI SDK's `generateText` and `streamText` functions.
 
 ## Requirements
 
@@ -52,7 +52,7 @@ for await (const delta of textStream) {
 Generate structured data that conforms to a specific schema:
 
 ```typescript
-import { generateObject } from 'ai';
+import { generateText, Output } from 'ai';
 import { mlc } from '@react-native-ai/mlc';
 import { z } from 'zod';
 
@@ -65,24 +65,24 @@ const schema = z.object({
   description: z.string()
 });
 
-const result = await generateObject({
+const result = await generateText({
   model,
   prompt: 'Who are you? Please identify yourself and your capabilities.',
-  schema
+  output: Output.object({ schema })
 });
 
-console.log(result.object);
+console.log(result.output);
 ```
 ## Available Options
 
 Configure model behavior with generation options:
 
 - `temperature` (0-1): Controls randomness. Higher values = more creative, lower = more focused
-- `maxTokens`: Maximum number of tokens to generate
+- `maxOutputTokens`: Maximum number of tokens to generate
 - `topP` (0-1): Nucleus sampling threshold
 - `topK`: Top-K sampling parameter
 
-You can pass selected options with `generateText`, `streamText`, or `generateObject` as follows:
+You can pass selected options with `generateText` or `streamText` as follows:
 
 ```typescript
 import { mlc } from '@react-native-ai/mlc';
@@ -96,7 +96,7 @@ const result = await generateText({
   model,
   prompt: 'Write a creative story',
   temperature: 0.8,
-  maxTokens: 500,
+  maxOutputTokens: 500,
   topP: 0.9,
 });
 ```
