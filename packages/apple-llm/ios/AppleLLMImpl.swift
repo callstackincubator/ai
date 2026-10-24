@@ -835,6 +835,10 @@ public class AppleLLMImpl: NSObject {
       return .contextWindowExceeded
     }
 
+    if case .rateLimited = generationError {
+      return .rateLimited
+    }
+
     return nil
   }
 
