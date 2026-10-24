@@ -886,13 +886,13 @@ public class AppleLLMImpl: NSObject {
         return .any
       }
       return .illustration
-#endif
-#if compiler(>=6.3)
     case "emoji":
       if #available(iOS 27, *) {
         return .emoji
       }
       return .illustration
+#endif
+#if compiler(>=6.3)
     case "externalProvider":
       if #available(iOS 27, *) {
         return .externalProvider
