@@ -31,6 +31,10 @@ const { text } = await generateText({
 
 - ✅ Text generation with GGUF models
 - ✅ Streaming
+- ✅ Reasoning, controlled with the AI SDK `reasoning` option
+- ✅ Structured output (`Output.object`), enforced with a JSON schema grammar
+- ✅ Tool calling
+- ✅ Vision and audio input with a multimodal projector (`projectorPath`)
 - ✅ On-device inference (iOS & Android)
 - ✅ Model download management
 - ✅ GPU acceleration support
