@@ -18,6 +18,7 @@ enum AppleLLMError: Error, LocalizedError {
   case toolCallError(Error)
   case unknownToolCallError
   case contextWindowExceeded
+  case rateLimited
   
   var errorDescription: String? {
     switch self {
@@ -29,8 +30,8 @@ enum AppleLLMError: Error, LocalizedError {
       return "Generation error: \(message)"
     case .streamNotFound(let id):
       return "Stream with ID \(id) not found"
-    case .invalidMessage(let role):
-      return "Invalid message role '\(role)'. Supported roles are: system, user, assistant"
+    case .invalidMessage(let message):
+      return "Invalid message: \(message)"
     case .conflictingSamplingMethods:
       return "Cannot specify both topP and topK parameters simultaneously. Please use only one sampling method."
     case .invalidSchema(let message):
@@ -41,6 +42,8 @@ enum AppleLLMError: Error, LocalizedError {
       return "Unknown tool call error"
     case .contextWindowExceeded:
       return "Context window exceeded"
+    case .rateLimited:
+      return "Apple Intelligence request limit reached"
     }
     
   }
@@ -65,6 +68,8 @@ enum AppleLLMError: Error, LocalizedError {
       return "UNKNOWN_TOOL_CALL_ERROR"
     case .contextWindowExceeded:
       return "CONTEXT_WINDOW_EXCEEDED"
+    case .rateLimited:
+      return "RATE_LIMITED"
     case .streamNotFound:
       return nil
     }
@@ -82,6 +87,7 @@ enum AppleLLMError: Error, LocalizedError {
     case .unknownToolCallError: return 8
     case .toolCallError: return 9
     case .contextWindowExceeded: return 10
+    case .rateLimited: return 11
     }
   }
 }

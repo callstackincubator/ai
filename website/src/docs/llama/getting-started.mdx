@@ -17,7 +17,7 @@ While you can use the Llama provider standalone, we recommend using it with the 
 ## Requirements
 
 - **React Native >= 0.76.0** - Required for native module functionality
-- **llama.rn >= 0.10.0** - The underlying llama.cpp bindings
+- **llama.rn >= 0.13.0-rc.8** (required for React Native 0.88) - The underlying llama.cpp bindings
 
 ## Expo Setup
 
@@ -66,7 +66,7 @@ import { streamText } from 'ai'
 
 // Download model from HuggingFace - returns the file path
 const modelPath = await downloadModel(
-  'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
 )
 
 // Create model instance with the path
@@ -94,7 +94,7 @@ Models are identified using the HuggingFace format: `owner/repo/filename.gguf`
 
 For example:
 
-- `ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf`
+- `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`
 - `Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf`
 - `lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q3_K_M.gguf`
 

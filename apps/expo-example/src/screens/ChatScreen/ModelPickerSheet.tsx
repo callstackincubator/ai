@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4 } from '@ai-sdk/provider'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { TrueSheet } from '@lodev09/react-native-true-sheet'
 import { SymbolView } from 'expo-symbols'
@@ -31,7 +31,7 @@ export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
   const [customUrl, setCustomUrl] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
 
-  const adaptersByProvider = new Map<string, SetupAdapter<LanguageModelV3>[]>()
+  const adaptersByProvider = new Map<string, SetupAdapter<LanguageModelV4>[]>()
 
   for (const adapter of adapters) {
     const key = adapter.model.provider

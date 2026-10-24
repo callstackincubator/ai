@@ -1,8 +1,7 @@
-import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4, SpeechModelV4 } from '@ai-sdk/provider'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { createLlamaSpeechSetupAdapter } from '../components/adapters/llamaSpeechSetupAdapter'
-import { createMLCLanguageSetupAdapter } from '../components/adapters/mlcModelSetupAdapter'
 
 export type Availability = 'yes' | 'no' | 'availableForDownload'
 
@@ -23,6 +22,8 @@ export interface SetupAdapter<TModel> {
   }
   // Whether the model is built-in (true) or downloadable (false)
   builtIn: boolean
+  // Whether the model accepts images, omitted means text only
+  imageInput?: boolean
   // Check if model is ready, unavailable, or downloadable
   isAvailable: () => Availability
   // Download the model with progress callback
@@ -36,9 +37,16 @@ export interface SetupAdapter<TModel> {
 }
 
 // Available language model adapters for text generation.
-export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
+export const commonLanguageAdapters: SetupAdapter<LanguageModelV4>[] = [
+  // Vision, audio, reasoning and tool calling
   createLlamaLanguageSetupAdapter(
-    'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
+    'ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q4_0.gguf',
+    'ggml-org/gemma-4-E2B-it-GGUF/mmproj-gemma-4-E2B-it-Q8_0.gguf'
+  ),
+  // Vision, reasoning and tool calling, about half the download of Gemma 4 E2B
+  createLlamaLanguageSetupAdapter(
+    'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf',
+    'bartowski/Qwen_Qwen3.5-2B-GGUF/mmproj-Qwen_Qwen3.5-2B-f16.gguf'
   ),
   createLlamaLanguageSetupAdapter(
     'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf'
@@ -46,14 +54,10 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
   createLlamaLanguageSetupAdapter(
     'speakleash/Bielik-1.5B-v3.0-Instruct-GGUF/Bielik-1.5B-v3.0-Instruct.Q8_0.gguf'
   ),
-  createMLCLanguageSetupAdapter('Llama-3.2-1B-Instruct'),
-  createMLCLanguageSetupAdapter('Llama-3.2-3B-Instruct'),
-  createMLCLanguageSetupAdapter('Phi-3.5-mini-instruct'),
-  createMLCLanguageSetupAdapter('Qwen2-1.5B-Instruct'),
 ]
 
 // Available speech model adapters for text-to-speech.
-export const commonSpeechAdapters: SetupAdapter<SpeechModelV3>[] = [
+export const commonSpeechAdapters: SetupAdapter<SpeechModelV4>[] = [
   createLlamaSpeechSetupAdapter({
     modelId: 'OuteAI/OuteTTS-0.3-500M-GGUF/OuteTTS-0.3-500M-Q4_K_M.gguf',
     vocoderId: 'ggml-org/WavTokenizer/WavTokenizer-Large-75-Q5_1.gguf',

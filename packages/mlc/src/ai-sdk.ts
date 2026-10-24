@@ -1,12 +1,12 @@
 import type {
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3FinishReason,
-  LanguageModelV3FunctionTool,
-  LanguageModelV3Prompt,
-  LanguageModelV3ProviderTool,
-  LanguageModelV3StreamPart,
-  LanguageModelV3ToolChoice,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  LanguageModelV4FinishReason,
+  LanguageModelV4FunctionTool,
+  LanguageModelV4Prompt,
+  LanguageModelV4ProviderTool,
+  LanguageModelV4StreamPart,
+  LanguageModelV4ToolChoice,
 } from '@ai-sdk/provider'
 
 import NativeMLCEngine, {
@@ -23,7 +23,7 @@ export const mlc = {
 }
 
 const convertToolsToNativeFormat = (
-  tools: (LanguageModelV3FunctionTool | LanguageModelV3ProviderTool)[]
+  tools: (LanguageModelV4FunctionTool | LanguageModelV4ProviderTool)[]
 ) => {
   return tools
     .filter((tool) => tool.type === 'function')
@@ -49,7 +49,7 @@ const convertToolsToNativeFormat = (
 }
 
 const convertToolChoice = (
-  toolChoice?: LanguageModelV3ToolChoice
+  toolChoice?: LanguageModelV4ToolChoice
 ): 'none' | 'auto' | undefined => {
   if (!toolChoice) {
     return 'none'
@@ -65,8 +65,8 @@ const convertToolChoice = (
 
 const convertFinishReason = (
   finishReason: GeneratedMessage['finish_reason']
-): LanguageModelV3FinishReason => {
-  let unified: LanguageModelV3FinishReason['unified'] = 'other'
+): LanguageModelV4FinishReason => {
+  let unified: LanguageModelV4FinishReason['unified'] = 'other'
 
   if (finishReason === 'tool_calls') {
     unified = 'tool-calls'
@@ -82,8 +82,8 @@ const convertFinishReason = (
   }
 }
 
-class MlcChatLanguageModel implements LanguageModelV3 {
-  readonly specificationVersion = 'v3'
+class MlcChatLanguageModel implements LanguageModelV4 {
+  readonly specificationVersion = 'v4'
   readonly supportedUrls = {}
 
   readonly provider = 'mlc'
@@ -113,7 +113,7 @@ class MlcChatLanguageModel implements LanguageModelV3 {
     return NativeMLCEngine.removeModel(this.modelId)
   }
 
-  private prepareMessages(messages: LanguageModelV3Prompt): Message[] {
+  private prepareMessages(messages: LanguageModelV4Prompt): Message[] {
     return messages.map((message): Message => {
       const content = Array.isArray(message.content)
         ? message.content.reduce((acc, part) => {
@@ -132,7 +132,7 @@ class MlcChatLanguageModel implements LanguageModelV3 {
     })
   }
 
-  async doGenerate(options: LanguageModelV3CallOptions) {
+  async doGenerate(options: LanguageModelV4CallOptions) {
     const messages = this.prepareMessages(options.prompt)
 
     const generationOptions: GenerationOptions = {
@@ -191,7 +191,7 @@ class MlcChatLanguageModel implements LanguageModelV3 {
     }
   }
 
-  async doStream(options: LanguageModelV3CallOptions) {
+  async doStream(options: LanguageModelV4CallOptions) {
     const messages = this.prepareMessages(options.prompt)
 
     if (typeof ReadableStream === 'undefined') {
@@ -224,7 +224,7 @@ class MlcChatLanguageModel implements LanguageModelV3 {
       listeners = []
     }
 
-    const stream = new ReadableStream<LanguageModelV3StreamPart>({
+    const stream = new ReadableStream<LanguageModelV4StreamPart>({
       async start(controller) {
         try {
           const id = (streamId = await NativeMLCEngine.streamText(

@@ -26,7 +26,7 @@ const result = await generateText({
 - [ ] React Native New Architecture
 - [ ] iOS 26+ (Android not supported)
 - [ ] Apple Intelligence enabled device
-- [ ] Vercel AI SDK v5+ (`ai`)
+- [ ] Vercel AI SDK v7+ (`ai`)
 - [ ] Android or iOS
 
 ## Step-by-Step Instructions
@@ -63,6 +63,16 @@ import { createAppleProvider } from '@react-native-ai/apple'
 
 const apple = createAppleProvider({ availableTools: tools })
 const model = apple.languageModel()
+```
+
+Use Private Cloud Compute on iOS 27+ when the app has Apple's managed PCC entitlement, and set a reasoning level with the AI SDK `reasoning` option:
+
+```ts
+const result = await generateText({
+  model: apple('private-cloud-compute'),
+  prompt,
+  reasoning: 'medium',
+})
 ```
 
 ## Common Pitfalls

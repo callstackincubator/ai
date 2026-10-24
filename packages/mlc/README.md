@@ -6,7 +6,7 @@ A Vercel AI SDK provider for MLC (Machine Learning Compilation) models, enabling
 
 - iOS 14+
 - React Native New Architecture
-- Vercel AI SDK v5
+- Vercel AI SDK v7
 
 ```ts
 import { mlc } from '@react-native-ai/mlc'

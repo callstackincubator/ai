@@ -115,7 +115,8 @@ using namespace JS::NativeAppleLLM;
     @"topP": options.topP().has_value() ? @(options.topP().value()) : [NSNull null],
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
-    @"tools": options.tools() ?: [NSNull null]
+    @"tools": options.tools() ?: [NSNull null],
+    @"providerOptions": options.providerOptions() ?: [NSNull null]
   };
   
   auto callToolBlock = ^(NSString *toolId, NSString *arguments, void (^completion)(id, NSError *)) {
@@ -131,6 +132,19 @@ using namespace JS::NativeAppleLLM;
   [_llm countTokens:text resolve:resolve reject:reject];
 }
 
+- (void)getModelInfo:(NSString *)locale
+               model:(NSString *)model
+             resolve:(nonnull RCTPromiseResolveBlock)resolve
+              reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_llm getModelInfo:locale model:model resolve:resolve reject:reject];
+}
+
+- (void)generateImages:(nonnull NSDictionary *)options
+               resolve:(nonnull RCTPromiseResolveBlock)resolve
+                reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_llm generateImages:options resolve:resolve reject:reject];
+}
+
 - (void)cancelStream:(nonnull NSString *)streamId {
   [_llm cancelStream:streamId];
 }
@@ -144,6 +158,7 @@ using namespace JS::NativeAppleLLM;
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null],
+    @"providerOptions": options.providerOptions() ?: [NSNull null],
   };
   
   auto callToolBlock = ^(NSString *toolId, NSString *arguments, void (^completion)(id, NSError *)) {

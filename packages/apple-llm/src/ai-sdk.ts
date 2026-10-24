@@ -1,24 +1,27 @@
 import type {
-  EmbeddingModelV3,
-  EmbeddingModelV3CallOptions,
-  EmbeddingModelV3Result,
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3FunctionTool,
-  LanguageModelV3Prompt,
-  LanguageModelV3ProviderTool,
-  LanguageModelV3StreamPart,
-  SpeechModelV3,
-  SpeechModelV3CallOptions,
-  TranscriptionModelV3,
-  TranscriptionModelV3CallOptions,
+  EmbeddingModelV4,
+  EmbeddingModelV4CallOptions,
+  EmbeddingModelV4Result,
+  ImageModelV4,
+  ImageModelV4CallOptions,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  LanguageModelV4FunctionTool,
+  LanguageModelV4Message,
+  LanguageModelV4Prompt,
+  LanguageModelV4ProviderTool,
+  LanguageModelV4StreamPart,
+  SpeechModelV4,
+  SpeechModelV4CallOptions,
+  TranscriptionModelV4,
+  TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
 import {
   generateId,
   jsonSchema,
   parseJSON,
   Tool as FullToolDefinition,
-  ToolCallOptions,
+  ToolExecutionOptions,
 } from '@ai-sdk/provider-utils'
 
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
@@ -28,27 +31,334 @@ import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
-type Tool = LanguageModelV3FunctionTool | LanguageModelV3ProviderTool
-type ToolDefinitionSet = Record<string, FullToolDefinition>
+type Tool = LanguageModelV4FunctionTool | LanguageModelV4ProviderTool
+export type AppleToolDefinitionSet = Record<string, FullToolDefinition>
+
+export interface AppleLanguageModel extends LanguageModelV4 {
+  prepare: () => Promise<void>
+  updateTools: (tools: AppleToolDefinitionSet) => void
+}
+export type AppleLanguageModelId = 'system' | 'private-cloud-compute'
+export type AppleBuiltInTool = 'ocr' | 'barcode'
+export type AppleImageStyle =
+  | 'animation'
+  | 'any'
+  | 'emoji'
+  | 'externalProvider'
+  | 'illustration'
+  | 'sketch'
+export type AppleImagePersonalization = 'automatic' | 'disabled' | 'enabled'
+export type AppleReasoningLevel = 'light' | 'moderate' | 'deep'
+export type AppleGuardrails = 'default' | 'permissiveContentTransformations'
+
+export interface AppleProviderOptions {
+  builtInTools?: AppleBuiltInTool[]
+  style?: AppleImageStyle
+  personalization?: AppleImagePersonalization
+}
+
+export interface AppleModelInfo {
+  model: AppleLanguageModelId
+  isAvailable: boolean
+  availability: string
+  supportsLocale: boolean
+  supportedLanguages: string[]
+  supportsTokenCounting: boolean
+  supportsImagePrompts: boolean
+  supportsDynamicProfiles: boolean
+  supportsVisionTools: boolean
+  contextSize?: number
+}
+
+export interface AppleLanguageModelOptions {
+  model?: AppleLanguageModelId
+  availableTools?: AppleToolDefinitionSet
+  guardrails?: AppleGuardrails
+}
+
+type AppleMessageAttachment = {
+  type: 'image'
+  mediaType: string
+  data?: string
+  url?: string
+}
+
+type AppleImageModelFile = {
+  mediaType: string
+  data: string
+}
+
+type AppleImageSource =
+  | {
+      type: 'data'
+      value: string
+    }
+  | {
+      type: 'url'
+      value: string
+    }
+
+type AppleMessageContentPart = Extract<
+  LanguageModelV4Message['content'],
+  readonly unknown[]
+>[number]
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize)
+    binary += String.fromCharCode(...chunk)
+  }
+  return btoa(binary)
+}
+
+function normalizeAppleImageSource(
+  data: unknown,
+  featureName: string
+): AppleImageSource {
+  if (data instanceof Uint8Array) {
+    return {
+      type: 'data',
+      value: uint8ArrayToBase64(data),
+    }
+  }
+
+  const value =
+    data instanceof URL
+      ? data.toString()
+      : typeof data === 'string'
+        ? data
+        : null
+
+  if (!value) {
+    throw new Error(`Unsupported ${featureName} image data`)
+  }
+
+  const lowerValue = value.toLowerCase()
+
+  if (lowerValue.startsWith('http://') || lowerValue.startsWith('https://')) {
+    throw new Error(
+      `Remote ${featureName} image URLs are not supported. Provide image data, a data URL, or a local file URL instead.`
+    )
+  }
+
+  if (lowerValue.startsWith('data:')) {
+    return {
+      type: 'data',
+      value,
+    }
+  }
+
+  if (lowerValue.startsWith('file://') || value.startsWith('/')) {
+    return {
+      type: 'url',
+      value,
+    }
+  }
+
+  if (/^[a-z][a-z\d+.-]*:/i.test(value)) {
+    throw new Error(
+      `Unsupported ${featureName} image URL. Provide image data, a data URL, or a local file URL instead.`
+    )
+  }
+
+  return {
+    type: 'data',
+    value,
+  }
+}
+
+function prepareImageAttachment(
+  part: Extract<
+    Extract<
+      LanguageModelV4Prompt[number],
+      { content: unknown[] }
+    >['content'][number],
+    { type: 'file' }
+  >
+): AppleMessageAttachment {
+  const mediaType = part.mediaType.toLowerCase()
+  if (mediaType !== 'image' && !mediaType.startsWith('image/')) {
+    throw new Error(
+      `Unsupported Apple Foundation Models file type: ${part.mediaType}`
+    )
+  }
+
+  const source = normalizeAppleImageSource(
+    part.data.type === 'data'
+      ? part.data.data
+      : part.data.type === 'url'
+        ? part.data.url
+        : undefined,
+    'Apple Foundation Models'
+  )
+
+  if (source.type === 'data') {
+    return {
+      type: 'image',
+      mediaType,
+      data: source.value,
+    }
+  }
+
+  return {
+    type: 'image',
+    mediaType,
+    url: source.value,
+  }
+}
+
+function prepareImageModelFiles(
+  files: ImageModelV4CallOptions['files'] = []
+): AppleImageModelFile[] {
+  return files.map((file) => {
+    if (file.type === 'url') {
+      const source = normalizeAppleImageSource(
+        file.url,
+        'Apple Image Playground'
+      )
+
+      return {
+        mediaType: getImageModelFileUrlMediaType(source.value),
+        data: source.value,
+      }
+    }
+
+    const mediaType = file.mediaType.toLowerCase()
+    if (!mediaType.startsWith('image/')) {
+      throw new Error(
+        `Unsupported Apple Image Playground file type: ${file.mediaType}`
+      )
+    }
+
+    const source = normalizeAppleImageSource(
+      file.data as unknown,
+      'Apple Image Playground'
+    )
+
+    return {
+      mediaType,
+      data: source.value,
+    }
+  })
+}
+
+function getImageModelFileUrlMediaType(url: string) {
+  if (!url.startsWith('data:')) {
+    return 'image/png'
+  }
+
+  const [, mediaType] = /^data:([^;,]+)/.exec(url) ?? []
+  return mediaType?.toLowerCase() ?? 'image/png'
+}
+
+// Options read by the native module. The model comes from the language model
+// instance and the reasoning level from the AI SDK `reasoning` call option
+interface AppleNativeOptions {
+  model?: AppleLanguageModelId
+  guardrails?: AppleGuardrails
+  reasoningLevel?: AppleReasoningLevel
+  builtInTools?: AppleBuiltInTool[]
+}
+
+function getAppleNativeOptions(
+  defaults: AppleLanguageModelOptions,
+  options: LanguageModelV4CallOptions
+): AppleNativeOptions {
+  const appleOptions = (options.providerOptions?.apple ??
+    {}) as AppleProviderOptions
+
+  return {
+    model: defaults.model,
+    guardrails: defaults.guardrails,
+    reasoningLevel: toAppleReasoningLevel(options.reasoning),
+    builtInTools: appleOptions.builtInTools,
+  }
+}
+
+function toAppleReasoningLevel(
+  reasoning: LanguageModelV4CallOptions['reasoning']
+): AppleReasoningLevel | undefined {
+  switch (reasoning) {
+    case 'minimal':
+    case 'low':
+      return 'light'
+    case 'medium':
+      return 'moderate'
+    case 'high':
+    case 'xhigh':
+    case 'max':
+      return 'deep'
+    default:
+      // 'provider-default' and 'none' keep Apple's default behavior
+      return undefined
+  }
+}
+
+function serializeKnownMessageContentPart(
+  part: AppleMessageContentPart
+): string | undefined {
+  if (part.type === 'text') {
+    return part.text
+  }
+
+  if (part.type === 'file') {
+    return `[file:${part.mediaType}]`
+  }
+
+  if (part.type === 'tool-call') {
+    return `[tool-call:${part.toolName}] ${JSON.stringify(part.input)}`
+  }
+
+  if (part.type === 'tool-result') {
+    return `[tool-result:${part.toolName}] ${JSON.stringify(part.output)}`
+  }
+}
+
+function appendMessageContent(content: string, addition: string) {
+  if (!addition) {
+    return content
+  }
+
+  return content ? `${content}\n${addition}` : addition
+}
 
 export function createAppleProvider({
   availableTools,
-}: {
-  availableTools?: ToolDefinitionSet
-} = {}) {
-  const createLanguageModel = () => {
-    return new AppleLLMChatLanguageModel(availableTools)
+  model,
+  guardrails,
+}: AppleLanguageModelOptions = {}) {
+  const createLanguageModel = (
+    options: AppleLanguageModelId | AppleLanguageModelOptions = {}
+  ): AppleLanguageModel => {
+    const modelOptions =
+      typeof options === 'string' ? { model: options } : options
+    return new AppleLLMChatLanguageModel({
+      availableTools: modelOptions.availableTools ?? availableTools,
+      model: modelOptions.model ?? model,
+      guardrails: modelOptions.guardrails ?? guardrails,
+    })
   }
-  const provider = function () {
-    return createLanguageModel()
+  const provider = function (
+    options: AppleLanguageModelId | AppleLanguageModelOptions = {}
+  ) {
+    return createLanguageModel(options)
   }
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
+  provider.getModelInfo = (
+    options: { locale?: string; model?: AppleLanguageModelId } = {}
+  ) =>
+    NativeAppleLLM.getModelInfo(
+      options.locale,
+      options.model
+    ) as Promise<AppleModelInfo>
   provider.languageModel = createLanguageModel
   provider.textEmbeddingModel = (options: AppleEmbeddingOptions = {}) => {
     return new AppleTextEmbeddingModel(options)
   }
-  provider.imageModel = () => {
-    throw new Error('Image generation models are not supported by Apple LLM')
+  provider.imageModel = (options: AppleImageModelOptions = {}) => {
+    return new AppleImageModel(options)
   }
   provider.transcriptionModel = (options: AppleTranscriptionOptions = {}) => {
     return new AppleTranscriptionModel(options)
@@ -61,12 +371,53 @@ export function createAppleProvider({
 
 export const apple = createAppleProvider()
 
+export interface AppleImageModelOptions {
+  style?: AppleImageStyle
+  personalization?: AppleImagePersonalization
+}
+
+class AppleImageModel implements ImageModelV4 {
+  readonly specificationVersion = 'v4'
+  readonly provider = 'apple'
+  readonly modelId = 'ImagePlayground'
+  readonly maxImagesPerCall = 4
+
+  private options: AppleImageModelOptions
+
+  constructor(options: AppleImageModelOptions = {}) {
+    this.options = options
+  }
+
+  async doGenerate(options: ImageModelV4CallOptions) {
+    const appleOptions = (options.providerOptions?.apple ??
+      {}) as AppleImageModelOptions
+    const images = await NativeAppleLLM.generateImages({
+      prompt: options.prompt,
+      n: options.n,
+      files: prepareImageModelFiles(options.files),
+      style: appleOptions.style ?? this.options.style,
+      personalization:
+        appleOptions.personalization ?? this.options.personalization,
+    })
+
+    return {
+      images,
+      warnings: [],
+      response: {
+        timestamp: new Date(),
+        modelId: this.modelId,
+        headers: undefined,
+      },
+    }
+  }
+}
+
 export interface AppleTranscriptionOptions {
   language?: string
 }
 
-class AppleTranscriptionModel implements TranscriptionModelV3 {
-  readonly specificationVersion = 'v3'
+class AppleTranscriptionModel implements TranscriptionModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'apple'
 
   readonly modelId = 'SpeechTranscriber'
@@ -87,7 +438,7 @@ class AppleTranscriptionModel implements TranscriptionModelV3 {
     this.prepared = true
   }
 
-  async doGenerate(options: TranscriptionModelV3CallOptions) {
+  async doGenerate(options: TranscriptionModelV4CallOptions) {
     try {
       let audio = options.audio
       if (typeof audio === 'string') {
@@ -142,8 +493,8 @@ export interface AppleSpeechOptions {
   language?: string
 }
 
-class AppleSpeechModel implements SpeechModelV3 {
-  readonly specificationVersion = 'v3'
+class AppleSpeechModel implements SpeechModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'apple'
 
   readonly modelId = 'AVSpeechSynthesizer'
@@ -156,7 +507,7 @@ class AppleSpeechModel implements SpeechModelV3 {
 
   async prepare(): Promise<void> {}
 
-  async doGenerate(options: SpeechModelV3CallOptions) {
+  async doGenerate(options: SpeechModelV4CallOptions) {
     const speechOptions = {
       language: this.language,
       voice: options.voice,
@@ -188,8 +539,8 @@ export interface AppleEmbeddingOptions {
   language?: string
 }
 
-class AppleTextEmbeddingModel implements EmbeddingModelV3 {
-  readonly specificationVersion = 'v3'
+class AppleTextEmbeddingModel implements EmbeddingModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'apple'
 
   readonly modelId: string = 'NLContextualEmbedding'
@@ -209,8 +560,8 @@ class AppleTextEmbeddingModel implements EmbeddingModelV3 {
   }
 
   async doEmbed(
-    options: EmbeddingModelV3CallOptions
-  ): Promise<EmbeddingModelV3Result> {
+    options: EmbeddingModelV4CallOptions
+  ): Promise<EmbeddingModelV4Result> {
     if (!this.prepared) {
       console.warn(
         '[apple-llm] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -229,36 +580,54 @@ class AppleTextEmbeddingModel implements EmbeddingModelV3 {
   }
 }
 
-class AppleLLMChatLanguageModel implements LanguageModelV3 {
-  readonly specificationVersion = 'v3'
+class AppleLLMChatLanguageModel implements AppleLanguageModel {
+  readonly specificationVersion = 'v4'
   readonly supportedUrls = {}
 
   readonly provider = 'apple'
-  readonly modelId = 'system-default'
+  readonly modelId: string
 
-  private tools: ToolDefinitionSet = {}
+  private tools: AppleToolDefinitionSet = {}
+  private options: AppleLanguageModelOptions
 
-  constructor(availableTools: ToolDefinitionSet = {}) {
-    this.updateTools(availableTools)
+  constructor(options: AppleLanguageModelOptions = {}) {
+    this.options = options
+    this.modelId = options.model ?? 'system'
+    this.updateTools(options.availableTools ?? {})
   }
 
   async prepare(): Promise<void> {}
 
-  private prepareMessages(messages: LanguageModelV3Prompt): AppleMessage[] {
+  private prepareMessages(messages: LanguageModelV4Prompt): AppleMessage[] {
     return messages.map((message): AppleMessage => {
-      const content = Array.isArray(message.content)
-        ? message.content.reduce((acc, part) => {
-            if (part.type === 'text') {
-              return acc + part.text
-            }
-            console.warn('Unsupported message content type:', part)
+      if (Array.isArray(message.content)) {
+        const attachments: AppleMessageAttachment[] = []
+        const content = message.content.reduce((acc, part) => {
+          if (part.type === 'file') {
+            attachments.push(prepareImageAttachment(part))
             return acc
-          }, '')
-        : message.content
+          }
+
+          const serializedPart = serializeKnownMessageContentPart(part)
+          if (serializedPart !== undefined) {
+            return appendMessageContent(acc, serializedPart)
+          }
+
+          throw new Error(
+            `Unsupported Apple Foundation Models message content type: ${JSON.stringify(part)}`
+          )
+        }, '')
+
+        return {
+          role: message.role,
+          content,
+          attachments,
+        }
+      }
 
       return {
         role: message.role,
-        content,
+        content: message.content,
       }
     })
   }
@@ -279,9 +648,10 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
               text,
               schema,
             })
-            const opts: ToolCallOptions = {
+            const opts: ToolExecutionOptions<unknown> = {
               toolCallId: generateId(),
               messages: [],
+              context: undefined,
             }
             return this.tools[tool.name].execute?.(toolCallArguments, opts)
           },
@@ -291,11 +661,12 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
     })
   }
 
-  updateTools(tools: ToolDefinitionSet) {
+  updateTools(tools: AppleToolDefinitionSet) {
     this.tools = tools
   }
 
-  async doGenerate(options: LanguageModelV3CallOptions) {
+  async doGenerate(options: LanguageModelV4CallOptions) {
+    const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -310,6 +681,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
         topP: options.topP,
         topK: options.topK,
         tools,
+        providerOptions: appleOptions as unknown as Record<string, unknown>,
         schema:
           options.responseFormat?.type === 'json'
             ? options.responseFormat.schema
@@ -362,7 +734,8 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
     }
   }
 
-  async doStream(options: LanguageModelV3CallOptions) {
+  async doStream(options: LanguageModelV4CallOptions) {
+    const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -397,7 +770,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
       }
     }
 
-    const stream = new ReadableStream<LanguageModelV3StreamPart>({
+    const stream = new ReadableStream<LanguageModelV4StreamPart>({
       async start(controller) {
         try {
           streamId = generateId()
@@ -477,6 +850,7 @@ class AppleLLMChatLanguageModel implements LanguageModelV3 {
             topP: options.topP,
             topK: options.topK,
             tools,
+            providerOptions: appleOptions as unknown as Record<string, unknown>,
             schema,
           })
         } catch (error) {

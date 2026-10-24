@@ -98,9 +98,10 @@ public class AppleTranscriptionImpl: NSObject {
               try? FileManager.default.removeItem(at: fileURL)
             }
             
-            var segments: [[String: Any]] = []
-            
-            Task {
+            // Collect results concurrently and await them after the analyzer finishes,
+            // so segments that arrive while finalizing are not dropped
+            let resultsTask = Task {
+              var segments: [[String: Any]] = []
               for try await result in transcriber.results {
                 if result.isFinal {
                   let segment: [String: Any] = [
@@ -111,6 +112,7 @@ public class AppleTranscriptionImpl: NSObject {
                   segments.append(segment)
                 }
               }
+              return segments
             }
             
             let lastSampleTime = try await analyzer.analyzeSequence(from: audioFile)
@@ -121,6 +123,7 @@ public class AppleTranscriptionImpl: NSObject {
               await analyzer.cancelAndFinishNow()
             }
             
+            let segments = try await resultsTask.value
             let totalDuration = if let lastSampleTime { CMTimeGetSeconds(lastSampleTime) } else { 0.0 }
             
             let result: [String: Any] = [

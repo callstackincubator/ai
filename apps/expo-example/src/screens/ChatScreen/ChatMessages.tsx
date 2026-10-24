@@ -1,5 +1,6 @@
 import { GenerativeUIView } from '@react-native-ai/json-ui'
 import React, { useEffect, useRef } from 'react'
+import type { ScrollViewInstance } from 'react-native'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { useKeyboardHandler } from 'react-native-keyboard-controller'
 import Reanimated, {
@@ -10,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
+import type { ImageAttachment } from '../../utils/imageAttachments'
 import { ChatEmptyState } from './ChatEmptyState'
 import { ChatInputBar } from './ChatInputBar'
 import { ChatMessageBubble } from './ChatMessageBubble'
@@ -19,6 +21,7 @@ type ChatMessage = {
   role: string
   content: string
   type?: 'text' | 'toolExecution'
+  attachments?: ImageAttachment[]
   toolExecution?: {
     toolName: string
     payload: unknown
@@ -29,21 +32,25 @@ type ChatMessage = {
 type ChatMessagesProps = {
   messages: ChatMessage[]
   selectedModelLabel: string
-  onSend: (message: string) => void
+  emptyStateSubtitle: string
+  onSend: (message: string, attachments: ImageAttachment[]) => void
   isGenerating: boolean
   genUiEnabled: boolean
   showAppleTokenCount: boolean
+  imageInputEnabled: boolean
 }
 
 export function ChatMessages({
   messages,
   selectedModelLabel,
+  emptyStateSubtitle,
   onSend,
   isGenerating,
   genUiEnabled,
   showAppleTokenCount,
+  imageInputEnabled,
 }: ChatMessagesProps) {
-  const ref = useRef<ScrollView>(null)
+  const ref = useRef<ScrollViewInstance>(null)
 
   const insets = useSafeAreaInsets()
   const keyboardHeight = useSharedValue(insets.bottom)
@@ -86,11 +93,7 @@ export function ChatMessages({
         {messages.length === 0 ? (
           <ChatEmptyState
             title="What can I help you with?"
-            subtitle={
-              genUiEnabled
-                ? `Start a conversation with ${selectedModelLabel}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.`
-                : `Start a conversation with ${selectedModelLabel}. Ask questions, get creative, or explore ideas.`
-            }
+            subtitle={emptyStateSubtitle}
           />
         ) : (
           <View style={styles.messageList}>
@@ -100,6 +103,7 @@ export function ChatMessages({
                 content={message.content}
                 isUser={message.role === 'user'}
                 messageType={message.type}
+                attachments={message.attachments}
                 toolExecution={message.toolExecution}
               />
             ))}
@@ -123,6 +127,7 @@ export function ChatMessages({
           onSend={onSend}
           isGenerating={isGenerating}
           showAppleTokenCount={showAppleTokenCount}
+          imageInputEnabled={imageInputEnabled}
         />
       </Reanimated.View>
     </>

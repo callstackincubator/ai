@@ -1,4 +1,4 @@
-import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4, SpeechModelV4 } from '@ai-sdk/provider'
 
 import {
   createAppleLanguageSetupAdapter,
@@ -12,13 +12,13 @@ import {
 } from './providers.common'
 
 // Available language model adapters for text generation.
-export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
+export const languageAdapters: SetupAdapter<LanguageModelV4>[] = [
   createAppleLanguageSetupAdapter(toolDefinitions),
   ...commonLanguageAdapters,
 ]
 
 // Available speech model adapters for text-to-speech.
-export const speechAdapters: SetupAdapter<SpeechModelV3>[] = [
+export const speechAdapters: SetupAdapter<SpeechModelV4>[] = [
   createAppleSpeechSetupAdapter(),
   ...commonSpeechAdapters,
 ]

@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4 } from '@ai-sdk/provider'
 import { llama } from '@react-native-ai/llama'
 
 import {
@@ -10,15 +10,20 @@ import type { Availability, SetupAdapter } from '../../config/providers.common'
 import { isLlamaModelDownloaded } from '../../utils/llamaStorageUtils'
 
 export const createLlamaLanguageSetupAdapter = (
-  hfModelId: string
-): SetupAdapter<LanguageModelV3> => {
+  hfModelId: string,
+  // HuggingFace ID of the multimodal projector (mmproj) for vision/audio input
+  projectorId?: string
+): SetupAdapter<LanguageModelV4> => {
   const modelPath = getModelPath(hfModelId)
   const model = llama.languageModel(modelPath, {
+    projectorPath: projectorId ? getModelPath(projectorId) : undefined,
     contextParams: {
-      n_ctx: 2048,
+      // Images and audio take hundreds of tokens each
+      n_ctx: projectorId ? 4096 : 2048,
       n_gpu_layers: 99,
     },
   })
+  const files = projectorId ? [hfModelId, projectorId] : [hfModelId]
   // Extract friendly name from HuggingFace model ID
   const filename = hfModelId.split('/').pop() ?? hfModelId
   const friendlyName = filename.replace(/\.gguf$/, '')
@@ -31,17 +36,22 @@ export const createLlamaLanguageSetupAdapter = (
       icon: 'memory',
     },
     builtIn: false,
+    imageInput: Boolean(projectorId),
     isAvailable(): Availability {
-      const downloaded = isLlamaModelDownloaded(hfModelId)
+      const downloaded = files.every(isLlamaModelDownloaded)
       return downloaded ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
-      await downloadModel(hfModelId, (progress) => {
-        onProgress(progress.percentage)
-      })
+      for (const [index, file] of files.entries()) {
+        await downloadModel(file, (progress) => {
+          onProgress(
+            Math.round((index * 100 + progress.percentage) / files.length)
+          )
+        })
+      }
     },
     async delete() {
-      await removeModel(hfModelId)
+      await Promise.all(files.map(removeModel))
     },
     async unload() {
       await model.unload()

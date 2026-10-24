@@ -1,25 +1,28 @@
 import type {
-  EmbeddingModelV3,
-  EmbeddingModelV3CallOptions,
-  EmbeddingModelV3Result,
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3Content,
-  LanguageModelV3FinishReason,
-  LanguageModelV3StreamPart,
-  RerankingModelV3,
-  RerankingModelV3CallOptions,
-  SpeechModelV3,
-  SpeechModelV3CallOptions,
+  EmbeddingModelV4,
+  EmbeddingModelV4CallOptions,
+  EmbeddingModelV4Result,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  LanguageModelV4Content,
+  LanguageModelV4FinishReason,
+  LanguageModelV4StreamPart,
+  RerankingModelV4,
+  RerankingModelV4CallOptions,
+  SharedV4Warning,
+  SpeechModelV4,
+  SpeechModelV4CallOptions,
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
+  type CompletionParams,
   type ContextParams,
   type EmbeddingParams,
   initLlama,
   type LlamaContext,
   type NativeCompletionResult,
   type NativeEmbeddingResult,
+  type TokenData,
 } from 'llama.rn'
 
 import {
@@ -30,8 +33,8 @@ import { createLlamaStreamParser } from './streamParser'
 
 function convertFinishReason(
   result: NativeCompletionResult
-): LanguageModelV3FinishReason {
-  let unified: LanguageModelV3FinishReason['unified'] = 'other'
+): LanguageModelV4FinishReason {
+  let unified: LanguageModelV4FinishReason['unified'] = 'other'
   let raw: string | undefined
 
   if (result.stopped_eos) {
@@ -49,6 +52,23 @@ function convertFinishReason(
     unified,
     raw,
   }
+}
+
+/**
+ * Stops the running completion when the call is aborted, so the native side
+ * stops generating instead of running to completion in the background
+ *
+ * @returns A function that removes the abort listener
+ */
+function stopCompletionOnAbort(
+  context: LlamaContext,
+  abortSignal: AbortSignal | undefined
+): () => void {
+  const stop = () => {
+    context.stopCompletion()
+  }
+  abortSignal?.addEventListener('abort', stop, { once: true })
+  return () => abortSignal?.removeEventListener('abort', stop)
 }
 
 /**
@@ -81,8 +101,8 @@ export interface LlamaModelOptions {
  *
  * @see https://github.com/mybigday/llama.rn
  */
-export class LlamaLanguageModel implements LanguageModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaLanguageModel implements LanguageModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -90,6 +110,7 @@ export class LlamaLanguageModel implements LanguageModelV3 {
   private options: LlamaModelOptions
   private context: LlamaContext | null = null
   private multimodalInitialized: boolean = false
+  private pendingCompletion: Promise<unknown> = Promise.resolve()
 
   /**
    * Supported URL patterns
@@ -184,6 +205,9 @@ export class LlamaLanguageModel implements LanguageModelV3 {
    */
   async unload(): Promise<void> {
     if (this.context) {
+      // Releasing the context under a running completion crashes natively
+      await this.context.stopCompletion()
+      await this.pendingCompletion
       if (this.multimodalInitialized) {
         await this.context.releaseMultimodal()
         this.multimodalInitialized = false
@@ -194,9 +218,28 @@ export class LlamaLanguageModel implements LanguageModelV3 {
   }
 
   /**
-   * Non-streaming text generation (AI SDK LanguageModelV3)
+   * Runs completions on this model one at a time. An aborted completion keeps
+   * running natively until stopCompletion() takes effect, and llama.rn rejects
+   * a completion started while another one is in progress
    */
-  async doGenerate(options: LanguageModelV3CallOptions) {
+  private runCompletion(
+    context: LlamaContext,
+    params: Partial<CompletionParams>,
+    abortSignal: AbortSignal | undefined,
+    callback?: (tokenData: TokenData) => void
+  ): Promise<NativeCompletionResult> {
+    const completion = this.pendingCompletion.then(() => {
+      const removeAbortListener = stopCompletionOnAbort(context, abortSignal)
+      return context.completion(params, callback).finally(removeAbortListener)
+    })
+    this.pendingCompletion = completion.catch(() => {})
+    return completion
+  }
+
+  /**
+   * Non-streaming text generation (AI SDK LanguageModelV4)
+   */
+  async doGenerate(options: LanguageModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -207,10 +250,18 @@ export class LlamaLanguageModel implements LanguageModelV3 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions = buildLlamaCompletionOptions(options, messages)
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(options, messages, {
+      contextSize: this.options.contextParams?.n_ctx,
+      warnings,
+    })
 
-    const response = await context.completion(completionOptions)
-    let content: LanguageModelV3Content[] = []
+    const response = await this.runCompletion(
+      context,
+      completionOptions,
+      options.abortSignal
+    )
+    let content: LanguageModelV4Content[] = []
 
     if (response.content) {
       content.push({
@@ -261,14 +312,14 @@ export class LlamaLanguageModel implements LanguageModelV3 {
           timings: response.timings,
         },
       },
-      warnings: [],
+      warnings,
     }
   }
 
   /**
-   * Streaming text generation (AI SDK LanguageModelV3)
+   * Streaming text generation (AI SDK LanguageModelV4)
    */
-  async doStream(options: LanguageModelV3CallOptions) {
+  async doStream(options: LanguageModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -285,9 +336,13 @@ export class LlamaLanguageModel implements LanguageModelV3 {
 
     const messages = prepareMessagesWithMedia(options.prompt)
 
-    const completionOptions = buildLlamaCompletionOptions(options, messages)
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(options, messages, {
+      contextSize: this.options.contextParams?.n_ctx,
+      warnings,
+    })
 
-    const stream = new ReadableStream<LanguageModelV3StreamPart>({
+    const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
         try {
           const streamParser = createLlamaStreamParser({
@@ -296,11 +351,13 @@ export class LlamaLanguageModel implements LanguageModelV3 {
 
           controller.enqueue({
             type: 'stream-start',
-            warnings: [],
+            warnings,
           })
 
-          const result = await context.completion(
+          const result = await this.runCompletion(
+            context,
             completionOptions,
+            options.abortSignal,
             (tokenData) => {
               streamParser.processToken(tokenData)
             }
@@ -368,8 +425,8 @@ export interface LlamaEmbeddingOptions {
 /**
  * llama.rn Embedding Model for AI SDK
  */
-export class LlamaEmbeddingModel implements EmbeddingModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaEmbeddingModel implements EmbeddingModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -440,11 +497,11 @@ export class LlamaEmbeddingModel implements EmbeddingModelV3 {
   }
 
   /**
-   * Generate embeddings (AI SDK EmbeddingModelV3)
+   * Generate embeddings (AI SDK EmbeddingModelV4)
    */
   async doEmbed(
-    options: EmbeddingModelV3CallOptions
-  ): Promise<EmbeddingModelV3Result> {
+    options: EmbeddingModelV4CallOptions
+  ): Promise<EmbeddingModelV4Result> {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -500,8 +557,8 @@ export interface LlamaRerankOptions {
  *
  * @see https://github.com/mybigday/llama.rn
  */
-export class LlamaRerankModel implements RerankingModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaRerankModel implements RerankingModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -564,9 +621,9 @@ export class LlamaRerankModel implements RerankingModelV3 {
   }
 
   /**
-   * Rerank documents based on relevance to query (AI SDK RerankingModelV3)
+   * Rerank documents based on relevance to query (AI SDK RerankingModelV4)
    */
-  async doRerank(options: RerankingModelV3CallOptions) {
+  async doRerank(options: RerankingModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -617,8 +674,8 @@ export interface LlamaSpeechOptions {
 /**
  * llama.rn Speech Model for AI SDK (using vocoder for TTS)
  */
-export class LlamaSpeechModel implements SpeechModelV3 {
-  readonly specificationVersion = 'v3'
+export class LlamaSpeechModel implements SpeechModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'llama'
   readonly modelId: string
 
@@ -710,9 +767,9 @@ export class LlamaSpeechModel implements SpeechModelV3 {
   }
 
   /**
-   * Generate speech audio (AI SDK SpeechModelV3)
+   * Generate speech audio (AI SDK SpeechModelV4)
    */
-  async doGenerate(options: SpeechModelV3CallOptions) {
+  async doGenerate(options: SpeechModelV4CallOptions) {
     if (!this.context) {
       console.warn(
         '[llama] Model not prepared. Call prepare() ahead of time to optimize performance.'
@@ -727,20 +784,14 @@ export class LlamaSpeechModel implements SpeechModelV3 {
       )
     }
 
-    const speaker = null // todo: extend to support different speakers and settings
-    const formatted = await context.getFormattedAudioCompletion(
-      speaker,
-      options.text
-    )
-
-    const guideTokens: number[] = await context.getAudioCompletionGuideTokens(
-      options.text
-    )
+    // todo: extend to support different speakers and settings
+    const formatted = await context.getFormattedAudioCompletion({
+      prompt: options.text,
+    })
 
     const completionResult = await context.completion({
       prompt: formatted.prompt,
       grammar: formatted.grammar,
-      guide_tokens: guideTokens,
       temperature: 0.8,
     })
 

@@ -1,15 +1,20 @@
 import type { TrueSheet } from '@lodev09/react-native-true-sheet'
-import type { createAppleProvider } from '@react-native-ai/apple'
+import type { AppleLanguageModel } from '@react-native-ai/apple'
 import {
   buildGenUISystemPrompt,
   createGenUITools,
 } from '@react-native-ai/json-ui'
-import { stepCountIs, streamText } from 'ai'
+import { wrapLanguageModelWithHistory } from '@react-native-ai/utils'
+import { isStepCount, type ModelMessage, streamText } from 'ai'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { getChatUISpecFromChats, useChatStore } from '../../store/chatStore'
+import {
+  getChatUISpecFromChats,
+  type Message,
+  useChatStore,
+} from '../../store/chatStore'
 import { useProviderStore } from '../../store/providerStore'
 import { colors } from '../../theme/colors'
 import {
@@ -18,6 +23,10 @@ import {
   withToolProxy,
 } from '../../tools'
 import { getAiSdkTelemetry } from '../../utils/aiSdkTelemetry'
+import {
+  getAttachmentUri,
+  type ImageAttachment,
+} from '../../utils/imageAttachments'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -36,7 +45,9 @@ export default function ChatScreen() {
     updateChatUISpec,
   } = useChatStore()
   const chatsRef = useRef(chats)
-  chatsRef.current = chats
+  useEffect(() => {
+    chatsRef.current = chats
+  }, [chats])
   const getSpec = useCallback(
     (chatId: string) => getChatUISpecFromChats(chatsRef.current, chatId),
     []
@@ -49,6 +60,9 @@ export default function ChatScreen() {
     maxSteps,
     enabledToolIds,
     genUiEnabled,
+    historyDemoEnabled,
+    historyWindowEntries,
+    historySummarizationThreshold,
   } = chatSettings
 
   const [isGenerating, setIsGenerating] = useState(false)
@@ -62,9 +76,35 @@ export default function ChatScreen() {
   )
 
   const selectedModelAvailability = availability.get(selectedModelId)
+  const imageInputEnabled = selectedAdapter?.imageInput ?? false
+
+  // Images go to the model as file URLs
+  const toModelMessage = ({
+    role,
+    content,
+    attachments,
+  }: Pick<Message, 'role' | 'content' | 'attachments'>): ModelMessage => {
+    if (role !== 'user' || !attachments?.length) {
+      return { role, content }
+    }
+    return {
+      role,
+      content: [
+        ...(content ? [{ type: 'text' as const, text: content }] : []),
+        ...attachments.map((attachment) => ({
+          type: 'image' as const,
+          image: new URL(getAttachmentUri(attachment)),
+          mediaType: attachment.mediaType,
+        })),
+      ],
+    }
+  }
 
   // Send message and stream AI response
-  const handleSend = async (userInput: string) => {
+  const handleSend = async (
+    userInput: string,
+    attachments: ImageAttachment[]
+  ) => {
     if (isGenerating || !selectedAdapter) return
 
     // Cancel any previous generation
@@ -74,7 +114,7 @@ export default function ChatScreen() {
 
     const baseMessages = currentChat?.messages ?? []
     const { chatId, messageIds } = addMessages([
-      { role: 'user', content: userInput },
+      { role: 'user', content: userInput, attachments },
       { role: 'assistant', content: '...' },
     ])
     const assistantMessageId = messageIds[1]
@@ -97,33 +137,37 @@ export default function ChatScreen() {
         ),
         ...genUITools,
       }
-      if ('updateTools' in selectedAdapter.model) {
-        ;(
-          selectedAdapter.model as ReturnType<
-            ReturnType<typeof createAppleProvider>['languageModel']
-          >
-        ).updateTools(tools)
+      let model = selectedAdapter.model
+      if ('updateTools' in model) {
+        ;(model as AppleLanguageModel).updateTools(tools)
+      }
+      if (historyDemoEnabled) {
+        model = wrapLanguageModelWithHistory(model, {
+          summarizeHistory: {
+            threshold: historySummarizationThreshold,
+            model,
+          },
+          rollingWindowMessages: historyWindowEntries,
+          dropCompletedToolCalls: true,
+        })
       }
       setToolExecutionReporter(({ toolName, args, result }) => {
         addToolExecutionMessage(chatId, toolName, args, result)
       })
       let streamError: unknown
       const result = streamText({
-        model: selectedAdapter.model,
+        model,
         messages: [
           ...baseMessages
             .filter((message) => message.type !== 'toolExecution')
-            .map((message) => ({
-              role: message.role,
-              content: message.content,
-            })),
-          { role: 'user', content: userInput },
+            .map(toModelMessage),
+          toModelMessage({ role: 'user', content: userInput, attachments }),
         ],
         tools,
         temperature,
-        stopWhen: stepCountIs(maxSteps),
+        stopWhen: isStepCount(maxSteps),
         abortSignal: signal,
-        experimental_telemetry: getAiSdkTelemetry('chat-screen-stream-text'),
+        telemetry: getAiSdkTelemetry('chat-screen-stream-text'),
         system: genUiEnabled
           ? buildGenUISystemPrompt({
               additionalInstructions:
@@ -185,6 +229,9 @@ export default function ChatScreen() {
   const showAppleTokenCount =
     selectedAdapter?.model.provider === 'apple' &&
     selectedModelAvailability === 'yes'
+  const emptyStateSubtitle = genUiEnabled
+    ? `Start a conversation with ${headerSubtitle}. Ask questions, ask it to add new UI elements to the screen, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also summarizes history, keeps a rolling window, and drops completed tool calls.' : ''}`
+    : `Start a conversation with ${headerSubtitle}. Ask questions, get creative, or explore ideas.${historyDemoEnabled ? ' History Demo is enabled, so this chat also summarizes history, keeps a rolling window, and drops completed tool calls.' : ''}`
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -204,11 +251,13 @@ export default function ChatScreen() {
         ) : (
           <ChatMessages
             messages={currentChat?.messages ?? []}
+            selectedModelLabel={selectedAdapter.display.label}
+            emptyStateSubtitle={emptyStateSubtitle}
             onSend={handleSend}
             isGenerating={isGenerating}
-            selectedModelLabel={selectedAdapter.display.label}
             genUiEnabled={genUiEnabled}
             showAppleTokenCount={showAppleTokenCount}
+            imageInputEnabled={imageInputEnabled}
           />
         )}
       </View>

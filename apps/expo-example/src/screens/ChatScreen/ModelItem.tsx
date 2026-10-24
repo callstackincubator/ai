@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4 } from '@ai-sdk/provider'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React from 'react'
@@ -19,7 +19,7 @@ import {
 import { colors } from '../../theme/colors'
 
 type ModelItemProps = {
-  adapter: SetupAdapter<LanguageModelV3>
+  adapter: SetupAdapter<LanguageModelV4>
   isSelected: boolean
   onSelect: (id: string) => void
   isFirst: boolean
