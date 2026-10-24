@@ -256,7 +256,7 @@ public class AppleLLMImpl: NSObject {
     _ streamId: String,
     messages: [[String: Any]],
     options: [String: Any],
-    onUpdate: @escaping (String, String) -> Void,
+    onUpdate: @escaping (String, String, [[String: Any]]?) -> Void,
     onComplete: @escaping (String) -> Void,
     onError: @escaping (String, String, String) -> Void,
     toolInvoker: @escaping ToolInvoker
@@ -285,8 +285,8 @@ public class AppleLLMImpl: NSObject {
               generationSchema: generationSchema,
               generationOptions: generationOptions,
               providerOptions: providerOptions
-            ) { chunk in
-              onUpdate(streamId, chunk)
+            ) { chunk, entries in
+              onUpdate(streamId, chunk, entries)
             }
 
             if !Task.isCancelled {
@@ -555,7 +555,7 @@ public class AppleLLMImpl: NSObject {
     generationSchema: GenerationSchema?,
     generationOptions: GenerationOptions,
     providerOptions: [String: Any],
-    onUpdate: @escaping (String) -> Void
+    onUpdate: @escaping (String, [[String: Any]]?) -> Void
   ) async throws {
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
@@ -580,7 +580,7 @@ public class AppleLLMImpl: NSObject {
           }
         }
         for try await chunk in responseStream {
-          onUpdate(String(describing: chunk.content))
+          onUpdate(String(describing: chunk.content), nil)
         }
         return
       }
@@ -594,8 +594,13 @@ public class AppleLLMImpl: NSObject {
           attachment
         }
       }
+      // Reasoning and tool activity are only sent when they change
+      var previousEntries: NSArray = []
       for try await chunk in responseStream {
-        onUpdate(chunk.content)
+        let entries = AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
+        let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
+        previousEntries = entries as NSArray
+        onUpdate(chunk.content, entriesChanged ? entries : nil)
       }
       return
     }
@@ -614,14 +619,14 @@ public class AppleLLMImpl: NSObject {
         options: generationOptions
       )
       for try await chunk in responseStream {
-        onUpdate(String(describing: chunk.content))
+        onUpdate(String(describing: chunk.content), nil)
       }
       return
     }
 
     let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
     for try await chunk in responseStream {
-      onUpdate(chunk.content)
+      onUpdate(chunk.content, nil)
     }
   }
 
@@ -1362,19 +1367,64 @@ public class AppleLLMImpl: NSObject {
 @available(iOS 26, *)
 extension LanguageModelSession.Response {
   func toModelMessages() -> [[String: Any]] {
-    return transcriptEntries.flatMap { entry -> [[String: Any]] in
+    return AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: true)
+  }
+}
+
+@available(iOS 26, *)
+enum AppleLLMTranscriptSerializer {
+  /// Converts generated transcript entries into AI SDK content parts. Streams leave
+  /// responses out because their text is sent as snapshots of the response content
+  static func serialize(
+    _ entries: some Collection<Transcript.Entry>,
+    includeResponses: Bool
+  ) -> [[String: Any]] {
+    // Tool outputs follow their tool calls, so they are paired in order per tool name
+    var pendingToolCallIds: [String: [String]] = [:]
+
+    return entries.flatMap { entry -> [[String: Any]] in
       switch entry {
       case .response(let response):
-        return [["type": "text", "text": String(describing: response.segments.last!)]]
-      case .toolCalls(let calls):
-        return calls.compactMap { toolCall in
-          return ["type": "tool-call", "toolName": toolCall.toolName, "input": String(describing: toolCall.arguments)]
+        guard includeResponses, let segment = response.segments.last else {
+          return []
         }
-      case .toolOutput(let toolCall):
-        return [["type": "tool-result", "toolName": toolCall.toolName, "output": String(describing: toolCall.segments.last!)]]
+        return [["type": "text", "text": String(describing: segment)]]
+      case .toolCalls(let calls):
+        return calls.map { toolCall in
+          pendingToolCallIds[toolCall.toolName, default: []].append(toolCall.id)
+          return [
+            "type": "tool-call",
+            "toolCallId": toolCall.id,
+            "toolName": toolCall.toolName,
+            "input": toolCall.arguments.jsonString,
+          ]
+        }
+      case .toolOutput(let toolOutput):
+        let toolCallId = pendingToolCallIds[toolOutput.toolName]?.isEmpty == false
+          ? pendingToolCallIds[toolOutput.toolName]!.removeFirst()
+          : toolOutput.id
+        return [[
+          "type": "tool-result",
+          "toolCallId": toolCallId,
+          "toolName": toolOutput.toolName,
+          "output": toolOutput.segments.last.map { String(describing: $0) } ?? "",
+        ]]
       case .instructions, .prompt:
         return []
       default:
+#if compiler(>=6.4)
+        if #available(iOS 27, *), case .reasoning(let reasoning) = entry {
+          var part: [String: Any] = [
+            "type": "reasoning",
+            "id": reasoning.id,
+            "text": reasoning.segments.map { String(describing: $0) }.joined(),
+          ]
+          if let signature = reasoning.signature {
+            part["signature"] = signature.base64EncodedString()
+          }
+          return [part]
+        }
+#endif
         return []
       }
     }
