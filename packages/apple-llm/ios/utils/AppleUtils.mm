@@ -30,10 +30,7 @@ using namespace facebook;
 }
 
 - (NSString *)getCurrentLocale {
-  // Drop keywords such as "@rg=plzzzz" (set when language and region differ),
-  // which Speech and other locale-matching APIs do not accept
-  NSString *identifier = [NSLocale currentLocale].localeIdentifier;
-  return [identifier componentsSeparatedByString:@"@"].firstObject;
+  return [NSLocale currentLocale].localeIdentifier;
 }
 
 @end
