@@ -8,10 +8,11 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4FinishReason,
   LanguageModelV4StreamPart,
+  SharedV4Warning,
   TranscriptionModelV4,
   TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
-import { generateId } from '@ai-sdk/provider-utils'
+import { generateId, isCustomReasoning } from '@ai-sdk/provider-utils'
 import type { CodegenTypes } from 'react-native'
 
 import NativeCoreAI from './NativeCoreAI'
@@ -149,7 +150,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
       content: response.map(toLanguageModelContent),
       finishReason: toFinishReason('stop'),
       usage: emptyUsage(),
-      warnings: [],
+      warnings: getCallWarnings(options),
     }
   }
 
@@ -161,6 +162,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     }
 
     const streamId = generateId()
+    const warnings = getCallWarnings(options)
     let listeners: { remove(): void }[] = []
 
     const cleanup = () => {
@@ -170,15 +172,24 @@ export class CoreAILanguageModel implements LanguageModelV4 {
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: (controller) => {
+        controller.enqueue({ type: 'stream-start', warnings })
         controller.enqueue({ type: 'text-start', id: streamId })
+
+        let previousContent = ''
 
         const updateListener = NativeCoreAI.onStreamUpdate(
           (event: CoreAIStreamUpdateEvent) => {
             if (event.streamId === streamId) {
+              // Native emits the full response so far on every update
+              const delta = event.content.startsWith(previousContent)
+                ? event.content.slice(previousContent.length)
+                : event.content
+              previousContent = event.content
+
               controller.enqueue({
                 type: 'text-delta',
                 id: streamId,
-                delta: event.content,
+                delta,
               })
             }
           }
@@ -494,6 +505,23 @@ function toCoreAIGenerationOptions(
         : undefined,
     tools: options.tools,
   }
+}
+
+function getCallWarnings(
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] {
+  // `none` is already what a model without reasoning control does
+  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
+    return [
+      {
+        type: 'unsupported',
+        feature: 'reasoning',
+        details:
+          'Core AI language models do not support configuring reasoning.',
+      },
+    ]
+  }
+  return []
 }
 
 function toLanguageModelContent(part: CoreAIGenerationPart) {

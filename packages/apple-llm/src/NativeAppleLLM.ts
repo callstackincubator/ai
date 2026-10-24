@@ -5,6 +5,8 @@ export interface AppleMessage {
   role: 'assistant' | 'system' | 'tool' | 'user'
   content: string
   attachments?: CodegenTypes.UnsafeObject[]
+  // Structured assistant and tool content replayed as transcript entries
+  parts?: CodegenTypes.UnsafeObject[]
 }
 
 export interface AppleGenerationOptions {
@@ -14,12 +16,15 @@ export interface AppleGenerationOptions {
   topK?: number
   schema?: CodegenTypes.UnsafeObject
   tools?: CodegenTypes.UnsafeObject
+  toolCallingMode?: string
   providerOptions?: CodegenTypes.UnsafeObject
 }
 
 export type StreamUpdateEvent = {
   streamId: string
   content: string
+  // Reasoning and tool parts generated so far (iOS 27), sent when they change
+  entries?: CodegenTypes.UnsafeObject[]
 }
 
 export type StreamCompleteEvent = {
@@ -47,12 +52,20 @@ export interface Spec extends TurboModule {
     (
       | { type: 'text'; text: string }
       | {
+          type: 'reasoning'
+          id: string
+          text: string
+          signature?: string
+        }
+      | {
           type: 'tool-call'
+          toolCallId: string
           toolName: string
           input: string
         }
       | {
           type: 'tool-result'
+          toolCallId: string
           toolName: string
           output: string
         }

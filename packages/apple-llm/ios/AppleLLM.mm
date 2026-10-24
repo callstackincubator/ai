@@ -42,18 +42,51 @@ using namespace JS::NativeAppleLLM;
   return @"NativeAppleLLM";
 }
 
+static NSError *AppleLLMToolError(NSString *message) {
+  return [NSError errorWithDomain:@"AppleLLM"
+                             code:1
+                         userInfo:@{NSLocalizedDescriptionKey: message}];
+}
+
+static NSString *AppleLLMToolRejectionMessage(jsi::Runtime &rt, const jsi::Value *args, size_t count) {
+  NSString *fallback = @"There was an error calling tool";
+  if (count == 0) {
+    return fallback;
+  }
+
+  try {
+    const jsi::Value &reason = args[0];
+    if (reason.isObject()) {
+      auto message = reason.asObject(rt).getProperty(rt, "message");
+      if (message.isString()) {
+        return [NSString stringWithUTF8String:message.asString(rt).utf8(rt).c_str()] ?: fallback;
+      }
+    }
+    return [NSString stringWithUTF8String:reason.toString(rt).utf8(rt).c_str()] ?: fallback;
+  } catch (...) {
+    return fallback;
+  }
+}
+
 - (void)callToolWithId:(NSString *)toolId
              arguments:(NSString *)arguments
             completion:(void (^)(id result, NSError *error))completion {
   [self.callInvoker callInvoker]->invokeAsync([toolId, arguments, completion](jsi::Runtime& rt) {
-    @try {
-      auto global = rt.global();
-      auto tools = global.getPropertyAsObject(rt, "__APPLE_LLM_TOOLS__");
-      auto tool = tools.getPropertyAsFunction(rt, [toolId UTF8String]);
-      
+    // JSI throws C++ exceptions, which @try/@catch does not catch
+    try {
+      // The tool is gone when its generation was cleaned up, e.g. after a stream was cancelled
+      auto tools = rt.global().getProperty(rt, "__APPLE_LLM_TOOLS__");
+      auto tool = tools.isObject()
+        ? tools.asObject(rt).getProperty(rt, [toolId UTF8String])
+        : jsi::Value::undefined();
+      if (!tool.isObject() || !tool.asObject(rt).isFunction(rt)) {
+        completion(nil, AppleLLMToolError([NSString stringWithFormat:@"Tool not found: %@", toolId]));
+        return;
+      }
+
       auto args = jsi::String::createFromUtf8(rt, [arguments UTF8String]);
       
-      auto result = tool.call(rt, args);
+      auto result = tool.asObject(rt).asFunction(rt).call(rt, args);
       
       auto isPromise = result.isObject() && result.asObject(rt).hasProperty(rt, "then");
       
@@ -72,7 +105,9 @@ using namespace JS::NativeAppleLLM;
                                                                           const jsi::Value&,
                                                                           const jsi::Value* args,
                                                                           size_t count) {
-        id response = react::TurboModuleConvertUtils::convertJSIValueToObjCObject(rt, args[0], nullptr, false);
+        id response = count > 0
+          ? react::TurboModuleConvertUtils::convertJSIValueToObjCObject(rt, args[0], nullptr, false)
+          : nil;
         completion(response, nil);
         return jsi::Value::undefined();
       });
@@ -84,19 +119,15 @@ using namespace JS::NativeAppleLLM;
                                                                          const jsi::Value&,
                                                                          const jsi::Value* args,
                                                                          size_t count) {
-        NSError *error = [NSError errorWithDomain:@"AppleLLM"
-                                             code:1
-                                         userInfo:@{NSLocalizedDescriptionKey: @"There was an error calling tool"}];
-        completion(nil, error);
+        completion(nil, AppleLLMToolError(AppleLLMToolRejectionMessage(rt, args, count)));
         return jsi::Value::undefined();
       });
       
       promiseObj.getPropertyAsFunction(rt, "then").callWithThis(rt, promiseObj, onResolve, onReject);
-    } @catch (NSException *exception) {
-      NSError *error = [NSError errorWithDomain:@"AppleLLM"
-                                           code:1
-                                       userInfo:@{NSLocalizedDescriptionKey: exception.reason}];
-      completion(nil, error);
+    } catch (const std::exception &exception) {
+      completion(nil, AppleLLMToolError([NSString stringWithUTF8String:exception.what()] ?: @"There was an error calling tool"));
+    } catch (...) {
+      completion(nil, AppleLLMToolError(@"There was an error calling tool"));
     }
   });
 }
@@ -116,6 +147,7 @@ using namespace JS::NativeAppleLLM;
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null],
+    @"toolCallingMode": options.toolCallingMode() ?: [NSNull null],
     @"providerOptions": options.providerOptions() ?: [NSNull null]
   };
   
@@ -158,6 +190,7 @@ using namespace JS::NativeAppleLLM;
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null],
+    @"toolCallingMode": options.toolCallingMode() ?: [NSNull null],
     @"providerOptions": options.providerOptions() ?: [NSNull null],
   };
   
@@ -168,8 +201,12 @@ using namespace JS::NativeAppleLLM;
   [_llm generateStream:streamId
               messages:messages
                options:opts
-              onUpdate:^(NSString *streamId, NSString *content) {
-    [self emitOnStreamUpdate:@{@"streamId": streamId, @"content": content}];
+              onUpdate:^(NSString *streamId, NSString *content, NSArray *entries) {
+    NSMutableDictionary *payload = [@{@"streamId": streamId, @"content": content} mutableCopy];
+    if (entries != nil) {
+      payload[@"entries"] = entries;
+    }
+    [self emitOnStreamUpdate:payload];
   }
             onComplete:^(NSString *streamId) {
     [self emitOnStreamComplete:@{@"streamId": streamId}];

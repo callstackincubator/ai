@@ -256,7 +256,7 @@ public class AppleLLMImpl: NSObject {
     _ streamId: String,
     messages: [[String: Any]],
     options: [String: Any],
-    onUpdate: @escaping (String, String) -> Void,
+    onUpdate: @escaping (String, String, [[String: Any]]?) -> Void,
     onComplete: @escaping (String) -> Void,
     onError: @escaping (String, String, String) -> Void,
     toolInvoker: @escaping ToolInvoker
@@ -285,8 +285,8 @@ public class AppleLLMImpl: NSObject {
               generationSchema: generationSchema,
               generationOptions: generationOptions,
               providerOptions: providerOptions
-            ) { chunk in
-              onUpdate(streamId, chunk)
+            ) { chunk, entries in
+              onUpdate(streamId, chunk, entries)
             }
 
             if !Task.isCancelled {
@@ -558,7 +558,7 @@ public class AppleLLMImpl: NSObject {
     generationSchema: GenerationSchema?,
     generationOptions: GenerationOptions,
     providerOptions: [String: Any],
-    onUpdate: @escaping (String) -> Void
+    onUpdate: @escaping (String, [[String: Any]]?) -> Void
   ) async throws {
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
@@ -583,7 +583,7 @@ public class AppleLLMImpl: NSObject {
           }
         }
         for try await chunk in responseStream {
-          onUpdate(String(describing: chunk.content))
+          onUpdate(String(describing: chunk.content), nil)
         }
         return
       }
@@ -597,8 +597,13 @@ public class AppleLLMImpl: NSObject {
           attachment
         }
       }
+      // Reasoning and tool activity are only sent when they change
+      var previousEntries: NSArray = []
       for try await chunk in responseStream {
-        onUpdate(chunk.content)
+        let entries = AppleLLMTranscriptSerializer.serialize(chunk.transcriptEntries, includeResponses: false)
+        let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
+        previousEntries = entries as NSArray
+        onUpdate(chunk.content, entriesChanged ? entries : nil)
       }
       return
     }
@@ -617,14 +622,14 @@ public class AppleLLMImpl: NSObject {
         options: generationOptions
       )
       for try await chunk in responseStream {
-        onUpdate(String(describing: chunk.content))
+        onUpdate(String(describing: chunk.content), nil)
       }
       return
     }
 
     let responseStream = session.streamResponse(to: userPrompt, options: generationOptions)
     for try await chunk in responseStream {
-      onUpdate(chunk.content)
+      onUpdate(chunk.content, nil)
     }
   }
 
@@ -816,6 +821,12 @@ public class AppleLLMImpl: NSObject {
         throw AppleLLMError.invalidMessage("Message must have role and content")
       }
 
+      // Assistant and tool messages carry structured parts
+      if let parts = message["parts"] as? [[String: Any]] {
+        entries.append(contentsOf: try createTranscriptEntries(from: parts))
+        continue
+      }
+
       if let attachments = message["attachments"] as? [[String: Any]], !attachments.isEmpty {
         throw AppleLLMError.invalidMessage("Image attachments are only supported on the final user prompt")
       }
@@ -842,7 +853,90 @@ public class AppleLLMImpl: NSObject {
       }
     }
     
+    // A tool output without its call (e.g. after trimming history) fails generation
+    var knownToolCallIds = Set<String>()
+    entries = entries.filter { entry in
+      switch entry {
+      case .toolCalls(let toolCalls):
+        knownToolCallIds.formUnion(toolCalls.map(\.id))
+        return true
+      case .toolOutput(let toolOutput):
+        return knownToolCallIds.contains(toolOutput.id)
+      default:
+        return true
+      }
+    }
+
     return (Transcript(entries: entries), userPrompt, promptAttachments)
+  }
+
+  @available(iOS 26, *)
+  private func createTranscriptEntries(from parts: [[String: Any]]) throws -> [Transcript.Entry] {
+    var entries: [Transcript.Entry] = []
+    var pendingText: [String] = []
+    var pendingToolCalls: [Transcript.ToolCall] = []
+
+    // Consecutive text parts form one response and consecutive tool calls one entry
+    func flush() {
+      if !pendingText.isEmpty {
+        let segment = Transcript.Segment.text(.init(content: pendingText.joined(separator: "\n")))
+        entries.append(.response(Transcript.Response(assetIDs: [], segments: [segment])))
+        pendingText = []
+      }
+      if !pendingToolCalls.isEmpty {
+        entries.append(.toolCalls(Transcript.ToolCalls(pendingToolCalls)))
+        pendingToolCalls = []
+      }
+    }
+
+    for part in parts {
+      guard let type = part["type"] as? String else {
+        throw AppleLLMError.invalidMessage("Message part must have a type")
+      }
+
+      switch type {
+      case "text":
+        if !pendingToolCalls.isEmpty {
+          flush()
+        }
+        pendingText.append(part["text"] as? String ?? "")
+      case "reasoning":
+        flush()
+#if compiler(>=6.4)
+        if #available(iOS 27, *) {
+          let segment = Transcript.Segment.text(.init(content: part["text"] as? String ?? ""))
+          let signature = (part["signature"] as? String).flatMap { Data(base64Encoded: $0) }
+          entries.append(.reasoning(Transcript.Reasoning(segments: [segment], signature: signature)))
+        }
+#endif
+        // Transcripts before iOS 27 have no reasoning entries, so it is left out
+      case "tool-call":
+        guard let toolCallId = part["toolCallId"] as? String,
+              let toolName = part["toolName"] as? String,
+              let input = part["input"] as? String else {
+          throw AppleLLMError.invalidMessage("Tool call part must have toolCallId, toolName and input")
+        }
+        if !pendingText.isEmpty {
+          flush()
+        }
+        let arguments = try GeneratedContent(json: input)
+        pendingToolCalls.append(Transcript.ToolCall(id: toolCallId, toolName: toolName, arguments: arguments))
+      case "tool-result":
+        guard let toolCallId = part["toolCallId"] as? String,
+              let toolName = part["toolName"] as? String,
+              let output = part["output"] as? String else {
+          throw AppleLLMError.invalidMessage("Tool result part must have toolCallId, toolName and output")
+        }
+        flush()
+        let segment = Transcript.Segment.text(.init(content: output))
+        entries.append(.toolOutput(Transcript.ToolOutput(id: toolCallId, toolName: toolName, segments: [segment])))
+      default:
+        throw AppleLLMError.invalidMessage("Unsupported message part type '\(type)'")
+      }
+    }
+
+    flush()
+    return entries
   }
 
 #if compiler(>=6.4)
@@ -1092,20 +1186,55 @@ public class AppleLLMImpl: NSObject {
       samplingMode = .random(top: topK)
     }
     
+    let toolCallingMode = options["toolCallingMode"] as? String
+
 #if compiler(>=6.4)
-    return GenerationOptions(
+    var generationOptions = GenerationOptions(
       samplingMode: samplingMode,
       temperature: temperature,
       maximumResponseTokens: maximumResponseTokens
     )
+
+    if #available(iOS 27, *) {
+      generationOptions.toolCallingMode = try createToolCallingMode(from: toolCallingMode)
+      return generationOptions
+    }
 #else
-    return GenerationOptions(
+    let generationOptions = GenerationOptions(
       sampling: samplingMode,
       temperature: temperature,
       maximumResponseTokens: maximumResponseTokens
     )
 #endif
+
+    // Before iOS 27 tools are always optional for the model. JS leaves tools out
+    // for "disallowed", so only "required" cannot be honored
+    if toolCallingMode == "required" {
+      throw AppleLLMError.unsupportedOS
+    }
+
+    return generationOptions
   }
+
+#if compiler(>=6.4)
+  @available(iOS 27, *)
+  private func createToolCallingMode(from toolCallingMode: String?) throws -> GenerationOptions.ToolCallingMode? {
+    guard let toolCallingMode else {
+      return nil
+    }
+
+    switch toolCallingMode {
+    case "allowed":
+      return .allowed
+    case "required":
+      return .required
+    case "disallowed":
+      return .disallowed
+    default:
+      throw AppleLLMError.invalidMessage("Unsupported Apple tool calling mode '\(toolCallingMode)'")
+    }
+  }
+#endif
   
   @available(iOS 26, *)
   struct JSITool : Tool {
@@ -1330,19 +1459,64 @@ public class AppleLLMImpl: NSObject {
 @available(iOS 26, *)
 extension LanguageModelSession.Response {
   func toModelMessages() -> [[String: Any]] {
-    return transcriptEntries.flatMap { entry -> [[String: Any]] in
+    return AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: true)
+  }
+}
+
+@available(iOS 26, *)
+enum AppleLLMTranscriptSerializer {
+  /// Converts generated transcript entries into AI SDK content parts. Streams leave
+  /// responses out because their text is sent as snapshots of the response content
+  static func serialize(
+    _ entries: some Collection<Transcript.Entry>,
+    includeResponses: Bool
+  ) -> [[String: Any]] {
+    // Tool outputs follow their tool calls, so they are paired in order per tool name
+    var pendingToolCallIds: [String: [String]] = [:]
+
+    return entries.flatMap { entry -> [[String: Any]] in
       switch entry {
       case .response(let response):
-        return [["type": "text", "text": String(describing: response.segments.last!)]]
-      case .toolCalls(let calls):
-        return calls.compactMap { toolCall in
-          return ["type": "tool-call", "toolName": toolCall.toolName, "input": String(describing: toolCall.arguments)]
+        guard includeResponses, let segment = response.segments.last else {
+          return []
         }
-      case .toolOutput(let toolCall):
-        return [["type": "tool-result", "toolName": toolCall.toolName, "output": String(describing: toolCall.segments.last!)]]
+        return [["type": "text", "text": String(describing: segment)]]
+      case .toolCalls(let calls):
+        return calls.map { toolCall in
+          pendingToolCallIds[toolCall.toolName, default: []].append(toolCall.id)
+          return [
+            "type": "tool-call",
+            "toolCallId": toolCall.id,
+            "toolName": toolCall.toolName,
+            "input": toolCall.arguments.jsonString,
+          ]
+        }
+      case .toolOutput(let toolOutput):
+        let toolCallId = pendingToolCallIds[toolOutput.toolName]?.isEmpty == false
+          ? pendingToolCallIds[toolOutput.toolName]!.removeFirst()
+          : toolOutput.id
+        return [[
+          "type": "tool-result",
+          "toolCallId": toolCallId,
+          "toolName": toolOutput.toolName,
+          "output": toolOutput.segments.last.map { String(describing: $0) } ?? "",
+        ]]
       case .instructions, .prompt:
         return []
       default:
+#if compiler(>=6.4)
+        if #available(iOS 27, *), case .reasoning(let reasoning) = entry {
+          var part: [String: Any] = [
+            "type": "reasoning",
+            "id": reasoning.id,
+            "text": reasoning.segments.map { String(describing: $0) }.joined(),
+          ]
+          if let signature = reasoning.signature {
+            part["signature"] = signature.base64EncodedString()
+          }
+          return [part]
+        }
+#endif
         return []
       }
     }

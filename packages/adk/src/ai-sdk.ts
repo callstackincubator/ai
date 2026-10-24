@@ -8,11 +8,14 @@ import type {
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
+  SharedV4Warning,
 } from '@ai-sdk/provider'
 import {
   generateId,
+  isCustomReasoning,
   jsonSchema,
   parseJSON,
+  resolveFullMediaType,
   type Tool as FullToolDefinition,
   type ToolExecutionOptions,
 } from '@ai-sdk/provider-utils'
@@ -169,6 +172,34 @@ const schemaPropertyToAdkParameter = (
   }
 }
 
+const getCallWarnings = (
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] => {
+  const warnings: SharedV4Warning[] = []
+
+  // `none` is already what a model without reasoning control does
+  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'reasoning',
+      details: 'ADK models do not support configuring reasoning.',
+    })
+  }
+
+  if (
+    options.toolChoice?.type === 'required' ||
+    options.toolChoice?.type === 'tool'
+  ) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'toolChoice',
+      details: 'ADK models only support auto and none tool choices.',
+    })
+  }
+
+  return warnings
+}
+
 const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
   let binary = ''
   for (let index = 0; index < bytes.length; index++) {
@@ -193,7 +224,8 @@ const normalizeFilePart = (
 
   return {
     data,
-    mediaType: part.mediaType,
+    // v4 allows top-level media types such as `image`, which Gemini rejects
+    mediaType: resolveFullMediaType({ part }),
   }
 }
 
@@ -485,12 +517,6 @@ class AdkChatLanguageModel implements LanguageModelV4 {
     const toolListener = this.createToolCallListener({ runId, ownedToolIds })
 
     try {
-      if (options.toolChoice && options.toolChoice.type === 'required') {
-        console.warn(
-          'ADK wrapper does not support required toolChoice yet. Defaulting to auto.'
-        )
-      }
-
       await this.ensureNanoPrepared()
 
       const response = await getNativeAdkEngine().generateText(
@@ -505,7 +531,7 @@ class AdkChatLanguageModel implements LanguageModelV4 {
         content: [{ type: 'text' as const, text: response.content }],
         finishReason: convertFinishReason(response.finishReason),
         usage: mapUsage(response.usage),
-        warnings: [],
+        warnings: getCallWarnings(options),
       }
     } finally {
       toolListener.remove()
@@ -521,6 +547,7 @@ class AdkChatLanguageModel implements LanguageModelV4 {
     const agentConfig = this.agentConfig
     const streamId = generateId()
     const ownedToolIds = new Set(preparedTools.map((tool) => tool.native.id))
+    const warnings = getCallWarnings(options)
 
     if (options.responseFormat?.type === 'json') {
       throw new Error('Streaming JSON responses is not yet supported by ADK.')
@@ -553,6 +580,8 @@ class AdkChatLanguageModel implements LanguageModelV4 {
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
+        controller.enqueue({ type: 'stream-start', warnings })
+
         const addListener = (listener: { remove(): void }) => {
           listeners.push(listener)
         }

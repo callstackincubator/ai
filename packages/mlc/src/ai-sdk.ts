@@ -7,7 +7,9 @@ import type {
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4ToolChoice,
+  SharedV4Warning,
 } from '@ai-sdk/provider'
+import { isCustomReasoning } from '@ai-sdk/provider-utils'
 
 import NativeMLCEngine, {
   DownloadProgress,
@@ -57,9 +59,7 @@ const convertToolChoice = (
   if (toolChoice.type === 'none' || toolChoice.type === 'auto') {
     return toolChoice.type
   }
-  console.warn(
-    `Unsupported toolChoice value: ${JSON.stringify(toolChoice)}. Defaulting to 'none'.`
-  )
+  // Reported in the call warnings
   return undefined
 }
 
@@ -80,6 +80,34 @@ const convertFinishReason = (
     unified,
     raw: finishReason,
   }
+}
+
+const getCallWarnings = (
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] => {
+  const warnings: SharedV4Warning[] = []
+
+  // `none` is already what a model without reasoning control does
+  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'reasoning',
+      details: 'MLC models do not support configuring reasoning.',
+    })
+  }
+
+  if (
+    options.toolChoice?.type === 'required' ||
+    options.toolChoice?.type === 'tool'
+  ) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'toolChoice',
+      details: 'MLC models only support auto and none tool choices.',
+    })
+  }
+
+  return warnings
 }
 
 class MlcChatLanguageModel implements LanguageModelV4 {
@@ -187,7 +215,7 @@ class MlcChatLanguageModel implements LanguageModelV4 {
           },
         },
       },
-      warnings: [],
+      warnings: getCallWarnings(options),
     }
   }
 
@@ -216,6 +244,7 @@ class MlcChatLanguageModel implements LanguageModelV4 {
       toolChoice: convertToolChoice(options.toolChoice),
     }
 
+    const warnings = getCallWarnings(options)
     let streamId: string | undefined
     let listeners: { remove(): void }[] = []
 
@@ -226,6 +255,8 @@ class MlcChatLanguageModel implements LanguageModelV4 {
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       async start(controller) {
+        controller.enqueue({ type: 'stream-start', warnings })
+
         try {
           const id = (streamId = await NativeMLCEngine.streamText(
             messages,
