@@ -24,14 +24,16 @@ const { text } = await generateText({
 
 ## Features
 
-- ✅ On-device Gemini Nano through ML Kit GenAI
+- ✅ On-device Gemini Nano through ML Kit GenAI, with model selection
 - ✅ Cloud Gemini through ADK `LlmAgent`
-- ✅ Device capability and readiness checks for Gemini Nano
+- ✅ Availability, download progress and token counting for Gemini Nano
 - ✅ Streaming
 - ✅ Tool calling, with the agent loop run natively by ADK
+- ✅ Structured outputs
+- ✅ Reasoning
 - ✅ Image prompts
-- ✅ JSON output (without schema constraints)
 - ✅ Token usage
+- ✅ Error codes
 
 ## Documentation
 
