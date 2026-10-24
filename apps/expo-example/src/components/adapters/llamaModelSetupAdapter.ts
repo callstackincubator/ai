@@ -36,6 +36,9 @@ export const createLlamaLanguageSetupAdapter = (
       icon: 'memory',
     },
     builtIn: false,
+    capabilities: {
+      imageInput: Boolean(projectorId),
+    },
     isAvailable(): Availability {
       const downloaded = files.every(isLlamaModelDownloaded)
       return downloaded ? 'yes' : 'availableForDownload'

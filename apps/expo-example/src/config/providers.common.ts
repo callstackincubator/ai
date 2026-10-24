@@ -22,6 +22,10 @@ export interface SetupAdapter<TModel> {
   }
   // Whether the model is built-in (true) or downloadable (false)
   builtIn: boolean
+  // Input types the model accepts besides text, omitted means text only
+  capabilities?: {
+    imageInput: boolean
+  }
   // Check if model is ready, unavailable, or downloadable
   isAvailable: () => Availability
   // Download the model with progress callback
