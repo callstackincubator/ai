@@ -1,5 +1,6 @@
 export type {
   AppleBuiltInTool,
+  AppleGuardrails,
   AppleImageModelOptions,
   AppleImagePersonalization,
   AppleImageStyle,

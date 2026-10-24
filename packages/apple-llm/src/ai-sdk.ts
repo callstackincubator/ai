@@ -49,6 +49,7 @@ export type AppleImageStyle =
   | 'sketch'
 export type AppleImagePersonalization = 'automatic' | 'disabled' | 'enabled'
 export type AppleReasoningLevel = 'light' | 'moderate' | 'deep'
+export type AppleGuardrails = 'default' | 'permissiveContentTransformations'
 
 export interface AppleProviderOptions {
   builtInTools?: AppleBuiltInTool[]
@@ -72,6 +73,7 @@ export interface AppleModelInfo {
 export interface AppleLanguageModelOptions {
   model?: AppleLanguageModelId
   availableTools?: AppleToolDefinitionSet
+  guardrails?: AppleGuardrails
 }
 
 type AppleMessageAttachment = {
@@ -255,6 +257,7 @@ function getImageModelFileUrlMediaType(url: string) {
 // instance and the reasoning level from the AI SDK `reasoning` call option
 interface AppleNativeOptions {
   model?: AppleLanguageModelId
+  guardrails?: AppleGuardrails
   reasoningLevel?: AppleReasoningLevel
   builtInTools?: AppleBuiltInTool[]
 }
@@ -268,6 +271,7 @@ function getAppleNativeOptions(
 
   return {
     model: defaults.model,
+    guardrails: defaults.guardrails,
     reasoningLevel: toAppleReasoningLevel(options.reasoning),
     builtInTools: appleOptions.builtInTools,
   }
@@ -323,6 +327,7 @@ function appendMessageContent(content: string, addition: string) {
 export function createAppleProvider({
   availableTools,
   model,
+  guardrails,
 }: AppleLanguageModelOptions = {}) {
   const createLanguageModel = (
     options: AppleLanguageModelId | AppleLanguageModelOptions = {}
@@ -332,6 +337,7 @@ export function createAppleProvider({
     return new AppleLLMChatLanguageModel({
       availableTools: modelOptions.availableTools ?? availableTools,
       model: modelOptions.model ?? model,
+      guardrails: modelOptions.guardrails ?? guardrails,
     })
   }
   const provider = function (

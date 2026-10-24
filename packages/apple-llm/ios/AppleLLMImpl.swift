@@ -453,11 +453,14 @@ public class AppleLLMImpl: NSObject {
     // requests work even when the on-device model is not available
     switch modelName {
     case "system":
-      guard SystemLanguageModel.default.availability == .available else {
+      let model = providerOptions["guardrails"] as? String == "permissiveContentTransformations"
+        ? SystemLanguageModel(guardrails: .permissiveContentTransformations)
+        : SystemLanguageModel.default
+      guard model.availability == .available else {
         throw AppleLLMError.modelUnavailable
       }
       return LanguageModelSession(
-        model: SystemLanguageModel.default,
+        model: model,
         tools: tools,
         transcript: transcript
       )

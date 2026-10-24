@@ -149,6 +149,27 @@ Call `apple.getModelInfo({ model: 'private-cloud-compute' })` before enabling
 this path. It requires iOS 27 APIs. When the Private Cloud Compute quota is
 reached, generation fails with `RATE_LIMITED`.
 
+## Guardrails
+
+Apple Foundation Models apply content guardrails to prompts and responses. Apps
+that transform legitimate but sensitive content, such as health or medical
+data, can hit guardrail violations with the default mode. Opt into
+Apple's permissive mode for those use cases:
+
+```typescript
+import { createAppleProvider } from '@react-native-ai/apple'
+
+const apple = createAppleProvider({
+  guardrails: 'permissiveContentTransformations',
+})
+```
+
+`apple({ guardrails: 'permissiveContentTransformations' })` sets it for a single
+model instance. Guardrails apply to the on-device `system` model only and are
+ignored by `private-cloud-compute`. See
+[Improving the safety of generative model output](https://developer.apple.com/documentation/foundationmodels/improving-the-safety-of-generative-model-output#Use-permissive-guardrail-mode-for-sensitive-content)
+for when this mode is appropriate.
+
 ## Reasoning Level
 
 On iOS 27 and newer, set how much reasoning the model should do before
