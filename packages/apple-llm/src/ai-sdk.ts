@@ -12,6 +12,7 @@ import type {
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4ToolResultOutput,
+  SharedV4Warning,
   SpeechModelV4,
   SpeechModelV4CallOptions,
   TranscriptionModelV4,
@@ -400,25 +401,36 @@ function getSnapshotDelta(previous: string, next: string) {
   return next.startsWith(previous) ? next.slice(previous.length) : next
 }
 
-type AppleToolCallingMode = 'allowed' | 'required' | 'disallowed'
-
 function prepareToolChoice(
   tools: Tool[] = [],
   toolChoice: LanguageModelV4CallOptions['toolChoice']
-): { tools: Tool[]; toolCallingMode?: AppleToolCallingMode } {
+): {
+  tools: Tool[]
+  toolCallingMode?: 'disallowed'
+  warnings: SharedV4Warning[]
+} {
+  // Apple runs tools natively in a loop and the required mode applies to every
+  // step of it, so the model would never stop calling tools to answer
+  const requiredWarning: SharedV4Warning = {
+    type: 'unsupported',
+    feature: 'toolChoice',
+    details:
+      'Apple Foundation Models run tools natively and cannot be required to call a tool.',
+  }
+
   switch (toolChoice?.type) {
     case 'none':
       // Also disables built-in tools on iOS 27
-      return { tools: [], toolCallingMode: 'disallowed' }
+      return { tools: [], toolCallingMode: 'disallowed', warnings: [] }
     case 'required':
-      return { tools, toolCallingMode: 'required' }
+      return { tools, warnings: [requiredWarning] }
     case 'tool':
       return {
         tools: tools.filter((tool) => tool.name === toolChoice.toolName),
-        toolCallingMode: 'required',
+        warnings: [requiredWarning],
       }
     default:
-      return { tools }
+      return { tools, warnings: [] }
   }
 }
 
@@ -777,10 +789,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   async doGenerate(options: LanguageModelV4CallOptions) {
     const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
-    const { tools: callTools, toolCallingMode } = prepareToolChoice(
-      options.tools,
-      options.toolChoice
-    )
+    const {
+      tools: callTools,
+      toolCallingMode,
+      warnings,
+    } = prepareToolChoice(options.tools, options.toolChoice)
     const tools = this.prepareTools(callTools)
 
     for (const tool of tools) {
@@ -847,7 +860,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             reasoning: undefined,
           },
         },
-        warnings: [],
+        warnings,
       }
     } finally {
       for (const tool of tools) {
@@ -859,10 +872,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   async doStream(options: LanguageModelV4CallOptions) {
     const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
-    const { tools: callTools, toolCallingMode } = prepareToolChoice(
-      options.tools,
-      options.toolChoice
-    )
+    const {
+      tools: callTools,
+      toolCallingMode,
+      warnings,
+    } = prepareToolChoice(options.tools, options.toolChoice)
     const tools = this.prepareTools(callTools)
 
     if (typeof ReadableStream === 'undefined') {
@@ -900,6 +914,8 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       async start(controller) {
         try {
           const id = (streamId = generateId())
+
+          controller.enqueue({ type: 'stream-start', warnings })
 
           let previousRawContent = ''
           let textStarted = false

@@ -240,25 +240,45 @@ describe('apple tool choice', () => {
     expect(nativeToolNames()).toEqual([])
   })
 
-  test('requires a tool call for required', async () => {
-    await apple().doGenerate(
+  // Apple runs tools natively in a loop, and the required mode applies to
+  // every step of it, so forcing a call never lets the model answer
+  const requiredWarning = {
+    type: 'unsupported',
+    feature: 'toolChoice',
+    details:
+      'Apple Foundation Models run tools natively and cannot be required to call a tool.',
+  }
+
+  test('warns that required tool choice is unsupported', async () => {
+    const result = await apple().doGenerate(
       createCallOptions({ tools, toolChoice: { type: 'required' } })
     )
 
-    expect(lastNativeOptions().toolCallingMode).toBe('required')
+    expect(lastNativeOptions().toolCallingMode).toBeUndefined()
     expect(nativeToolNames()).toEqual(['weather', 'time'])
+    expect(result.warnings).toEqual([requiredWarning])
   })
 
-  test('requires the named tool for a specific tool choice', async () => {
-    await apple().doGenerate(
+  test('narrows tools for a specific tool choice', async () => {
+    const result = await apple().doGenerate(
       createCallOptions({
         tools,
         toolChoice: { type: 'tool', toolName: 'time' },
       })
     )
 
-    expect(lastNativeOptions().toolCallingMode).toBe('required')
+    expect(lastNativeOptions().toolCallingMode).toBeUndefined()
     expect(nativeToolNames()).toEqual(['time'])
+    expect(result.warnings).toEqual([requiredWarning])
+  })
+
+  test('reports tool choice warnings in stream-start', async () => {
+    const { stream } = await apple().doStream(
+      createCallOptions({ tools, toolChoice: { type: 'required' } })
+    )
+
+    const { value } = await stream.getReader().read()
+    expect(value).toEqual({ type: 'stream-start', warnings: [requiredWarning] })
   })
 })
 
@@ -358,7 +378,11 @@ describe('apple generated content', () => {
     onStreamUpdate.emit({ streamId, content: 'It is sunny' })
     onStreamComplete.emit({ streamId })
 
-    expect((await parts).filter((part) => part.type !== 'finish')).toEqual([
+    expect(
+      (await parts).filter(
+        (part) => part.type !== 'stream-start' && part.type !== 'finish'
+      )
+    ).toEqual([
       { type: 'reasoning-start', id: 'r1' },
       { type: 'reasoning-delta', id: 'r1', delta: 'Let' },
       { type: 'reasoning-delta', id: 'r1', delta: ' me check' },
