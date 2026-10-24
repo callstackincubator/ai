@@ -1,12 +1,15 @@
 import {
   type LanguageModelV4CallOptions,
   type LanguageModelV4Prompt,
+  type SharedV4Warning,
   UnsupportedFunctionalityError,
 } from '@ai-sdk/provider'
 import {
   convertToBase64,
   getTopLevelMediaType,
+  isCustomReasoning,
   isFullMediaType,
+  mapReasoningToProviderBudget,
 } from '@ai-sdk/provider-utils'
 import type { CompletionParams } from 'llama.rn'
 
@@ -170,9 +173,59 @@ export function prepareMessagesWithMedia(
   return messages
 }
 
+/**
+ * Maps the provider-agnostic `reasoning` call option to llama.rn thinking
+ * params. Levels become a thinking token budget, sized from
+ * `maxOutputTokens` or, when that is not set, the context size.
+ */
+function getReasoningOptions(
+  options: LanguageModelV4CallOptions,
+  contextSize: number | undefined,
+  warnings: SharedV4Warning[]
+): Partial<CompletionParams> {
+  const { reasoning } = options
+
+  if (reasoning === 'none') {
+    return { enable_thinking: false }
+  }
+
+  if (!isCustomReasoning(reasoning)) {
+    // 'provider-default' keeps the chat template's default
+    return {}
+  }
+
+  const maxOutputTokens = options.maxOutputTokens ?? contextSize
+  if (!maxOutputTokens) {
+    return { enable_thinking: true }
+  }
+
+  return {
+    enable_thinking: true,
+    thinking_budget_tokens: mapReasoningToProviderBudget({
+      reasoning,
+      maxOutputTokens,
+      maxReasoningBudget: maxOutputTokens,
+      warnings,
+    }),
+  }
+}
+
+export interface LlamaCompletionSettings {
+  /**
+   * Context size of the loaded model, used to size the thinking budget when
+   * `maxOutputTokens` is not set
+   */
+  contextSize?: number
+  /**
+   * Collects call warnings
+   */
+  warnings?: SharedV4Warning[]
+}
+
 export function buildLlamaCompletionOptions(
   options: LanguageModelV4CallOptions,
-  messages: LLMMessage[]
+  messages: LLMMessage[],
+  { contextSize, warnings = [] }: LlamaCompletionSettings = {}
 ): Partial<CompletionParams> {
   const completionOptions: Partial<CompletionParams> = {
     messages,
@@ -185,6 +238,8 @@ export function buildLlamaCompletionOptions(
     stop: options.stopSequences,
     seed: options.seed,
     reasoning_format: 'auto',
+    ...getReasoningOptions(options, contextSize, warnings),
+    // providerOptions.llama takes precedence over the `reasoning` call option
     ...(options.providerOptions?.llama ?? {}),
   }
 
