@@ -31,6 +31,13 @@ public class AppleSpeechImpl: NSObject {
   
   @objc
   public func generateAudio(_ text: String, options: [String: Any], resolve: @escaping ([String: Any]) -> Void, reject: @escaping (String, String, Error?) -> Void) {
+    // AVSpeechSynthesizer never calls the write callback for empty or
+    // whitespace-only text, so the promise would never settle.
+    if text.unicodeScalars.allSatisfy({ $0.properties.isWhitespace }) {
+      resolve(AppleSpeechImpl.concatenatePCMDataWithFormat(from: []))
+      return
+    }
+
     let utterance = AVSpeechUtterance(string: text)
     
     utterance.voice = if let voiceId = options["voice"] as? String {
