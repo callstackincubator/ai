@@ -699,7 +699,11 @@ class AppleTextEmbeddingModel implements EmbeddingModelV4 {
 
 class AppleLLMChatLanguageModel implements AppleLanguageModel {
   readonly specificationVersion = 'v4'
-  readonly supportedUrls = {}
+  // Local and inline images are read natively. Without this, AI SDK 7 tries to
+  // download file:// URLs and rejects them
+  readonly supportedUrls = {
+    'image/*': [/^file:\/\//, /^data:image\//],
+  }
 
   readonly provider = 'apple'
   readonly modelId: string
