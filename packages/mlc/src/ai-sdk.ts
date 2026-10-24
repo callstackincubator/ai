@@ -7,7 +7,9 @@ import type {
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4ToolChoice,
+  SharedV4Warning,
 } from '@ai-sdk/provider'
+import { isCustomReasoning } from '@ai-sdk/provider-utils'
 
 import NativeMLCEngine, {
   DownloadProgress,
@@ -80,6 +82,21 @@ const convertFinishReason = (
     unified,
     raw: finishReason,
   }
+}
+
+const getCallWarnings = (
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] => {
+  if (isCustomReasoning(options.reasoning)) {
+    return [
+      {
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: 'MLC models do not support configuring reasoning.',
+      },
+    ]
+  }
+  return []
 }
 
 class MlcChatLanguageModel implements LanguageModelV4 {
@@ -187,7 +204,7 @@ class MlcChatLanguageModel implements LanguageModelV4 {
           },
         },
       },
-      warnings: [],
+      warnings: getCallWarnings(options),
     }
   }
 
@@ -216,6 +233,7 @@ class MlcChatLanguageModel implements LanguageModelV4 {
       toolChoice: convertToolChoice(options.toolChoice),
     }
 
+    const warnings = getCallWarnings(options)
     let streamId: string | undefined
     let listeners: { remove(): void }[] = []
 
@@ -226,6 +244,8 @@ class MlcChatLanguageModel implements LanguageModelV4 {
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       async start(controller) {
+        controller.enqueue({ type: 'stream-start', warnings })
+
         try {
           const id = (streamId = await NativeMLCEngine.streamText(
             messages,
