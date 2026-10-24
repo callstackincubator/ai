@@ -1,4 +1,4 @@
-import type { UnsafeObject } from 'react-native/Libraries/Types/CodegenTypes'
+import type { CodegenTypes } from 'react-native'
 
 export type CoreAIPlatform = 'iOS' | 'macOS'
 
@@ -66,7 +66,7 @@ export interface CoreAIModelInfo {
   }[]
   maxContextLength?: number
   modelSizeBytes?: number
-  metadata?: UnsafeObject
+  metadata?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAILoadedModel {
@@ -88,8 +88,8 @@ export interface CoreAIGenerationOptions {
   maxTokens?: number
   topP?: number
   topK?: number
-  schema?: UnsafeObject
-  tools?: UnsafeObject
+  schema?: CodegenTypes.UnsafeObject
+  tools?: CodegenTypes.UnsafeObject
 }
 
 export type CoreAIGenerationPart =
@@ -115,7 +115,7 @@ export interface CoreAIStreamErrorEvent {
 
 export interface CoreAIEmbeddingResult {
   embeddings: number[][]
-  metadata?: UnsafeObject
+  metadata?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAITranscriptionSegment {
@@ -129,7 +129,7 @@ export interface CoreAITranscriptionResult {
   segments: CoreAITranscriptionSegment[]
   language?: string
   durationInSeconds?: number
-  metadata?: UnsafeObject
+  metadata?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAIImageGenerationOptions {
@@ -148,7 +148,7 @@ export interface CoreAIImageGenerationOptions {
 
 export interface CoreAIImageGenerationResult {
   images: string[]
-  metadata?: UnsafeObject
+  metadata?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAITaskInput {
@@ -156,13 +156,13 @@ export interface CoreAITaskInput {
   audioUri?: string
   text?: string
   values?: string[]
-  data?: UnsafeObject
+  data?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAITaskResult {
   task: CoreAIModelTask
-  output: UnsafeObject
-  metadata?: UnsafeObject
+  output: CodegenTypes.UnsafeObject
+  metadata?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAICapabilities {

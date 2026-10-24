@@ -1,18 +1,18 @@
 import type {
-  EmbeddingModelV3,
-  EmbeddingModelV3CallOptions,
-  EmbeddingModelV3Result,
-  ImageModelV3,
-  ImageModelV3CallOptions,
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3FinishReason,
-  LanguageModelV3StreamPart,
-  TranscriptionModelV3,
-  TranscriptionModelV3CallOptions,
+  EmbeddingModelV4,
+  EmbeddingModelV4CallOptions,
+  EmbeddingModelV4Result,
+  ImageModelV4,
+  ImageModelV4CallOptions,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  LanguageModelV4FinishReason,
+  LanguageModelV4StreamPart,
+  TranscriptionModelV4,
+  TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
-import type { UnsafeObject } from 'react-native/Libraries/Types/CodegenTypes'
+import type { CodegenTypes } from 'react-native'
 
 import NativeCoreAI from './NativeCoreAI'
 import type {
@@ -70,8 +70,8 @@ export interface CoreAILanguageSession {
   close(): Promise<void>
 }
 
-export class CoreAILanguageModel implements LanguageModelV3 {
-  readonly specificationVersion = 'v3'
+export class CoreAILanguageModel implements LanguageModelV4 {
+  readonly specificationVersion = 'v4'
   readonly supportedUrls = {}
   readonly provider = 'core-ai'
   readonly modelId: string
@@ -94,7 +94,9 @@ export class CoreAILanguageModel implements LanguageModelV3 {
     ) as Promise<CoreAIModelInfo>
   }
 
-  async prepare(options: UnsafeObject = {}): Promise<CoreAIModelInfo> {
+  async prepare(
+    options: CodegenTypes.UnsafeObject = {}
+  ): Promise<CoreAIModelInfo> {
     const loadedModel = (await NativeCoreAI.loadModel(
       toNativeModelConfig(this.config),
       options
@@ -103,7 +105,9 @@ export class CoreAILanguageModel implements LanguageModelV3 {
     return loadedModel.info
   }
 
-  async specialize(options: UnsafeObject = {}): Promise<CoreAIModelInfo> {
+  async specialize(
+    options: CodegenTypes.UnsafeObject = {}
+  ): Promise<CoreAIModelInfo> {
     return NativeCoreAI.specializeModel(
       toNativeModelConfig(this.config),
       options
@@ -124,7 +128,7 @@ export class CoreAILanguageModel implements LanguageModelV3 {
   }
 
   async createSession(
-    options: UnsafeObject = {}
+    options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAILanguageSession> {
     const model = await this.ensureLoaded()
     const sessionHandle = await NativeCoreAI.createLanguageSession(
@@ -134,7 +138,7 @@ export class CoreAILanguageModel implements LanguageModelV3 {
     return createLanguageSession(sessionHandle)
   }
 
-  async doGenerate(options: LanguageModelV3CallOptions) {
+  async doGenerate(options: LanguageModelV4CallOptions) {
     const response = (await NativeCoreAI.generateText(
       toNativeModelConfig(this.config),
       prepareMessages(options.prompt),
@@ -149,7 +153,7 @@ export class CoreAILanguageModel implements LanguageModelV3 {
     }
   }
 
-  async doStream(options: LanguageModelV3CallOptions) {
+  async doStream(options: LanguageModelV4CallOptions) {
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
         'ReadableStream is not available. Load a web stream polyfill before streaming Core AI responses.'
@@ -164,7 +168,7 @@ export class CoreAILanguageModel implements LanguageModelV3 {
       listeners = []
     }
 
-    const stream = new ReadableStream<LanguageModelV3StreamPart>({
+    const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: (controller) => {
         controller.enqueue({ type: 'text-start', id: streamId })
 
@@ -237,8 +241,8 @@ export class CoreAILanguageModel implements LanguageModelV3 {
   }
 }
 
-export class CoreAITextEmbeddingModel implements EmbeddingModelV3 {
-  readonly specificationVersion = 'v3'
+export class CoreAITextEmbeddingModel implements EmbeddingModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'core-ai'
   readonly modelId: string
   readonly maxEmbeddingsPerCall = Infinity
@@ -252,7 +256,7 @@ export class CoreAITextEmbeddingModel implements EmbeddingModelV3 {
 
   async embed(
     values: string[],
-    options: UnsafeObject = {}
+    options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAIEmbeddingResult> {
     return NativeCoreAI.embed(
       toNativeModelConfig(this.config),
@@ -262,8 +266,8 @@ export class CoreAITextEmbeddingModel implements EmbeddingModelV3 {
   }
 
   async doEmbed(
-    options: EmbeddingModelV3CallOptions
-  ): Promise<EmbeddingModelV3Result> {
+    options: EmbeddingModelV4CallOptions
+  ): Promise<EmbeddingModelV4Result> {
     const result = await this.embed(options.values)
     return {
       embeddings: result.embeddings,
@@ -272,8 +276,8 @@ export class CoreAITextEmbeddingModel implements EmbeddingModelV3 {
   }
 }
 
-export class CoreAIImageGenerationModel implements ImageModelV3 {
-  readonly specificationVersion = 'v3'
+export class CoreAIImageGenerationModel implements ImageModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'core-ai'
   readonly modelId: string
   readonly maxImagesPerCall = 1
@@ -295,7 +299,7 @@ export class CoreAIImageGenerationModel implements ImageModelV3 {
     ) as Promise<CoreAIImageGenerationResult>
   }
 
-  async doGenerate(options: ImageModelV3CallOptions) {
+  async doGenerate(options: ImageModelV4CallOptions) {
     const result = await this.generate(options.prompt ?? '', {
       n: options.n,
       size: options.size,
@@ -324,8 +328,8 @@ export class CoreAIImageGenerationModel implements ImageModelV3 {
   }
 }
 
-export class CoreAITranscriptionModel implements TranscriptionModelV3 {
-  readonly specificationVersion = 'v3'
+export class CoreAITranscriptionModel implements TranscriptionModelV4 {
+  readonly specificationVersion = 'v4'
   readonly provider = 'core-ai'
   readonly modelId: string
   readonly config: CoreAIModelConfig
@@ -338,7 +342,7 @@ export class CoreAITranscriptionModel implements TranscriptionModelV3 {
   async transcribe(
     audio: Uint8Array | string,
     mediaType: string,
-    options: UnsafeObject = {}
+    options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAITranscriptionResult> {
     return NativeCoreAI.transcribe(
       toNativeModelConfig(this.config),
@@ -348,7 +352,7 @@ export class CoreAITranscriptionModel implements TranscriptionModelV3 {
     ) as Promise<CoreAITranscriptionResult>
   }
 
-  async doGenerate(options: TranscriptionModelV3CallOptions) {
+  async doGenerate(options: TranscriptionModelV4CallOptions) {
     const result = await this.transcribe(options.audio, options.mediaType, {
       ...(options.providerOptions?.['core-ai'] ?? {}),
     })
@@ -477,7 +481,7 @@ export function prepareMessages(messages: unknown): CoreAIMessage[] {
 }
 
 function toCoreAIGenerationOptions(
-  options: LanguageModelV3CallOptions
+  options: LanguageModelV4CallOptions
 ): CoreAIGenerationOptions {
   return {
     maxTokens: options.maxOutputTokens,
@@ -522,7 +526,7 @@ function toLanguageModelContent(part: CoreAIGenerationPart) {
 
 function toFinishReason(
   raw: 'stop' | 'length' | 'tool-calls' | 'error'
-): LanguageModelV3FinishReason {
+): LanguageModelV4FinishReason {
   return {
     unified: raw === 'tool-calls' ? 'tool-calls' : raw,
     raw,

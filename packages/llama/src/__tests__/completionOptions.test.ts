@@ -1,11 +1,11 @@
-import type { LanguageModelV3CallOptions } from '@ai-sdk/provider'
+import type { LanguageModelV4CallOptions } from '@ai-sdk/provider'
 import { describe, expect, test } from 'bun:test'
 
 import { buildLlamaCompletionOptions } from '../completionOptions'
 
 function createCallOptions(
   providerOptions?: Record<string, unknown>
-): LanguageModelV3CallOptions {
+): LanguageModelV4CallOptions {
   return {
     prompt: [
       {

@@ -1,4 +1,4 @@
-import type { LanguageModelV3StreamPart } from '@ai-sdk/provider'
+import type { LanguageModelV4StreamPart } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import type { TokenData } from 'llama.rn'
 
@@ -24,7 +24,7 @@ const MAX_PLACEHOLDER_LENGTH = Math.max(
 )
 
 export interface StreamPartSink {
-  enqueue: (part: LanguageModelV3StreamPart) => void
+  enqueue: (part: LanguageModelV4StreamPart) => void
 }
 
 export interface LlamaStreamParser {

@@ -1,13 +1,13 @@
 import type {
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3Message,
-  LanguageModelV3Prompt,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  LanguageModelV4Message,
+  LanguageModelV4Prompt,
 } from '@ai-sdk/provider'
 
 export interface HistorySummarizationOptions {
   threshold: number
-  model: LanguageModelV3
+  model: LanguageModelV4
 }
 
 export interface HistoryManagementOptions {
@@ -26,23 +26,23 @@ export interface HistoryManagementOptions {
 }
 
 type LanguageModelLikeResult = Awaited<
-  ReturnType<LanguageModelV3['doGenerate']>
+  ReturnType<LanguageModelV4['doGenerate']>
 >
 
-type TokenCountCapableLanguageModel = LanguageModelV3 & {
+type TokenCountCapableLanguageModel = LanguageModelV4 & {
   countTokens?: (text: string) => Promise<number>
 }
 
 type MessageContentPart = Extract<
-  LanguageModelV3Message['content'],
+  LanguageModelV4Message['content'],
   readonly unknown[]
 >[number]
 
 async function summarizePromptHistory(
-  prompt: LanguageModelV3Prompt,
+  prompt: LanguageModelV4Prompt,
   threshold: number,
-  summarizerModel: LanguageModelV3
-): Promise<LanguageModelV3Prompt> {
+  summarizerModel: LanguageModelV4
+): Promise<LanguageModelV4Prompt> {
   if (threshold <= 0) {
     return prompt
   }
@@ -73,7 +73,7 @@ async function summarizePromptHistory(
   const summaryResult = await summarizerModel.doGenerate({
     prompt: summaryPrompt,
     maxOutputTokens: 400,
-  } as LanguageModelV3CallOptions)
+  } as LanguageModelV4CallOptions)
   const summaryText = extractTextFromGenerationResult(summaryResult).trim()
 
   if (!summaryText) {
@@ -96,8 +96,8 @@ async function summarizePromptHistory(
 }
 
 async function countPromptTokens(
-  prompt: LanguageModelV3Prompt,
-  model: LanguageModelV3
+  prompt: LanguageModelV4Prompt,
+  model: LanguageModelV4
 ): Promise<number> {
   const serializedPrompt = serializePromptForSummary(prompt)
   const countTokens = (model as TokenCountCapableLanguageModel).countTokens
@@ -122,8 +122,8 @@ function estimateTokenCount(text: string): number {
 }
 
 function buildSummaryPrompt(
-  messages: LanguageModelV3Prompt
-): LanguageModelV3Prompt {
+  messages: LanguageModelV4Prompt
+): LanguageModelV4Prompt {
   return [
     {
       role: 'system',
@@ -142,7 +142,7 @@ function buildSummaryPrompt(
   ]
 }
 
-function serializePromptForSummary(messages: LanguageModelV3Prompt): string {
+function serializePromptForSummary(messages: LanguageModelV4Prompt): string {
   return messages
     .map((message) => {
       const content = Array.isArray(message.content)
@@ -187,9 +187,9 @@ function extractTextFromGenerationResult(
 }
 
 export function trimMessagesForHistory(
-  messages: LanguageModelV3Prompt,
+  messages: LanguageModelV4Prompt,
   options: HistoryManagementOptions = {}
-): LanguageModelV3Prompt {
+): LanguageModelV4Prompt {
   let nextMessages = messages
 
   if (options.dropCompletedToolCalls) {
@@ -213,8 +213,8 @@ export function trimMessagesForHistory(
 }
 
 function dropCompletedToolCallMessages(
-  messages: LanguageModelV3Prompt
-): LanguageModelV3Prompt {
+  messages: LanguageModelV4Prompt
+): LanguageModelV4Prompt {
   const lastToolRelatedIndex = findLastIndex(messages, isToolRelatedMessage)
 
   if (lastToolRelatedIndex === -1) {
@@ -251,7 +251,7 @@ function findLastIndex<T>(
   return -1
 }
 
-function isToolRelatedMessage(message: LanguageModelV3Message) {
+function isToolRelatedMessage(message: LanguageModelV4Message) {
   if (message.role === 'tool') {
     return true
   }
@@ -270,9 +270,9 @@ function isToolRelatedMessage(message: LanguageModelV3Message) {
 }
 
 export async function applyHistoryManagement(
-  prompt: LanguageModelV3Prompt,
+  prompt: LanguageModelV4Prompt,
   options: HistoryManagementOptions | undefined
-): Promise<LanguageModelV3Prompt> {
+): Promise<LanguageModelV4Prompt> {
   if (!options) {
     return prompt
   }
@@ -302,14 +302,14 @@ export async function applyHistoryManagement(
   return nextPrompt
 }
 
-export function wrapLanguageModelWithHistory<TModel extends LanguageModelV3>(
+export function wrapLanguageModelWithHistory<TModel extends LanguageModelV4>(
   model: TModel,
   options: HistoryManagementOptions
 ): TModel {
   return new Proxy(model, {
     get(target, prop, receiver) {
       if (prop === 'doGenerate') {
-        return async (callOptions: LanguageModelV3CallOptions) => {
+        return async (callOptions: LanguageModelV4CallOptions) => {
           const prompt = await applyHistoryManagement(
             callOptions.prompt,
             options
@@ -322,7 +322,7 @@ export function wrapLanguageModelWithHistory<TModel extends LanguageModelV3>(
       }
 
       if (prop === 'doStream') {
-        return async (callOptions: LanguageModelV3CallOptions) => {
+        return async (callOptions: LanguageModelV4CallOptions) => {
           const prompt = await applyHistoryManagement(
             callOptions.prompt,
             options
