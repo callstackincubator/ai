@@ -1,5 +1,9 @@
 # Core AI Provider
 
+<!-- Agent skill reference. Kept here, unlinked, while the package is unreleased.
+On release, move it back to skills/react-native-ai/references/core-ai-provider.md
+and add the Core AI route to skills/react-native-ai/SKILL.md and quick-start.md. -->
+
 ## Quick Command
 
 ```bash
@@ -23,7 +27,7 @@ const { text } = await generateText({ model, prompt: 'Hello' })
 
 - Run your own Apple Core AI model bundles (`.aimodel` / `.aimodelc`) exported from [`apple/coreai-models`](https://github.com/apple/coreai-models)
 - Need image generation (FLUX.2 / Sana Sprint), segmentation, or object detection with Core AI
-- DO NOT use for Apple Intelligence system models. Use [apple-provider](apple-provider.md) instead
+- DO NOT use for Apple Intelligence system models. Use [apple-provider](../../../skills/react-native-ai/references/apple-provider.md) instead
 
 ## Prerequisites
 
@@ -98,5 +102,5 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 
 ## Related Skills
 
-- [quick-start](quick-start.md)
-- [apple-provider](apple-provider.md)
+- [quick-start](../../../skills/react-native-ai/references/quick-start.md)
+- [apple-provider](../../../skills/react-native-ai/references/apple-provider.md)

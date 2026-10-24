@@ -79,7 +79,7 @@ Native-only API status:
 
 When the AI SDK owns message history, every request sends the whole chat. To
 keep it inside the context window, see
-[Conversation History](../history.md).
+[Conversation History](https://react-native-ai.dev/docs/history).
 
 ## Loading Models
 
@@ -87,4 +87,4 @@ Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them
 
 ## Starter Models
 
-The package does not ship a model catalog. The [starter models](./models) page is a reference list of models known to work; your app decides which models to bundle or download.
+The package does not ship a model catalog. The [starter models](./models.md) page is a reference list of models known to work; your app decides which models to bundle or download.
