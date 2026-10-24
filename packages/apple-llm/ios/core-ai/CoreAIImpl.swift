@@ -1062,10 +1062,20 @@ private struct LanguageModelRequest {
     self.session = LanguageModelSession(model: model, tools: [], transcript: transcript)
     self.prompt = prompt
     self.generationOptions = try AppleLLMImpl.createGenerationOptions(from: options)
-    self.contextOptions = try AppleLLMImpl.createContextOptions(
-      from: options["providerOptions"] as? [String: Any] ?? [:],
+    var providerOptions = options["providerOptions"] as? [String: Any] ?? [:]
+    let disablesReasoning = providerOptions["reasoningLevel"] as? String == "none"
+    if disablesReasoning {
+      providerOptions["reasoningLevel"] = nil
+    }
+    var contextOptions = try AppleLLMImpl.createContextOptions(
+      from: providerOptions,
       includeSchemaInPrompt: schema == nil ? nil : true
     )
+    // Core AI chat templates turn thinking off for the custom "none" effort
+    if disablesReasoning {
+      contextOptions.reasoningLevel = .custom("none")
+    }
+    self.contextOptions = contextOptions
     self.schema = schema
   }
 

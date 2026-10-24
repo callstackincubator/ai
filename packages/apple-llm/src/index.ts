@@ -36,6 +36,8 @@ export type {
   CoreAIModelSource,
   CoreAIModelTask,
   CoreAIPlatform,
+  CoreAIProviderOptions,
+  CoreAIReasoningLevel,
   CoreAITaskInput,
   CoreAITaskResult,
   CoreAITranscriptionResult,

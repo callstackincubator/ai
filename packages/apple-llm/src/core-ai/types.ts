@@ -91,6 +91,20 @@ export interface CoreAIGenerationOptions {
   maxTokens?: number
   // JSON schema of the structured output
   schema?: CodegenTypes.UnsafeObject
+  providerOptions?: { reasoningLevel?: CoreAIReasoningLevel }
+}
+
+/**
+ * Foundation Models reasoning level. Core AI maps it to the chat template's
+ * thinking effort, and `none` turns thinking off
+ */
+export type CoreAIReasoningLevel = 'none' | 'light' | 'moderate' | 'deep'
+
+/**
+ * Options under `providerOptions['core-ai']` of AI SDK calls
+ */
+export interface CoreAIProviderOptions {
+  reasoningLevel?: CoreAIReasoningLevel
 }
 
 export type CoreAIGenerationPart =

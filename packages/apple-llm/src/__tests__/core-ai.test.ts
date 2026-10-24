@@ -331,6 +331,7 @@ describe('core ai language model warnings', () => {
     expect(generateText.mock.calls[0]![3]).toEqual({
       maxTokens: undefined,
       temperature: undefined,
+      providerOptions: {},
     })
   })
 
@@ -425,27 +426,43 @@ describe('core ai structured output', () => {
   })
 })
 
-const reasoningWarning = {
-  type: 'unsupported',
-  feature: 'reasoning',
-  details: 'Core AI language models do not support configuring reasoning.',
+function lastReasoningLevel() {
+  return generateText.mock.calls.at(-1)![3].providerOptions?.reasoningLevel
 }
 
-describe('core ai reasoning warnings', () => {
-  test('warns that reasoning is unsupported', async () => {
+describe('core ai reasoning', () => {
+  test('forwards the reasoning call option as reasoningLevel', async () => {
     const result = await createModel().doGenerate(
       createCallOptions({ reasoning: 'high' })
     )
 
-    expect(result.warnings).toEqual([reasoningWarning])
+    expect(lastReasoningLevel()).toBe('deep')
+    expect(result.warnings).toEqual([])
   })
 
-  test('does not warn for provider-default or none reasoning', async () => {
-    for (const reasoning of ['provider-default', 'none'] as const) {
-      const result = await createModel().doGenerate(
-        createCallOptions({ reasoning })
-      )
-      expect(result.warnings).toEqual([])
-    }
+  test('forwards providerOptions core-ai reasoningLevel over reasoning', async () => {
+    await createModel().doGenerate(
+      createCallOptions({
+        reasoning: 'high',
+        providerOptions: { 'core-ai': { reasoningLevel: 'light' } },
+      })
+    )
+
+    expect(lastReasoningLevel()).toBe('light')
+  })
+
+  test('turns thinking off for reasoning none', async () => {
+    await createModel().doGenerate(createCallOptions({ reasoning: 'none' }))
+
+    expect(lastReasoningLevel()).toBe('none')
+  })
+
+  test('keeps the model default for provider-default reasoning', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({ reasoning: 'provider-default' })
+    )
+
+    expect(lastReasoningLevel()).toBeUndefined()
+    expect(result.warnings).toEqual([])
   })
 })
