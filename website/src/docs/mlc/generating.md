@@ -100,3 +100,9 @@ const result = await generateText({
   topP: 0.9,
 });
 ```
+
+:::tip Long conversations
+Every request sends the whole chat, which must fit the model's context window.
+To keep a rolling window and summarize older messages, wrap the model with
+`wrapLanguageModelWithHistory`. See [Conversation History](../history.md).
+:::

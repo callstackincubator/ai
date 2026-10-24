@@ -264,6 +264,12 @@ const { text } = await generateText({
 })
 ```
 
+:::tip Long conversations
+Gemini Nano has a small context window and every request sends the whole chat.
+To keep a rolling window and summarize older messages, wrap the model with
+`wrapLanguageModelWithHistory`. See [Conversation History](../history.md).
+:::
+
 ## Limitations
 
 The following features are not yet supported:

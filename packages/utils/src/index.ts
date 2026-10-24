@@ -6,21 +6,31 @@ import type {
 } from '@ai-sdk/provider'
 
 export interface HistorySummarizationOptions {
+  /**
+   * Prompt size in tokens above which turns before the latest user message
+   * are folded into the summary. Also caps the input of each summarizer call.
+   */
   threshold: number
+  /**
+   * Model that writes the summary. Its `countTokens` method, when it has one,
+   * measures the prompt.
+   */
   model: LanguageModelV4
 }
 
 export interface HistoryManagementOptions {
   /**
-   * Summarize older messages when the prompt token count exceeds the threshold.
+   * Summarize older messages instead of dropping them, and compact the prompt
+   * when it exceeds the token threshold.
    */
   summarizeHistory?: HistorySummarizationOptions
   /**
-   * Keep system messages and only the last N non-system messages.
+   * Keep system messages and the last N non-system messages. The latest user
+   * turn is always kept whole.
    */
   rollingWindowMessages?: number
   /**
-   * Remove completed tool-call/tool-result entries from older context.
+   * Remove tool calls and tool results of turns before the latest user message.
    */
   dropCompletedToolCalls?: boolean
 }
@@ -38,121 +48,262 @@ type MessageContentPart = Extract<
   readonly unknown[]
 >[number]
 
-async function summarizePromptHistory(
-  prompt: LanguageModelV4Prompt,
-  threshold: number,
-  summarizerModel: LanguageModelV4
-): Promise<LanguageModelV4Prompt> {
-  if (threshold <= 0) {
-    return prompt
-  }
+type SystemMessage = Extract<LanguageModelV4Message, { role: 'system' }>
 
-  const promptTokenCount = await countPromptTokens(prompt, summarizerModel)
-
-  if (promptTokenCount <= threshold) {
-    return prompt
-  }
-
-  const systemMessages = prompt.filter((message) => message.role === 'system')
-  const conversationMessages = prompt.filter(
-    (message) => message.role !== 'system'
-  )
-
-  if (conversationMessages.length <= 2) {
-    return prompt
-  }
-
-  const latestMessage = conversationMessages[conversationMessages.length - 1]
-  const messagesToSummarize = conversationMessages.slice(0, -1)
-
-  if (messagesToSummarize.length === 0) {
-    return prompt
-  }
-
-  const summaryPrompt = buildSummaryPrompt(messagesToSummarize)
-  const summaryResult = await summarizerModel.doGenerate({
-    prompt: summaryPrompt,
-    maxOutputTokens: 400,
-  } as LanguageModelV4CallOptions)
-  const summaryText = extractTextFromGenerationResult(summaryResult).trim()
-
-  if (!summaryText) {
-    return prompt
-  }
-
-  return [
-    ...systemMessages,
-    {
-      role: 'assistant',
-      content: [
-        {
-          type: 'text',
-          text: `Summary of earlier conversation:\n${summaryText}`,
-        },
-      ],
-    },
-    latestMessage,
-  ]
+interface CachedSummary {
+  messages: string[]
+  summary: string
 }
 
-async function countPromptTokens(
+const SUMMARY_MAX_OUTPUT_TOKENS = 400
+
+// Keyed by the summarizer model, so the summary survives wrapping the model
+// again for every request
+const summaryCache = new WeakMap<LanguageModelV4, CachedSummary>()
+
+interface HistorySplit {
+  systemMessages: SystemMessage[]
+  conversation: LanguageModelV4Message[]
+  windowStart: number
+  currentTurnStart: number
+}
+
+function splitHistory(
   prompt: LanguageModelV4Prompt,
+  options: HistoryManagementOptions
+): HistorySplit {
+  const messages = options.dropCompletedToolCalls
+    ? dropCompletedToolCallMessages(prompt)
+    : prompt
+  const systemMessages = messages.filter(
+    (message): message is SystemMessage => message.role === 'system'
+  )
+  const conversation = messages.filter((message) => message.role !== 'system')
+  const currentTurnStart = findCurrentTurnStart(conversation)
+  const windowStart =
+    options.rollingWindowMessages && options.rollingWindowMessages > 0
+      ? findWindowStart(
+          conversation,
+          currentTurnStart,
+          options.rollingWindowMessages
+        )
+      : 0
+
+  return { systemMessages, conversation, windowStart, currentTurnStart }
+}
+
+/**
+ * Index of the latest user message, where the turn being answered starts.
+ * Tool steps of that turn follow it and must stay together.
+ */
+function findCurrentTurnStart(messages: LanguageModelV4Message[]): number {
+  const index = findLastIndex(messages, (message) => message.role === 'user')
+  return index === -1 ? 0 : index
+}
+
+function findWindowStart(
+  conversation: LanguageModelV4Message[],
+  currentTurnStart: number,
+  windowSize: number
+): number {
+  let start = Math.max(
+    0,
+    Math.min(conversation.length - windowSize, currentTurnStart)
+  )
+
+  // Tool results whose call fell outside the window would be orphaned
+  while (start < currentTurnStart && conversation[start].role === 'tool') {
+    start += 1
+  }
+
+  return start
+}
+
+function dropCompletedToolCallMessages(
+  messages: LanguageModelV4Prompt
+): LanguageModelV4Prompt {
+  const currentTurnStart = findCurrentTurnStart(messages)
+
+  return messages.flatMap((message, index): LanguageModelV4Message[] => {
+    if (index >= currentTurnStart || message.role === 'system') {
+      return [message]
+    }
+
+    if (message.role === 'tool') {
+      return []
+    }
+
+    if (message.role !== 'assistant') {
+      return [message]
+    }
+
+    const content = message.content.filter(
+      (part) => part.type !== 'tool-call' && part.type !== 'tool-result'
+    )
+
+    return content.length > 0 ? [{ ...message, content }] : []
+  })
+}
+
+function findLastIndex<T>(
+  items: T[],
+  predicate: (item: T, index: number) => boolean
+) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index], index)) {
+      return index
+    }
+  }
+
+  return -1
+}
+
+async function countTokens(
+  text: string,
   model: LanguageModelV4
 ): Promise<number> {
-  const serializedPrompt = serializePromptForSummary(prompt)
+  if (!text.trim()) {
+    return 0
+  }
+
   const tokenCountModel = model as TokenCountCapableLanguageModel
 
   // Called on the model, since providers read their own state in countTokens
   if (typeof tokenCountModel.countTokens === 'function') {
     try {
-      return await tokenCountModel.countTokens(serializedPrompt)
+      return await tokenCountModel.countTokens(text)
     } catch {
-      return estimateTokenCount(serializedPrompt)
+      return estimateTokenCount(text)
     }
   }
 
-  return estimateTokenCount(serializedPrompt)
+  return estimateTokenCount(text)
 }
 
 function estimateTokenCount(text: string): number {
-  if (!text.trim()) {
-    return 0
-  }
-
   return Math.ceil(text.length / 4)
 }
 
+/**
+ * Folds messages into a running summary. The summary of an earlier call is
+ * reused when its messages are still the start of the history, so each new
+ * turn only summarizes what changed since.
+ */
+async function summarizeMessages(
+  messages: LanguageModelV4Message[],
+  { model, threshold }: HistorySummarizationOptions,
+  abortSignal: AbortSignal | undefined
+): Promise<string> {
+  const serialized = messages.map(serializeMessage)
+  const cached = summaryCache.get(model)
+  const reusable =
+    cached !== undefined &&
+    cached.messages.length <= serialized.length &&
+    cached.messages.every((message, index) => message === serialized[index])
+
+  let summary = reusable ? cached.summary : ''
+  const pending = serialized.slice(reusable ? cached.messages.length : 0)
+
+  // Summarize in chunks that fit the threshold, so a long history does not
+  // overflow the summarizer's own context
+  let chunk: string[] = []
+  let chunkTokens = await countTokens(summary, model)
+  for (const message of pending) {
+    const messageTokens = await countTokens(message, model)
+    if (chunk.length > 0 && chunkTokens + messageTokens > threshold) {
+      summary = await summarizeChunk(model, summary, chunk, abortSignal)
+      chunk = []
+      chunkTokens = await countTokens(summary, model)
+    }
+    chunk.push(message)
+    chunkTokens += messageTokens
+  }
+
+  if (chunk.length > 0) {
+    summary = await summarizeChunk(model, summary, chunk, abortSignal)
+  }
+
+  if (summary) {
+    summaryCache.set(model, { messages: serialized, summary })
+  }
+
+  return summary
+}
+
+async function summarizeChunk(
+  model: LanguageModelV4,
+  previousSummary: string,
+  messages: string[],
+  abortSignal: AbortSignal | undefined
+): Promise<string> {
+  const result = await model.doGenerate({
+    prompt: buildSummaryPrompt(previousSummary, messages),
+    maxOutputTokens: SUMMARY_MAX_OUTPUT_TOKENS,
+    abortSignal,
+  } as LanguageModelV4CallOptions)
+
+  return extractTextFromGenerationResult(result).trim() || previousSummary
+}
+
 function buildSummaryPrompt(
-  messages: LanguageModelV4Prompt
+  previousSummary: string,
+  messages: string[]
 ): LanguageModelV4Prompt {
+  const transcript = messages.join('\n\n')
+
   return [
     {
       role: 'system',
-      content:
-        'Summarize the conversation history for continued assistant use. Preserve user goals, constraints, factual details, decisions, unresolved questions, and tool outcomes. Be concise and structured.',
+      content: `Summarize the conversation history for continued assistant use. Preserve user goals, constraints, factual details, decisions, unresolved questions, and tool outcomes. Be concise and structured.${previousSummary ? ' Merge the existing summary and the new messages into one updated summary.' : ''}`,
     },
     {
       role: 'user',
       content: [
         {
           type: 'text',
-          text: serializePromptForSummary(messages),
+          text: previousSummary
+            ? `Existing summary:\n${previousSummary}\n\nNew messages:\n${transcript}`
+            : transcript,
         },
       ],
     },
   ]
 }
 
-function serializePromptForSummary(messages: LanguageModelV4Prompt): string {
-  return messages
-    .map((message) => {
-      const content = Array.isArray(message.content)
-        ? message.content.map(serializeMessageContentPart).join('\n')
-        : message.content
+/**
+ * Adds the summary to the last system message, since some chat templates
+ * accept only one
+ */
+function withSummary(
+  systemMessages: SystemMessage[],
+  summary: string
+): SystemMessage[] {
+  const summaryText = `Summary of earlier conversation:\n${summary}`
+  const lastSystemMessage = systemMessages[systemMessages.length - 1]
 
-      return `${message.role.toUpperCase()}: ${content}`
-    })
-    .join('\n\n')
+  if (!lastSystemMessage) {
+    return [{ role: 'system', content: summaryText }]
+  }
+
+  return [
+    ...systemMessages.slice(0, -1),
+    {
+      ...lastSystemMessage,
+      content: `${lastSystemMessage.content}\n\n${summaryText}`,
+    },
+  ]
+}
+
+function serializeMessages(messages: LanguageModelV4Message[]): string {
+  return messages.map(serializeMessage).join('\n\n')
+}
+
+function serializeMessage(message: LanguageModelV4Message): string {
+  const content = Array.isArray(message.content)
+    ? message.content.map(serializeMessageContentPart).join('\n')
+    : message.content
+
+  return `${message.role.toUpperCase()}: ${content}`
 }
 
 function serializeKnownMessageContentPart(
@@ -187,120 +338,66 @@ function extractTextFromGenerationResult(
     .join('')
 }
 
+/**
+ * Applies `dropCompletedToolCalls` and `rollingWindowMessages` without
+ * summarizing. Messages outside the window are dropped.
+ */
 export function trimMessagesForHistory(
   messages: LanguageModelV4Prompt,
   options: HistoryManagementOptions = {}
 ): LanguageModelV4Prompt {
-  let nextMessages = messages
-
-  if (options.dropCompletedToolCalls) {
-    nextMessages = dropCompletedToolCallMessages(nextMessages)
-  }
-
-  if (options.rollingWindowMessages && options.rollingWindowMessages > 0) {
-    const systemMessages = nextMessages.filter(
-      (message) => message.role === 'system'
-    )
-    const conversationMessages = nextMessages.filter(
-      (message) => message.role !== 'system'
-    )
-    nextMessages = [
-      ...systemMessages,
-      ...conversationMessages.slice(-options.rollingWindowMessages),
-    ]
-  }
-
-  return nextMessages
-}
-
-function dropCompletedToolCallMessages(
-  messages: LanguageModelV4Prompt
-): LanguageModelV4Prompt {
-  const lastToolRelatedIndex = findLastIndex(messages, isToolRelatedMessage)
-
-  if (lastToolRelatedIndex === -1) {
-    return messages
-  }
-
-  let latestToolExchangeStartIndex = lastToolRelatedIndex
-  while (
-    latestToolExchangeStartIndex > 0 &&
-    isToolRelatedMessage(messages[latestToolExchangeStartIndex - 1])
-  ) {
-    latestToolExchangeStartIndex -= 1
-  }
-
-  return messages.filter((message, index) => {
-    if (index >= latestToolExchangeStartIndex) {
-      return true
-    }
-
-    return !isToolRelatedMessage(message)
-  })
-}
-
-function findLastIndex<T>(
-  items: T[],
-  predicate: (item: T, index: number) => boolean
-) {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (predicate(items[index], index)) {
-      return index
-    }
-  }
-
-  return -1
-}
-
-function isToolRelatedMessage(message: LanguageModelV4Message) {
-  if (message.role === 'tool') {
-    return true
-  }
-
-  if (message.role !== 'assistant') {
-    return false
-  }
-
-  if (!Array.isArray(message.content)) {
-    return false
-  }
-
-  return message.content.some(
-    (part) => part.type === 'tool-call' || part.type === 'tool-result'
+  const { systemMessages, conversation, windowStart } = splitHistory(
+    messages,
+    options
   )
+
+  return [...systemMessages, ...conversation.slice(windowStart)]
 }
 
 export async function applyHistoryManagement(
   prompt: LanguageModelV4Prompt,
-  options: HistoryManagementOptions | undefined
+  options: HistoryManagementOptions | undefined,
+  abortSignal?: AbortSignal
 ): Promise<LanguageModelV4Prompt> {
   if (!options) {
     return prompt
   }
 
-  let nextPrompt = prompt
+  const { systemMessages, conversation, windowStart, currentTurnStart } =
+    splitHistory(prompt, options)
+  const summarizeHistory =
+    options.summarizeHistory && options.summarizeHistory.threshold > 0
+      ? options.summarizeHistory
+      : undefined
 
-  if (options.dropCompletedToolCalls) {
-    nextPrompt = trimMessagesForHistory(nextPrompt, {
-      dropCompletedToolCalls: true,
-    })
-  }
+  let keepFrom = windowStart
 
-  if (options.rollingWindowMessages && options.rollingWindowMessages > 0) {
-    nextPrompt = trimMessagesForHistory(nextPrompt, {
-      rollingWindowMessages: options.rollingWindowMessages,
-    })
-  }
-
-  if (options.summarizeHistory) {
-    nextPrompt = await summarizePromptHistory(
-      nextPrompt,
-      options.summarizeHistory.threshold,
-      options.summarizeHistory.model
+  if (summarizeHistory && keepFrom < currentTurnStart) {
+    const promptTokenCount = await countTokens(
+      serializeMessages([...systemMessages, ...conversation.slice(keepFrom)]),
+      summarizeHistory.model
     )
+    if (promptTokenCount > summarizeHistory.threshold) {
+      keepFrom = currentTurnStart
+    }
   }
 
-  return nextPrompt
+  const keptMessages = conversation.slice(keepFrom)
+
+  if (!summarizeHistory || keepFrom === 0) {
+    return [...systemMessages, ...keptMessages]
+  }
+
+  const summary = await summarizeMessages(
+    conversation.slice(0, keepFrom),
+    summarizeHistory,
+    abortSignal
+  )
+
+  return [
+    ...(summary ? withSummary(systemMessages, summary) : systemMessages),
+    ...keptMessages,
+  ]
 }
 
 export function wrapLanguageModelWithHistory<TModel extends LanguageModelV4>(
@@ -313,7 +410,8 @@ export function wrapLanguageModelWithHistory<TModel extends LanguageModelV4>(
         return async (callOptions: LanguageModelV4CallOptions) => {
           const prompt = await applyHistoryManagement(
             callOptions.prompt,
-            options
+            options,
+            callOptions.abortSignal
           )
           return target.doGenerate.call(target, {
             ...callOptions,
@@ -326,7 +424,8 @@ export function wrapLanguageModelWithHistory<TModel extends LanguageModelV4>(
         return async (callOptions: LanguageModelV4CallOptions) => {
           const prompt = await applyHistoryManagement(
             callOptions.prompt,
-            options
+            options,
+            callOptions.abortSignal
           )
           return target.doStream.call(target, {
             ...callOptions,

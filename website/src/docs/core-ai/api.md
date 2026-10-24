@@ -73,6 +73,10 @@ Native-only API status:
 | Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Throws unsupported error                | AI SDK has no image-to-image upscaling primitive.                          |
 | Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Throws unsupported error                | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
 
+When the AI SDK owns message history, every request sends the whole chat. To
+keep it inside the context window, see
+[Conversation History](../history.md).
+
 ## Loading Models
 
 Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
