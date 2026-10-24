@@ -292,6 +292,7 @@ function mergeAppleProviderOptions(
 ): AppleProviderOptions {
   return {
     model: callOptions.model ?? defaults.model,
+    reasoningLevel: callOptions.reasoningLevel,
     builtInTools: callOptions.builtInTools,
   }
 }
