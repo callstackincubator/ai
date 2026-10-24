@@ -14,11 +14,20 @@ export type {
   AppleToolDefinitionSet,
 } from './ai-sdk'
 export { apple, createAppleProvider } from './ai-sdk'
+// Foundation Models helpers shared with @react-native-ai/core-ai, whose language
+// models run through the same LanguageModelSession. Not a stable public API
+export type { AppleStreamEntry } from './ai-sdk'
+export {
+  createSnapshotStreamHandler,
+  prepareAppleMessages,
+  toAppleReasoningLevel,
+} from './ai-sdk'
 export { default as AppleFoundationModels } from './AppleFoundationModels'
 export type { AppleLLMError, AppleLLMErrorCode } from './errors'
 export { AppleLLMErrorCodes } from './errors'
 export { default as AppleEmbeddings } from './NativeAppleEmbeddings'
-export { default as AppleSpeech, VoiceInfo } from './NativeAppleSpeech'
+export type { VoiceInfo } from './NativeAppleSpeech'
+export { default as AppleSpeech } from './NativeAppleSpeech'
 export { default as AppleTranscription } from './NativeAppleTranscription'
 export { default as AppleUtils } from './NativeAppleUtils'
 export { addWAVHeader, AudioFormatType } from './utils'
