@@ -208,15 +208,15 @@ public class AppleLLMImpl: NSObject {
         do {
           let providerOptions = self.createProviderOptions(from: options)
           let tools = try self.createTools(from: options, providerOptions: providerOptions, toolInvoker: toolInvoker)
-          let (transcript, userPrompt, promptAttachments) = try self.createTranscriptAndPrompt(
+          let (transcript, userPrompt, promptAttachments) = try Self.createTranscriptAndPrompt(
             from: messages,
             tools: tools
           )
 
           let session = try self.createSession(providerOptions: providerOptions, tools: tools, transcript: transcript)
 
-          let generationOptions = try self.createGenerationOptions(from: options)
-          let generationSchema = try self.createGenerationSchema(from: options)
+          let generationOptions = try Self.createGenerationOptions(from: options)
+          let generationSchema = try Self.createGenerationSchema(from: options)
 
           do {
             let response = try await self.respond(
@@ -267,15 +267,15 @@ public class AppleLLMImpl: NSObject {
         do {
           let providerOptions = self.createProviderOptions(from: options)
           let tools = try self.createTools(from: options, providerOptions: providerOptions, toolInvoker: toolInvoker)
-          let (transcript, userPrompt, promptAttachments) = try self.createTranscriptAndPrompt(
+          let (transcript, userPrompt, promptAttachments) = try Self.createTranscriptAndPrompt(
             from: messages,
             tools: tools
           )
 
           let session = try self.createSession(providerOptions: providerOptions, tools: tools, transcript: transcript)
 
-          let generationOptions = try self.createGenerationOptions(from: options)
-          let generationSchema = try self.createGenerationSchema(from: options)
+          let generationOptions = try Self.createGenerationOptions(from: options)
+          let generationSchema = try Self.createGenerationSchema(from: options)
 
           do {
             try await self.streamResponse(
@@ -492,7 +492,7 @@ public class AppleLLMImpl: NSObject {
   ) async throws -> [[String: Any]] {
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
-      let contextOptions = try createContextOptions(
+      let contextOptions = try Self.createContextOptions(
         from: providerOptions,
         includeSchemaInPrompt: generationSchema == nil ? nil : true
       )
@@ -559,7 +559,7 @@ public class AppleLLMImpl: NSObject {
   ) async throws {
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
-      let contextOptions = try createContextOptions(
+      let contextOptions = try Self.createContextOptions(
         from: providerOptions,
         includeSchemaInPrompt: generationSchema == nil ? nil : true
       )
@@ -632,7 +632,8 @@ public class AppleLLMImpl: NSObject {
 
 #if compiler(>=6.4)
   @available(iOS 27, *)
-  private func createContextOptions(
+  // Shared with CoreAIImpl, which drives the same LanguageModelSession
+  static func createContextOptions(
     from providerOptions: [String: Any],
     includeSchemaInPrompt: Bool?
   ) throws -> ContextOptions {
@@ -643,7 +644,7 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 27, *)
-  private func createReasoningLevel(from providerOptions: [String: Any]) throws -> ContextOptions.ReasoningLevel? {
+  static func createReasoningLevel(from providerOptions: [String: Any]) throws -> ContextOptions.ReasoningLevel? {
     guard let reasoningLevel = providerOptions["reasoningLevel"] as? String else {
       return nil
     }
@@ -712,7 +713,7 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 26, *)
-  private func createGenerationSchema(from options: [String: Any]) throws -> GenerationSchema? {
+  static func createGenerationSchema(from options: [String: Any]) throws -> GenerationSchema? {
     guard let schemaOption = options["schema"] as? [String: Any] else {
       return nil
     }
@@ -791,7 +792,7 @@ public class AppleLLMImpl: NSObject {
   }
   
   @available(iOS 26, *)
-  private func createTranscriptAndPrompt(
+  static func createTranscriptAndPrompt(
     from messages: [[String: Any]],
     tools: [any Tool]
   ) throws -> (Transcript, String, [[String: Any]]) {
@@ -868,7 +869,7 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 26, *)
-  private func createTranscriptEntries(from parts: [[String: Any]]) throws -> [Transcript.Entry] {
+  static func createTranscriptEntries(from parts: [[String: Any]]) throws -> [Transcript.Entry] {
     var entries: [Transcript.Entry] = []
     var pendingText: [String] = []
     var pendingToolCalls: [Transcript.ToolCall] = []
@@ -1157,7 +1158,7 @@ public class AppleLLMImpl: NSObject {
   }
   
   @available(iOS 26, *)
-  private func createGenerationOptions(from options: [String: Any]) throws -> GenerationOptions {
+  static func createGenerationOptions(from options: [String: Any]) throws -> GenerationOptions {
     var temperature: Double?
     var maximumResponseTokens: Int?
     var samplingMode: GenerationOptions.SamplingMode = .greedy
@@ -1215,7 +1216,7 @@ public class AppleLLMImpl: NSObject {
 
 #if compiler(>=6.4)
   @available(iOS 27, *)
-  private func createToolCallingMode(from toolCallingMode: String?) throws -> GenerationOptions.ToolCallingMode? {
+  static func createToolCallingMode(from toolCallingMode: String?) throws -> GenerationOptions.ToolCallingMode? {
     guard let toolCallingMode else {
       return nil
     }
