@@ -51,8 +51,6 @@ export type AppleImagePersonalization = 'automatic' | 'disabled' | 'enabled'
 export type AppleReasoningLevel = 'light' | 'moderate' | 'deep'
 
 export interface AppleProviderOptions {
-  model?: AppleLanguageModelId
-  reasoningLevel?: AppleReasoningLevel
   builtInTools?: AppleBuiltInTool[]
   style?: AppleImageStyle
   personalization?: AppleImagePersonalization
@@ -253,18 +251,26 @@ function getImageModelFileUrlMediaType(url: string) {
   return mediaType?.toLowerCase() ?? 'image/png'
 }
 
-function getAppleProviderOptions(
+// Options read by the native module. The model comes from the language model
+// instance and the reasoning level from the AI SDK `reasoning` call option
+interface AppleNativeOptions {
+  model?: AppleLanguageModelId
+  reasoningLevel?: AppleReasoningLevel
+  builtInTools?: AppleBuiltInTool[]
+}
+
+function getAppleNativeOptions(
+  defaults: AppleLanguageModelOptions,
   options: LanguageModelV4CallOptions
-): AppleProviderOptions {
+): AppleNativeOptions {
   const appleOptions = (options.providerOptions?.apple ??
     {}) as AppleProviderOptions
 
-  // providerOptions.apple.reasoningLevel takes precedence over the
-  // provider-agnostic `reasoning` call option
-  const reasoningLevel =
-    appleOptions.reasoningLevel ?? toAppleReasoningLevel(options.reasoning)
-
-  return reasoningLevel ? { ...appleOptions, reasoningLevel } : appleOptions
+  return {
+    model: defaults.model,
+    reasoningLevel: toAppleReasoningLevel(options.reasoning),
+    builtInTools: appleOptions.builtInTools,
+  }
 }
 
 function toAppleReasoningLevel(
@@ -283,16 +289,6 @@ function toAppleReasoningLevel(
     default:
       // 'provider-default' and 'none' keep Apple's default behavior
       return undefined
-  }
-}
-
-function mergeAppleProviderOptions(
-  defaults: AppleLanguageModelOptions,
-  callOptions: AppleProviderOptions
-): AppleProviderOptions {
-  return {
-    model: callOptions.model ?? defaults.model,
-    builtInTools: callOptions.builtInTools,
   }
 }
 
@@ -329,14 +325,18 @@ export function createAppleProvider({
   model,
 }: AppleLanguageModelOptions = {}) {
   const createLanguageModel = (
-    options: AppleLanguageModelOptions = {}
+    options: AppleLanguageModelId | AppleLanguageModelOptions = {}
   ): AppleLanguageModel => {
+    const modelOptions =
+      typeof options === 'string' ? { model: options } : options
     return new AppleLLMChatLanguageModel({
-      availableTools: options.availableTools ?? availableTools,
-      model: options.model ?? model,
+      availableTools: modelOptions.availableTools ?? availableTools,
+      model: modelOptions.model ?? model,
     })
   }
-  const provider = function (options: AppleLanguageModelOptions = {}) {
+  const provider = function (
+    options: AppleLanguageModelId | AppleLanguageModelOptions = {}
+  ) {
     return createLanguageModel(options)
   }
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
@@ -660,10 +660,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doGenerate(options: LanguageModelV4CallOptions) {
-    const appleOptions = mergeAppleProviderOptions(
-      this.options,
-      getAppleProviderOptions(options)
-    )
+    const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 
@@ -732,10 +729,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doStream(options: LanguageModelV4CallOptions) {
-    const appleOptions = mergeAppleProviderOptions(
-      this.options,
-      getAppleProviderOptions(options)
-    )
+    const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
     const tools = this.prepareTools(options.tools)
 

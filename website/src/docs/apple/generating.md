@@ -125,22 +125,17 @@ tools.
 ## Private Cloud Compute
 
 The default `apple()` model uses `SystemLanguageModel.default`. On iOS 27 and
-newer, choose Apple's Private Cloud Compute language model with provider
-options:
+newer, choose Apple's Private Cloud Compute language model by its model ID:
 
 ```typescript
 const result = await generateText({
-  model: apple(),
+  model: apple('private-cloud-compute'),
   prompt: 'Analyze this longer task with more reasoning.',
-  providerOptions: {
-    apple: {
-      model: 'private-cloud-compute',
-    },
-  },
 })
 ```
 
-You can also create a provider with a default model:
+`apple({ model: 'private-cloud-compute' })` is equivalent. You can also create a
+provider with a default model:
 
 ```typescript
 import { createAppleProvider } from '@react-native-ai/apple'
@@ -157,21 +152,21 @@ reached, generation fails with `RATE_LIMITED`.
 ## Reasoning Level
 
 On iOS 27 and newer, set how much reasoning the model should do before
-answering:
+answering with the AI SDK `reasoning` call option:
 
 ```typescript
 const result = await generateText({
   model: apple(),
   prompt: 'Plan a three-day trip to Kyoto.',
-  providerOptions: {
-    apple: {
-      reasoningLevel: 'moderate', // 'light' | 'moderate' | 'deep'
-    },
-  },
+  reasoning: 'medium',
 })
 ```
 
-Setting `reasoningLevel` on older iOS versions fails with `UNSUPPORTED_OS`.
+Apple has three reasoning levels. `minimal` and `low` map to `light`, `medium`
+to `moderate`, and `high` and above to `deep`. `none` and `provider-default`
+keep Apple's default.
+
+Setting `reasoning` on older iOS versions fails with `UNSUPPORTED_OS`.
 
 ## Image Prompts
 
