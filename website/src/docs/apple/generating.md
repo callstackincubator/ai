@@ -167,6 +167,13 @@ to `moderate`, and `high` and above to `deep`. `none` and `provider-default`
 keep Apple's default.
 
 Setting `reasoning` on older iOS versions fails with `UNSUPPORTED_OS`.
+The on-device system model can reject reasoning levels as an unsupported
+capability; Private Cloud Compute supports them.
+
+Reasoning is returned as `reasoning` content (streamed as reasoning parts on
+iOS 27). Its `providerMetadata.apple` marks it as Apple reasoning, so it is
+replayed in later turns; reasoning from other providers is left out of the
+transcript.
 
 ## Image Prompts
 
@@ -283,7 +290,6 @@ Important Apple-specific behavior:
 - Tool calls are provider-executed, so AI SDK step callbacks such as
   `stopWhen`, `onStepStart`, and `onStepEnd` do not run for native Apple
   tool execution.
-- Apple does not provide stable tool call IDs; the provider returns empty IDs.
 - You can update the registered tools on a model instance with
   `model.updateTools(...)` before generation.
 
