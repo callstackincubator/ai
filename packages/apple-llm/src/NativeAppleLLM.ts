@@ -5,6 +5,8 @@ export interface AppleMessage {
   role: 'assistant' | 'system' | 'tool' | 'user'
   content: string
   attachments?: CodegenTypes.UnsafeObject[]
+  // Structured assistant and tool content replayed as transcript entries
+  parts?: CodegenTypes.UnsafeObject[]
 }
 
 export interface AppleGenerationOptions {
