@@ -1112,4 +1112,5 @@ declare global {
   var __APPLE_LLM_TOOLS__: Record<string, Function>
 }
 
-globalThis.__APPLE_LLM_TOOLS__ = {}
+// Keep tools in flight when the module is evaluated again, e.g. on Fast Refresh
+globalThis.__APPLE_LLM_TOOLS__ ??= {}
