@@ -1,4 +1,7 @@
-import type { LanguageModelV4StreamPart } from '@ai-sdk/provider'
+import type {
+  LanguageModelV4CallOptions,
+  LanguageModelV4StreamPart,
+} from '@ai-sdk/provider'
 import { describe, expect, mock, test } from 'bun:test'
 
 type Listener = (event: Record<string, unknown>) => void
@@ -22,6 +25,7 @@ const streamText = mock((_streamId: string) => {})
 mock.module('react-native', () => ({
   TurboModuleRegistry: {
     getEnforcing: () => ({
+      generateText: async () => [{ type: 'text', text: 'ok' }],
       streamText,
       cancelStream: () => {},
       onStreamUpdate,
@@ -64,5 +68,52 @@ describe('core ai language model', () => {
       .map((part) => part.delta)
 
     expect(deltas).toEqual(['Hel', 'lo', ' world'])
+  })
+})
+
+const reasoningWarning = {
+  type: 'unsupported',
+  feature: 'reasoning',
+  details: 'Core AI language models do not support configuring reasoning.',
+}
+
+function createCallOptions(
+  overrides: Partial<LanguageModelV4CallOptions> = {}
+): LanguageModelV4CallOptions {
+  return {
+    prompt: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+    ...overrides,
+  }
+}
+
+describe('core ai language model warnings', () => {
+  const model = coreAI({ id: 'model', source: { type: 'bundle', name: 'm' } })
+
+  test('warns that reasoning is unsupported in doGenerate', async () => {
+    const result = await model.doGenerate(
+      createCallOptions({ reasoning: 'high' })
+    )
+
+    expect(result.warnings).toEqual([reasoningWarning])
+  })
+
+  test('warns that reasoning is unsupported in doStream', async () => {
+    const { stream } = await model.doStream(
+      createCallOptions({ reasoning: 'high' })
+    )
+
+    const { value } = await stream.getReader().read()
+    expect(value).toEqual({
+      type: 'stream-start',
+      warnings: [reasoningWarning],
+    })
+  })
+
+  test('does not warn for provider-default reasoning', async () => {
+    const result = await model.doGenerate(
+      createCallOptions({ reasoning: 'provider-default' })
+    )
+
+    expect(result.warnings).toEqual([])
   })
 })
