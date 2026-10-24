@@ -10,7 +10,7 @@ Use `@react-native-ai/apple` for Apple system models. Use `@react-native-ai/core
 npm install @react-native-ai/core-ai
 ```
 
-If you use the AI SDK, install `ai` v6 and the required polyfills:
+If you use the AI SDK, install `ai` v7 and the required polyfills:
 
 ```bash
 npm install ai

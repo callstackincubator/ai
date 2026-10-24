@@ -16,7 +16,8 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 | React Native AI | AI SDK |
 | --------------- | ------ |
 | 0.11 and below  | v5     |
-| 0.12 and above  | v6     |
+| 0.12            | v6     |
+| 0.13 and above  | v7     |
 
 ## DevTools
 
