@@ -47,17 +47,28 @@ Pod::Spec.new do |s|
   
   # User target configuration to ensure static libraries are force loaded
   s.user_target_xcconfig = {
-    'OTHER_LDFLAGS' => [
+    'OTHER_LDFLAGS[sdk=iphoneos*]' => [
       '$(inherited)',
       '-ObjC',
-      "-force_load \"#{package_path}/prebuilt/ios/lib/libmodel_iphone.a\"",
-      "-force_load \"#{package_path}/prebuilt/ios/lib/libmlc_llm.a\"",
-      "-force_load \"#{package_path}/prebuilt/ios/lib/libtvm_runtime.a\"",
-      "-force_load \"#{package_path}/prebuilt/ios/lib/libtvm_ffi_static.a\"",
-      "-force_load \"#{package_path}/prebuilt/ios/lib/libsentencepiece.a\"",
-      "-force_load \"#{package_path}/prebuilt/ios/lib/libtokenizers_cpp.a\"",
-      "-force_load \"#{package_path}/prebuilt/ios/lib/libtokenizers_c.a\""
-    ].join(' ')
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphone/libmodel_iphone.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphone/libmlc_llm.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphone/libtvm_runtime.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphone/libtvm_ffi_static.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphone/libsentencepiece.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphone/libtokenizers_cpp.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphone/libtokenizers_c.a\""
+    ].join(' '),
+    'OTHER_LDFLAGS[sdk=iphonesimulator*]' => [
+      '$(inherited)',
+      '-ObjC',
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphonesim/libmodel_iphone.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphonesim/libmlc_llm.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphonesim/libtvm_runtime.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphonesim/libtvm_ffi_static.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphonesim/libsentencepiece.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphonesim/libtokenizers_cpp.a\"",
+      "-force_load \"#{package_path}/prebuilt/ios/lib_iphonesim/libtokenizers_c.a\""
+    ].join(' '),
   }
   
   # Framework dependencies
