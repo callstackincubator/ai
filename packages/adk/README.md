@@ -56,7 +56,7 @@ const { text } = await generateText({
 - Post-generation token usage via ADK `UsageMetadata`
 - Multimodal user prompts (text + inline images)
 - Structured JSON output via `responseMimeType` (schema constraints not yet supported)
-- Vercel AI SDK v7 `LanguageModelV3` provider
+- Vercel AI SDK v7 `LanguageModelV4` provider
 
 ## Usage metadata
 
