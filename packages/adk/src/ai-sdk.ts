@@ -8,9 +8,11 @@ import type {
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
+  SharedV4Warning,
 } from '@ai-sdk/provider'
 import {
   generateId,
+  isCustomReasoning,
   jsonSchema,
   parseJSON,
   resolveFullMediaType,
@@ -168,6 +170,21 @@ const schemaPropertyToAdkParameter = (
     type: (schema?.type as AdkToolParameter['type']) ?? 'string',
     required,
   }
+}
+
+const getCallWarnings = (
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] => {
+  if (isCustomReasoning(options.reasoning)) {
+    return [
+      {
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: 'ADK models do not support configuring reasoning.',
+      },
+    ]
+  }
+  return []
 }
 
 const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
@@ -507,7 +524,7 @@ class AdkChatLanguageModel implements LanguageModelV4 {
         content: [{ type: 'text' as const, text: response.content }],
         finishReason: convertFinishReason(response.finishReason),
         usage: mapUsage(response.usage),
-        warnings: [],
+        warnings: getCallWarnings(options),
       }
     } finally {
       toolListener.remove()
@@ -523,6 +540,7 @@ class AdkChatLanguageModel implements LanguageModelV4 {
     const agentConfig = this.agentConfig
     const streamId = generateId()
     const ownedToolIds = new Set(preparedTools.map((tool) => tool.native.id))
+    const warnings = getCallWarnings(options)
 
     if (options.responseFormat?.type === 'json') {
       throw new Error('Streaming JSON responses is not yet supported by ADK.')
@@ -555,6 +573,8 @@ class AdkChatLanguageModel implements LanguageModelV4 {
 
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
+        controller.enqueue({ type: 'stream-start', warnings })
+
         const addListener = (listener: { remove(): void }) => {
           listeners.push(listener)
         }
