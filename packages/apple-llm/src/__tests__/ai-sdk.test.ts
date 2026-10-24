@@ -234,6 +234,32 @@ describe('apple image history', () => {
   })
 })
 
+describe('apple image urls', () => {
+  test('passes local file image urls through instead of downloading them', async () => {
+    const { generateText: generate } = await import('ai')
+
+    await generate({
+      model: apple(),
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'what is this?' },
+            { type: 'image', image: new URL('file:///tmp/photo.jpg') },
+          ],
+        },
+      ],
+    })
+
+    const [message] = generateText.mock.calls.at(-1)![0] as {
+      attachments: unknown[]
+    }[]
+    expect(message.attachments).toEqual([
+      expect.objectContaining({ url: 'file:///tmp/photo.jpg' }),
+    ])
+  })
+})
+
 describe('apple tool choice', () => {
   const tools: LanguageModelV4CallOptions['tools'] = [
     {
