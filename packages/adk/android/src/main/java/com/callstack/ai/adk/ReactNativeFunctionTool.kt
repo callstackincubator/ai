@@ -85,7 +85,7 @@ class ReactNativeFunctionTool(
     )
   }
 
-  override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any {
+  override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
     val toolCallId = UUID.randomUUID().toString()
     val argumentsJson = AdkJson.encode(args)
     onToolCall(toolCallId, toolId, argumentsJson, toolCallScope)
