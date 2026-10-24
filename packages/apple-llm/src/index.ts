@@ -1,3 +1,16 @@
+export type {
+  AppleBuiltInTool,
+  AppleImageModelOptions,
+  AppleImagePersonalization,
+  AppleImageStyle,
+  AppleLanguageModel,
+  AppleLanguageModelId,
+  AppleLanguageModelOptions,
+  AppleModelInfo,
+  AppleProviderOptions,
+  AppleReasoningLevel,
+  AppleToolDefinitionSet,
+} from './ai-sdk'
 export { apple, createAppleProvider } from './ai-sdk'
 export { default as AppleFoundationModels } from './AppleFoundationModels'
 export type { AppleLLMError, AppleLLMErrorCode } from './errors'

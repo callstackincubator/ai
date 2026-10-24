@@ -13,6 +13,7 @@
   "scripts": {
     "clean": "del-cli lib",
     "typecheck": "tsc --noEmit",
+    "typecheck:swift": "bash scripts/typecheck-swift.sh",
     "prepare": "bob build"
   },
   "dependencies": {

@@ -20,7 +20,95 @@ function runParser(tokens: TokenData[]): LanguageModelV3StreamPart[] {
 }
 
 describe('createLlamaStreamParser', () => {
-  test('handles split <think> delimiters as reasoning boundaries', () => {
+  test('prefers native reasoning/content fields and emits deltas from accumulated values', () => {
+    const parts = runParser([
+      { token: '', reasoning_content: 'Let me' },
+      { token: '', reasoning_content: 'Let me think' },
+      { token: '', content: 'Final' },
+      { token: '', content: 'Final answer' },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual([
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-delta',
+      'reasoning-end',
+      'text-start',
+      'text-delta',
+      'text-delta',
+      'text-end',
+    ])
+
+    const reasoningDeltas = parts.filter(
+      (
+        part
+      ): part is Extract<
+        LanguageModelV3StreamPart,
+        { type: 'reasoning-delta' }
+      > => part.type === 'reasoning-delta'
+    )
+    const textDeltas = parts.filter(
+      (
+        part
+      ): part is Extract<LanguageModelV3StreamPart, { type: 'text-delta' }> =>
+        part.type === 'text-delta'
+    )
+
+    expect(reasoningDeltas.map((part) => part.delta)).toEqual([
+      'Let me',
+      ' think',
+    ])
+    expect(textDeltas.map((part) => part.delta)).toEqual(['Final', ' answer'])
+  })
+
+  test('does not duplicate output when native fields and raw tokens coexist on the same chunk', () => {
+    const parts = runParser([
+      { token: 'Let me', reasoning_content: 'Let me' },
+      { token: ' think', reasoning_content: 'Let me think' },
+      { token: 'Final', content: 'Final' },
+      { token: ' answer', content: 'Final answer' },
+    ])
+
+    const reasoningDeltas = parts.filter(
+      (
+        part
+      ): part is Extract<
+        LanguageModelV3StreamPart,
+        { type: 'reasoning-delta' }
+      > => part.type === 'reasoning-delta'
+    )
+    const textDeltas = parts.filter(
+      (
+        part
+      ): part is Extract<LanguageModelV3StreamPart, { type: 'text-delta' }> =>
+        part.type === 'text-delta'
+    )
+
+    expect(reasoningDeltas.map((part) => part.delta)).toEqual([
+      'Let me',
+      ' think',
+    ])
+    expect(textDeltas.map((part) => part.delta)).toEqual(['Final', ' answer'])
+  })
+
+  test('flushes buffered fallback text even after native chunks appeared', () => {
+    const parts = runParser([
+      { token: '', content: 'Final' },
+      { token: '<' },
+      { token: 'think' },
+      { token: '>' },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual([
+      'text-start',
+      'text-delta',
+      'text-end',
+      'reasoning-start',
+      'reasoning-end',
+    ])
+  })
+
+  test('falls back to placeholder parsing when native fields are absent', () => {
     const parts = runParser([
       { token: '<' },
       { token: 'think' },
@@ -40,38 +128,6 @@ describe('createLlamaStreamParser', () => {
       'text-delta',
       'text-end',
     ])
-
-    expect(
-      parts.filter((part) => part.type === 'reasoning-start')
-    ).toHaveLength(1)
-
-    expect(
-      parts
-        .filter(
-          (
-            part
-          ): part is Extract<
-            LanguageModelV3StreamPart,
-            { type: 'reasoning-delta' }
-          > => part.type === 'reasoning-delta'
-        )
-        .map((part) => part.delta)
-        .join('')
-    ).toBe('reasoning text')
-
-    expect(
-      parts
-        .filter(
-          (
-            part
-          ): part is Extract<
-            LanguageModelV3StreamPart,
-            { type: 'text-delta' }
-          > => part.type === 'text-delta'
-        )
-        .map((part) => part.delta)
-        .join('')
-    ).toBe('final answer')
   })
 
   test('handles markers embedded in a reasoning chunk', () => {
@@ -117,6 +173,63 @@ describe('createLlamaStreamParser', () => {
         .map((part) => part.delta)
         .join('')
     ).toBe('final answer')
+  })
+
+  test('keeps <think> markers inside tool-call payload text untouched', () => {
+    const parts = runParser([
+      { token: '<tool_call>' },
+      {
+        token: '{"prompt":"<think>do not parse</think>"}',
+        tool_calls: [
+          {
+            id: 'tool-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"prompt":"<think>do not parse</think>"}',
+            },
+          },
+        ],
+      },
+      { token: '</tool_call>' },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual(['tool-call'])
+    expect(parts[0]).toMatchObject({
+      type: 'tool-call',
+      toolCallId: 'tool-1',
+      toolName: 'search',
+      input: '{"prompt":"<think>do not parse</think>"}',
+    })
+  })
+
+  test('keeps split <think> markers inside tool-call payload text untouched', () => {
+    const parts = runParser([
+      { token: '<tool_call>' },
+      {
+        token: '{"prompt":"<thi',
+        tool_calls: [
+          {
+            id: 'tool-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"prompt":"<think>do not parse</think>"}',
+            },
+          },
+        ],
+      },
+      { token: 'nk>do not parse</think>"}' },
+      { token: '</tool_call>' },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual(['tool-call'])
+    expect(parts[0]).toMatchObject({
+      type: 'tool-call',
+      toolCallId: 'tool-1',
+      toolName: 'search',
+      input: '{"prompt":"<think>do not parse</think>"}',
+    })
   })
 
   test('handles start and end markers inside a single chunk', () => {
@@ -270,6 +383,58 @@ describe('createLlamaStreamParser', () => {
     expect(toolCalls).toHaveLength(2)
   })
 
+  test('emits tool calls queued on native chunks even without tool-call state', () => {
+    const parts = runParser([
+      {
+        token: '<tool_call>{"query":"react native"}</tool_call>',
+        content: 'Final answer',
+        tool_calls: [
+          {
+            id: 'tool-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query":"react native"}',
+            },
+          },
+        ],
+      },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual([
+      'tool-call',
+      'text-start',
+      'text-delta',
+      'text-end',
+    ])
+  })
+
+  test('emits native tool calls at the closing marker boundary before resumed text', () => {
+    const parts = runParser([
+      {
+        token: '</tool_call>final answer',
+        content: 'final answer',
+        tool_calls: [
+          {
+            id: 'tool-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query":"react native"}',
+            },
+          },
+        ],
+      },
+    ])
+
+    expect(parts.map((part) => part.type)).toEqual([
+      'tool-call',
+      'text-start',
+      'text-delta',
+      'text-end',
+    ])
+  })
+
   test('emits tool calls at the closing marker boundary before resumed text', () => {
     const parts = runParser([
       { token: '<tool_call>' },
@@ -371,64 +536,6 @@ describe('createLlamaStreamParser', () => {
     expect(textDeltas[0]).toMatchObject({
       type: 'text-delta',
       delta: 'final answer',
-    })
-  })
-
-  test('treats thinking markers inside tool-call payload as opaque text', () => {
-    const parts = runParser([
-      { token: '<tool_call>' },
-      {
-        token: '{"query":"what does <think>reasoning</think> mean?"}',
-        tool_calls: [
-          {
-            id: 'tool-1',
-            type: 'function',
-            function: {
-              name: 'search',
-              arguments: '{"query":"what does <think>reasoning</think> mean?"}',
-            },
-          },
-        ],
-      },
-      { token: '</tool_call>' },
-    ])
-
-    expect(parts.map((part) => part.type)).toEqual(['tool-call'])
-    expect(parts[0]).toMatchObject({
-      type: 'tool-call',
-      toolCallId: 'tool-1',
-      toolName: 'search',
-      input: '{"query":"what does <think>reasoning</think> mean?"}',
-    })
-  })
-
-  test('treats split thinking markers inside tool-call payload as opaque text', () => {
-    const parts = runParser([
-      { token: '<tool_call>' },
-      { token: '{"query":"what does <thi' },
-      { token: 'nk>reasoning</thi' },
-      {
-        token: 'nk> mean?"}',
-        tool_calls: [
-          {
-            id: 'tool-1',
-            type: 'function',
-            function: {
-              name: 'search',
-              arguments: '{"query":"what does <think>reasoning</think> mean?"}',
-            },
-          },
-        ],
-      },
-      { token: '</tool_call>' },
-    ])
-
-    expect(parts.map((part) => part.type)).toEqual(['tool-call'])
-    expect(parts[0]).toMatchObject({
-      type: 'tool-call',
-      toolCallId: 'tool-1',
-      toolName: 'search',
-      input: '{"query":"what does <think>reasoning</think> mean?"}',
     })
   })
 })

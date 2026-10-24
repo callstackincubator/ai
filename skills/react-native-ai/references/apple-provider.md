@@ -65,6 +65,18 @@ const apple = createAppleProvider({ availableTools: tools })
 const model = apple.languageModel()
 ```
 
+Use Private Cloud Compute on iOS 27+ when the app has Apple's managed PCC entitlement, and set a reasoning level through provider options:
+
+```ts
+const result = await generateText({
+  model: apple(),
+  prompt,
+  providerOptions: {
+    apple: { model: 'private-cloud-compute', reasoningLevel: 'moderate' },
+  },
+})
+```
+
 ## Common Pitfalls
 
 - **Wrong iOS version**: Apple Intelligence requires iOS 26+.

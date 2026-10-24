@@ -3,11 +3,12 @@ import { TurboModuleRegistry } from 'react-native'
 import type {
   EventEmitter,
   UnsafeObject,
-} from 'react-native/Libraries/Types/CodegenTypes'
+} from 'react-native/Libraries/Types/CodegenTypesNamespace'
 
 export interface AppleMessage {
   role: 'assistant' | 'system' | 'tool' | 'user'
   content: string
+  attachments?: UnsafeObject[]
 }
 
 export interface AppleGenerationOptions {
@@ -17,6 +18,7 @@ export interface AppleGenerationOptions {
   topK?: number
   schema?: UnsafeObject
   tools?: UnsafeObject
+  providerOptions?: UnsafeObject
 }
 
 export type StreamUpdateEvent = {
@@ -36,7 +38,9 @@ export type StreamErrorEvent = {
 
 export interface Spec extends TurboModule {
   isAvailable(): boolean
+  getModelInfo(locale?: string, model?: string): Promise<UnsafeObject>
   countTokens(text: string): Promise<number>
+  generateImages(options: UnsafeObject): Promise<string[]>
   generateText(
     messages: AppleMessage[],
     options: AppleGenerationOptions
