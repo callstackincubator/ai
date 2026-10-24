@@ -29,6 +29,10 @@ const generateStream = mock(
 const onStreamUpdate = createEmitter()
 const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
+const onToolCall = createEmitter()
+const submitToolResult = mock(
+  (_callId: string, _result: string, _isError: boolean) => {}
+)
 
 mock.module('react-native', () => ({
   TurboModuleRegistry: {
@@ -41,12 +45,14 @@ mock.module('react-native', () => ({
             onStreamUpdate,
             onStreamComplete,
             onStreamError,
+            onToolCall,
+            submitToolResult,
           }
         : { getCurrentLocale: () => 'en-US' },
   },
 }))
 
-const { apple } = await import('../ai-sdk')
+const { apple, createAppleProvider } = await import('../ai-sdk')
 
 function createCallOptions(
   overrides: Partial<LanguageModelV4CallOptions> = {}
@@ -454,5 +460,67 @@ describe('apple generated content', () => {
       { type: 'text-delta', id: streamId, delta: ' sunny' },
       { type: 'text-end', id: streamId },
     ])
+  })
+})
+
+describe('apple tool execution bridge', () => {
+  const weather = {
+    type: 'function' as const,
+    name: 'weather',
+    inputSchema: {
+      type: 'object' as const,
+      properties: { city: { type: 'string' as const } },
+    },
+  }
+
+  async function runToolCall(execute: (input: { city: string }) => unknown) {
+    const model = createAppleProvider({
+      availableTools: {
+        weather: { inputSchema: weather.inputSchema, execute },
+      },
+    } as never)()
+
+    generateText.mockImplementationOnce(async (_messages, options) => {
+      const [nativeTool] = options.tools as { id: string }[]
+      onToolCall.emit({
+        callId: 'native-call-1',
+        toolId: nativeTool.id,
+        arguments: '{"city":"Paris"}',
+      })
+      // Wait for the JS tool to finish and report back
+      while (submitToolResult.mock.calls.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      return [{ type: 'text', text: 'done' }]
+    })
+
+    submitToolResult.mockClear()
+    await model.doGenerate(createCallOptions({ tools: [weather] }))
+    return submitToolResult.mock.calls.at(-1)
+  }
+
+  test('runs the registered tool and submits its result', async () => {
+    const result = await runToolCall(({ city }) => ({
+      city,
+      forecast: 'sunny',
+    }))
+
+    expect(result).toEqual([
+      'native-call-1',
+      '{"city":"Paris","forecast":"sunny"}',
+      false,
+    ])
+  })
+
+  test('submits tool errors with their message', async () => {
+    const result = await runToolCall(() => {
+      throw new Error('Weather service is down')
+    })
+
+    expect(result).toEqual(['native-call-1', 'Weather service is down', true])
+  })
+
+  test('does not expose tools on globalThis', () => {
+    expect('__APPLE_LLM_TOOLS__' in globalThis).toBe(false)
   })
 })

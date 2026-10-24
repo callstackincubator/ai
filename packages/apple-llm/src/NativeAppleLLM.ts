@@ -31,6 +31,12 @@ export type StreamCompleteEvent = {
   streamId: string
 }
 
+export type ToolCallEvent = {
+  callId: string
+  toolId: string
+  arguments: string
+}
+
 export type StreamErrorEvent = {
   streamId: string
   code?: string
@@ -77,10 +83,12 @@ export interface Spec extends TurboModule {
     options: AppleGenerationOptions
   ): void
   cancelStream(streamId: string): void
+  submitToolResult(callId: string, result: string, isError: boolean): void
 
   onStreamUpdate: CodegenTypes.EventEmitter<StreamUpdateEvent>
   onStreamComplete: CodegenTypes.EventEmitter<StreamCompleteEvent>
   onStreamError: CodegenTypes.EventEmitter<StreamErrorEvent>
+  onToolCall: CodegenTypes.EventEmitter<ToolCallEvent>
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeAppleLLM')

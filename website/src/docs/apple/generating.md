@@ -441,6 +441,12 @@ const result = await AppleFoundationModels.generateText(
 )
 ```
 
+When you pass tools to the low-level `generateText` or `generateStream`, native
+asks JavaScript to run them through the `onToolCall` event (`callId`, `toolId`,
+`arguments` as JSON). Answer each call with
+`AppleFoundationModels.submitToolResult(callId, result, isError)`. The AI SDK
+models handle this for you.
+
 Low-level `generateImages` is available for advanced callers, but
 `apple.imageModel()` is the recommended Image Playground integration because it
 matches the AI SDK image API.

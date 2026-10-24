@@ -60,9 +60,12 @@ const AppleFoundationModels: AppleFoundationModelsSpec = {
     options: AppleGenerationOptions
   ) => NativeAppleLLM.generateStream(streamId, messages, options),
   cancelStream: (streamId) => NativeAppleLLM.cancelStream(streamId),
+  submitToolResult: (callId, result, isError) =>
+    NativeAppleLLM.submitToolResult(callId, result, isError),
   onStreamUpdate: NativeAppleLLM.onStreamUpdate,
   onStreamComplete: NativeAppleLLM.onStreamComplete,
   onStreamError: NativeAppleLLM.onStreamError,
+  onToolCall: NativeAppleLLM.onToolCall,
 }
 
 export default AppleFoundationModels

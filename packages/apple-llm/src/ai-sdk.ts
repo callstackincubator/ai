@@ -806,7 +806,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     const tools = this.prepareTools(callTools)
 
     for (const tool of tools) {
-      globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
+      registerToolExecutor(tool.id, tool.execute)
     }
 
     try {
@@ -873,7 +873,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       }
     } finally {
       for (const tool of tools) {
-        delete globalThis.__APPLE_LLM_TOOLS__[tool.id]
+        toolExecutors.delete(tool.id)
       }
     }
   }
@@ -907,7 +907,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     }
 
     for (const tool of tools) {
-      globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
+      registerToolExecutor(tool.id, tool.execute)
     }
 
     let streamId: string | null = null
@@ -918,7 +918,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       listeners = []
 
       for (const tool of tools) {
-        delete globalThis.__APPLE_LLM_TOOLS__[tool.id]
+        toolExecutors.delete(tool.id)
       }
     }
 
@@ -1115,8 +1115,43 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 }
 
-declare global {
-  var __APPLE_LLM_TOOLS__: Record<string, Function>
-}
+// Tools of in-flight generations, keyed by the id native reports in onToolCall
+const toolExecutors = new Map<string, (input: string) => Promise<unknown>>()
+let toolCallListener: { remove(): void } | null = null
 
-globalThis.__APPLE_LLM_TOOLS__ = {}
+function registerToolExecutor(
+  toolId: string,
+  execute: (input: string) => Promise<unknown>
+) {
+  toolExecutors.set(toolId, execute)
+
+  if (toolCallListener) {
+    return
+  }
+
+  toolCallListener = NativeAppleLLM.onToolCall(async (event) => {
+    try {
+      const execute = toolExecutors.get(event.toolId)
+      if (!execute) {
+        throw new Error(`Tool not found: ${event.toolId}`)
+      }
+
+      const result = await execute(event.arguments)
+      if (result === undefined) {
+        throw new Error('Tool returned no result')
+      }
+
+      NativeAppleLLM.submitToolResult(
+        event.callId,
+        typeof result === 'string' ? result : JSON.stringify(result),
+        false
+      )
+    } catch (error) {
+      NativeAppleLLM.submitToolResult(
+        event.callId,
+        error instanceof Error ? error.message : String(error),
+        true
+      )
+    }
+  })
+}
