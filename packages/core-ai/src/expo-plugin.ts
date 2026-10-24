@@ -22,6 +22,7 @@ export type CoreAIExpoPluginOptions = {
 
 const CORE_AI_PACKAGE_URL = 'https://github.com/apple/coreai-models'
 const CORE_AI_PACKAGE_NAME = 'coreai-models'
+const CORE_AI_PACKAGE_MINIMUM_VERSION = '1.0.0'
 const DEFAULT_PRODUCTS: CoreAISwiftPackageProduct[] = [
   'CoreAILM',
   'CoreAIDiffusion',
@@ -95,8 +96,8 @@ function addSwiftPackageProducts(
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "${CORE_AI_PACKAGE_URL}";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = upToNextMajorVersion;
+				minimumVersion = ${CORE_AI_PACKAGE_MINIMUM_VERSION};
 			};
 		};`
   )

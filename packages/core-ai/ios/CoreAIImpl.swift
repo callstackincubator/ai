@@ -386,7 +386,7 @@ public class CoreAIImpl: NSObject {
         Task {
           do {
             let pipeline = try await self.makeDiffusionPipeline(at: sourceURL, options: options)
-            let configuration = try self.makePipelineConfiguration(prompt: prompt, options: options)
+            let configuration = try self.makePipelineConfiguration(prompt: prompt, pipeline: pipeline, options: options)
             let result = try await pipeline.generateImages(configuration: configuration) { _ in true }
             let images = try result.images.map(Self.pngBase64)
             resolve([
@@ -783,29 +783,23 @@ extension CoreAIImpl {
   private func makeDiffusionPipeline(
     at sourceURL: URL,
     options: [String: Any]?
-  ) async throws -> any DiffusionPipeline {
-    let descriptor = try PipelineDescriptor.resolve(at: sourceURL)
-
-    switch descriptor.type {
-    case .stableDiffusion, .stableDiffusionXL, .none:
-      return try await StableDiffusionPipeline.load(from: sourceURL)
-    case .stableDiffusion3:
-      return try await SD3Pipeline(from: sourceURL)
-    case .flux2:
-      let mode = DecodeResolution(rawValue: options?["decodeResolution"] as? String ?? "auto") ?? .auto
-      return try await Flux2Pipeline(from: sourceURL, mode: mode)
-    }
+  ) async throws -> FlowTransformerPipeline {
+    // coreai-models 1.0 loads FLUX.2 and Sana Sprint bundles through one pipeline
+    let mode = DecodeResolution(rawValue: options?["decodeResolution"] as? String ?? "auto") ?? .auto
+    return try await FlowTransformerPipeline(from: sourceURL, mode: mode)
   }
 
   private func makePipelineConfiguration(
     prompt: String,
+    pipeline: FlowTransformerPipeline,
     options: [String: Any]?
   ) throws -> PipelineConfiguration {
-    let scheduler = SchedulerType(rawValue: options?["schedulerType"] as? String ?? "") ?? .dpmSolverMultistep
+    let defaults = pipeline.config
+    let scheduler = SchedulerType(rawValue: options?["schedulerType"] as? String ?? "") ?? .discreteFlow
     let decodeResolution = DecodeResolution(rawValue: options?["decodeResolution"] as? String ?? "full") ?? .full
     let seed = UInt32(options?["seed"] as? Double ?? 0)
-    let stepCount = Int(options?["stepCount"] as? Double ?? 50)
-    let guidanceScale = Float(options?["guidanceScale"] as? Double ?? 7.5)
+    let stepCount = (options?["stepCount"] as? Double).map(Int.init) ?? defaults.defaultSteps ?? 50
+    let guidanceScale = (options?["guidanceScale"] as? Double).map(Float.init) ?? defaults.defaultGuidanceScale ?? 7.5
 
     return PipelineConfiguration(
       prompt: prompt,
@@ -815,6 +809,9 @@ extension CoreAIImpl {
       guidanceScale: guidanceScale,
       schedulerType: scheduler,
       strength: Float(options?["strength"] as? Double ?? 1.0),
+      encoderScaleFactor: defaults.encoderScaleFactor ?? DiffusionDefaults.Image.scaleFactor,
+      decoderScaleFactor: defaults.decoderScaleFactor ?? DiffusionDefaults.Image.scaleFactor,
+      decoderShiftFactor: defaults.decoderShiftFactor ?? DiffusionDefaults.Image.decoderShiftFactor,
       decodeResolution: decodeResolution,
       lazyModelLoading: options?["lazyModelLoading"] as? Bool ?? true
     )
