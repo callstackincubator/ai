@@ -3,18 +3,20 @@ import React from 'react'
 import { Alert, Pressable } from 'react-native'
 
 import { colors } from '../../theme/colors'
+import type { ImageSource } from '../../utils/imageAttachments'
 
-export function AttachmentMenu() {
+type AttachmentMenuProps = {
+  onPick: (source: ImageSource) => void
+}
+
+export function AttachmentMenu({ onPick }: AttachmentMenuProps) {
   return (
     <Pressable
       hitSlop={8}
       onPress={() =>
         Alert.alert('Add attachment', undefined, [
-          { text: 'Take Photo', onPress: () => console.log('Take Photo') },
-          {
-            text: 'Photo Library',
-            onPress: () => console.log('Photo Library'),
-          },
+          { text: 'Take Photo', onPress: () => onPick('camera') },
+          { text: 'Photo Library', onPress: () => onPick('library') },
           { text: 'Cancel', style: 'cancel' },
         ])
       }

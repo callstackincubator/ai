@@ -19,6 +19,7 @@ import {
   withToolProxy,
 } from '../../tools'
 import { getAiSdkTelemetry } from '../../utils/aiSdkTelemetry'
+import type { ImageAttachment } from '../../utils/imageAttachments'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessages } from './ChatMessages'
 import { ModelAvailableForDownload } from './ModelAvailableForDownload'
@@ -68,9 +69,13 @@ export default function ChatScreen() {
   )
 
   const selectedModelAvailability = availability.get(selectedModelId)
+  const imageInputEnabled = selectedAdapter?.capabilities?.imageInput ?? false
 
   // Send message and stream AI response
-  const handleSend = async (userInput: string) => {
+  const handleSend = async (
+    userInput: string,
+    attachments: ImageAttachment[]
+  ) => {
     if (isGenerating || !selectedAdapter) return
 
     // Cancel any previous generation
@@ -80,7 +85,7 @@ export default function ChatScreen() {
 
     const baseMessages = currentChat?.messages ?? []
     const { chatId, messageIds } = addMessages([
-      { role: 'user', content: userInput },
+      { role: 'user', content: userInput, attachments },
       { role: 'assistant', content: '...' },
     ])
     const assistantMessageId = messageIds[1]
@@ -226,6 +231,7 @@ export default function ChatScreen() {
             isGenerating={isGenerating}
             genUiEnabled={genUiEnabled}
             showAppleTokenCount={showAppleTokenCount}
+            imageInputEnabled={imageInputEnabled}
           />
         )}
       </View>

@@ -1,12 +1,17 @@
 import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { colors } from '../../theme/colors'
+import {
+  getAttachmentUri,
+  type ImageAttachment,
+} from '../../utils/imageAttachments'
 
 type ChatMessageBubbleProps = {
   content: string
   isUser: boolean
   messageType?: 'text' | 'toolExecution'
+  attachments?: ImageAttachment[]
   toolExecution?: {
     toolName: string
     payload: unknown
@@ -18,6 +23,7 @@ export function ChatMessageBubble({
   content,
   isUser,
   messageType = 'text',
+  attachments,
   toolExecution,
 }: ChatMessageBubbleProps) {
   const [expanded, setExpanded] = React.useState(false)
@@ -72,15 +78,35 @@ export function ChatMessageBubble({
             )}
           </View>
         ) : (
-          <Text
-            selectable
-            style={[
-              styles.messageText,
-              isUser ? styles.messageTextUser : styles.messageTextAssistant,
-            ]}
-          >
-            {content}
-          </Text>
+          <>
+            {attachments?.length ? (
+              <View
+                style={[
+                  styles.attachments,
+                  content ? styles.attachmentsWithText : null,
+                ]}
+              >
+                {attachments.map((attachment) => (
+                  <Image
+                    key={attachment.fileName}
+                    source={{ uri: getAttachmentUri(attachment) }}
+                    style={styles.attachmentImage}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {content ? (
+              <Text
+                selectable
+                style={[
+                  styles.messageText,
+                  isUser ? styles.messageTextUser : styles.messageTextAssistant,
+                ]}
+              >
+                {content}
+              </Text>
+            ) : null}
+          </>
         )}
         {isToolHint && expanded && hasPayload ? (
           <View style={styles.detailBlock}>
@@ -129,6 +155,20 @@ const styles = StyleSheet.create({
   messageBubbleToolHint: {
     backgroundColor: colors.tertiarySystemFill as any,
     borderRadius: 14,
+  },
+  attachments: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  attachmentsWithText: {
+    marginBottom: 8,
+  },
+  attachmentImage: {
+    width: 160,
+    height: 160,
+    borderRadius: 14,
+    borderCurve: 'continuous',
   },
   messageText: {
     fontSize: 16,
