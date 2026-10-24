@@ -72,7 +72,7 @@ const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3
 const languageModel = llama.languageModel(modelPath)
 
 // Embedding model
-const embeddingModel = llama.textEmbeddingModel(modelPath)
+const embeddingModel = llama.embeddingModel(modelPath)
 
 // Speech model (requires vocoder)
 const speechModel = llama.speechModel(modelPath, {
@@ -162,7 +162,7 @@ Creates a language model instance.
     - `n_ctx`: Context size (default: 2048, or 4096 for multimodal)
     - `n_gpu_layers`: Number of GPU layers (default: 99)
 
-### `llama.textEmbeddingModel(modelPath, options?)`
+### `llama.embeddingModel(modelPath, options?)`
 
 Creates an embedding model instance.
 

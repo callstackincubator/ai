@@ -12,6 +12,7 @@ import type {
   LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4ToolResultOutput,
+  LanguageModelV4Usage,
   SharedV4Warning,
   SpeechModelV4,
   SpeechModelV4CallOptions,
@@ -28,7 +29,10 @@ import {
 
 import { createAppleLLMError, isAppleLLMErrorCode } from './errors'
 import NativeAppleEmbeddings from './NativeAppleEmbeddings'
-import NativeAppleLLM, { type AppleMessage } from './NativeAppleLLM'
+import NativeAppleLLM, {
+  type AppleMessage,
+  type AppleUsage,
+} from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
 import NativeAppleTranscription from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
@@ -39,6 +43,12 @@ export type AppleToolDefinitionSet = Record<string, FullToolDefinition>
 export interface AppleLanguageModel extends LanguageModelV4 {
   prepare: () => Promise<void>
   updateTools: (tools: AppleToolDefinitionSet) => void
+  /**
+   * Counts tokens in text with the on-device model's tokenizer (iOS 26.4+).
+   * Private Cloud Compute has no token counting API, so Private Cloud Compute
+   * models also count with the on-device tokenizer, which may not match
+   */
+  countTokens: (text: string) => Promise<number>
 }
 export type AppleLanguageModelId = 'system' | 'private-cloud-compute'
 export type AppleBuiltInTool = 'ocr' | 'barcode'
@@ -445,6 +455,30 @@ function prepareToolChoice(
   }
 }
 
+function toUsage(usage: AppleUsage | undefined): LanguageModelV4Usage {
+  const cachedInputTokens = usage?.cachedInputTokens
+  const reasoningTokens = usage?.reasoningTokens
+  return {
+    inputTokens: {
+      total: usage?.inputTokens,
+      noCache:
+        usage && cachedInputTokens !== undefined
+          ? usage.inputTokens - cachedInputTokens
+          : undefined,
+      cacheRead: cachedInputTokens,
+      cacheWrite: undefined,
+    },
+    outputTokens: {
+      total: usage?.outputTokens,
+      text:
+        usage && reasoningTokens !== undefined
+          ? usage.outputTokens - reasoningTokens
+          : undefined,
+      reasoning: reasoningTokens,
+    },
+  }
+}
+
 function appendMessageContent(content: string, addition: string) {
   if (!addition) {
     return content
@@ -474,6 +508,7 @@ export function createAppleProvider({
   ) {
     return createLanguageModel(options)
   }
+  provider.specificationVersion = 'v4' as const
   provider.isAvailable = () => NativeAppleLLM.isAvailable()
   provider.getModelInfo = (
     options: { locale?: string; model?: AppleLanguageModelId } = {}
@@ -483,9 +518,11 @@ export function createAppleProvider({
       options.model
     ) as Promise<AppleModelInfo>
   provider.languageModel = createLanguageModel
-  provider.textEmbeddingModel = (options: AppleEmbeddingOptions = {}) => {
+  provider.embeddingModel = (options: AppleEmbeddingOptions = {}) => {
     return new AppleTextEmbeddingModel(options)
   }
+  /** @deprecated Use `embeddingModel` */
+  provider.textEmbeddingModel = provider.embeddingModel
   provider.imageModel = (options: AppleImageModelOptions = {}) => {
     return new AppleImageModel(options)
   }
@@ -731,6 +768,10 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   async prepare(): Promise<void> {}
 
+  countTokens(text: string): Promise<number> {
+    return NativeAppleLLM.countTokens(text)
+  }
+
   private prepareMessages(messages: LanguageModelV4Prompt): AppleMessage[] {
     return messages.map((message, index): AppleMessage => {
       switch (message.role) {
@@ -838,7 +879,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       })
 
       return {
-        content: response.map((part) => {
+        content: response.content.map((part) => {
           switch (part.type) {
             case 'text':
               return part
@@ -869,19 +910,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           }
         }),
         finishReason: { unified: 'stop' as const, raw: 'stop' },
-        usage: {
-          inputTokens: {
-            total: 0,
-            noCache: undefined,
-            cacheRead: undefined,
-            cacheWrite: undefined,
-          },
-          outputTokens: {
-            total: 0,
-            text: undefined,
-            reasoning: undefined,
-          },
-        },
+        usage: toUsage(response.usage),
         warnings,
       }
     } finally {
@@ -911,10 +940,6 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       options.responseFormat?.type === 'json'
         ? options.responseFormat.schema
         : undefined
-
-    if (schema) {
-      throw new Error('Streaming JSON responses is not yet supported.')
-    }
 
     for (const tool of tools) {
       globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
@@ -1023,6 +1048,14 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               }
 
               const nextRawContent = String(data.content ?? '')
+
+              // Partial JSON snapshots are not prefixes of the final JSON, so
+              // structured output is sent once the stream completes
+              if (schema) {
+                previousRawContent = nextRawContent
+                return
+              }
+
               const rawDelta = getSnapshotDelta(
                 previousRawContent,
                 nextRawContent
@@ -1049,6 +1082,15 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           const completeListener = NativeAppleLLM.onStreamComplete((data) => {
             if (data.streamId === streamId) {
               endReasoning()
+              if (schema && previousRawContent) {
+                controller.enqueue({ type: 'text-start', id })
+                controller.enqueue({
+                  type: 'text-delta',
+                  delta: previousRawContent,
+                  id,
+                })
+                textStarted = true
+              }
               if (textStarted) {
                 controller.enqueue({
                   type: 'text-end',
@@ -1058,19 +1100,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
               controller.enqueue({
                 type: 'finish',
                 finishReason: { unified: 'stop' as const, raw: 'stop' },
-                usage: {
-                  inputTokens: {
-                    total: 0,
-                    noCache: undefined,
-                    cacheRead: undefined,
-                    cacheWrite: undefined,
-                  },
-                  outputTokens: {
-                    total: 0,
-                    text: undefined,
-                    reasoning: undefined,
-                  },
-                },
+                usage: toUsage(data.usage as AppleUsage | undefined),
               })
               cleanup()
               controller.close()

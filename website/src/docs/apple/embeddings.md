@@ -29,7 +29,7 @@ import { embed } from 'ai'
 import { apple } from '@react-native-ai/apple'
 
 const { embedding } = await embed({
-  model: apple.textEmbeddingModel(),
+  model: apple.embeddingModel(),
   value: 'Hello world',
 })
 
@@ -43,7 +43,7 @@ import { embedMany } from 'ai'
 import { apple } from '@react-native-ai/apple'
 
 const { embeddings } = await embedMany({
-  model: apple.textEmbeddingModel(),
+  model: apple.embeddingModel(),
   values: ['Hello world', 'How are you?', 'Goodbye'],
 })
 
@@ -55,7 +55,7 @@ console.log(embeddings)
 The embeddings model supports multiple languages. You can specify the language using [ISO 639-1 codes](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) or full names when creating the model:
 
 ```tsx
-const model = apple.textEmbeddingModel({ language: 'fr' })
+const model = apple.embeddingModel({ language: 'fr' })
 
 await embed({
   model,
@@ -73,7 +73,7 @@ For list of all supported languages, [check Apple documentation](https://develop
 Apple's NLContextualEmbedding requires downloading language-specific assets to the device. While the provider automatically prepares assets when needed, you can call `prepare()` ahead of time for better performance:
 
 ```tsx
-const model = apple.textEmbeddingModel({ language: 'en' })
+const model = apple.embeddingModel({ language: 'en' })
 
 // Call prepare() ahead of time to optimize first inference latency
 await model.prepare()

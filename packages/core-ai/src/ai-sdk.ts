@@ -38,14 +38,14 @@ export function createCoreAIProvider() {
     return provider.languageModel(config)
   }
 
+  provider.specificationVersion = 'v4' as const
   provider.getCapabilities = () => NativeCoreAI.getCapabilities()
   provider.languageModel = (config: CoreAIModelConfig) => {
     return new CoreAILanguageModel(config)
   }
-  provider.textEmbeddingModel = (config: CoreAIModelConfig) => {
+  provider.embeddingModel = (config: CoreAIModelConfig) => {
     return new CoreAITextEmbeddingModel(config)
   }
-  provider.embeddingModel = provider.textEmbeddingModel
   provider.imageModel = (config: CoreAIModelConfig) => {
     return new CoreAIImageGenerationModel(config)
   }
@@ -564,13 +564,13 @@ function toFinishReason(
 function emptyUsage() {
   return {
     inputTokens: {
-      total: 0,
+      total: undefined,
       noCache: undefined,
       cacheRead: undefined,
       cacheWrite: undefined,
     },
     outputTokens: {
-      total: 0,
+      total: undefined,
       text: undefined,
       reasoning: undefined,
     },

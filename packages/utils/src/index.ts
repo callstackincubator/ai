@@ -100,11 +100,12 @@ async function countPromptTokens(
   model: LanguageModelV4
 ): Promise<number> {
   const serializedPrompt = serializePromptForSummary(prompt)
-  const countTokens = (model as TokenCountCapableLanguageModel).countTokens
+  const tokenCountModel = model as TokenCountCapableLanguageModel
 
-  if (typeof countTokens === 'function') {
+  // Called on the model, since providers read their own state in countTokens
+  if (typeof tokenCountModel.countTokens === 'function') {
     try {
-      return await countTokens(serializedPrompt)
+      return await tokenCountModel.countTokens(serializedPrompt)
     } catch {
       return estimateTokenCount(serializedPrompt)
     }

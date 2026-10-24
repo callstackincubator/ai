@@ -21,8 +21,11 @@ const generateText = mock(
   async (
     _messages: unknown,
     _options: Record<string, unknown>
-  ): Promise<Record<string, unknown>[]> => [{ type: 'text', text: 'ok' }]
+  ): Promise<Record<string, unknown>> => ({
+    content: [{ type: 'text', text: 'ok' }],
+  })
 )
+const countTokens = mock(async (text: string) => text.length)
 const generateStream = mock(
   (_streamId: string, _messages: unknown, _options: unknown) => {}
 )
@@ -37,6 +40,7 @@ mock.module('react-native', () => ({
         ? {
             generateText,
             generateStream,
+            countTokens,
             cancelStream: () => {},
             onStreamUpdate,
             onStreamComplete,
@@ -354,22 +358,24 @@ async function readAll(stream: ReadableStream<LanguageModelV4StreamPart>) {
 
 describe('apple generated content', () => {
   test('returns reasoning and tool parts with their ids', async () => {
-    generateText.mockImplementationOnce(async () => [
-      { type: 'reasoning', id: 'r1', text: 'thinking', signature: 'c2ln' },
-      {
-        type: 'tool-call',
-        toolCallId: 'call-1',
-        toolName: 'weather',
-        input: '{"city":"Paris"}',
-      },
-      {
-        type: 'tool-result',
-        toolCallId: 'call-1',
-        toolName: 'weather',
-        output: 'sunny',
-      },
-      { type: 'text', text: 'It is sunny' },
-    ])
+    generateText.mockImplementationOnce(async () => ({
+      content: [
+        { type: 'reasoning', id: 'r1', text: 'thinking', signature: 'c2ln' },
+        {
+          type: 'tool-call',
+          toolCallId: 'call-1',
+          toolName: 'weather',
+          input: '{"city":"Paris"}',
+        },
+        {
+          type: 'tool-result',
+          toolCallId: 'call-1',
+          toolName: 'weather',
+          output: 'sunny',
+        },
+        { type: 'text', text: 'It is sunny' },
+      ],
+    }))
 
     const result = await apple().doGenerate(createCallOptions())
 
@@ -467,5 +473,136 @@ describe('apple generated content', () => {
       { type: 'text-delta', id: streamId, delta: ' sunny' },
       { type: 'text-end', id: streamId },
     ])
+  })
+})
+
+describe('apple usage', () => {
+  test('maps native token usage', async () => {
+    generateText.mockImplementationOnce(async () => ({
+      content: [{ type: 'text', text: 'ok' }],
+      usage: {
+        inputTokens: 120,
+        cachedInputTokens: 20,
+        outputTokens: 30,
+        reasoningTokens: 10,
+      },
+    }))
+
+    const result = await apple().doGenerate(createCallOptions())
+
+    expect(result.usage).toEqual({
+      inputTokens: {
+        total: 120,
+        noCache: 100,
+        cacheRead: 20,
+        cacheWrite: undefined,
+      },
+      outputTokens: { total: 30, text: 20, reasoning: 10 },
+    })
+  })
+
+  test('reports unknown usage as undefined instead of zero', async () => {
+    const result = await apple().doGenerate(createCallOptions())
+
+    expect(result.usage).toEqual({
+      inputTokens: {
+        total: undefined,
+        noCache: undefined,
+        cacheRead: undefined,
+        cacheWrite: undefined,
+      },
+      outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+    })
+  })
+
+  test('reports stream usage on finish', async () => {
+    const { stream } = await apple().doStream(createCallOptions())
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamUpdate.emit({ streamId, content: 'ok' })
+    onStreamComplete.emit({
+      streamId,
+      usage: { inputTokens: 12, outputTokens: 3 },
+    })
+
+    const finish = (await parts).find((part) => part.type === 'finish')
+    expect(finish).toMatchObject({
+      usage: {
+        inputTokens: { total: 12, noCache: undefined, cacheRead: undefined },
+        outputTokens: { total: 3, text: undefined, reasoning: undefined },
+      },
+    })
+  })
+})
+
+describe('apple structured output stream', () => {
+  test('sends the final json once the stream completes', async () => {
+    const { stream } = await apple().doStream(
+      createCallOptions({
+        responseFormat: {
+          type: 'json',
+          schema: { type: 'object', properties: { city: { type: 'string' } } },
+        },
+      })
+    )
+    const parts = readAll(stream)
+    const streamId = generateStream.mock.calls.at(-1)![0]
+
+    onStreamUpdate.emit({ streamId, content: '{"city":"Par"}' })
+    onStreamUpdate.emit({ streamId, content: '{"city":"Paris"}' })
+    onStreamComplete.emit({ streamId })
+
+    expect(
+      (await parts).filter(
+        (part) => part.type !== 'stream-start' && part.type !== 'finish'
+      )
+    ).toEqual([
+      { type: 'text-start', id: streamId },
+      { type: 'text-delta', id: streamId, delta: '{"city":"Paris"}' },
+      { type: 'text-end', id: streamId },
+    ])
+  })
+})
+
+describe('apple with the ai sdk', () => {
+  test('streams structured output and usage through streamText', async () => {
+    const { jsonSchema, Output, streamText } = await import('ai')
+    generateStream.mockImplementationOnce((streamId) => {
+      setTimeout(() => {
+        onStreamUpdate.emit({ streamId, content: '{"city":"Par"}' })
+        onStreamUpdate.emit({ streamId, content: '{"city":"Paris"}' })
+        onStreamComplete.emit({
+          streamId,
+          usage: { inputTokens: 40, outputTokens: 6 },
+        })
+      })
+    })
+
+    const result = streamText({
+      model: apple(),
+      prompt: 'Where is the Eiffel Tower?',
+      output: Output.object({
+        schema: jsonSchema<{ city: string }>({
+          type: 'object',
+          properties: { city: { type: 'string' } },
+          required: ['city'],
+        }),
+      }),
+    })
+
+    expect(await result.output).toEqual({ city: 'Paris' })
+    expect(await result.usage).toMatchObject({
+      inputTokens: 40,
+      outputTokens: 6,
+      totalTokens: 46,
+    })
+  })
+})
+
+describe('apple token counting', () => {
+  test('counts tokens through the language model', async () => {
+    expect(await apple().countTokens('hello')).toBe(5)
+    expect(countTokens).toHaveBeenCalledWith('hello')
   })
 })
