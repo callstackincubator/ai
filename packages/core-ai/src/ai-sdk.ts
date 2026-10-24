@@ -172,13 +172,21 @@ export class CoreAILanguageModel implements LanguageModelV4 {
       start: (controller) => {
         controller.enqueue({ type: 'text-start', id: streamId })
 
+        let previousContent = ''
+
         const updateListener = NativeCoreAI.onStreamUpdate(
           (event: CoreAIStreamUpdateEvent) => {
             if (event.streamId === streamId) {
+              // Native emits the full response so far on every update
+              const delta = event.content.startsWith(previousContent)
+                ? event.content.slice(previousContent.length)
+                : event.content
+              previousContent = event.content
+
               controller.enqueue({
                 type: 'text-delta',
                 id: streamId,
-                delta: event.content,
+                delta,
               })
             }
           }
