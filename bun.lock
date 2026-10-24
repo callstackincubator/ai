@@ -173,7 +173,7 @@
       "dependencies": {
         "@ai-sdk/provider": "^4.0.33",
         "@ai-sdk/provider-utils": "^5.0.67",
-        "react-native-blob-util": "^0.24.5",
+        "react-native-blob-util": "^0.24.12",
         "zod": "^4.0.0",
       },
       "devDependencies": {
@@ -1172,7 +1172,7 @@
 
     "balanced-match": ["balanced-match@1.0.2", "", {}, "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="],
 
-    "base-64": ["base-64@0.1.0", "", {}, "sha512-Y5gU45svrR5tI2Vt/X9GPd3L0HNIKzGu202EjxrXMpuc2V2CiKgemAbUUsqYmZJvPtCXoUKjNZwBJzsNScUbXA=="],
+    "base-64": ["base-64@1.0.0", "", {}, "sha512-kwDPIFCGx0NZHog36dj+tHiwP4QMzsZ3AgMViUBKI0+V5n4U0ufTCUMhnQ04diaRI8EX/QcPfql7zlhZ7j4zgg=="],
 
     "base64-js": ["base64-js@1.5.1", "", {}, "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="],
 
@@ -2286,7 +2286,7 @@
 
     "react-native-audio-api": ["react-native-audio-api@0.13.6", "", { "dependencies": { "semver": "^7.7.3" }, "peerDependencies": { "react": "*", "react-native": "*", "react-native-worklets": ">= 0.7.0" }, "optionalPeers": ["react-native-worklets"], "bin": { "setup-rn-audio-api-web": "scripts/setup-rn-audio-api-web.js" } }, "sha512-055JlxTaajdzcJCzyd+xnH1pJawNkt2NZ3RNoI2vv1QxYRh257W/dcDky/qf4/VMEFdpZFuFfVW1hv75OEh3gA=="],
 
-    "react-native-blob-util": ["react-native-blob-util@0.24.5", "", { "dependencies": { "base-64": "0.1.0", "glob": "13.0.0" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-GmhV7sJ0oC1ENLXE5mVe5eUE8JXgNNyylOmpgo6NZhkWzB0tCcV/RNNanpHw6CkAF+WdnPdnpo5G/yrSxX75fg=="],
+    "react-native-blob-util": ["react-native-blob-util@0.24.12", "", { "dependencies": { "base-64": "1.0.0" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-AJhwLgIV6CbjWUL8pdb38oh7uRNi1nHpOeEy3SqN4ATe88zC+3QWgAM3YnFANXSQclNLYtcQDWMMPl/rdRN5MQ=="],
 
     "react-native-builder-bob": ["react-native-builder-bob@0.44.1", "", { "dependencies": { "@babel/core": "^7.29.7", "@babel/plugin-transform-flow-strip-types": "^7.29.7", "@babel/plugin-transform-strict-mode": "^7.29.7", "@babel/preset-env": "^7.29.7", "@babel/preset-react": "^7.29.7", "@babel/preset-typescript": "^7.29.7", "@jridgewell/sourcemap-codec": "^1.6.0", "arktype": "^2.2.9", "babel-plugin-syntax-hermes-parser": "^0.37.0", "browserslist": "^4.29.4", "cross-spawn": "^7.0.6", "dedent": "^1.7.2", "del": "^9.0.1", "escape-string-regexp": "^5.0.0", "fs-extra": "^11.4.1", "glob": "^13.0.6", "json5": "^2.2.3", "kleur": "^4.1.5", "prompts": "^2.4.2", "typescript": "^6.0.3", "which": "^7.0.0", "yargs": "^18.2.0" }, "bin": { "bob": "bin/bob" } }, "sha512-CqRvOdSynP27CQohCwNte6r2B8cZSZiA24Vuq3f5jloq/aQ1dlbARtuO6a7hjb7Ao06gfqlde7NuJ5oAocb6iw=="],
 
@@ -3312,8 +3312,6 @@
 
     "react-native-audio-api/semver": ["semver@7.8.5", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA=="],
 
-    "react-native-blob-util/glob": ["glob@13.0.0", "", { "dependencies": { "minimatch": "^10.1.1", "minipass": "^7.1.2", "path-scurry": "^2.0.0" } }, "sha512-tvZgpqk6fz4BaNZ66ZsRaZnbHvP/jG3uKJvAZOwEVUL4RTA5nJeeLYfyN9/VA8NX/V3IBG+hkeuGpKjvELkVhA=="],
-
     "react-native-builder-bob/@babel/plugin-transform-flow-strip-types": ["@babel/plugin-transform-flow-strip-types@7.29.7", "", { "dependencies": { "@babel/helper-plugin-utils": "^7.29.7", "@babel/plugin-syntax-flow": "^7.29.7" }, "peerDependencies": { "@babel/core": "^7.0.0-0" } }, "sha512-wRHeUjUjCZnMHmiO5bRgjFLcoEh7JyTdByOW11ahhwNa4V0bmeGEaIvt51yq0zQp2yWIpqfxXXPyUP6GFJZHOQ=="],
 
     "react-native-builder-bob/@babel/plugin-transform-strict-mode": ["@babel/plugin-transform-strict-mode@7.29.7", "", { "dependencies": { "@babel/helper-plugin-utils": "^7.29.7" }, "peerDependencies": { "@babel/core": "^7.0.0-0" } }, "sha512-YjFcy7S8kEndK6dsK4UBISrMZa2MHiitApdZ7hTxAyQpX+Ct+aKgKOZoTx/Kcz6drgKxe50TIPUvZq7V4HGGKg=="],
@@ -3990,12 +3988,6 @@
 
     "raw-body/http-errors/statuses": ["statuses@2.0.2", "", {}, "sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw=="],
 
-    "react-native-blob-util/glob/minimatch": ["minimatch@10.1.1", "", { "dependencies": { "@isaacs/brace-expansion": "^5.0.0" } }, "sha512-enIvLvRAFZYXJzkCYG5RKmPfrFArdLv+R+lbQ53BmIMLIry74bjKzX6iHAm8WYamJkhSSEabrWN5D97XnKObjQ=="],
-
-    "react-native-blob-util/glob/minipass": ["minipass@7.1.2", "", {}, "sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw=="],
-
-    "react-native-blob-util/glob/path-scurry": ["path-scurry@2.0.1", "", { "dependencies": { "lru-cache": "^11.0.0", "minipass": "^7.1.2" } }, "sha512-oWyT4gICAu+kaA7QWk/jvCHWarMKNs6pXOGWKDTr7cw4IGcUbW+PeTfbaQiLGheFRpjo6O9J0PmyMfQPjH71oA=="],
-
     "react-native-builder-bob/@babel/plugin-transform-flow-strip-types/@babel/helper-plugin-utils": ["@babel/helper-plugin-utils@7.29.7", "", {}, "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="],
 
     "react-native-builder-bob/@babel/plugin-transform-flow-strip-types/@babel/plugin-syntax-flow": ["@babel/plugin-syntax-flow@7.29.7", "", { "dependencies": { "@babel/helper-plugin-utils": "^7.29.7" }, "peerDependencies": { "@babel/core": "^7.0.0-0" } }, "sha512-ajMX6QPcyomotqwpzhkYGxcK2i/us0rs1Qo9QvUpa+Fca0FTmqrzKrctoIYLMxcOhGZldGT/BAVkRGTWBiR8gQ=="],
@@ -4447,8 +4439,6 @@
     "metro/yargs/cliui/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
 
     "metro/yargs/string-width/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
-
-    "react-native-blob-util/glob/path-scurry/lru-cache": ["lru-cache@11.2.4", "", {}, "sha512-B5Y16Jr9LB9dHVkh6ZevG+vAbOsNOYCX+sXvFWFu7B3Iz5mijW3zdbMyhsh8ANd2mSWBYdJgnqi+mL7/LrOPYg=="],
 
     "react-native-builder-bob/del/globby/@sindresorhus/merge-streams": ["@sindresorhus/merge-streams@4.0.0", "", {}, "sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ=="],
 

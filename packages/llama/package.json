@@ -39,7 +39,7 @@
   "dependencies": {
     "@ai-sdk/provider": "^4.0.33",
     "@ai-sdk/provider-utils": "^5.0.67",
-    "react-native-blob-util": "^0.24.5",
+    "react-native-blob-util": "^0.24.12",
     "zod": "^4.0.0"
   },
   "peerDependencies": {
