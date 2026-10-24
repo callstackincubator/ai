@@ -1,13 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React, { useState } from 'react'
-import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 
 import { AdaptiveGlass } from '../../components/AdaptiveGlass'
-import { Button, ContextMenu, Host } from '../../components/expo-ui'
 import { RecordButton } from '../../components/RecordButton'
 import { colors } from '../../theme/colors'
 import { AppleTokenCounter } from './AppleTokenCounter'
+import { AttachmentMenu } from './AttachmentMenu'
 
 type ChatInputBarProps = {
   onSend: (message: string) => void
@@ -36,43 +36,7 @@ export function ChatInputBar({
       </View>
       <View style={styles.inputRow}>
         <AdaptiveGlass isInteractive style={styles.plusButton}>
-          <Host matchContents>
-            <ContextMenu activationMethod="singlePress">
-              <ContextMenu.Items>
-                <Button
-                  // @ts-expect-error - conditional icons per platform
-                  systemImage={Platform.select({
-                    ios: 'camera',
-                    android: 'rounded.ArrowForward',
-                  })}
-                  onPress={() => console.log('Take Photo')}
-                >
-                  Take Photo
-                </Button>
-                <Button
-                  // @ts-expect-error - conditional icons per platform
-                  systemImage={Platform.select({
-                    ios: 'photo.on.rectangle',
-                    android: 'rounded.ArrowBack',
-                  })}
-                  onPress={() => console.log('Photo Library')}
-                >
-                  Photo Library
-                </Button>
-              </ContextMenu.Items>
-              <ContextMenu.Trigger>
-                <Button
-                  // @ts-expect-error - conditional icons per platform
-                  systemImage={Platform.select({
-                    ios: 'plus',
-                    android: 'rounded.Add',
-                  })}
-                  variant="borderless"
-                  color={colors.tertiaryLabel as any}
-                />
-              </ContextMenu.Trigger>
-            </ContextMenu>
-          </Host>
+          <AttachmentMenu />
         </AdaptiveGlass>
 
         <View style={styles.textInputContainer}>

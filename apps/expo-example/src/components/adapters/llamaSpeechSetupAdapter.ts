@@ -1,4 +1,4 @@
-import type { SpeechModelV3 } from '@ai-sdk/provider'
+import type { SpeechModelV4 } from '@ai-sdk/provider'
 import {
   downloadModel,
   getModelPath,
@@ -17,7 +17,7 @@ interface LlamaSpeechSetupOptions {
 export const createLlamaSpeechSetupAdapter = ({
   modelId: hfModelId,
   vocoderId,
-}: LlamaSpeechSetupOptions): SetupAdapter<SpeechModelV3> => {
+}: LlamaSpeechSetupOptions): SetupAdapter<SpeechModelV4> => {
   const modelPath = getModelPath(hfModelId)
   const vocoderPath = getModelPath(vocoderId)
   const model = llama.speechModel(modelPath, {

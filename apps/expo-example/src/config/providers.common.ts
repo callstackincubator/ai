@@ -1,4 +1,4 @@
-import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4, SpeechModelV4 } from '@ai-sdk/provider'
 
 import { createLlamaLanguageSetupAdapter } from '../components/adapters/llamaModelSetupAdapter'
 import { createLlamaSpeechSetupAdapter } from '../components/adapters/llamaSpeechSetupAdapter'
@@ -36,7 +36,7 @@ export interface SetupAdapter<TModel> {
 }
 
 // Available language model adapters for text generation.
-export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
+export const commonLanguageAdapters: SetupAdapter<LanguageModelV4>[] = [
   createLlamaLanguageSetupAdapter(
     'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
   ),
@@ -53,7 +53,7 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
 ]
 
 // Available speech model adapters for text-to-speech.
-export const commonSpeechAdapters: SetupAdapter<SpeechModelV3>[] = [
+export const commonSpeechAdapters: SetupAdapter<SpeechModelV4>[] = [
   createLlamaSpeechSetupAdapter({
     modelId: 'OuteAI/OuteTTS-0.3-500M-GGUF/OuteTTS-0.3-500M-Q4_K_M.gguf',
     vocoderId: 'ggml-org/WavTokenizer/WavTokenizer-Large-75-Q5_1.gguf',

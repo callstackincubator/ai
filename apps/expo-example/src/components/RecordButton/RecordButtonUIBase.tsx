@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { experimental_transcribe, TranscriptionModel } from 'ai'
+import { transcribe as transcribeAudio, TranscriptionModel } from 'ai'
 import { SymbolView } from 'expo-symbols'
 import { useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from 'react-native'
@@ -46,14 +46,11 @@ export function RecordButtonUIBase({
     AudioManager.setAudioSessionOptions({
       iosCategory: 'playAndRecord',
       iosMode: 'voiceChat',
-      iosOptions: ['defaultToSpeaker', 'allowBluetooth'],
+      iosOptions: ['defaultToSpeaker', 'allowBluetoothHFP'],
     })
 
     // Always create a fresh recorder to avoid accumulating listeners
-    recorderRef.current = new AudioRecorder({
-      sampleRate: SAMPLE_RATE,
-      bufferLengthInSamples: SAMPLE_RATE,
-    })
+    recorderRef.current = new AudioRecorder()
   }
 
   const requestPermissionIfNeeded = async (): Promise<boolean> => {
@@ -76,7 +73,7 @@ export function RecordButtonUIBase({
     setIsTranscribing(true)
 
     try {
-      const result = await experimental_transcribe({
+      const result = await transcribeAudio({
         model: transcriptionModel,
         audio: audioBuffer,
       })
@@ -113,17 +110,24 @@ export function RecordButtonUIBase({
 
     audioBuffersRef.current = []
 
-    recorderRef.current.onAudioReady((event) => {
-      const { buffer } = event
-      audioBuffersRef.current.push(buffer)
-    })
+    recorderRef.current.onAudioReady(
+      {
+        sampleRate: SAMPLE_RATE,
+        bufferLength: SAMPLE_RATE,
+        channelCount: 1,
+      },
+      (event) => {
+        const { buffer } = event
+        audioBuffersRef.current.push(buffer)
+      }
+    )
 
     aCtxRef.current = new AudioContext({ sampleRate: SAMPLE_RATE })
     recorderAdapterRef.current = aCtxRef.current.createRecorderAdapter()
     recorderAdapterRef.current.connect(aCtxRef.current.destination)
     recorderRef.current.connect(recorderAdapterRef.current)
 
-    recorderRef.current.start()
+    await recorderRef.current.start()
     setIsRecording(true)
 
     if (aCtxRef.current.state === 'suspended') {
@@ -149,7 +153,7 @@ export function RecordButtonUIBase({
     // Add a small delay to capture the end of speech
     await new Promise((resolve) => setTimeout(resolve, STOP_DELAY_MS))
 
-    recorderRef.current.stop()
+    await recorderRef.current.stop()
     setIsStopping(false)
 
     // Merge all recorded PCM data

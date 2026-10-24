@@ -1,4 +1,4 @@
-import type { LanguageModelV3, SpeechModelV3 } from '@ai-sdk/provider'
+import type { LanguageModelV4, SpeechModelV4 } from '@ai-sdk/provider'
 
 import {
   createAdkCloudSetupAdapter,
@@ -11,17 +11,17 @@ import {
   type SetupAdapter,
 } from './providers.common'
 
-const adkLanguageAdapters: SetupAdapter<LanguageModelV3>[] = [
+const adkLanguageAdapters: SetupAdapter<LanguageModelV4>[] = [
   createAdkNanoSetupAdapter(toolDefinitions),
   createAdkCloudSetupAdapter(toolDefinitions),
 ]
 
 // Available language model adapters for text generation.
-export const languageAdapters: SetupAdapter<LanguageModelV3>[] = [
+export const languageAdapters: SetupAdapter<LanguageModelV4>[] = [
   ...commonLanguageAdapters,
   ...adkLanguageAdapters,
 ]
 
 // Available speech model adapters for text-to-speech.
-export const speechAdapters: SetupAdapter<SpeechModelV3>[] =
+export const speechAdapters: SetupAdapter<SpeechModelV4>[] =
   commonSpeechAdapters

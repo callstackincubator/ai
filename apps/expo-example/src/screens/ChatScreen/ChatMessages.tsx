@@ -1,5 +1,6 @@
 import { GenerativeUIView } from '@react-native-ai/json-ui'
 import React, { useEffect, useRef } from 'react'
+import type { ScrollViewInstance } from 'react-native'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { useKeyboardHandler } from 'react-native-keyboard-controller'
 import Reanimated, {
@@ -45,7 +46,7 @@ export function ChatMessages({
   genUiEnabled,
   showAppleTokenCount,
 }: ChatMessagesProps) {
-  const ref = useRef<ScrollView>(null)
+  const ref = useRef<ScrollViewInstance>(null)
 
   const insets = useSafeAreaInsets()
   const keyboardHeight = useSharedValue(insets.bottom)
