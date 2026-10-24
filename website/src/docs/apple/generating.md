@@ -42,7 +42,7 @@ const result = await generateText({
   model: apple(),
   prompt: 'Write a concise product announcement.',
   temperature: 0.6,
-  maxTokens: 300,
+  maxOutputTokens: 300,
   topP: 0.9,
 })
 ```
@@ -70,24 +70,26 @@ Streaming structured objects are not currently supported by this provider.
 
 ## Structured Output
 
-Use `generateObject` when you want Apple guided generation through the AI SDK:
+Use `Output.object` when you want Apple guided generation through the AI SDK:
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
-import { generateObject } from 'ai'
+import { generateText, Output } from 'ai'
 import { z } from 'zod'
 
-const result = await generateObject({
+const result = await generateText({
   model: apple(),
   prompt: 'Create a compact user profile for a software developer.',
-  schema: z.object({
-    name: z.string(),
-    role: z.string(),
-    seniority: z.enum(['junior', 'mid', 'senior']),
+  output: Output.object({
+    schema: z.object({
+      name: z.string(),
+      role: z.string(),
+      seniority: z.enum(['junior', 'mid', 'senior']),
+    }),
   }),
 })
 
-console.log(result.object)
+console.log(result.output)
 ```
 
 Supported schema shapes include objects, arrays, strings, numbers, booleans,
@@ -229,8 +231,9 @@ The provider accepts local file URLs, absolute file paths, base64 image data,
 and image data URLs. Remote HTTP URLs are not sent directly to Apple; download
 them first and pass a local file URL or base64 payload.
 
-Image attachments are currently supported on the final user prompt. Passing
-image parts on older OS versions throws `AppleLLMErrorCodes.UnsupportedOS`.
+Apple Foundation Models only reads images on the final user prompt. Images in
+earlier user turns are left out of the history sent to the model. Passing image
+parts on older OS versions throws `AppleLLMErrorCodes.UnsupportedOS`.
 
 ## Image Generation
 

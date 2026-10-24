@@ -16,7 +16,8 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 | React Native AI | AI SDK |
 | --------------- | ------ |
 | 0.11 and below  | v5     |
-| 0.12 and above  | v6     |
+| 0.12            | v6     |
+| 0.13 and above  | v7     |
 
 ## DevTools
 
@@ -125,8 +126,8 @@ See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-sta
 Run app-provided Apple Core AI model bundles exported from [`apple/coreai-models`](https://github.com/apple/coreai-models). This provider is for custom `.aimodel` assets, not Apple system models.
 
 - **Language Sessions** - Core AI language models with persistent native sessions
-- **AI SDK Adapters** - Language, embeddings, image generation, and transcription where AI SDK has matching interfaces
-- **Native-only APIs** - Segmentation, object detection, depth, super-resolution, model inspection, specialization, and raw `.aimodel` functions
+- **AI SDK Adapters** - Language and image generation. Embedding and transcription adapters exist but reject with an unsupported error until native runners land ([#237](https://github.com/callstackincubator/ai/issues/237))
+- **Native-only APIs** - Model inspection, segmentation, and object detection
 - **Starter Models** - Documented starter bundles for language, image generation, segmentation, and object detection
 
 #### Installation
