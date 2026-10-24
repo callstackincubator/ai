@@ -47,9 +47,6 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV4>[] = [
     'bartowski/Qwen_Qwen3.5-2B-GGUF/mmproj-Qwen_Qwen3.5-2B-f16.gguf'
   ),
   createLlamaLanguageSetupAdapter(
-    'ggml-org/SmolLM3-3B-GGUF/SmolLM3-Q4_K_M.gguf'
-  ),
-  createLlamaLanguageSetupAdapter(
     'Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf'
   ),
   createLlamaLanguageSetupAdapter(
