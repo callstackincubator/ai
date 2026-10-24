@@ -30,7 +30,10 @@ export async function pickImages(
 ): Promise<ImageAttachment[]> {
   const options: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images'],
-    // Below 1 the picker re-encodes HEIC photos as JPEG, which llama.cpp can decode
+    // llama.cpp can't decode HEIC, so ask the library for JPEG and let the
+    // camera re-encode its capture
+    preferredAssetRepresentationMode:
+      ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     quality: 0.8,
   }
 
