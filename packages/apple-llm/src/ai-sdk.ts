@@ -59,10 +59,17 @@ export interface AppleProviderOptions {
   personalization?: AppleImagePersonalization
 }
 
+export type AppleModelAvailability =
+  | 'available'
+  | 'deviceNotEligible'
+  | 'appleIntelligenceNotEnabled'
+  | 'modelNotReady'
+  | 'systemNotReady'
+  | 'unknown'
+
 export interface AppleModelInfo {
   model: AppleLanguageModelId
-  isAvailable: boolean
-  availability: string
+  availability: AppleModelAvailability
   supportsLocale: boolean
   supportedLanguages: string[]
   supportsTokenCounting: boolean

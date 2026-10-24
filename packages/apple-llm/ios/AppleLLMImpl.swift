@@ -58,12 +58,9 @@ public class AppleLLMImpl: NSObject {
 #if canImport(FoundationModels)
 #if compiler(>=6.3)
     if #available(iOS 26.4, *) {
-      guard SystemLanguageModel.default.availability == .available else {
-        reject(
-          "MODEL_UNAVAILABLE",
-          "Apple Intelligence model is not available",
-          nil
-        )
+      let availability = availabilityString(SystemLanguageModel.default.availability)
+      guard availability == "available" else {
+        rejectWithAppleError(.modelUnavailable(availability), reject: reject)
         return
       }
       Task {
@@ -363,11 +360,9 @@ public class AppleLLMImpl: NSObject {
 #if canImport(FoundationModels)
   @available(iOS 26, *)
   private func modelInfo(for model: SystemLanguageModel, locale: Locale, modelName: String) -> [String: Any] {
-    let isAvailable = model.availability == .available
     var info: [String: Any] = [
       "model": modelName,
-      "isAvailable": isAvailable,
-      "availability": isAvailable ? "available" : "unavailable",
+      "availability": availabilityString(model.availability),
       "supportsLocale": model.supportsLocale(locale),
       "supportedLanguages": model.supportedLanguages.map(languageIdentifier).sorted(),
       "supportsTokenCounting": false,
@@ -399,25 +394,61 @@ public class AppleLLMImpl: NSObject {
     locale: Locale,
     modelName: String
   ) async throws -> [String: Any] {
-    let contextSize = try await model.contextSize
-    let supportsLocale = try await model.supportsLocale(locale)
-    let supportedLanguages = try await model.supportedLanguages
-    let isAvailable = model.availability == .available
-    return [
+    let availability = availabilityString(model.availability)
+    var info: [String: Any] = [
       "model": modelName,
-      "isAvailable": isAvailable,
-      "availability": isAvailable ? "available" : "unavailable",
-      "contextSize": contextSize,
-      "supportsLocale": supportsLocale,
-      "supportedLanguages": supportedLanguages.map(languageIdentifier).sorted(),
+      "availability": availability,
+      "supportsLocale": false,
+      "supportedLanguages": [String](),
       // PrivateCloudComputeLanguageModel has no tokenCount(for:) API, only SystemLanguageModel does
       "supportsTokenCounting": false,
       "supportsImagePrompts": true,
       "supportsDynamicProfiles": true,
       "supportsVisionTools": supportsVisionTools,
     ]
+
+    // Model metadata is fetched asynchronously, so only ask for it once Private Cloud
+    // Compute is available and report the unavailable reason otherwise
+    guard availability == "available" else {
+      return info
+    }
+
+    info["contextSize"] = try await model.contextSize
+    info["supportsLocale"] = try await model.supportsLocale(locale)
+    info["supportedLanguages"] = try await model.supportedLanguages.map(languageIdentifier).sorted()
+    return info
+  }
+
+  @available(iOS 27, *)
+  private func availabilityString(_ availability: PrivateCloudComputeLanguageModel.Availability) -> String {
+    switch availability {
+    case .available:
+      return "available"
+    case .unavailable(.deviceNotEligible):
+      return "deviceNotEligible"
+    case .unavailable(.systemNotReady):
+      return "systemNotReady"
+    case .unavailable:
+      return "unknown"
+    }
   }
 #endif
+
+  @available(iOS 26, *)
+  private func availabilityString(_ availability: SystemLanguageModel.Availability) -> String {
+    switch availability {
+    case .available:
+      return "available"
+    case .unavailable(.deviceNotEligible):
+      return "deviceNotEligible"
+    case .unavailable(.appleIntelligenceNotEnabled):
+      return "appleIntelligenceNotEnabled"
+    case .unavailable(.modelNotReady):
+      return "modelNotReady"
+    case .unavailable:
+      return "unknown"
+    }
+  }
 
   @available(iOS 26, *)
   private func languageIdentifier(_ language: Locale.Language) -> String {
@@ -456,8 +487,9 @@ public class AppleLLMImpl: NSObject {
       let model = providerOptions["guardrails"] as? String == "permissiveContentTransformations"
         ? SystemLanguageModel(guardrails: .permissiveContentTransformations)
         : SystemLanguageModel.default
-      guard model.availability == .available else {
-        throw AppleLLMError.modelUnavailable
+      let availability = availabilityString(model.availability)
+      guard availability == "available" else {
+        throw AppleLLMError.modelUnavailable(availability)
       }
       return LanguageModelSession(
         model: model,
@@ -468,8 +500,9 @@ public class AppleLLMImpl: NSObject {
 #if compiler(>=6.4)
       if #available(iOS 27, *) {
         let model = PrivateCloudComputeLanguageModel()
-        guard model.availability == .available else {
-          throw AppleLLMError.modelUnavailable
+        let availability = availabilityString(model.availability)
+        guard availability == "available" else {
+          throw AppleLLMError.modelUnavailable(availability)
         }
         return LanguageModelSession(
           model: model,
