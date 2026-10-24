@@ -83,6 +83,22 @@ class AdkStreamToolCallEmitter(
     }
   }
 
+  /** Emits the result of each tool call that ADK ran in this event. */
+  fun handleResults(event: Event) {
+    for (functionResponse in event.functionResponses()) {
+      val toolCallId = functionResponse.id ?: continue
+      emit(
+        Arguments.createMap().apply {
+          putString("streamId", streamId)
+          putString("phase", "result")
+          putString("toolCallId", toolCallId)
+          putString("toolName", functionResponse.name)
+          putString("output", AdkJson.encode(functionResponse.response))
+        },
+      )
+    }
+  }
+
   private fun emitEnd(toolCallId: String, toolName: String, input: String) {
     emit(
       Arguments.createMap().apply {

@@ -1,6 +1,8 @@
 import type {
+  JSONValue,
   LanguageModelV4,
   LanguageModelV4CallOptions,
+  LanguageModelV4Content,
   LanguageModelV4FilePart,
   LanguageModelV4FinishReason,
   LanguageModelV4FunctionTool,
@@ -12,7 +14,6 @@ import type {
 } from '@ai-sdk/provider'
 import {
   generateId,
-  isCustomReasoning,
   jsonSchema,
   parseJSON,
   resolveFullMediaType,
@@ -21,133 +22,362 @@ import {
 } from '@ai-sdk/provider-utils'
 import { Platform } from 'react-native'
 
+import { AdkErrorCodes, createAdkError, toAdkError } from './errors'
 import {
   type AdkAgentConfig,
   type AdkGenerationOptions,
   type AdkMessage,
   type AdkMessagePart,
   type AdkModelType,
+  type AdkNanoModelConfig,
   type AdkTool,
   type AdkToolParameter,
   type AdkUsageMetadata,
   getNativeAdkEngine,
+  type NanoDownloadProgressEvent,
   type StreamToolCallEvent,
   type ToolCallEvent,
 } from './NativeAdkEngine'
 
-export interface AdkProviderOptions {
-  name?: string
-  description?: string
-  instruction?: string
+const DEFAULT_NANO_MODEL = 'gemini-nano'
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+
+export type AdkToolDefinitionSet = Record<string, FullToolDefinition>
+
+/** `gemini-nano` runs on device, any other name is a cloud Gemini model */
+export type AdkLanguageModelId = 'gemini-nano' | (string & {})
+
+export interface AdkLanguageModelOptions {
+  /** Defaults to `genai-nano`, or `gemini` when `modelName` names a cloud model */
   modelType?: AdkModelType
-  modelName?: string
+  /** Defaults to `gemini-nano` on device and `gemini-2.5-flash` in the cloud */
+  modelName?: AdkLanguageModelId
+  /** ADK agent name */
+  name?: string
+  /** ADK agent description */
+  description?: string
+  /** System instruction for the agent */
+  instruction?: string
+  /** Gemini API key, required for `gemini` */
   apiKey?: string
-  availableTools?: Record<string, FullToolDefinition>
+  /** Tools whose `execute` handlers ADK can call */
+  availableTools?: AdkToolDefinitionSet
+  /** Gemini Nano model selection */
+  nano?: AdkNanoModelConfig
 }
 
-/**
- * Whether the device can support on-device Gemini Nano at all
- * (ML Kit `checkStatus !== 0`). Does not download models.
- */
-async function checkNanoSupported(): Promise<boolean> {
-  if (Platform.OS !== 'android') {
-    return false
-  }
+/** Per-call options passed as `providerOptions.adk` */
+export interface AdkProviderOptions {
+  /** Thinking token budget for cloud Gemini. `0` disables thinking */
+  thinkingBudget?: number
+  /** Whether the model's thoughts come back as reasoning parts */
+  includeThoughts?: boolean
+}
 
-  return getNativeAdkEngine().isNanoSupported()
+export type AdkModelAvailability =
+  | 'available'
+  | 'downloadable'
+  | 'downloading'
+  | 'unavailable'
+  | 'unknown'
+
+export interface AdkModelInfo {
+  modelType: AdkModelType
+  modelName: string
+  availability: AdkModelAvailability
+  /** Name of the Gemini Nano base model, when ML Kit reports it */
+  baseModelName?: string
+  /** Gemini Nano input token limit, when ML Kit reports it */
+  contextSize?: number
+}
+
+export interface AdkDownloadProgress {
+  phase: 'started' | 'progress' | 'completed'
+  bytesDownloaded?: number
+  bytesToDownload?: number
+}
+
+export interface AdkPrepareOptions {
+  onProgress?: (progress: AdkDownloadProgress) => void
+}
+
+export interface AdkLanguageModel extends LanguageModelV4 {
+  /** Downloads and initializes Gemini Nano. No-op for cloud models */
+  prepare: () => Promise<void>
+  updateTools: (tools: AdkToolDefinitionSet) => void
+  /** Counts tokens with the Gemini Nano tokenizer. Not available for cloud models */
+  countTokens: (text: string) => Promise<number>
 }
 
 export interface AdkProvider {
-  (): LanguageModelV4
+  (options?: AdkLanguageModelId | AdkLanguageModelOptions): AdkLanguageModel
   readonly specificationVersion: 'v4'
-  languageModel: () => LanguageModelV4
-  /** Device capability check (ML Kit `checkStatus !== 0`). Returns `false` on non-Android. */
+  languageModel: (
+    options?: AdkLanguageModelId | AdkLanguageModelOptions
+  ) => AdkLanguageModel
+  /** Whether the device can run Gemini Nano at all. Returns `false` on non-Android */
   isNanoSupported: () => Promise<boolean>
   /**
-   * Whether `modelType` can be used now. For `genai-nano`, checks ML Kit readiness
-   * (status 1 or 3). Returns `false` when {@link isNanoSupported} is `false`.
-   * Cloud `gemini` always resolves to `true` on Android.
+   * Whether `modelType` can be used now. For `genai-nano`, Gemini Nano must be
+   * available or downloadable. Cloud `gemini` resolves to `true` on Android
    */
   isAvailable: (modelType?: AdkModelType) => Promise<boolean>
-  /** Downloads and initializes on-device Gemini Nano. No-op for cloud models. */
-  prepareNano: () => Promise<void>
+  /** Availability details for a model type */
+  getModelInfo: (options?: {
+    modelType?: AdkModelType
+    nano?: AdkNanoModelConfig
+  }) => Promise<AdkModelInfo>
+  /** Downloads and initializes Gemini Nano, reporting download progress */
+  prepareNano: (options?: AdkPrepareOptions) => Promise<void>
+}
+
+type ResolvedModelOptions = Omit<
+  AdkLanguageModelOptions,
+  'modelType' | 'modelName'
+> & {
+  modelType: AdkModelType
+  modelName: string
+}
+
+function resolveModelOptions(
+  defaults: AdkLanguageModelOptions,
+  options: AdkLanguageModelId | AdkLanguageModelOptions = {}
+): ResolvedModelOptions {
+  const overrides =
+    typeof options === 'string' ? { modelName: options } : options
+  const merged = { ...defaults, ...overrides }
+  const modelType =
+    merged.modelType ??
+    (merged.modelName && merged.modelName !== DEFAULT_NANO_MODEL
+      ? 'gemini'
+      : 'genai-nano')
+  const modelName =
+    merged.modelName ??
+    (modelType === 'gemini' ? DEFAULT_GEMINI_MODEL : DEFAULT_NANO_MODEL)
+
+  return { ...merged, modelType, modelName }
+}
+
+const toModelAvailability = (value: string): AdkModelAvailability => {
+  switch (value) {
+    case 'available':
+    case 'downloadable':
+    case 'downloading':
+    case 'unavailable':
+      return value
+    default:
+      return 'unknown'
+  }
+}
+
+async function prepareNano(
+  nano: AdkNanoModelConfig | undefined,
+  options: AdkPrepareOptions = {}
+) {
+  const native = getNativeAdkEngine()
+  const listener = options.onProgress
+    ? native.onNanoDownloadProgress((event: NanoDownloadProgressEvent) => {
+        options.onProgress?.({
+          phase: event.phase as AdkDownloadProgress['phase'],
+          bytesDownloaded: event.bytesDownloaded,
+          bytesToDownload: event.bytesToDownload,
+        })
+      })
+    : null
+
+  try {
+    await native.prepareNano(nano)
+  } catch (error) {
+    throw toAdkError(error)
+  } finally {
+    listener?.remove()
+  }
 }
 
 export function createAdkProvider(
-  options: AdkProviderOptions = {}
+  defaults: AdkLanguageModelOptions = {}
 ): AdkProvider {
-  const createLanguageModel = () => new AdkChatLanguageModel(options)
-  const provider = function () {
-    return createLanguageModel()
+  const createLanguageModel = (
+    options?: AdkLanguageModelId | AdkLanguageModelOptions
+  ): AdkLanguageModel =>
+    new AdkChatLanguageModel(resolveModelOptions(defaults, options))
+
+  const provider = function (
+    options?: AdkLanguageModelId | AdkLanguageModelOptions
+  ) {
+    return createLanguageModel(options)
   }
   provider.specificationVersion = 'v4' as const
   provider.languageModel = createLanguageModel
-  provider.isNanoSupported = () => checkNanoSupported()
-  provider.isAvailable = async (modelType: AdkModelType = 'genai-nano') => {
-    if (modelType === 'genai-nano' && !(await checkNanoSupported())) {
+  provider.isNanoSupported = async () => {
+    if (Platform.OS !== 'android') {
       return false
     }
-    return getNativeAdkEngine().isAvailable(modelType).then(Boolean)
+    return getNativeAdkEngine().isNanoSupported(defaults.nano)
   }
-  provider.prepareNano = () => getNativeAdkEngine().prepareNano()
+  provider.isAvailable = async (modelType: AdkModelType = 'genai-nano') => {
+    if (Platform.OS !== 'android') {
+      return false
+    }
+    return getNativeAdkEngine()
+      .isAvailable(modelType, defaults.nano)
+      .then(Boolean)
+  }
+  provider.getModelInfo = async (
+    options: { modelType?: AdkModelType; nano?: AdkNanoModelConfig } = {}
+  ): Promise<AdkModelInfo> => {
+    const resolved = resolveModelOptions(defaults)
+    const { modelType, modelName } =
+      options.modelType && options.modelType !== resolved.modelType
+        ? resolveModelOptions({ modelType: options.modelType })
+        : resolved
+    const nano = options.nano ?? defaults.nano
+
+    if (Platform.OS !== 'android') {
+      return { modelType, modelName, availability: 'unavailable' }
+    }
+
+    const info = await getNativeAdkEngine()
+      .getModelInfo(modelType, nano)
+      .catch((error: unknown) => {
+        throw toAdkError(error)
+      })
+    return {
+      modelType,
+      modelName,
+      availability: toModelAvailability(info.availability),
+      baseModelName: info.baseModelName,
+      contextSize: info.contextSize,
+    }
+  }
+  provider.prepareNano = (options?: AdkPrepareOptions) =>
+    prepareNano(defaults.nano, options)
   return provider
 }
 
 export const adk = createAdkProvider()
 
 type Tool = LanguageModelV4FunctionTool | LanguageModelV4ProviderTool
-type ToolDefinitionSet = Record<string, FullToolDefinition>
 
-const createEmptyUsage = (): LanguageModelV4Usage => ({
-  inputTokens: {
-    total: undefined,
-    noCache: undefined,
-    cacheRead: undefined,
-    cacheWrite: undefined,
-  },
-  outputTokens: {
-    total: undefined,
-    text: undefined,
-    reasoning: undefined,
-  },
-})
+const toolChoiceWarning: SharedV4Warning = {
+  type: 'unsupported',
+  feature: 'toolChoice',
+  details: 'ADK runs tools natively and cannot be required to call a tool.',
+}
+
+function prepareToolChoice(
+  tools: Tool[] = [],
+  toolChoice: LanguageModelV4CallOptions['toolChoice']
+): { tools: Tool[]; warnings: SharedV4Warning[] } {
+  switch (toolChoice?.type) {
+    case 'none':
+      return { tools: [], warnings: [] }
+    case 'required':
+      return { tools, warnings: [toolChoiceWarning] }
+    case 'tool':
+      return {
+        tools: tools.filter((tool) => tool.name === toolChoice.toolName),
+        warnings: [toolChoiceWarning],
+      }
+    default:
+      return { tools, warnings: [] }
+  }
+}
+
+// Gemini thinking budgets for the AI SDK reasoning levels
+const thinkingBudgets = {
+  minimal: 512,
+  low: 2048,
+  medium: 8192,
+  high: 24576,
+  xhigh: 24576,
+  max: 24576,
+} as const
+
+function prepareThinking(
+  reasoning: LanguageModelV4CallOptions['reasoning'],
+  adkOptions: AdkProviderOptions
+): AdkGenerationOptions['thinking'] {
+  if (adkOptions.thinkingBudget !== undefined) {
+    return {
+      includeThoughts:
+        adkOptions.includeThoughts ?? adkOptions.thinkingBudget !== 0,
+      budget: adkOptions.thinkingBudget,
+    }
+  }
+
+  switch (reasoning) {
+    case undefined:
+    case 'provider-default':
+      return adkOptions.includeThoughts === undefined
+        ? undefined
+        : { includeThoughts: adkOptions.includeThoughts }
+    case 'none':
+      return { includeThoughts: false, budget: 0 }
+    default:
+      return {
+        includeThoughts: adkOptions.includeThoughts ?? true,
+        budget: thinkingBudgets[reasoning],
+      }
+  }
+}
 
 const mapUsage = (usage?: AdkUsageMetadata): LanguageModelV4Usage => {
-  if (!usage) {
-    return createEmptyUsage()
-  }
+  const promptTokens = usage?.promptTokenCount
+  const cachedTokens = usage?.cachedContentTokenCount
+  const textTokens = usage?.candidatesTokenCount
+  const reasoningTokens = usage?.thoughtsTokenCount
 
   return {
     inputTokens: {
-      total: usage.promptTokenCount,
-      noCache: undefined,
-      cacheRead: undefined,
+      total: promptTokens,
+      noCache:
+        promptTokens !== undefined && cachedTokens !== undefined
+          ? promptTokens - cachedTokens
+          : undefined,
+      cacheRead: cachedTokens,
       cacheWrite: undefined,
     },
     outputTokens: {
-      total: usage.candidatesTokenCount,
-      text: undefined,
-      reasoning: undefined,
+      // Gemini counts thoughts separately from candidates
+      total:
+        textTokens === undefined && reasoningTokens === undefined
+          ? undefined
+          : (textTokens ?? 0) + (reasoningTokens ?? 0),
+      text: textTokens,
+      reasoning: reasoningTokens,
     },
-    raw: {
-      promptTokenCount: usage.promptTokenCount,
-      candidatesTokenCount: usage.candidatesTokenCount,
-      totalTokenCount: usage.totalTokenCount,
-    },
+    raw: usage ? { ...usage } : undefined,
   }
 }
+
+const contentFilterReasons = new Set([
+  'SAFETY',
+  'RECITATION',
+  'BLOCKLIST',
+  'PROHIBITED_CONTENT',
+  'SPII',
+  'IMAGE_SAFETY',
+  'IMAGE_PROHIBITED_CONTENT',
+  'IMAGE_RECITATION',
+])
 
 const convertFinishReason = (
   finishReason?: string
 ): LanguageModelV4FinishReason => {
   let unified: LanguageModelV4FinishReason['unified'] = 'other'
 
-  if (finishReason === 'STOP' || finishReason === 'stop') {
+  if (finishReason === undefined || finishReason === 'STOP') {
     unified = 'stop'
-  } else if (finishReason === 'MAX_TOKENS' || finishReason === 'length') {
+  } else if (finishReason === 'MAX_TOKENS') {
     unified = 'length'
-  } else if (finishReason === 'tool_calls' || finishReason === 'TOOL_CALLS') {
-    unified = 'tool-calls'
+  } else if (contentFilterReasons.has(finishReason)) {
+    unified = 'content-filter'
+  } else if (
+    finishReason === 'MALFORMED_FUNCTION_CALL' ||
+    finishReason === 'UNEXPECTED_TOOL_CALL'
+  ) {
+    unified = 'error'
   }
 
   return {
@@ -174,34 +404,6 @@ const schemaPropertyToAdkParameter = (
   }
 }
 
-const getCallWarnings = (
-  options: LanguageModelV4CallOptions
-): SharedV4Warning[] => {
-  const warnings: SharedV4Warning[] = []
-
-  // `none` is already what a model without reasoning control does
-  if (isCustomReasoning(options.reasoning) && options.reasoning !== 'none') {
-    warnings.push({
-      type: 'unsupported',
-      feature: 'reasoning',
-      details: 'ADK models do not support configuring reasoning.',
-    })
-  }
-
-  if (
-    options.toolChoice?.type === 'required' ||
-    options.toolChoice?.type === 'tool'
-  ) {
-    warnings.push({
-      type: 'unsupported',
-      feature: 'toolChoice',
-      details: 'ADK models only support auto and none tool choices.',
-    })
-  }
-
-  return warnings
-}
-
 const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
   let binary = ''
   for (let index = 0; index < bytes.length; index++) {
@@ -210,97 +412,151 @@ const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
   return btoa(binary)
 }
 
-const normalizeFilePart = (
-  part: LanguageModelV4FilePart
-): { data: string; mediaType: string } => {
-  if (part.data.type !== 'data') {
-    throw new Error(
-      'ADK wrapper does not support file URLs or references yet. Pass base64 or Uint8Array data.'
-    )
-  }
+const localUrlProtocols = new Set(['file:', 'content:'])
 
-  const data =
-    typeof part.data.data === 'string'
-      ? part.data.data.replace(/^data:[^;]+;base64,/, '')
-      : uint8ArrayToBase64(part.data.data)
+const toFileMessagePart = (part: LanguageModelV4FilePart): AdkMessagePart => {
+  // v4 allows top-level media types such as `image`, which Gemini rejects
+  const mimeType = resolveFullMediaType({ part })
 
-  return {
-    data,
-    // v4 allows top-level media types such as `image`, which Gemini rejects
-    mediaType: resolveFullMediaType({ part }),
+  switch (part.data.type) {
+    case 'data':
+      return {
+        type: 'file',
+        mimeType,
+        data:
+          typeof part.data.data === 'string'
+            ? part.data.data.replace(/^data:[^;]+;base64,/, '')
+            : uint8ArrayToBase64(part.data.data),
+      }
+    case 'url':
+      // The AI SDK downloads other URLs because they are not in `supportedUrls`
+      if (!localUrlProtocols.has(part.data.url.protocol)) {
+        throw createAdkError(
+          `ADK only reads file:// and content:// URLs. Got ${part.data.url.protocol}`,
+          AdkErrorCodes.InvalidMessage
+        )
+      }
+      return { type: 'file', mimeType, uri: part.data.url.toString() }
+    case 'text':
+      return { type: 'text', text: part.data.text }
+    default:
+      throw createAdkError(
+        'ADK does not support provider file references.',
+        AdkErrorCodes.InvalidMessage
+      )
   }
 }
 
-class AdkChatLanguageModel implements LanguageModelV4 {
+const getAbortReason = (signal: AbortSignal) => {
+  if (signal.reason !== undefined) {
+    return signal.reason
+  }
+  const error = new Error('The operation was aborted.')
+  error.name = 'AbortError'
+  return error
+}
+
+const stringifyToolOutput = (value: unknown) =>
+  typeof value === 'string' ? value : JSON.stringify(value ?? null)
+
+// Gemini Nano often wraps JSON in a Markdown code fence
+const jsonFencePrefix = /^\s*```(?:json)?\s*\n?/
+const stripJsonFences = (text: string) =>
+  text.replace(jsonFencePrefix, '').replace(/\s*```\s*$/, '')
+
+const parseToolResult = (output: string): NonNullable<JSONValue> => {
+  try {
+    return (JSON.parse(output) as JSONValue) ?? {}
+  } catch {
+    return output
+  }
+}
+
+const createNanoJsonInstruction = (schema: unknown) =>
+  schema
+    ? `Respond only with JSON that matches this JSON schema, without Markdown or other text:\n${JSON.stringify(schema)}`
+    : 'Respond only with valid JSON, without Markdown or other text.'
+
+class AdkChatLanguageModel implements AdkLanguageModel {
   readonly specificationVersion = 'v4'
-  readonly supportedUrls = {}
+  readonly supportedUrls = {
+    'image/*': [/^file:\/\//, /^content:\/\//],
+  }
 
   readonly provider = 'adk'
   readonly modelId: string
 
   private readonly agentConfig: AdkAgentConfig
-  private tools: ToolDefinitionSet = {}
+  private tools: AdkToolDefinitionSet = {}
   private nanoPreparePromise: Promise<void> | null = null
 
-  constructor(options: AdkProviderOptions) {
-    const modelType = options.modelType ?? 'genai-nano'
-    this.modelId = options.modelName ?? 'gemini-nano'
+  constructor(options: ResolvedModelOptions) {
+    this.modelId = options.modelName
     this.agentConfig = {
       name: options.name ?? 'react_native_adk_agent',
       description: options.description ?? 'React Native ADK agent',
       instruction: options.instruction,
       model: {
-        type: modelType,
-        name: this.modelId,
+        type: options.modelType,
+        name: options.modelName,
         apiKey: options.apiKey,
+        nano: options.nano,
       },
     }
     this.updateTools(options.availableTools ?? {})
   }
 
-  updateTools(tools: ToolDefinitionSet) {
+  private get isNano() {
+    return this.agentConfig.model.type === 'genai-nano'
+  }
+
+  updateTools(tools: AdkToolDefinitionSet) {
     this.tools = tools
-  }
-
-  public isAvailable() {
-    return getNativeAdkEngine()
-      .isAvailable(this.agentConfig.model.type)
-      .then(Boolean)
-  }
-
-  public prepareNano() {
-    return getNativeAdkEngine().prepareNano()
   }
 
   async prepare(): Promise<void> {
     await this.ensureNanoPrepared()
   }
 
+  async countTokens(text: string): Promise<number> {
+    if (!this.isNano) {
+      throw createAdkError(
+        'Token counting is only available for Gemini Nano.',
+        AdkErrorCodes.ModelUnavailable
+      )
+    }
+
+    try {
+      return await getNativeAdkEngine().countTokens(
+        text,
+        this.agentConfig.model.nano
+      )
+    } catch (error) {
+      throw toAdkError(error)
+    }
+  }
+
   private ensureNanoPrepared(): Promise<void> {
-    if (this.agentConfig.model.type !== 'genai-nano') {
+    if (!this.isNano) {
       return Promise.resolve()
     }
 
     if (!this.nanoPreparePromise) {
-      this.nanoPreparePromise = checkNanoSupported()
-        .then((supported) => {
-          if (!supported) {
-            throw new Error(
-              'Gemini Nano is not supported on this device or device has not fetched the latest configuration to support it'
-            )
-          }
-          return getNativeAdkEngine().prepareNano()
-        })
-        .catch((error) => {
+      this.nanoPreparePromise = prepareNano(this.agentConfig.model.nano).catch(
+        (error) => {
           this.nanoPreparePromise = null
           throw error
-        })
+        }
+      )
     }
 
     return this.nanoPreparePromise
   }
 
-  private prepareMessages(messages: LanguageModelV4Prompt): AdkMessage[] {
+  private prepareMessages(
+    messages: LanguageModelV4Prompt,
+    warnings: SharedV4Warning[]
+  ): AdkMessage[] {
     return messages.map((message): AdkMessage => {
       if (message.role === 'system') {
         return {
@@ -310,19 +566,12 @@ class AdkChatLanguageModel implements LanguageModelV4 {
       }
 
       if (message.role === 'user') {
-        const parts = message.content
-          .map((part): AdkMessagePart | null => {
-            if (part.type === 'text') {
-              return { type: 'text', text: part.text }
-            }
-            if (part.type === 'file') {
-              const { data, mediaType } = normalizeFilePart(part)
-              return { type: 'file', mimeType: mediaType, data }
-            }
-            console.warn('Unsupported user message content type:', part)
-            return null
-          })
-          .filter((part): part is AdkMessagePart => part !== null)
+        const parts = message.content.map((part): AdkMessagePart => {
+          if (part.type === 'text') {
+            return { type: 'text', text: part.text }
+          }
+          return toFileMessagePart(part)
+        })
 
         if (parts.length === 1 && parts[0]?.type === 'text') {
           return {
@@ -338,13 +587,34 @@ class AdkChatLanguageModel implements LanguageModelV4 {
       }
 
       if (message.role === 'assistant') {
-        const content = message.content.reduce((acc, part) => {
-          if (part.type === 'text') {
-            return acc + part.text
-          }
-          console.warn('Unsupported assistant message content type:', part)
-          return acc
-        }, '')
+        // ADK replays history as text, so earlier tool steps become text too
+        const content = message.content
+          .flatMap((part) => {
+            switch (part.type) {
+              case 'text':
+                return [part.text]
+              case 'tool-call':
+                return [
+                  `[Tool call: ${part.toolName}(${stringifyToolOutput(part.input)})]`,
+                ]
+              case 'tool-result':
+                return [
+                  `[Tool result for ${part.toolName}: ${stringifyToolOutput(
+                    'value' in part.output ? part.output.value : part.output
+                  )}]`,
+                ]
+              case 'reasoning':
+                return []
+              default:
+                warnings.push({
+                  type: 'unsupported',
+                  feature: `assistant ${part.type} parts`,
+                  details: 'ADK replays assistant messages as text only.',
+                })
+                return []
+            }
+          })
+          .join('\n')
 
         return {
           role: 'assistant',
@@ -359,9 +629,7 @@ class AdkChatLanguageModel implements LanguageModelV4 {
             if (part.output.type === 'execution-denied') {
               return part.output.reason ?? 'Execution denied'
             }
-            return typeof part.output.value === 'string'
-              ? part.output.value
-              : JSON.stringify(part.output.value)
+            return stringifyToolOutput(part.output.value)
           })
           .join('\n')
 
@@ -371,20 +639,54 @@ class AdkChatLanguageModel implements LanguageModelV4 {
         }
       }
 
-      throw new Error(`Unsupported message role for ADK provider`)
+      throw createAdkError(
+        'Unsupported message role for ADK provider',
+        AdkErrorCodes.InvalidMessage
+      )
     })
   }
 
-  private prepareGenerationOptions(
+  private prepareAgentConfig(
     options: LanguageModelV4CallOptions
+  ): AdkAgentConfig {
+    // Gemini Nano has no response schema, so the schema goes in the instruction
+    if (!this.isNano || options.responseFormat?.type !== 'json') {
+      return this.agentConfig
+    }
+
+    const instruction = [
+      this.agentConfig.instruction,
+      createNanoJsonInstruction(options.responseFormat.schema),
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+
+    return { ...this.agentConfig, instruction }
+  }
+
+  private prepareGenerationOptions(
+    options: LanguageModelV4CallOptions,
+    warnings: SharedV4Warning[]
   ): AdkGenerationOptions {
-    if (
-      options.responseFormat?.type === 'json' &&
-      options.responseFormat.schema
-    ) {
-      throw new Error(
-        'ADK does not support responseFormat.schema yet. Use JSON mode without a schema or omit responseFormat.'
-      )
+    const adkOptions = (options.providerOptions?.adk ??
+      {}) as AdkProviderOptions
+
+    if (this.isNano) {
+      const unsupported = {
+        topP: options.topP,
+        stopSequences: options.stopSequences,
+        presencePenalty: options.presencePenalty,
+        frequencyPenalty: options.frequencyPenalty,
+      }
+      for (const [feature, value] of Object.entries(unsupported)) {
+        if (value !== undefined) {
+          warnings.push({
+            type: 'unsupported',
+            feature,
+            details: 'Gemini Nano does not support this setting.',
+          })
+        }
+      }
     }
 
     return {
@@ -392,19 +694,34 @@ class AdkChatLanguageModel implements LanguageModelV4 {
       maxTokens: options.maxOutputTokens,
       topP: options.topP,
       topK: options.topK,
+      seed: options.seed,
+      stopSequences: options.stopSequences,
+      presencePenalty: options.presencePenalty,
+      frequencyPenalty: options.frequencyPenalty,
       responseFormat:
         options.responseFormat?.type === 'json'
           ? {
               type: 'json',
               mimeType: 'application/json',
+              schema: this.isNano ? undefined : options.responseFormat.schema,
             }
           : undefined,
+      thinking: prepareThinking(options.reasoning, adkOptions),
     }
   }
 
-  private prepareTools(tools: Tool[] = []) {
+  private prepareTools(tools: Tool[], warnings: SharedV4Warning[]) {
     return tools
-      .filter((tool) => tool.type === 'function')
+      .filter((tool): tool is LanguageModelV4FunctionTool => {
+        if (tool.type === 'function') {
+          return true
+        }
+        warnings.push({
+          type: 'unsupported',
+          feature: `provider-defined tool ${tool.name}`,
+        })
+        return false
+      })
       .map((tool) => {
         const required = Array.isArray(tool.inputSchema.required)
           ? tool.inputSchema.required
@@ -417,6 +734,13 @@ class AdkChatLanguageModel implements LanguageModelV4 {
 
         const schema = jsonSchema(tool.inputSchema)
 
+        if (!this.tools[tool.name]?.execute) {
+          warnings.push({
+            type: 'other',
+            message: `Tool "${tool.name}" has no executor. Pass it to createAdkProvider via availableTools so ADK can run it.`,
+          })
+        }
+
         return {
           native: {
             id: generateId(),
@@ -426,6 +750,13 @@ class AdkChatLanguageModel implements LanguageModelV4 {
             parameters,
           } satisfies AdkTool,
           execute: async (modelInput: unknown) => {
+            const execute = this.tools[tool.name]?.execute
+            if (!execute) {
+              return {
+                error: `Tool "${tool.name}" is not available in this app.`,
+              }
+            }
+
             const text =
               typeof modelInput === 'string'
                 ? modelInput
@@ -439,10 +770,30 @@ class AdkChatLanguageModel implements LanguageModelV4 {
               messages: [],
               context: undefined,
             }
-            return this.tools[tool.name]?.execute?.(toolCallArguments, opts)
+            return execute(toolCallArguments, opts)
           },
         }
       })
+  }
+
+  private prepareCall(options: LanguageModelV4CallOptions) {
+    const { tools, warnings } = prepareToolChoice(
+      options.tools,
+      options.toolChoice
+    )
+    const messages = this.prepareMessages(options.prompt, warnings)
+    const generationOptions = this.prepareGenerationOptions(options, warnings)
+    const preparedTools = this.prepareTools(tools, warnings)
+
+    return {
+      messages,
+      generationOptions,
+      preparedTools,
+      nativeTools: preparedTools.map((tool) => tool.native),
+      ownedToolIds: new Set(preparedTools.map((tool) => tool.native.id)),
+      agentConfig: this.prepareAgentConfig(options),
+      warnings,
+    }
   }
 
   private registerTools(
@@ -508,52 +859,105 @@ class AdkChatLanguageModel implements LanguageModelV4 {
   }
 
   async doGenerate(options: LanguageModelV4CallOptions) {
-    const messages = this.prepareMessages(options.prompt)
-    const generationOptions = this.prepareGenerationOptions(options)
-    const preparedTools = this.prepareTools(options.tools)
-    const nativeTools = preparedTools.map((tool) => tool.native)
-    const ownedToolIds = new Set(preparedTools.map((tool) => tool.native.id))
+    const {
+      messages,
+      generationOptions,
+      preparedTools,
+      nativeTools,
+      ownedToolIds,
+      agentConfig,
+      warnings,
+    } = this.prepareCall(options)
     const runId = generateId()
+    const native = getNativeAdkEngine()
+    const abortSignal = options.abortSignal
+
+    if (abortSignal?.aborted) {
+      throw getAbortReason(abortSignal)
+    }
+
+    const onAbort = () => {
+      void native
+        .cancelStream(runId)
+        .catch((error) => console.warn('[adk] cancel failed:', error))
+    }
 
     this.registerTools(preparedTools)
     const toolListener = this.createToolCallListener({ runId, ownedToolIds })
+    abortSignal?.addEventListener('abort', onAbort, { once: true })
 
     try {
       await this.ensureNanoPrepared()
 
-      const response = await getNativeAdkEngine().generateText(
+      const response = await native.generateText(
         runId,
         messages,
-        this.agentConfig,
+        agentConfig,
         generationOptions,
         nativeTools
       )
 
+      const content: LanguageModelV4Content[] = []
+      if (response.reasoning) {
+        content.push({ type: 'reasoning', text: response.reasoning })
+      }
+      for (const toolCall of response.toolCalls ?? []) {
+        content.push({
+          type: 'tool-call',
+          toolCallId: toolCall.toolCallId,
+          toolName: toolCall.toolName,
+          input: toolCall.input,
+          providerExecuted: true,
+        })
+      }
+      for (const toolResult of response.toolResults ?? []) {
+        content.push({
+          type: 'tool-result',
+          toolCallId: toolResult.toolCallId,
+          toolName: toolResult.toolName,
+          result: parseToolResult(toolResult.output),
+        })
+      }
+      content.push({
+        type: 'text',
+        text:
+          options.responseFormat?.type === 'json'
+            ? stripJsonFences(response.content)
+            : response.content,
+      })
+
       return {
-        content: [{ type: 'text' as const, text: response.content }],
+        content,
         finishReason: convertFinishReason(response.finishReason),
         usage: mapUsage(response.usage),
-        warnings: getCallWarnings(options),
+        warnings,
       }
+    } catch (error) {
+      if (abortSignal?.aborted) {
+        throw getAbortReason(abortSignal)
+      }
+      throw toAdkError(error)
     } finally {
+      abortSignal?.removeEventListener('abort', onAbort)
       toolListener.remove()
       this.unregisterTools(preparedTools)
     }
   }
 
   async doStream(options: LanguageModelV4CallOptions) {
-    const messages = this.prepareMessages(options.prompt)
-    const generationOptions = this.prepareGenerationOptions(options)
-    const preparedTools = this.prepareTools(options.tools)
-    const nativeTools = preparedTools.map((tool) => tool.native)
-    const agentConfig = this.agentConfig
+    const {
+      messages,
+      generationOptions,
+      preparedTools,
+      nativeTools,
+      ownedToolIds,
+      agentConfig,
+      warnings,
+    } = this.prepareCall(options)
     const streamId = generateId()
-    const ownedToolIds = new Set(preparedTools.map((tool) => tool.native.id))
-    const warnings = getCallWarnings(options)
-
-    if (options.responseFormat?.type === 'json') {
-      throw new Error('Streaming JSON responses is not yet supported by ADK.')
-    }
+    const native = getNativeAdkEngine()
+    const abortSignal = options.abortSignal
+    const isJson = options.responseFormat?.type === 'json'
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
@@ -561,11 +965,18 @@ class AdkChatLanguageModel implements LanguageModelV4 {
       )
     }
 
+    if (abortSignal?.aborted) {
+      throw getAbortReason(abortSignal)
+    }
+
     this.registerTools(preparedTools)
 
     let listeners: { remove(): void }[] = []
     let cleanedUp = false
     const toolListener = this.createToolCallListener({ streamId, ownedToolIds })
+    const toolNames = new Map<string, string>()
+
+    let onAbort = () => {}
 
     const cleanup = () => {
       if (cleanedUp) {
@@ -576,37 +987,112 @@ class AdkChatLanguageModel implements LanguageModelV4 {
         listener.remove()
       })
       listeners = []
+      abortSignal?.removeEventListener('abort', onAbort)
       toolListener.remove()
       this.unregisterTools(preparedTools)
     }
 
+    const cancelNative = () => {
+      void native
+        .cancelStream(streamId)
+        .catch((error) => console.warn('[adk] cancelStream failed:', error))
+    }
+
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
-        controller.enqueue({ type: 'stream-start', warnings })
+        const textId = `${streamId}-text`
+        let textOpen = false
+        let reasoningId: string | undefined
+        let reasoningCount = 0
+        // JSON mode keeps the full text so code fences can be stripped
+        let rawText = ''
+        let emittedText = ''
 
         const addListener = (listener: { remove(): void }) => {
           listeners.push(listener)
         }
 
+        const closeReasoning = () => {
+          if (reasoningId) {
+            controller.enqueue({ type: 'reasoning-end', id: reasoningId })
+            reasoningId = undefined
+          }
+        }
+
+        const emitText = (delta: string) => {
+          if (!delta) {
+            return
+          }
+          closeReasoning()
+          if (!textOpen) {
+            controller.enqueue({ type: 'text-start', id: textId })
+            textOpen = true
+          }
+          controller.enqueue({ type: 'text-delta', id: textId, delta })
+        }
+
+        const emitJsonText = (final: boolean) => {
+          const stripped = final
+            ? stripJsonFences(rawText)
+            : // Hold back trailing backticks that could start a closing fence
+              rawText.replace(jsonFencePrefix, '').replace(/\s*`{1,3}$/, '')
+          // Only emit once the opening fence can no longer change the prefix
+          if (!final && /^\s*`{0,3}(j(s(o(n)?)?)?)?$/.test(rawText)) {
+            return
+          }
+          if (stripped.startsWith(emittedText)) {
+            emitText(stripped.slice(emittedText.length))
+            emittedText = stripped
+          }
+        }
+
+        controller.enqueue({ type: 'stream-start', warnings })
+
+        onAbort = () => {
+          cleanup()
+          cancelNative()
+          controller.error(abortSignal && getAbortReason(abortSignal))
+        }
+        abortSignal?.addEventListener('abort', onAbort, { once: true })
+
         addListener(
-          getNativeAdkEngine().onStreamUpdate((data) => {
-            if (data.streamId === streamId && data.delta) {
-              controller.enqueue({
-                type: 'text-delta',
-                delta: data.delta,
-                id: streamId,
-              })
+          native.onStreamUpdate((data) => {
+            if (data.streamId !== streamId || !data.delta) {
+              return
             }
+
+            if (data.kind === 'reasoning') {
+              if (!reasoningId) {
+                reasoningId = `${streamId}-reasoning-${reasoningCount++}`
+                controller.enqueue({ type: 'reasoning-start', id: reasoningId })
+              }
+              controller.enqueue({
+                type: 'reasoning-delta',
+                id: reasoningId,
+                delta: data.delta,
+              })
+              return
+            }
+
+            if (isJson) {
+              rawText += data.delta
+              emitJsonText(false)
+              return
+            }
+
+            emitText(data.delta)
           })
         )
 
         addListener(
-          getNativeAdkEngine().onStreamToolCall((data: StreamToolCallEvent) => {
+          native.onStreamToolCall((data: StreamToolCallEvent) => {
             if (data.streamId !== streamId) {
               return
             }
 
             if (data.phase === 'start' && data.toolName) {
+              closeReasoning()
+              toolNames.set(data.toolCallId, data.toolName)
               controller.enqueue({
                 type: 'tool-input-start',
                 id: data.toolCallId,
@@ -637,34 +1123,49 @@ class AdkChatLanguageModel implements LanguageModelV4 {
                 input: data.input,
                 providerExecuted: true,
               })
+              return
+            }
+
+            if (data.phase === 'result' && data.output !== undefined) {
+              controller.enqueue({
+                type: 'tool-result',
+                toolCallId: data.toolCallId,
+                toolName:
+                  data.toolName ?? toolNames.get(data.toolCallId) ?? 'unknown',
+                result: parseToolResult(data.output),
+              })
             }
           })
         )
 
         addListener(
-          getNativeAdkEngine().onStreamComplete((data) => {
-            if (data.streamId === streamId) {
-              controller.enqueue({
-                type: 'text-end',
-                id: streamId,
-              })
-              controller.enqueue({
-                type: 'finish',
-                finishReason: convertFinishReason(data.finishReason),
-                usage: mapUsage(data.usage),
-              })
-              cleanup()
-              controller.close()
+          native.onStreamComplete((data) => {
+            if (data.streamId !== streamId) {
+              return
             }
+            if (isJson) {
+              emitJsonText(true)
+            }
+            closeReasoning()
+            if (textOpen) {
+              controller.enqueue({ type: 'text-end', id: textId })
+            }
+            controller.enqueue({
+              type: 'finish',
+              finishReason: convertFinishReason(data.finishReason),
+              usage: mapUsage(data.usage),
+            })
+            cleanup()
+            controller.close()
           })
         )
 
         addListener(
-          getNativeAdkEngine().onStreamError((data) => {
+          native.onStreamError((data) => {
             if (data.streamId === streamId) {
               controller.enqueue({
                 type: 'error',
-                error: new Error(data.error),
+                error: toAdkError(data.error, data.code),
               })
               cleanup()
               controller.close()
@@ -675,12 +1176,7 @@ class AdkChatLanguageModel implements LanguageModelV4 {
         try {
           await this.ensureNanoPrepared()
 
-          controller.enqueue({
-            type: 'text-start',
-            id: streamId,
-          })
-
-          await getNativeAdkEngine().streamText(
+          await native.streamText(
             streamId,
             messages,
             agentConfig,
@@ -689,15 +1185,12 @@ class AdkChatLanguageModel implements LanguageModelV4 {
           )
         } catch (error) {
           cleanup()
-          const message = error instanceof Error ? error.message : String(error)
-          controller.error(new Error(`ADK stream failed: ${message}`))
+          controller.error(toAdkError(error))
         }
       },
       cancel: () => {
         cleanup()
-        void getNativeAdkEngine()
-          .cancelStream(streamId)
-          .catch((error) => console.warn('[adk] cancelStream failed:', error))
+        cancelNative()
       },
     })
 

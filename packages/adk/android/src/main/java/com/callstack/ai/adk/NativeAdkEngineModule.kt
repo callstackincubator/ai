@@ -5,6 +5,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
+import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,51 +23,96 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   override fun getName(): String = NAME
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-  private val runner = AdkAgentRunner { toolCallId, toolId, arguments, toolCallScope ->
-    toolCallScope?.streamId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
-    toolCallScope?.runId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
-    val args = Arguments.createMap().apply {
-      putString("toolCallId", toolCallId)
-      putString("toolId", toolId)
-      putString("arguments", arguments)
-      toolCallScope?.streamId?.let { putString("streamId", it) }
-      toolCallScope?.runId?.let { putString("runId", it) }
-    }
-    emitOnToolCall(args)
-  }
-  private val activeStreams = ConcurrentHashMap<String, Job>()
+  private val runner = AdkAgentRunner(
+    context = reactContext,
+    onToolCall = { toolCallId, toolId, arguments, toolCallScope ->
+      toolCallScope?.streamId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
+      toolCallScope?.runId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
+      val args = Arguments.createMap().apply {
+        putString("toolCallId", toolCallId)
+        putString("toolId", toolId)
+        putString("arguments", arguments)
+        toolCallScope?.streamId?.let { putString("streamId", it) }
+        toolCallScope?.runId?.let { putString("runId", it) }
+      }
+      emitOnToolCall(args)
+    },
+    onDownloadProgress = { phase, bytesDownloaded, bytesToDownload ->
+      emitOnNanoDownloadProgress(
+        Arguments.createMap().apply {
+          putString("phase", phase)
+          bytesDownloaded?.let { putDouble("bytesDownloaded", it.toDouble()) }
+          bytesToDownload?.let { putDouble("bytesToDownload", it.toDouble()) }
+        },
+      )
+    },
+  )
 
-  override fun isAvailable(modelType: String, promise: Promise) {
+  // Streams and generateText runs, by id, so both can be cancelled
+  private val activeRuns = ConcurrentHashMap<String, Job>()
+
+  private fun Promise.rejectWithCode(error: Exception) {
+    reject(AdkErrors.codeFor(error), error.message ?: "Unknown ADK error", error)
+  }
+
+  override fun isAvailable(modelType: String, nano: ReadableMap?, promise: Promise) {
     scope.launch {
       try {
         val available = when (modelType) {
-          "genai-nano" -> runner.isNanoAvailable()
+          "genai-nano" -> runner.isNanoAvailable(NanoConfig.from(nano))
           else -> true
         }
         promise.resolve(available)
-      } catch (error: Exception) {
-        promise.resolve(false)
-      }
-    }
-  }
-
-  override fun isNanoSupported(promise: Promise) {
-    scope.launch {
-      try {
-        promise.resolve(runner.isNanoSupported())
       } catch (_: Exception) {
         promise.resolve(false)
       }
     }
   }
 
-  override fun prepareNano(promise: Promise) {
+  override fun isNanoSupported(nano: ReadableMap?, promise: Promise) {
     scope.launch {
       try {
-        runner.prepareNano()
+        promise.resolve(runner.isNanoSupported(NanoConfig.from(nano)))
+      } catch (_: Exception) {
+        promise.resolve(false)
+      }
+    }
+  }
+
+  override fun getModelInfo(modelType: String, nano: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        val info = runner.getModelInfo(modelType, NanoConfig.from(nano))
+        promise.resolve(
+          Arguments.createMap().apply {
+            putString("availability", info.availability)
+            info.baseModelName?.let { putString("baseModelName", it) }
+            info.contextSize?.let { putInt("contextSize", it) }
+          },
+        )
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
+  override fun prepareNano(nano: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        runner.prepareNano(NanoConfig.from(nano))
         promise.resolve(null)
       } catch (error: Exception) {
-        promise.reject("ADK_PREPARE_ERROR", error.message, error)
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
+  override fun countTokens(text: String, nano: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        promise.resolve(runner.countTokens(text, NanoConfig.from(nano)).toDouble())
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
       }
     }
   }
@@ -79,22 +125,53 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     tools: ReadableArray?,
     promise: Promise,
   ) {
-    scope.launch {
+    val job = scope.launch {
       try {
         val result = runner.generateText(messages, config, options, tools, runId)
         val response = Arguments.createMap().apply {
           putString("role", "assistant")
           putString("content", result.content)
+          result.reasoning?.let { putString("reasoning", it) }
+          putArray(
+            "toolCalls",
+            Arguments.createArray().apply {
+              result.toolCalls.forEach { call ->
+                pushMap(
+                  Arguments.createMap().apply {
+                    putString("toolCallId", call.toolCallId)
+                    putString("toolName", call.toolName)
+                    putString("input", call.input)
+                  },
+                )
+              }
+            },
+          )
+          putArray(
+            "toolResults",
+            Arguments.createArray().apply {
+              result.toolResults.forEach { toolResult ->
+                pushMap(
+                  Arguments.createMap().apply {
+                    putString("toolCallId", toolResult.toolCallId)
+                    putString("toolName", toolResult.toolName)
+                    putString("output", toolResult.output)
+                  },
+                )
+              }
+            },
+          )
           result.finishReason?.let { putString("finishReason", it) }
           AdkUsage.toWritableMap(result.usage)?.let { putMap("usage", it) }
         }
         promise.resolve(response)
       } catch (error: Exception) {
-        promise.reject("ADK_GENERATION_ERROR", error.message, error)
+        promise.rejectWithCode(error)
       } finally {
+        activeRuns.remove(runId)
         AdkToolBridge.cancelForStream(runId)
       }
     }
+    activeRuns[runId] = job
   }
 
   override fun streamText(
@@ -105,8 +182,8 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     tools: ReadableArray?,
     promise: Promise,
   ) {
-    if (activeStreams.containsKey(streamId)) {
-      promise.reject("ADK_STREAM_ERROR", "Stream ID already in use: $streamId")
+    if (activeRuns.containsKey(streamId)) {
+      promise.reject(AdkErrors.GENERATION_ERROR, "Stream ID already in use: $streamId")
       return
     }
 
@@ -124,9 +201,12 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         //   currentTurnText: full reconstructed text of the current agent turn
         //   emittedText:     the prefix of currentTurnText already sent to JS
         //   suppressCurrentTurn: true once we confirm this turn is a tool-code turn
+        //   currentTurnReasoning / emittedReasoning: the same for thought parts
         var currentTurnText = ""
         var emittedText = ""
         var suppressCurrentTurn = false
+        var currentTurnReasoning = ""
+        var emittedReasoning = ""
         val toolCallEmitter = AdkStreamToolCallEmitter(streamId) { args ->
           emitOnStreamToolCall(args)
         }
@@ -136,8 +216,22 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
 
           event.usageMetadata?.let { latestUsage = it }
           toolCallEmitter.handleEvent(event)
+          toolCallEmitter.handleResults(event)
 
-          val text = event.content?.parts?.mapNotNull { it.text }?.joinToString("") ?: ""
+          val reasoning = event.textParts(thoughts = true)
+          if (reasoning.isNotEmpty()) {
+            currentTurnReasoning =
+              if (reasoning.startsWith(currentTurnReasoning)) reasoning
+              else currentTurnReasoning + reasoning
+            if (currentTurnReasoning.length > emittedReasoning.length &&
+              currentTurnReasoning.startsWith(emittedReasoning)
+            ) {
+              emitDelta(streamId, currentTurnReasoning.substring(emittedReasoning.length), "reasoning")
+              emittedReasoning = currentTurnReasoning
+            }
+          }
+
+          val text = event.textParts(thoughts = false)
 
           if (text.isNotEmpty()) {
             // Reconstruct the full turn text. If the event repeats what we already have
@@ -158,6 +252,8 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
             currentTurnText = ""
             emittedText = ""
             suppressCurrentTurn = false
+            currentTurnReasoning = ""
+            emittedReasoning = ""
           }
 
           if (!suppressCurrentTurn && !(event.isFinalResponse && !event.partial)) {
@@ -165,14 +261,8 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
             // so we never emit a partial "```", "```tool", etc. that later completes.
             val safeEnd = currentTurnText.length - pendingMarkerPrefixLength(currentTurnText)
             if (safeEnd > emittedText.length) {
-              val delta = currentTurnText.substring(emittedText.length, safeEnd)
+              emitDelta(streamId, currentTurnText.substring(emittedText.length, safeEnd), "text")
               emittedText = currentTurnText.substring(0, safeEnd)
-
-              val updateArgs = Arguments.createMap().apply {
-                putString("streamId", streamId)
-                putString("delta", delta)
-              }
-              emitOnStreamUpdate(updateArgs)
             }
           }
 
@@ -180,42 +270,53 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
             // Flush any held-back text for a normal turn (e.g. a response legitimately
             // ending in backticks that turned out not to be a tool-code marker).
             if (!suppressCurrentTurn && currentTurnText.length > emittedText.length) {
-              val delta = currentTurnText.substring(emittedText.length)
+              emitDelta(streamId, currentTurnText.substring(emittedText.length), "text")
               emittedText = currentTurnText
-              val updateArgs = Arguments.createMap().apply {
-                putString("streamId", streamId)
-                putString("delta", delta)
-              }
-              emitOnStreamUpdate(updateArgs)
             }
 
-            val completeArgs = Arguments.createMap().apply {
-              putString("streamId", streamId)
-              putString("finishReason", event.finishReason?.name)
-              AdkUsage.toWritableMap(latestUsage ?: event.usageMetadata)?.let {
-                putMap("usage", it)
-              }
-            }
-            emitOnStreamComplete(completeArgs)
+            emitComplete(streamId, event, latestUsage)
           }
         }
       } catch (error: Exception) {
         val errorArgs = Arguments.createMap().apply {
           putString("streamId", streamId)
           putString("error", error.message ?: "Unknown ADK stream error")
+          putString("code", AdkErrors.codeFor(error))
         }
         emitOnStreamError(errorArgs)
       } finally {
-        activeStreams.remove(streamId)
+        activeRuns.remove(streamId)
       }
     }
 
-    activeStreams[streamId] = job
+    activeRuns[streamId] = job
     promise.resolve(null)
   }
 
+  private fun emitDelta(streamId: String, delta: String, kind: String) {
+    emitOnStreamUpdate(
+      Arguments.createMap().apply {
+        putString("streamId", streamId)
+        putString("delta", delta)
+        putString("kind", kind)
+      },
+    )
+  }
+
+  private fun emitComplete(streamId: String, event: Event, latestUsage: UsageMetadata?) {
+    emitOnStreamComplete(
+      Arguments.createMap().apply {
+        putString("streamId", streamId)
+        event.finishReason?.name?.let { putString("finishReason", it) }
+        AdkUsage.toWritableMap(latestUsage ?: event.usageMetadata)?.let {
+          putMap("usage", it)
+        }
+      },
+    )
+  }
+
   override fun cancelStream(streamId: String, promise: Promise) {
-    activeStreams.remove(streamId)?.cancel()
+    activeRuns.remove(streamId)?.cancel()
     AdkToolBridge.cancelForStream(streamId)
     promise.resolve(null)
   }
@@ -225,8 +326,8 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   }
 
   override fun invalidate() {
-    activeStreams.values.forEach { it.cancel() }
-    activeStreams.clear()
+    activeRuns.values.forEach { it.cancel() }
+    activeRuns.clear()
     AdkToolBridge.cancelAll()
     scope.cancel()
     super.invalidate()
