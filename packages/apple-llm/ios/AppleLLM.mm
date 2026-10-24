@@ -116,6 +116,7 @@ using namespace JS::NativeAppleLLM;
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null],
+    @"toolCallingMode": options.toolCallingMode() ?: [NSNull null],
     @"providerOptions": options.providerOptions() ?: [NSNull null]
   };
   
@@ -158,6 +159,7 @@ using namespace JS::NativeAppleLLM;
     @"topK": options.topK().has_value() ? @(options.topK().value()) : [NSNull null],
     @"schema": options.schema() ?: [NSNull null],
     @"tools": options.tools() ?: [NSNull null],
+    @"toolCallingMode": options.toolCallingMode() ?: [NSNull null],
     @"providerOptions": options.providerOptions() ?: [NSNull null],
   };
   

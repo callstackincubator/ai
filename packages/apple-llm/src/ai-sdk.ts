@@ -322,6 +322,28 @@ function serializeKnownMessageContentPart(
   }
 }
 
+type AppleToolCallingMode = 'allowed' | 'required' | 'disallowed'
+
+function prepareToolChoice(
+  tools: Tool[] = [],
+  toolChoice: LanguageModelV4CallOptions['toolChoice']
+): { tools: Tool[]; toolCallingMode?: AppleToolCallingMode } {
+  switch (toolChoice?.type) {
+    case 'none':
+      // Also disables built-in tools on iOS 27
+      return { tools: [], toolCallingMode: 'disallowed' }
+    case 'required':
+      return { tools, toolCallingMode: 'required' }
+    case 'tool':
+      return {
+        tools: tools.filter((tool) => tool.name === toolChoice.toolName),
+        toolCallingMode: 'required',
+      }
+    default:
+      return { tools }
+  }
+}
+
 function appendMessageContent(content: string, addition: string) {
   if (!addition) {
     return content
@@ -672,7 +694,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   async doGenerate(options: LanguageModelV4CallOptions) {
     const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
-    const tools = this.prepareTools(options.tools)
+    const { tools: callTools, toolCallingMode } = prepareToolChoice(
+      options.tools,
+      options.toolChoice
+    )
+    const tools = this.prepareTools(callTools)
 
     for (const tool of tools) {
       globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
@@ -685,6 +711,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         topP: options.topP,
         topK: options.topK,
         tools,
+        toolCallingMode,
         providerOptions: appleOptions as unknown as Record<string, unknown>,
         schema:
           options.responseFormat?.type === 'json'
@@ -741,7 +768,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   async doStream(options: LanguageModelV4CallOptions) {
     const appleOptions = getAppleNativeOptions(this.options, options)
     const messages = this.prepareMessages(options.prompt)
-    const tools = this.prepareTools(options.tools)
+    const { tools: callTools, toolCallingMode } = prepareToolChoice(
+      options.tools,
+      options.toolChoice
+    )
+    const tools = this.prepareTools(callTools)
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
@@ -854,6 +885,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             topP: options.topP,
             topK: options.topK,
             tools,
+            toolCallingMode,
             providerOptions: appleOptions as unknown as Record<string, unknown>,
             schema,
           })

@@ -114,3 +114,63 @@ describe('apple prompt conversion', () => {
     ])
   })
 })
+
+describe('apple tool choice', () => {
+  const tools: LanguageModelV4CallOptions['tools'] = [
+    {
+      type: 'function',
+      name: 'weather',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
+      type: 'function',
+      name: 'time',
+      inputSchema: { type: 'object', properties: {} },
+    },
+  ]
+
+  function nativeToolNames() {
+    return (lastNativeOptions().tools as { name: string }[]).map(
+      (tool) => tool.name
+    )
+  }
+
+  test('keeps the default tool calling mode for auto', async () => {
+    await apple().doGenerate(
+      createCallOptions({ tools, toolChoice: { type: 'auto' } })
+    )
+
+    expect(lastNativeOptions().toolCallingMode).toBeUndefined()
+    expect(nativeToolNames()).toEqual(['weather', 'time'])
+  })
+
+  test('disallows tool calls for none', async () => {
+    await apple().doGenerate(
+      createCallOptions({ tools, toolChoice: { type: 'none' } })
+    )
+
+    expect(lastNativeOptions().toolCallingMode).toBe('disallowed')
+    expect(nativeToolNames()).toEqual([])
+  })
+
+  test('requires a tool call for required', async () => {
+    await apple().doGenerate(
+      createCallOptions({ tools, toolChoice: { type: 'required' } })
+    )
+
+    expect(lastNativeOptions().toolCallingMode).toBe('required')
+    expect(nativeToolNames()).toEqual(['weather', 'time'])
+  })
+
+  test('requires the named tool for a specific tool choice', async () => {
+    await apple().doGenerate(
+      createCallOptions({
+        tools,
+        toolChoice: { type: 'tool', toolName: 'time' },
+      })
+    )
+
+    expect(lastNativeOptions().toolCallingMode).toBe('required')
+    expect(nativeToolNames()).toEqual(['time'])
+  })
+})

@@ -14,6 +14,7 @@ export interface AppleGenerationOptions {
   topK?: number
   schema?: CodegenTypes.UnsafeObject
   tools?: CodegenTypes.UnsafeObject
+  toolCallingMode?: string
   providerOptions?: CodegenTypes.UnsafeObject
 }
 
