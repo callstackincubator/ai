@@ -16,7 +16,7 @@ npm add ai @react-native-ai/<provider>
 ## Prerequisites
 
 - [ ] React Native >= 0.76.0
-- [ ] Vercel AI SDK v5+ (`ai` package) for generateText/streamText
+- [ ] Vercel AI SDK v7+ (`ai` package) for generateText/streamText
 - [ ] For Apple (Apple Intelligence) provider: iOS 26+, Apple Intelligence enabled
 
 ## Step-by-Step Instructions

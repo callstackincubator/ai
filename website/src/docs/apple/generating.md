@@ -2,7 +2,7 @@
 
 Use `@react-native-ai/apple` with the Vercel AI SDK to call Apple Foundation
 Models from React Native. The provider keeps the common text, object,
-streaming, tool, and image APIs aligned with AI SDK v5, and exposes a small
+streaming, tool, and image APIs aligned with AI SDK v7, and exposes a small
 Apple-specific surface for runtime model information and Apple-only options.
 
 ## Requirements
@@ -286,7 +286,7 @@ const result = await generateText({
 Important Apple-specific behavior:
 
 - Tool calls are provider-executed, so AI SDK step callbacks such as
-  `maxSteps`, `onStepStart`, and `onStepFinish` do not run for native Apple
+  `stopWhen`, `onStepStart`, and `onStepEnd` do not run for native Apple
   tool execution.
 - Apple does not provide stable tool call IDs; the provider returns empty IDs.
 - You can update the registered tools on a model instance with
@@ -367,7 +367,7 @@ try {
 }
 ```
 
-For streaming, inspect `fullStream` when you need provider error parts:
+For streaming, inspect `stream` when you need provider error parts:
 
 ```typescript
 import {
@@ -382,7 +382,7 @@ const result = streamText({
   messages,
 })
 
-for await (const part of result.fullStream) {
+for await (const part of result.stream) {
   if (part.type === 'error') {
     const error = part.error as AppleLLMError
 

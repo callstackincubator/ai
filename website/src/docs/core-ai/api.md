@@ -8,7 +8,7 @@ Use these when you want portable AI SDK app code:
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
-import { embed, experimental_transcribe, generateImage, generateText } from 'ai'
+import { embed, transcribe, generateImage, generateText } from 'ai'
 
 const language = coreAI.languageModel({
   id: 'qwen3-0.6b',
@@ -27,7 +27,7 @@ AI SDK adapter status:
 | Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Routed through language sessions |
 | Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Native diffusion wrapper         |
 | Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Explicit unsupported error       |
-| Transcription     | `experimental_transcribe`                     | `coreAI.transcriptionModel(...)` | Explicit unsupported error       |
+| Transcription     | `transcribe`                     | `coreAI.transcriptionModel(...)` | Explicit unsupported error       |
 
 The embedding and transcription adapters are present because AI SDK has matching interfaces and Apple’s registry has starter export recipes. They reject until this package gets task-specific native runners for CLIP/CLAP and wav2vec2/Whisper outputs.
 
