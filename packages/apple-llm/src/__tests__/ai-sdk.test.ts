@@ -42,7 +42,9 @@ mock.module('react-native', () => ({
             onStreamComplete,
             onStreamError,
           }
-        : { getCurrentLocale: () => 'en-US' },
+        : name === 'NativeAppleTranscription'
+          ? { prepare: async () => {}, isAvailable: () => true }
+          : { getCurrentLocale: () => 'en-US' },
   },
 }))
 
@@ -467,5 +469,25 @@ describe('apple generated content', () => {
       { type: 'text-delta', id: streamId, delta: ' sunny' },
       { type: 'text-end', id: streamId },
     ])
+  })
+})
+
+describe('apple transcription', () => {
+  test('sends only the bytes of a typed array view', async () => {
+    const transcribe = mock(
+      async (_data: ArrayBufferLike, _language: string) => ({
+        segments: [],
+        duration: 0,
+      })
+    )
+    globalThis.__apple__llm__transcribe__ = transcribe
+
+    const model = apple.transcriptionModel()
+    await model.prepare()
+    const audio = new Uint8Array([0, 1, 2, 3, 4, 5]).subarray(2, 4)
+    await model.doGenerate({ audio, mediaType: 'audio/wav' })
+
+    const sent = new Uint8Array(transcribe.mock.calls[0]![0])
+    expect([...sent]).toEqual([2, 3])
   })
 })
