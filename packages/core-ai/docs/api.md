@@ -21,13 +21,17 @@ await generateText({ model: language, prompt: 'Hello' })
 
 AI SDK adapter status:
 
-| Capability        | AI SDK API                                    | Core AI API                      | Status                           |
-| ----------------- | --------------------------------------------- | -------------------------------- | -------------------------------- |
-| Language text     | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Native wrapper implemented       |
-| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Not supported yet                |
-| Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Native diffusion wrapper         |
-| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Explicit unsupported error       |
-| Transcription     | `transcribe`                     | `coreAI.transcriptionModel(...)` | Explicit unsupported error       |
+| Capability        | AI SDK API                                    | Core AI API                      | Status                          |
+| ----------------- | --------------------------------------------- | -------------------------------- | ------------------------------- |
+| Language text     | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Native wrapper implemented      |
+| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Guided generation with a schema |
+| Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Native diffusion wrapper        |
+| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Explicit unsupported error      |
+| Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Explicit unsupported error      |
+
+Structured output needs a JSON schema and runs as guided generation, so the output always matches it. Models whose inference engine cannot do guided generation reject with a `CORE_AI_UNSUPPORTED_CAPABILITY` error. When streaming, the JSON arrives in one piece once it is complete.
+
+The `reasoning` call option sets the model's thinking effort (`minimal`/`low` → `light`, `medium` → `moderate`, `high` and above → `deep`), and `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence. Reasoning comes back as reasoning parts. Core AI ignores `topP`, `topK`, `seed`, stop sequences and penalties, and returns a warning when they are set.
 
 The embedding and transcription adapters are present because AI SDK has matching interfaces and Apple’s registry has starter export recipes. They reject until this package gets task-specific native runners for CLIP/CLAP and wav2vec2/Whisper outputs.
 

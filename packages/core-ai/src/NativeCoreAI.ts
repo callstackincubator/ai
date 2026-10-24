@@ -32,15 +32,22 @@ export interface CoreAILoadedModel {
 export interface CoreAIMessage {
   role: 'assistant' | 'system' | 'tool' | 'user'
   content: string
+  attachments?: CodegenTypes.UnsafeObject[]
+  // Structured assistant and tool content replayed as transcript entries
+  parts?: CodegenTypes.UnsafeObject[]
 }
 
 export type CoreAIStreamUpdateEvent = {
   streamId: string
+  // Full response text so far
   content: string
+  // Reasoning entries generated so far, sent when they change
+  entries?: CodegenTypes.UnsafeObject[]
 }
 
 export type CoreAIStreamCompleteEvent = {
   streamId: string
+  usage?: CodegenTypes.UnsafeObject
 }
 
 export type CoreAIStreamErrorEvent = {
@@ -81,17 +88,21 @@ export interface Spec extends TurboModule {
     options?: CodegenTypes.UnsafeObject
   ): void
 
+  // AI SDK calls on a loaded language model. The last message is the prompt
+  // and earlier messages are replayed as the session transcript
   generateText(
-    config: NativeCoreAIModelConfig,
+    requestId: string,
+    modelHandle: string,
     messages: CoreAIMessage[],
     options?: CodegenTypes.UnsafeObject
-  ): Promise<CodegenTypes.UnsafeObject[]>
+  ): Promise<CodegenTypes.UnsafeObject>
   streamText(
     streamId: string,
-    config: NativeCoreAIModelConfig,
+    modelHandle: string,
     messages: CoreAIMessage[],
     options?: CodegenTypes.UnsafeObject
   ): void
+  // Cancels a stream or a generateText request
   cancelStream(streamId: string): void
 
   embed(

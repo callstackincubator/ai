@@ -135,11 +135,11 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
                    sessionHandle:sessionHandle
                           prompt:prompt
                          options:options
-                        onUpdate:^(NSString *streamId, NSString *content) {
-    [self emitOnStreamUpdate:@{@"streamId": streamId, @"content": content}];
+                        onUpdate:^(NSString *streamId, NSString *content, NSArray *entries) {
+    [self emitStreamUpdate:streamId content:content entries:entries];
   }
-                      onComplete:^(NSString *streamId) {
-    [self emitOnStreamComplete:@{@"streamId": streamId}];
+                      onComplete:^(NSString *streamId, NSDictionary *usage) {
+    [self emitStreamComplete:streamId usage:usage];
   }
                          onError:^(NSString *streamId, NSString *code, NSString *error) {
     NSMutableDictionary *payload = [@{@"streamId": streamId, @"error": error} mutableCopy];
@@ -150,27 +150,28 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
   }];
 }
 
-- (void)generateText:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+- (void)generateText:(nonnull NSString *)requestId
+         modelHandle:(nonnull NSString *)modelHandle
             messages:(nonnull NSArray *)messages
              options:(nonnull NSDictionary *)options
              resolve:(nonnull RCTPromiseResolveBlock)resolve
               reject:(nonnull RCTPromiseRejectBlock)reject {
-  [_coreAI generateText:CoreAIConfigToDictionary(config) messages:messages options:options resolve:resolve reject:reject];
+  [_coreAI generateText:requestId modelHandle:modelHandle messages:messages options:options resolve:resolve reject:reject];
 }
 
 - (void)streamText:(nonnull NSString *)streamId
-            config:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+       modelHandle:(nonnull NSString *)modelHandle
           messages:(nonnull NSArray *)messages
            options:(nonnull NSDictionary *)options {
   [_coreAI streamText:streamId
-               config:CoreAIConfigToDictionary(config)
+          modelHandle:modelHandle
              messages:messages
               options:options
-             onUpdate:^(NSString *streamId, NSString *content) {
-    [self emitOnStreamUpdate:@{@"streamId": streamId, @"content": content}];
+             onUpdate:^(NSString *streamId, NSString *content, NSArray *entries) {
+    [self emitStreamUpdate:streamId content:content entries:entries];
   }
-           onComplete:^(NSString *streamId) {
-    [self emitOnStreamComplete:@{@"streamId": streamId}];
+           onComplete:^(NSString *streamId, NSDictionary *usage) {
+    [self emitStreamComplete:streamId usage:usage];
   }
               onError:^(NSString *streamId, NSString *code, NSString *error) {
     NSMutableDictionary *payload = [@{@"streamId": streamId, @"error": error} mutableCopy];
@@ -183,6 +184,22 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
 
 - (void)cancelStream:(nonnull NSString *)streamId {
   [_coreAI cancelStream:streamId];
+}
+
+- (void)emitStreamUpdate:(NSString *)streamId content:(NSString *)content entries:(NSArray *)entries {
+  NSMutableDictionary *payload = [@{@"streamId": streamId, @"content": content} mutableCopy];
+  if (entries != nil) {
+    payload[@"entries"] = entries;
+  }
+  [self emitOnStreamUpdate:payload];
+}
+
+- (void)emitStreamComplete:(NSString *)streamId usage:(NSDictionary *)usage {
+  NSMutableDictionary *payload = [@{@"streamId": streamId} mutableCopy];
+  if (usage != nil) {
+    payload[@"usage"] = usage;
+  }
+  [self emitOnStreamComplete:payload];
 }
 
 - (void)embed:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config

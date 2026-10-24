@@ -18,7 +18,6 @@ npm add ai @react-native-ai/<provider>
 - [ ] React Native >= 0.76.0
 - [ ] Vercel AI SDK v7+ (`ai` package) for generateText/streamText
 - [ ] For Apple (Apple Intelligence) provider: iOS 26+, Apple Intelligence enabled
-- [ ] For Core AI provider: iOS 27 deployment target, Xcode 27, physical device
 
 ## Step-by-Step Instructions
 
@@ -26,13 +25,12 @@ npm add ai @react-native-ai/<provider>
 
 Classify the request into exactly one path:
 
-| Path    | Trigger terms                         | Reference file      |
-| ------- | ------------------------------------- | ------------------- |
-| Apple   | apple, Apple Intelligence, iOS 26     | apple-provider.md   |
-| Core AI | Core AI, coreai-models, .aimodel      | core-ai-provider.md |
-| Llama   | llama, GGUF, llama.rn, HuggingFace    | llama-provider.md   |
-| MLC-LLM | mlc, Llama-3.2, Phi, Qwen, download   | mlc-provider.md     |
-| NCNN    | ncnn, loadModel, runInference, Tensor | ncnn-provider.md    |
+| Path    | Trigger terms                         | Reference file    |
+| ------- | ------------------------------------- | ----------------- |
+| Apple   | apple, Apple Intelligence, iOS 26     | apple-provider.md |
+| Llama   | llama, GGUF, llama.rn, HuggingFace    | llama-provider.md |
+| MLC-LLM | mlc, Llama-3.2, Phi, Qwen, download   | mlc-provider.md   |
+| NCNN    | ncnn, loadModel, runInference, Tensor | ncnn-provider.md  |
 
 ### 2. Proceed to Provider
 
@@ -53,7 +51,6 @@ If using NCNN, the user code supplies the input tensor and receives an output te
 ## Related Skills
 
 - [apple-provider](apple-provider.md)
-- [core-ai-provider](core-ai-provider.md)
 - [llama-provider](llama-provider.md)
 - [mlc-provider](mlc-provider.md)
 - [ncnn-provider](ncnn-provider.md)

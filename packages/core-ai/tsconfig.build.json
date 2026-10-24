@@ -4,6 +4,15 @@
     "rootDir": "src",
     "outDir": "lib/typescript",
     "noEmit": false,
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    // Read @react-native-ai/apple from its source, so this build doesn't need
+    // the Apple package built first (bun runs workspace prepare scripts in
+    // parallel). Going through node_modules makes tsc treat it as an external
+    // library, so it isn't emitted here or held to rootDir.
+    "paths": {
+      "@react-native-ai/apple": [
+        "../../node_modules/@react-native-ai/apple/src/index.ts"
+      ]
+    }
   }
 }
