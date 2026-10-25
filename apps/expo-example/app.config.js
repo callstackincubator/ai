@@ -10,7 +10,9 @@ module.exports = ({ config }) => {
       ...config.plugins,
       [
         '@react-native-ai/core-ai',
-        { tasks: ['language', 'object-detection', 'segmentation'] },
+        {
+          tasks: ['language', 'diffusion', 'object-detection', 'segmentation'],
+        },
       ],
     ],
   }
