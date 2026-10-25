@@ -1,7 +1,7 @@
 import type { CodegenTypes, TurboModule } from 'react-native'
 import { Platform, TurboModuleRegistry } from 'react-native'
 
-export type AdkMessageRole = 'assistant' | 'system' | 'user'
+export type AdkMessageRole = 'assistant' | 'user'
 
 export type AdkMessagePart =
   | { type: 'text'; text: string }

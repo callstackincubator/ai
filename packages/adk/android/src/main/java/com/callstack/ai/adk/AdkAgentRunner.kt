@@ -425,8 +425,7 @@ class AdkAgentRunner(
       val message = messages.getMap(index) ?: continue
       val role = when (message.getString("role")) {
         "assistant" -> Role.MODEL
-        "system" -> Role.SYSTEM
-        "user", "tool" -> Role.USER
+        "user" -> Role.USER
         else -> throw IllegalArgumentException(
           "Unsupported message role: ${message.getString("role")}",
         )
