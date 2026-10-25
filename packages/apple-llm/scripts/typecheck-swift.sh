@@ -12,7 +12,7 @@ xcrun swiftc -version
 for target in "iphoneos:arm64-apple-ios15.1" "iphonesimulator:arm64-apple-ios15.1-simulator"; do
   sdk="${target%%:*}"
   echo "Typechecking against $sdk SDK"
-  find "$PACKAGE_DIR/ios" -name '*.swift' -not -path '*/Tests/*' -print0 | xargs -0 xcrun -sdk "$sdk" swiftc \
+  find "$PACKAGE_DIR/ios" -name '*.swift' -print0 | xargs -0 xcrun -sdk "$sdk" swiftc \
     -typecheck \
     -swift-version 5 \
     -I "$STUB_DIR" \

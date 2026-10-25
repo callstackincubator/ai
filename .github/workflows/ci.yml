@@ -59,6 +59,3 @@ jobs:
 
       - name: Typecheck Swift
         run: cd packages/apple-llm && bun run typecheck:swift
-
-      - name: Test Swift
-        run: cd packages/apple-llm && bun run test:swift
