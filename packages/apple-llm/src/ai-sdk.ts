@@ -486,83 +486,73 @@ type AppleStreamEntry =
       output: string
     }
 
-// Native streams send the full text generated so far
 // Foundation Models cannot constrain a number to a single fractional value, so
-// enums with fractional numbers are generated as their string forms and turned
-// back into numbers in the response
-function hasFractionalNumberEnum(schema: JSONSchema7) {
+// enums with fractional numbers are generated as strings and parsed back
+function isFractionalEnum(schema: unknown) {
+  const { type, enum: values } = (schema ?? {}) as JSONSchema7
   return (
-    schema.type === 'number' &&
-    schema.enum?.some(
-      (value) => typeof value === 'number' && !Number.isInteger(value)
-    ) === true
+    type === 'number' &&
+    values?.some((value) => !Number.isInteger(value)) === true
   )
 }
 
-function toNativeSchema(schema: JSONSchema7Definition): JSONSchema7Definition {
-  if (typeof schema === 'boolean') {
-    return schema
-  }
-  if (hasFractionalNumberEnum(schema)) {
-    const { type, enum: values, ...rest } = schema
-    return { ...rest, type: 'string', enum: values!.map(String) }
-  }
-  const nativeSchema = { ...schema }
-  if (schema.properties) {
-    nativeSchema.properties = Object.fromEntries(
-      Object.entries(schema.properties).map(([key, value]) => [
-        key,
-        toNativeSchema(value),
-      ])
+function toNativeSchema<T extends JSONSchema7 | undefined>(schema: T): T {
+  return (
+    schema &&
+    JSON.parse(
+      JSON.stringify(schema, (_, value) =>
+        isFractionalEnum(value)
+          ? { ...value, type: 'string', enum: value.enum!.map(String) }
+          : value
+      )
     )
-  }
-  if (schema.items) {
-    nativeSchema.items = Array.isArray(schema.items)
-      ? schema.items.map(toNativeSchema)
-      : toNativeSchema(schema.items)
-  }
-  if (schema.anyOf) {
-    nativeSchema.anyOf = schema.anyOf.map(toNativeSchema)
-  }
-  return nativeSchema
+  )
 }
 
 function restoreNumbers(
   value: unknown,
-  schema: JSONSchema7Definition
+  schema?: JSONSchema7Definition
 ): unknown {
-  if (typeof schema === 'boolean') {
+  if (typeof schema !== 'object') {
     return value
   }
-  if (hasFractionalNumberEnum(schema) && typeof value === 'string') {
-    return schema.enum!.map(String).includes(value) ? Number(value) : value
+  if (isFractionalEnum(schema)) {
+    return schema.enum!.map(String).includes(value as string)
+      ? Number(value)
+      : value
   }
-  if (Array.isArray(value) && schema.items && !Array.isArray(schema.items)) {
-    const items = schema.items
-    return value.map((item) => restoreNumbers(item, items))
+  if (Array.isArray(value) && schema.items) {
+    return value.map((item) =>
+      restoreNumbers(item, schema.items as JSONSchema7Definition)
+    )
   }
   if (value && typeof value === 'object' && schema.properties) {
-    const properties = schema.properties
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        properties[key] ? restoreNumbers(item, properties[key]) : item,
+        restoreNumbers(item, schema.properties![key]),
       ])
     )
   }
   return (schema.anyOf ?? []).reduce(restoreNumbers, value)
 }
 
-function restoreJsonNumbers(text: string, schema: JSONSchema7) {
+function restoreJsonNumbers(text: string, schema?: JSONSchema7) {
   try {
-    const value = JSON.parse(text)
-    const restored = JSON.stringify(restoreNumbers(value, schema))
-    return restored === JSON.stringify(value) ? text : restored
+    return JSON.stringify(restoreNumbers(JSON.parse(text), schema))
   } catch {
     return text
   }
 }
 
+function restoreToolInput(tools: Tool[] = [], name: string, input: string) {
+  const tool = tools.find((tool) => tool.name === name)
+  return tool?.type === 'function'
+    ? restoreJsonNumbers(input, tool.inputSchema)
+    : input
+}
+
+// Native streams send the full text generated so far
 function getSnapshotDelta(previous: string, next: string) {
   return next.startsWith(previous) ? next.slice(previous.length) : next
 }
@@ -1038,6 +1028,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         const schema = jsonSchema(tool.inputSchema)
         return {
           ...tool,
+          inputSchema: toNativeSchema(tool.inputSchema),
           id: generateId(),
           execute: async (modelInput: unknown) => {
             const text =
@@ -1045,7 +1036,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
                 ? modelInput
                 : JSON.stringify(modelInput ?? '')
             const toolCallArguments = await parseJSON({
-              text,
+              text: restoreJsonNumbers(text, tool.inputSchema),
               schema,
             })
             const opts: ToolExecutionOptions<unknown> = {
@@ -1097,7 +1088,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             string,
             unknown
           >,
-          schema: schema && toNativeSchema(schema),
+          schema: toNativeSchema(schema),
         }),
         options.abortSignal,
         () => NativeAppleLLM.cancelStream(requestId)
@@ -1124,7 +1115,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
                 toolCallId: part.toolCallId,
                 providerExecuted: true,
                 toolName: part.toolName,
-                input: part.input,
+                input: restoreToolInput(callTools, part.toolName, part.input),
               }
             case 'tool-result':
               return {
@@ -1253,7 +1244,14 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
                   type: 'tool-call',
                   toolCallId: entry.toolCallId,
                   toolName: entry.toolName,
-                  input: toolCall?.type === 'tool-call' ? toolCall.input : '{}',
+                  input:
+                    toolCall?.type === 'tool-call'
+                      ? restoreToolInput(
+                          callTools,
+                          entry.toolName,
+                          toolCall.input
+                        )
+                      : '{}',
                   providerExecuted: true,
                 })
                 controller.enqueue({
@@ -1359,7 +1357,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             tools,
             toolCallingMode,
             providerOptions: appleOptions as unknown as Record<string, unknown>,
-            schema: schema && toNativeSchema(schema),
+            schema: toNativeSchema(schema),
           })
         } catch (error) {
           cleanup()
