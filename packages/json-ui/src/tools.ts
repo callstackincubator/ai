@@ -8,6 +8,10 @@ import {
   type JsonUISpec,
 } from './registry'
 
+// Models put style keys next to text and leave text out without an example
+const propsDescription =
+  'Props as a JSON object, with style keys inside style, e.g. {"text":"Hello","style":{"fontSize":24}}'
+
 /**
  * Props arrive as a string, since some models cannot generate free-form
  * objects. Models often write them as JavaScript object literals, with unquoted
@@ -217,7 +221,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
     description: 'Set or add props for a node by id.',
     inputSchema: z.object({
       id: z.string().describe('Node id'),
-      props: z.string().describe('Props object for the node'),
+      props: z.string().describe(propsDescription),
       replace: z.boolean().optional().describe('Replace existing props'),
     }),
     execute: toolWrapper(
@@ -284,7 +288,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
       type: z
         .string()
         .describe(`Component type, one of: ${nodeTypes.join(', ')}`),
-      props: z.string().optional().describe('Props object for the node'),
+      props: z.string().optional().describe(propsDescription),
     }),
     execute: toolWrapper(
       'addUINode',
