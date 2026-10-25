@@ -174,7 +174,7 @@ Creates an embedding model instance.
   - `contextParams`: llama.rn context parameters
     - `n_ctx`: Context size (default: 2048)
     - `n_gpu_layers`: Number of GPU layers (default: 99)
-    - `n_parallel`: Parallel embeddings (default: 8)
+    - `n_parallel`: Values embedded per call (default: 8). Calls run one at a time, since a context embeds one value at a time
 
 ### `llama.speechModel(modelPath, options)`
 

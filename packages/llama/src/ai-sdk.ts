@@ -468,9 +468,8 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
   get maxEmbeddingsPerCall(): number {
     return this.options.contextParams?.n_parallel ?? 8
   }
-  get supportsParallelCalls(): boolean {
-    return this.maxEmbeddingsPerCall > 0
-  }
+  // A context runs one embedding at a time and rejects others as busy
+  readonly supportsParallelCalls = false
 
   private modelPath: string
   private options: LlamaEmbeddingOptions
@@ -558,6 +557,7 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
     const context = this.context ?? (await this.prepare())
 
     const embeddings: number[][] = []
+    let tokens = 0
     const embeddingParams: EmbeddingParams = {
       embd_normalize: this.options.normalize,
     }
@@ -573,13 +573,12 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
         embeddingParams
       )
       embeddings.push(result.embedding)
+      tokens += (await context.tokenize(value)).tokens.length
     }
 
     return {
       embeddings,
-      usage: {
-        tokens: options.values.reduce((acc, val) => acc + val.length, 0),
-      },
+      usage: { tokens },
       warnings: [],
     }
   }
