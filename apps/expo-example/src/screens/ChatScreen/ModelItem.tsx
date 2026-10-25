@@ -118,7 +118,7 @@ export function ModelItem({
                   : 'Downloaded'
                 : selectedModelAvailability === 'availableForDownload'
                   ? 'Tap to download'
-                  : adapter.modelId === 'adk-gemini-2.5-flash' &&
+                  : adapter.modelId === 'adk-gemini-3.8-flash' &&
                       !hasGoogleApiKey()
                     ? 'Set EXPO_PUBLIC_GOOGLE_API_KEY'
                     : adapter.modelId === 'adk-gemini-nano'

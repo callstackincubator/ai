@@ -1,13 +1,15 @@
 import type { LanguageModelV4 } from '@ai-sdk/provider'
 import type { Tool } from '@ai-sdk/provider-utils'
-import { type AdkModelType, createAdkProvider } from '@react-native-ai/adk'
+import {
+  type AdkLanguageModelId,
+  createAdkProvider,
+} from '@react-native-ai/adk'
 
 import { getGoogleApiKey } from '../../config/adk'
 import type { Availability, SetupAdapter } from '../../config/providers.common'
 
 type AdkAdapterOptions = {
-  modelType: AdkModelType
-  modelName: string
+  model: AdkLanguageModelId
   label: string
   accentColor: string
   icon: string
@@ -20,8 +22,7 @@ export const createAdkLanguageSetupAdapter = (
   tools: Record<string, Tool>
 ): SetupAdapter<LanguageModelV4> => {
   const provider = createAdkProvider({
-    modelType: options.modelType,
-    modelName: options.modelName,
+    model: options.model,
     apiKey: options.apiKey,
     instruction:
       'You are a helpful assistant in the Callstack React Native AI demo app.',
@@ -31,7 +32,7 @@ export const createAdkLanguageSetupAdapter = (
 
   return {
     model,
-    modelId: `adk-${options.modelName}`,
+    modelId: `adk-${options.model}`,
     display: {
       label: options.label,
       accentColor: options.accentColor,
@@ -40,14 +41,14 @@ export const createAdkLanguageSetupAdapter = (
     builtIn: options.builtIn,
     imageInput: true,
     isAvailable(): Availability {
-      if (options.modelType === 'gemini' && !options.apiKey) {
+      if (options.model !== 'gemini-nano' && !options.apiKey) {
         return 'no'
       }
       return 'yes'
     },
     async download(onProgress) {
       let bytesToDownload: number | undefined
-      await provider.prepareNano({
+      await model.prepare({
         onProgress: (progress) => {
           bytesToDownload = progress.bytesToDownload ?? bytesToDownload
           if (progress.phase === 'completed') {
@@ -71,8 +72,7 @@ export const createAdkLanguageSetupAdapter = (
 export const createAdkCloudSetupAdapter = (tools: Record<string, Tool>) =>
   createAdkLanguageSetupAdapter(
     {
-      modelType: 'gemini',
-      modelName: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       label: 'ADK Gemini Flash',
       accentColor: '#4285F4',
       icon: 'psychology',
@@ -85,8 +85,7 @@ export const createAdkCloudSetupAdapter = (tools: Record<string, Tool>) =>
 export const createAdkNanoSetupAdapter = (tools: Record<string, Tool>) =>
   createAdkLanguageSetupAdapter(
     {
-      modelType: 'genai-nano',
-      modelName: 'gemini-nano',
+      model: 'gemini-nano',
       label: 'ADK Gemini Nano',
       accentColor: '#34A853',
       icon: 'memory',
