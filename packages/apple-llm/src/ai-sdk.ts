@@ -88,6 +88,7 @@ export interface AppleModelInfo {
   supportsImagePrompts: boolean
   supportsDynamicProfiles: boolean
   supportsVisionTools: boolean
+  supportsReasoning: boolean
   contextSize?: number
 }
 
@@ -820,6 +821,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   private tools: AppleToolDefinitionSet = {}
   private options: AppleLanguageModelOptions
+  private reasoningSupport?: Promise<boolean>
 
   constructor(options: AppleLanguageModelOptions = {}) {
     this.options = options
@@ -831,6 +833,37 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   countTokens(text: string): Promise<number> {
     return NativeAppleLLM.countTokens(text)
+  }
+
+  // Asked once per model, since reasoning depends on the model and the OS
+  private supportsReasoning(): Promise<boolean> {
+    this.reasoningSupport ??= NativeAppleLLM.getModelInfo(
+      undefined,
+      this.modelId
+    ).then(
+      (info) => (info as AppleModelInfo).supportsReasoning !== false,
+      // Older OS versions report the unsupported reasoning level natively
+      () => true
+    )
+    return this.reasoningSupport
+  }
+
+  private async prepareCallOptions(options: LanguageModelV4CallOptions) {
+    const appleOptions = getAppleNativeOptions(this.options, options)
+    const warnings: SharedV4Warning[] = []
+
+    // Foundation Models fails the whole call for a reasoning level the model
+    // cannot use, so it is dropped with a warning like other unsupported settings
+    if (appleOptions.reasoningLevel && !(await this.supportsReasoning())) {
+      appleOptions.reasoningLevel = undefined
+      warnings.push({
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: `The ${this.modelId} model does not support reasoning.`,
+      })
+    }
+
+    return { appleOptions, warnings }
   }
 
   private prepareMessages(messages: LanguageModelV4Prompt): AppleMessage[] {
@@ -911,14 +944,16 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doGenerate(options: LanguageModelV4CallOptions) {
-    const appleOptions = getAppleNativeOptions(this.options, options)
+    const { appleOptions, warnings: settingWarnings } =
+      await this.prepareCallOptions(options)
     const requestId = generateId()
     const messages = this.prepareMessages(options.prompt)
     const {
       tools: callTools,
       toolCallingMode,
-      warnings,
+      warnings: toolWarnings,
     } = prepareToolChoice(options.tools, options.toolChoice)
+    const warnings = [...settingWarnings, ...toolWarnings]
     const tools = this.prepareTools(callTools)
 
     for (const tool of tools) {
@@ -990,13 +1025,15 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doStream(options: LanguageModelV4CallOptions) {
-    const appleOptions = getAppleNativeOptions(this.options, options)
+    const { appleOptions, warnings: settingWarnings } =
+      await this.prepareCallOptions(options)
     const messages = this.prepareMessages(options.prompt)
     const {
       tools: callTools,
       toolCallingMode,
-      warnings,
+      warnings: toolWarnings,
     } = prepareToolChoice(options.tools, options.toolChoice)
+    const warnings = [...settingWarnings, ...toolWarnings]
     const tools = this.prepareTools(callTools)
 
     if (typeof ReadableStream === 'undefined') {

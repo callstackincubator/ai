@@ -386,6 +386,7 @@ public class AppleLLMImpl: NSObject {
       "supportsImagePrompts": false,
       "supportsDynamicProfiles": false,
       "supportsVisionTools": false,
+      "supportsReasoning": false,
     ]
 
 #if compiler(>=6.3)
@@ -398,6 +399,12 @@ public class AppleLLMImpl: NSObject {
       info["supportsImagePrompts"] = true
       info["supportsDynamicProfiles"] = true
       info["supportsVisionTools"] = supportsVisionTools
+    }
+#endif
+
+#if compiler(>=6.4)
+    if #available(iOS 27, *) {
+      info["supportsReasoning"] = model.capabilities.contains(.reasoning)
     }
 #endif
 
@@ -422,6 +429,7 @@ public class AppleLLMImpl: NSObject {
       "supportsImagePrompts": true,
       "supportsDynamicProfiles": true,
       "supportsVisionTools": supportsVisionTools,
+      "supportsReasoning": model.capabilities.contains(.reasoning),
     ]
 
     // Model metadata is fetched asynchronously, so only ask for it once Private Cloud
