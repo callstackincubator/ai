@@ -353,7 +353,10 @@ describe('createLlamaStreamParser', () => {
     })
   })
 
-  // llama.rn sends every tool call parsed so far with each token
+  // llama.rn re-sends the whole tool call list with every token, and the
+  // calls carry no id while still being parsed. Each snapshot below is the
+  // same call with more of its arguments filled in, so it must come out as
+  // one tool call with the final arguments, not one per snapshot
   test('emits one tool call for partial snapshots without ids', () => {
     const snapshot = (args: string) => ({
       token: args.slice(-1),
