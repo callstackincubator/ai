@@ -537,19 +537,7 @@ function restoreNumbers(
   return (schema.anyOf ?? []).reduce(restoreNumbers, value)
 }
 
-function hasFractionalEnum(schema?: JSONSchema7) {
-  let found = false
-  JSON.stringify(schema, (_, value) => {
-    found ||= isFractionalEnum(value)
-    return value
-  })
-  return found
-}
-
 function restoreJsonNumbers(text: string, schema?: JSONSchema7) {
-  if (!hasFractionalEnum(schema)) {
-    return text
-  }
   try {
     return JSON.stringify(restoreNumbers(JSON.parse(text), schema))
   } catch {
