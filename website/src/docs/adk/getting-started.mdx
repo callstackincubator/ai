@@ -30,29 +30,21 @@ Cloud Gemini works on all devices supported by ADK & MLKit when an API key is co
 
 ## Integration with your app
 
-Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST`; exclude it in your app packaging via `expo-build-properties`:
+Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST` and `META-INF/DEPENDENCIES`, so your app packaging must exclude them.
 
 ### Expo Setup
+
+Add the config plugin to your `app.json` or `app.config.js`:
 
 ```json
 {
   "expo": {
-    "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "minSdkVersion": 26,
-            "packagingOptions": {
-              "exclude": ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
-            }
-          }
-        }
-      ]
-    ]
+    "plugins": ["@react-native-ai/adk"]
   }
 }
 ```
+
+The plugin raises `minSdkVersion` to 26 (a higher one is kept) and adds both files to the packaging excludes of `android/app/build.gradle`, next to any excludes you set in `expo-build-properties`. If you also set `android.minSdkVersion` in `expo-build-properties`, make it 26 or higher.
 
 After changing CNG config, run:
 
