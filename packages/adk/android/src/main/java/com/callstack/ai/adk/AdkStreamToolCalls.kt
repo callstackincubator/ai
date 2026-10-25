@@ -60,8 +60,14 @@ class AdkStreamToolCallEmitter(
         }
       }
 
-      if (functionCall.args.isNotEmpty() && !state.completed) {
-        val input = AdkJson.encode(functionCall.args)
+      // A complete event carries the final arguments, which are empty for tools without parameters
+      if ((functionCall.args.isNotEmpty() || !event.partial) && state.started && !state.completed) {
+        val input =
+          if (functionCall.args.isEmpty() && state.inputBuilder.isNotEmpty()) {
+            state.inputBuilder.toString()
+          } else {
+            AdkJson.encode(functionCall.args)
+          }
         if (state.inputBuilder.isEmpty()) {
           emit(
             Arguments.createMap().apply {
