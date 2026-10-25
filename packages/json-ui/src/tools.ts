@@ -9,12 +9,30 @@ import {
 } from './registry'
 
 /**
- * Sometimes LLMs call tools with a string instead of an object.
+ * Props arrive as a string, since some models cannot generate free-form
+ * objects. Models often write them as JavaScript object literals, with unquoted
+ * keys or single quotes, so those are accepted too
  */
 function smartParse(
   props: string | Record<string, unknown>
 ): Record<string, unknown> {
-  return typeof props === 'string' ? JSON.parse(props) : props
+  if (typeof props !== 'string') return props
+  try {
+    return JSON.parse(props)
+  } catch {
+    const json = props
+      .replace(/'((?:[^'\\]|\\.)*)'/g, (_, value: string) =>
+        JSON.stringify(value.replace(/\\'/g, "'"))
+      )
+      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+    try {
+      return JSON.parse(json)
+    } catch {
+      throw new Error(
+        `Props must be a JSON object, e.g. {"text":"Hello"}. Received: ${props}`
+      )
+    }
+  }
 }
 
 const defaultCreateId = () =>
