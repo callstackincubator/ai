@@ -3,8 +3,7 @@
 Apple Core AI provider for React Native AI.
 
 > [!WARNING]
-> Work in progress. This package is not published to npm yet, and nothing has
-> run on a device so far ([#236](https://github.com/callstackincubator/ai/issues/236)).
+> Work in progress. This package is not published to npm yet.
 > Its docs live in [`docs/`](./docs) until it is released.
 
 This package is for app-provided Core AI model bundles exported from
