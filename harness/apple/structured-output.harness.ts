@@ -162,6 +162,44 @@ describe('apple structured output', () => {
     expect([0.5, 1.5]).toContain(value)
   })
 
+  it('picks fractional enum values in nested arrays', async () => {
+    const output = await generateObject('Rate three songs with a score each.', {
+      type: 'object',
+      properties: {
+        ratings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              song: { type: 'string' },
+              score: { type: 'number', enum: [1, 2.5, 4] },
+            },
+            required: ['song', 'score'],
+          },
+        },
+      },
+      required: ['ratings'],
+    })
+
+    expect(output.ratings.length).toBeGreaterThan(0)
+    for (const rating of output.ratings) {
+      expect([1, 2.5, 4]).toContain(rating.score)
+    }
+  })
+
+  it('streams fractional enum values as numbers', async () => {
+    const { stream } = await apple().doStream({
+      prompt: prompt('Pick the number 9.'),
+      responseFormat: {
+        type: 'json',
+        schema: numberSchema({ type: 'number', enum: [0.5, 1.5] }),
+      },
+    })
+
+    const { value } = JSON.parse(textOf(await readAll(stream)))
+    expect([0.5, 1.5]).toContain(value)
+  })
+
   it('accepts nullable fields', async () => {
     const output = await generateObject('Describe a cat named Tom.', {
       type: 'object',

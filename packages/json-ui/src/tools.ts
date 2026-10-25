@@ -8,14 +8,42 @@ import {
   type JsonUISpec,
 } from './registry'
 
+// Models put style keys next to text and leave text out without an example
+const propsDescription =
+  'Props as a JSON object, with style keys inside style, e.g. {"text":"Hello","style":{"fontSize":24}}'
+
 /**
- * Sometimes LLMs call tools with a string instead of an object.
+ * Props arrive as a string, since some models cannot generate free-form
+ * objects. Models often write them as JavaScript object literals, with unquoted
+ * keys or single quotes, so those are accepted too. Returns null for props that
+ * cannot be parsed
  */
 function smartParse(
   props: string | Record<string, unknown>
-): Record<string, unknown> {
-  return typeof props === 'string' ? JSON.parse(props) : props
+): Record<string, unknown> | null {
+  if (typeof props !== 'string') return props
+  try {
+    return JSON.parse(props)
+  } catch {
+    const json = props
+      .replace(/'((?:[^'\\]|\\.)*)'/g, (_, value: string) =>
+        JSON.stringify(value.replace(/\\'/g, "'"))
+      )
+      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+    try {
+      return JSON.parse(json)
+    } catch {
+      return null
+    }
+  }
 }
+
+// Returned rather than thrown, since a thrown error ends the generation on
+// Apple Foundation Models, while models retry with valid props
+const invalidProps = (props: string) => ({
+  success: false,
+  message: `Props must be a JSON object, e.g. {"text":"Hello"}. Received: ${props}`,
+})
 
 const defaultCreateId = () =>
   `UI-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`
@@ -82,6 +110,12 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
 }: CreateGenTUIoolsOptions<TSpec>) {
   // Serialize mutating tool calls to avoid interleaving writes.
   let cachedSpec: TSpec | null = null
+
+  // Models change the case of type names (e.g. BUTTON), which would render as
+  // an empty container
+  const nodeTypes = Object.keys(nodeHints)
+  const resolveNodeType = (type: string) =>
+    nodeTypes.find((name) => name.toLowerCase() === type.toLowerCase())
 
   const readSpec = (): TSpec | null => {
     if (cachedSpec) return cloneSpec(cachedSpec)
@@ -187,7 +221,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
     description: 'Set or add props for a node by id.',
     inputSchema: z.object({
       id: z.string().describe('Node id'),
-      props: z.string().describe('Props object for the node'),
+      props: z.string().describe(propsDescription),
       replace: z.boolean().optional().describe('Replace existing props'),
     }),
     execute: toolWrapper(
@@ -195,6 +229,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
       async ({ id, props: propsArg, replace = false }) =>
         withMutationLock(async () => {
           const parsedProps = smartParse(propsArg)
+          if (!parsedProps) return invalidProps(propsArg)
           const spec = readSpec()
           if (!spec) return { success: false, message: 'No UI spec' }
           if (!spec.elements[id]) {
@@ -252,14 +287,22 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
       parentId: z.string().optional().describe('Parent node id; omit for root'),
       type: z
         .string()
-        .describe('Component type (e.g. Container, Column, Text, Button)'),
-      props: z.string().optional().describe('Props object for the node'),
+        .describe(`Component type, one of: ${nodeTypes.join(', ')}`),
+      props: z.string().optional().describe(propsDescription),
     }),
     execute: toolWrapper(
       'addUINode',
-      async ({ parentId, type, props: propsArg }) =>
+      async ({ parentId, type: typeArg, props: propsArg }) =>
         withMutationLock(async () => {
+          const type = resolveNodeType(typeArg)
+          if (!type) {
+            return {
+              success: false,
+              message: `Unknown type "${typeArg}". Use one of: ${nodeTypes.join(', ')}`,
+            }
+          }
           const parsedProps = smartParse(propsArg ?? '{}')
+          if (!parsedProps) return invalidProps(propsArg!)
           const spec = readSpec()
           if (!spec) {
             console.warn(

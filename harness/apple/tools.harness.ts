@@ -1,6 +1,6 @@
 import type { LanguageModelV4FunctionTool } from '@ai-sdk/provider'
 import { createAppleProvider } from '@react-native-ai/apple'
-import { generateText, tool } from 'ai'
+import { generateText, jsonSchema, tool } from 'ai'
 import { describe, expect, it } from 'react-native-harness'
 import { z } from 'zod'
 
@@ -205,6 +205,36 @@ describe('apple tools', () => {
         },
       },
     ])
+  })
+
+  it('passes fractional enum arguments to a tool as numbers', async () => {
+    const calls: unknown[] = []
+    const setSpeed = tool({
+      description: 'Set the playback speed.',
+      inputSchema: jsonSchema<{ speed: number }>({
+        type: 'object',
+        properties: { speed: { type: 'number', enum: [0.5, 1, 1.5] } },
+        required: ['speed'],
+      }),
+      execute: async (input) => {
+        calls.push(input)
+        return 'done'
+      },
+    })
+
+    const result = await generateText({
+      model: createAppleProvider({ availableTools: { setSpeed } })(),
+      tools: { setSpeed },
+      toolChoice: 'required',
+      prompt: 'Play at one and a half speed. Use your tool.',
+    })
+
+    expect(calls).toEqual([{ speed: 1.5 }])
+    expect(result.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'tool-call', input: { speed: 1.5 } }),
+      ])
+    )
   })
 
   it('reports an error thrown by a tool as a tool call error', async () => {

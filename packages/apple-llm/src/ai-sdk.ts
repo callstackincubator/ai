@@ -4,6 +4,8 @@ import type {
   EmbeddingModelV4Result,
   ImageModelV4,
   ImageModelV4CallOptions,
+  JSONSchema7,
+  JSONSchema7Definition,
   LanguageModelV4,
   LanguageModelV4CallOptions,
   LanguageModelV4FinishReason,
@@ -484,6 +486,72 @@ export type AppleStreamEntry =
       output: string
     }
 
+// Foundation Models cannot constrain a number to a single fractional value, so
+// enums with fractional numbers are generated as strings and parsed back
+function isFractionalEnum(schema: unknown) {
+  const { type, enum: values } = (schema ?? {}) as JSONSchema7
+  return (
+    type === 'number' &&
+    values?.some((value) => !Number.isInteger(value)) === true
+  )
+}
+
+function toNativeSchema<T extends JSONSchema7 | undefined>(schema: T): T {
+  return (
+    schema &&
+    JSON.parse(
+      JSON.stringify(schema, (_, value) =>
+        isFractionalEnum(value)
+          ? { ...value, type: 'string', enum: value.enum!.map(String) }
+          : value
+      )
+    )
+  )
+}
+
+function restoreNumbers(
+  value: unknown,
+  schema?: JSONSchema7Definition
+): unknown {
+  if (typeof schema !== 'object') {
+    return value
+  }
+  if (isFractionalEnum(schema)) {
+    return schema.enum!.map(String).includes(value as string)
+      ? Number(value)
+      : value
+  }
+  if (Array.isArray(value) && schema.items) {
+    return value.map((item) =>
+      restoreNumbers(item, schema.items as JSONSchema7Definition)
+    )
+  }
+  if (value && typeof value === 'object' && schema.properties) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        restoreNumbers(item, schema.properties![key]),
+      ])
+    )
+  }
+  return (schema.anyOf ?? []).reduce(restoreNumbers, value)
+}
+
+function restoreJsonNumbers(text: string, schema?: JSONSchema7) {
+  try {
+    return JSON.stringify(restoreNumbers(JSON.parse(text), schema))
+  } catch {
+    return text
+  }
+}
+
+function restoreToolInput(tools: Tool[] = [], name: string, input: string) {
+  const tool = tools.find((tool) => tool.name === name)
+  return tool?.type === 'function'
+    ? restoreJsonNumbers(input, tool.inputSchema)
+    : input
+}
+
 // Native streams send the full text generated so far
 export function getSnapshotDelta(previous: string, next: string) {
   return next.startsWith(previous) ? next.slice(previous.length) : next
@@ -496,14 +564,15 @@ export function getSnapshotDelta(previous: string, next: string) {
  * LanguageModelSession
  *
  * @param providerKey Key of the provider metadata on reasoning parts
- * @param bufferText Hold the text back and send it in end(), for structured
- * output, whose partial JSON snapshots are not prefixes of the final JSON
+ * @param schema Schema of structured output. The text is held back and sent in
+ * end(), since partial JSON snapshots are not prefixes of the final JSON
+ * @param tools Tools of the call, to restore the numbers in their inputs
  */
 export function createSnapshotStreamHandler(
   controller: ReadableStreamDefaultController<LanguageModelV4StreamPart>,
   id: string,
   providerKey: string,
-  { bufferText = false }: { bufferText?: boolean } = {}
+  { schema, tools }: { schema?: JSONSchema7; tools?: Tool[] } = {}
 ) {
   let previousRawContent = ''
   let textStarted = false
@@ -568,7 +637,10 @@ export function createSnapshotStreamHandler(
           type: 'tool-call',
           toolCallId: entry.toolCallId,
           toolName: entry.toolName,
-          input: toolCall?.type === 'tool-call' ? toolCall.input : '{}',
+          input:
+            toolCall?.type === 'tool-call'
+              ? restoreToolInput(tools, entry.toolName, toolCall.input)
+              : '{}',
           providerExecuted: true,
         })
         controller.enqueue({
@@ -588,7 +660,7 @@ export function createSnapshotStreamHandler(
         handleEntries(entries)
       }
 
-      if (bufferText) {
+      if (schema) {
         previousRawContent = content
         return
       }
@@ -613,11 +685,11 @@ export function createSnapshotStreamHandler(
     },
     end() {
       endReasoning()
-      if (bufferText && previousRawContent) {
+      if (schema && previousRawContent) {
         controller.enqueue({ type: 'text-start', id })
         controller.enqueue({
           type: 'text-delta',
-          delta: previousRawContent,
+          delta: restoreJsonNumbers(previousRawContent, schema),
           id,
         })
         textStarted = true
@@ -1104,6 +1176,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         const schema = jsonSchema(tool.inputSchema)
         return {
           ...tool,
+          inputSchema: toNativeSchema(tool.inputSchema),
           id: generateId(),
           execute: async (modelInput: unknown) => {
             const text =
@@ -1111,7 +1184,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
                 ? modelInput
                 : JSON.stringify(modelInput ?? '')
             const toolCallArguments = await parseJSON({
-              text,
+              text: restoreJsonNumbers(text, tool.inputSchema),
               schema,
             })
             const opts: ToolExecutionOptions<unknown> = {
@@ -1145,6 +1218,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
       globalThis.__APPLE_LLM_TOOLS__[tool.id] = tool.execute
     }
 
+    const schema =
+      options.responseFormat?.type === 'json'
+        ? options.responseFormat.schema
+        : undefined
+
     try {
       const response = await abortable(
         NativeAppleLLM.generateText(messages, {
@@ -1158,10 +1236,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             string,
             unknown
           >,
-          schema:
-            options.responseFormat?.type === 'json'
-              ? options.responseFormat.schema
-              : undefined,
+          schema: toNativeSchema(schema),
         }),
         options.abortSignal,
         () => NativeAppleLLM.cancelStream(requestId)
@@ -1171,7 +1246,9 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         content: response.content.map((part) => {
           switch (part.type) {
             case 'text':
-              return part
+              return schema
+                ? { ...part, text: restoreJsonNumbers(part.text, schema) }
+                : part
             case 'reasoning':
               return {
                 type: 'reasoning' as const,
@@ -1186,7 +1263,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
                 toolCallId: part.toolCallId,
                 providerExecuted: true,
                 toolName: part.toolName,
-                input: part.input,
+                input: restoreToolInput(callTools, part.toolName, part.input),
               }
             case 'tool-result':
               return {
@@ -1256,9 +1333,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             controller,
             id,
             'apple',
-            // Partial JSON snapshots are not prefixes of the final JSON, so
-            // structured output is sent once the stream completes
-            { bufferText: Boolean(schema) }
+            { schema, tools: callTools }
           )
 
           const updateListener = NativeAppleLLM.onStreamUpdate((data) => {
@@ -1309,7 +1384,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             tools,
             toolCallingMode,
             providerOptions: appleOptions as unknown as Record<string, unknown>,
-            schema,
+            schema: toNativeSchema(schema),
           })
         } catch (error) {
           cleanup()

@@ -13,14 +13,15 @@ const PROJECTOR_ID =
   'bartowski/Qwen_Qwen3.5-2B-GGUF/mmproj-Qwen_Qwen3.5-2B-f16.gguf'
 
 // Loads the language model before the tests of a file and unloads it after.
-// Models already on the device are not downloaded again
-export function setupLanguageModel() {
+// Models already on the device are not downloaded again. Without vision, the
+// projector is not loaded, which crashes the Metal driver of iOS simulators
+export function setupLanguageModel({ vision = true } = {}) {
   let model: LlamaLanguageModel | undefined
 
   beforeAll(async () => {
     const [modelPath, projectorPath] = await Promise.all([
       downloadModel(MODEL_ID),
-      downloadModel(PROJECTOR_ID),
+      vision ? downloadModel(PROJECTOR_ID) : undefined,
     ])
     model = llama.languageModel(modelPath, { projectorPath })
   })
