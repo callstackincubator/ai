@@ -96,4 +96,20 @@ describe('apple stream', () => {
       error: expect.objectContaining({ code: 'CONFLICTING_SAMPLING_METHODS' }),
     })
   })
+
+  it('warns about dropped reasoning in stream-start', async () => {
+    const { stream } = await apple().doStream({
+      prompt: prompt('Say hi.'),
+      reasoning: 'high',
+    })
+    const parts = await readAll(stream)
+
+    expect(parts[0]).toEqual({
+      type: 'stream-start',
+      warnings: [
+        expect.objectContaining({ type: 'unsupported', feature: 'reasoning' }),
+      ],
+    })
+    expect(parts.at(-1)).toMatchObject({ type: 'finish' })
+  })
 })

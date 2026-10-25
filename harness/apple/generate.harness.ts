@@ -85,10 +85,22 @@ describe('apple generate', () => {
     expect(long).toBeGreaterThan(short)
   })
 
-  it('rejects reasoning levels the on-device model cannot use', async () => {
-    await expect(
-      apple().doGenerate({ prompt: prompt('Say hi.'), reasoning: 'high' })
-    ).rejects.toThrow(/capability/)
+  it('drops reasoning with a warning for the on-device model', async () => {
+    const result = await apple().doGenerate({
+      prompt: prompt('Reply with exactly the word BANANA and nothing else.'),
+      reasoning: 'high',
+    })
+
+    expect(result.warnings).toEqual([
+      {
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: 'The system model does not support reasoning.',
+      },
+    ])
+    expect(result.content).toEqual([
+      { type: 'text', text: expect.stringMatching(/banana/i) },
+    ])
   })
 
   it('generates with permissive guardrails', async () => {

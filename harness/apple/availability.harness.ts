@@ -15,6 +15,7 @@ describe('apple availability', () => {
       supportsLocale: true,
       supportsTokenCounting: true,
       supportsImagePrompts: true,
+      supportsReasoning: false,
     })
     expect(info.contextSize).toBeGreaterThan(0)
     expect(info.supportedLanguages).toContain('en-US')
