@@ -199,6 +199,19 @@ describe('apple tools', () => {
       message: expect.stringContaining('The clock is broken'),
     })
   })
+
+  it('explains how to register a tool the provider does not know', async () => {
+    const model = createAppleProvider()()
+
+    await expect(
+      model.doGenerate({
+        prompt: prompt('What time is it right now? Use your tool.'),
+        tools: [timeTool],
+      })
+    ).rejects.toThrow(
+      'Tool "getCurrentTime" is not registered with the Apple provider'
+    )
+  })
 })
 
 describe('apple tool history', () => {

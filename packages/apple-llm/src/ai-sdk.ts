@@ -948,6 +948,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   private prepareTools(tools: Tool[] = []) {
     return tools.map((tool) => {
       if (tool.type === 'function') {
+        if (!this.tools[tool.name]) {
+          throw new Error(
+            `Tool "${tool.name}" is not registered with the Apple provider. Apple runs tools natively, so pass it in availableTools of createAppleProvider() or call updateTools() first.`
+          )
+        }
         const schema = jsonSchema(tool.inputSchema)
         return {
           ...tool,
