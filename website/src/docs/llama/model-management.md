@@ -182,9 +182,11 @@ Creates a speech model instance for text-to-speech.
 
 - `modelPath`: Path to the model file (from `downloadModel()` or `getModelPath()`)
 - `options`:
-  - `vocoderPath`: **Required** - Path to vocoder model file
+  - `vocoderPath`: **Required** - Path to a [codec.cpp](https://github.com/mybigday/codec.cpp) vocoder GGUF, e.g. `BricksDisplay/codec.cpp-gguf/wavtokenizer-large-speech-75tokens.gguf` for OuteTTS 0.3
   - `vocoderBatchSize`: Batch size for vocoder processing
   - `contextParams`: llama.rn context parameters
+
+Speech is returned as 16-bit mono WAV at the vocoder's sample rate.
 
 ### Storage Functions
 

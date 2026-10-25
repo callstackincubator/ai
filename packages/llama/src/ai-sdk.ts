@@ -718,6 +718,41 @@ export class LlamaRerankModel implements RerankingModelV4 {
 }
 
 /**
+ * Encodes mono float samples in [-1, 1], as decoded by llama.rn, as a 16-bit
+ * PCM WAV file
+ */
+export function encodeWav(samples: number[], sampleRate: number): Uint8Array {
+  const dataLength = samples.length * 2
+  const view = new DataView(new ArrayBuffer(44 + dataLength))
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i))
+    }
+  }
+
+  writeString(0, 'RIFF')
+  view.setUint32(4, 36 + dataLength, true)
+  writeString(8, 'WAVE')
+  writeString(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeString(36, 'data')
+  view.setUint32(40, dataLength, true)
+
+  samples.forEach((sample, index) => {
+    const clamped = Math.max(-1, Math.min(1, sample))
+    view.setInt16(44 + index * 2, clamped * 0x7fff, true)
+  })
+
+  return new Uint8Array(view.buffer)
+}
+
+/**
  * Configuration options for llama.rn speech model (vocoder-based TTS)
  */
 export interface LlamaSpeechOptions {
@@ -869,11 +904,10 @@ export class LlamaSpeechModel implements SpeechModelV4 {
       throw new Error('No audio tokens generated')
     }
 
-    const audioData = await context.decodeAudioTokens(
+    const samples = await context.decodeAudioTokens(
       completionResult.audio_tokens
     )
-
-    const audio = new Uint8Array(audioData)
+    const audio = encodeWav(samples, await context.getAudioSampleRate())
 
     return {
       audio,
