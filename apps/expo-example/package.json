@@ -8,8 +8,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:harness:simulator": "HARNESS_SIMULATOR=true react-native-harness --harnessRunner ios-simulator",
-    "test:harness:device": "react-native-harness --harnessRunner ios"
+    "test:harness:simulator": "scripts/test-harness.sh simulator",
+    "test:harness:device": "scripts/test-harness.sh device"
   },
   "dependencies": {
     "@ai-sdk/otel": "^1.0.152",

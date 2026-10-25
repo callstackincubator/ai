@@ -93,27 +93,19 @@ bun run android
 
 The providers are tested with [React Native Harness](https://react-native-harness.dev), which runs the tests in [`harness/`](../../harness) at the repository root inside this app, against the real native modules and models. Each provider has a folder with one file per feature. Files ending in `.device.harness.ts` need a physical device.
 
-Install a debug build on an iPhone 18 Pro simulator with iOS 27 first (`bun run ios`), then run the tests that don't need a physical device:
+Each command builds the app with the right flags, installs it, and runs the tests in it. Run the tests that don't need a physical device on an iPhone 18 Pro simulator with iOS 27:
 
 ```bash
 bun run test:harness:simulator
 ```
 
-Or run every test, including [Core AI](#core-ai-ios-27-devices) and [Private Cloud Compute](#private-cloud-compute-ios-27-devices), on a physical device with Apple Intelligence. Install a debug build with both enabled first. The team signing it needs the Private Cloud Compute entitlement, or those tests fail:
-
-```bash
-CORE_AI=1 PCC=1 npx expo prebuild --clean --platform ios
-```
-
-```bash
-CORE_AI=1 PCC=1 bun run ios --device
-```
-
-Then run the tests on the device, named as `xcrun devicectl list devices` shows it. Devices always connect to Metro on port 8081, so stop any Metro server running there first:
+Or run every test, including [Core AI](#core-ai-ios-27-devices) and [Private Cloud Compute](#private-cloud-compute-ios-27-devices), on a physical device with Apple Intelligence, named as `xcrun devicectl list devices` shows it. The device build sets `CORE_AI=1 PCC=1`, so the team signing it needs the Private Cloud Compute entitlement, or those tests fail. Devices always connect to Metro on port 8081, so stop any Metro server running there first:
 
 ```bash
 HARNESS_IOS_DEVICE="My iPhone" bun run test:harness:device
 ```
+
+Both regenerate the `ios` folder, so run `npx expo prebuild --clean` afterwards to go back to the default build.
 
 Pass a path such as `harness/apple` or `harness/apple/tools` to run part of the tests. The first llama run downloads about 2.5 GB of models.
 
