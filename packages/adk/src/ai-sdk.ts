@@ -557,12 +557,10 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     messages: LanguageModelV4Prompt,
     warnings: SharedV4Warning[]
   ): AdkMessage[] {
-    return messages.map((message): AdkMessage => {
+    // System messages become part of the agent instruction instead
+    return messages.flatMap((message): AdkMessage[] => {
       if (message.role === 'system') {
-        return {
-          role: 'system',
-          content: message.content,
-        }
+        return []
       }
 
       if (message.role === 'user') {
@@ -574,16 +572,10 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         })
 
         if (parts.length === 1 && parts[0]?.type === 'text') {
-          return {
-            role: 'user',
-            content: parts[0].text,
-          }
+          return [{ role: 'user', content: parts[0].text }]
         }
 
-        return {
-          role: 'user',
-          parts,
-        }
+        return [{ role: 'user', parts }]
       }
 
       if (message.role === 'assistant') {
@@ -616,10 +608,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
           })
           .join('\n')
 
-        return {
-          role: 'assistant',
-          content,
-        }
+        return [{ role: 'assistant', content }]
       }
 
       if (message.role === 'tool') {
@@ -633,10 +622,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
           })
           .join('\n')
 
-        return {
-          role: 'user',
-          content,
-        }
+        return [{ role: 'user', content }]
       }
 
       throw createAdkError(
@@ -649,14 +635,24 @@ class AdkChatLanguageModel implements AdkLanguageModel {
   private prepareAgentConfig(
     options: LanguageModelV4CallOptions
   ): AdkAgentConfig {
+    // ADK only takes a system prompt as the agent instruction
+    const systemPrompts = options.prompt.flatMap((message) =>
+      message.role === 'system' ? [message.content] : []
+    )
     // Gemini Nano has no response schema, so the schema goes in the instruction
-    if (!this.isNano || options.responseFormat?.type !== 'json') {
+    const jsonInstruction =
+      this.isNano && options.responseFormat?.type === 'json'
+        ? createNanoJsonInstruction(options.responseFormat.schema)
+        : undefined
+
+    if (systemPrompts.length === 0 && !jsonInstruction) {
       return this.agentConfig
     }
 
     const instruction = [
       this.agentConfig.instruction,
-      createNanoJsonInstruction(options.responseFormat.schema),
+      ...systemPrompts,
+      jsonInstruction,
     ]
       .filter(Boolean)
       .join('\n\n')

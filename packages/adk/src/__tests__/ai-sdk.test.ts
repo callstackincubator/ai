@@ -164,6 +164,27 @@ describe('model resolution', () => {
 })
 
 describe('prompt conversion', () => {
+  test('moves system messages into the agent instruction', async () => {
+    const model = createAdkProvider({
+      modelType: 'gemini',
+      instruction: 'Be brief.',
+    })()
+    await model.doGenerate(
+      createCallOptions({
+        prompt: [
+          { role: 'system', content: 'Answer in Polish.' },
+          { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+        ],
+      })
+    )
+
+    const [, messages, config] = lastGenerateCall()
+    expect(messages).toEqual([{ role: 'user', content: 'hello' }])
+    expect(config).toMatchObject({
+      instruction: 'Be brief.\n\nAnswer in Polish.',
+    })
+  })
+
   test('resolves top-level file media types to a full mime type', async () => {
     await gemini.doGenerate(
       createCallOptions({
