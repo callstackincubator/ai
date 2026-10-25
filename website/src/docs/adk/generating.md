@@ -82,6 +82,67 @@ console.log(usage.outputTokenDetails.reasoningTokens) // thoughtsTokenCount
 console.log(usage.raw?.totalTokenCount)
 ```
 
+ML Kit does not report token usage for Gemini Nano, so Nano usage is empty apart from the cached prompt tokens described in [Context Caching](#context-caching).
+
+## Context Caching
+
+Chat apps send the same system prompt with every turn, and Gemini Nano processes it again each time. ML Kit can cache the processed prompt prefix and reuse it. Google's ML Kit docs report these Pixel 9 timings:
+
+| Prompt                               | Without cache | Cache hit |
+| ------------------------------------ | ------------- | --------- |
+| 300-token prefix, 50-token suffix    | 0.82 s        | 0.45 s    |
+| 1,000-token prefix, 100-token suffix | 2.11 s        | 0.5 s     |
+
+Prefix caching is experimental in ML Kit, only works on some devices and only with text prompts. Where it is not available, requests run without a cache.
+
+### Caching the System Prompt
+
+Set `cacheSystemPrompt` to send the system prompt to Gemini Nano as a prompt prefix that ML Kit caches by itself:
+
+```typescript
+import { createAdkProvider } from '@react-native-ai/adk'
+import { streamText } from 'ai'
+
+const adk = createAdkProvider({ instruction: 'You are a cooking assistant.' })
+
+const result = streamText({
+  model: adk(),
+  system: 'Answer in two sentences.',
+  messages,
+  providerOptions: { adk: { cacheSystemPrompt: true } },
+})
+```
+
+The prefix is the agent `instruction`, the prompt's `system` messages, and the tool and JSON guidance the provider adds for Gemini Nano. Keep it the same across calls: any change is a new prefix, and the first call with a prefix is a cache miss. ADK adds a note about role markers to the prefix once a conversation has more than one message, so the second turn of a chat is a miss too. Prompts with images skip the cache. ML Kit stores the caches in app storage and evicts the least used ones. Call `adk.caches.clearImplicit()` to delete them.
+
+### Explicit Caches
+
+To process a long, fixed prefix ahead of time, such as a document to answer questions about, create a named cache and pass its name as `cachedContent`:
+
+```typescript
+import { adk } from '@react-native-ai/adk'
+import { generateText } from 'ai'
+
+await adk.caches.create(
+  'manual',
+  `Answer questions about this manual:\n${manual}`
+)
+
+const { text } = await generateText({
+  model: adk(),
+  prompt: 'How do I reset the device?',
+  providerOptions: { adk: { cachedContent: 'manual' } },
+})
+```
+
+ML Kit keeps explicit caches across app launches until you delete them. Use `adk.caches.list()` and `adk.caches.delete(name)` to manage them. The cache comes before the agent instruction and the messages, so leave out a `system` prompt that repeats it. `cacheSystemPrompt` is ignored when `cachedContent` is set.
+
+For cloud Gemini, `cachedContent` takes the name of a Gemini API cache, such as `cachedContents/abc123`. Cloud Gemini models also cache repeated prefixes on their own, so `cacheSystemPrompt` only applies to Gemini Nano.
+
+### Cached Tokens in Usage
+
+With Gemini Nano, `usage.inputTokenDetails.cacheReadTokens` is the token count of the cached prefix. Because ML Kit does not report cache hits, this is an estimate. It is set when the prefix was already used in this app session, or when the explicit cache was created in this app session.
+
 ## Reasoning
 
 Set the AI SDK `reasoning` option to turn on the model's thinking. The thoughts come back as reasoning parts:
@@ -277,5 +338,6 @@ const { text } = await generateText({
 | Native tool calling on Nano | Not in ML Kit - the provider parses `tool_code` blocks      |
 | Forcing a tool call         | `required` and specific tools run as `auto`, with a warning |
 | Schema enforcement on Nano  | Prompted, then validated by the AI SDK                      |
+| Token usage on Nano         | Not in ML Kit - only cached prompt tokens are estimated     |
 | Provider file references    | Throws - pass data or a URL                                 |
 | iOS / web                   | Android only                                                |
