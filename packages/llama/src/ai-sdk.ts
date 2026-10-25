@@ -141,6 +141,10 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       contextParams: {
         n_ctx: Boolean(options.projectorPath) ? 4096 : 2048,
         n_gpu_layers: 99,
+        // llama.rn's prefix cache for recurrent and hybrid models (e.g. Qwen3.5)
+        // crashes natively on the completion after a tool call or structured
+        // output, so it is off unless enabled explicitly
+        state_cache_budget_mb: 0,
         ...options.contextParams,
       },
     }

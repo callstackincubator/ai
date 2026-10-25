@@ -161,6 +161,7 @@ Creates a language model instance.
   - `contextParams`: llama.rn context parameters
     - `n_ctx`: Context size (default: 2048, or 4096 for multimodal)
     - `n_gpu_layers`: Number of GPU layers (default: 99)
+    - `state_cache_budget_mb`: Prefix cache for recurrent and hybrid models such as Qwen3.5 (default: 0). llama.rn crashes on the completion after a tool call or structured output when it is on
 
 ### `llama.embeddingModel(modelPath, options?)`
 
