@@ -28,10 +28,10 @@ features:
     details: Use Apple's Foundation Models on iOS 26+ devices with Apple Intelligence, with no model downloads.
     icon: <img src="/apple.svg" />
   - title: Multiple runtimes
-    details: Run models with Apple Foundation Models, Gemini Nano, llama.rn or MLC LLM behind the same AI SDK interface.
+    details: Run models with Apple Foundation Models, Gemini Nano or llama.rn behind the same AI SDK interface.
     icon: <img src="/zap.svg" />
   - title: iOS and Android
-    details: Llama and MLC run on both platforms. Apple Foundation Models is iOS-only, and Gemini Nano via ADK is Android-only.
+    details: Llama runs on both platforms. Apple Foundation Models is iOS-only, and Gemini Nano via ADK is Android-only.
     icon: <img src="/smartphone.svg" />
   - title: Privacy-first approach
     details: Inference runs locally on the device, so user data stays on it. Cloud models, like ADK's optional cloud Gemini, are opt-in.

@@ -7,8 +7,7 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "lint:fix": "eslint \"**/*.{js,ts,tsx}\" --fix",
     "release": "release-it",
-    "build": "bun run --filter='@react-native-ai/*' prepare",
-    "postinstall": "bash packages/mlc/scripts/fetch-prebuilt.sh"
+    "build": "bun run --filter='@react-native-ai/*' prepare"
   },
   "repository": {
     "type": "git",

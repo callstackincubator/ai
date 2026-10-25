@@ -50,7 +50,6 @@ keep the panel mounted without receiving telemetry.
 | [Apple](#apple)     | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
 | [ADK](#google-adk)  | ✅ Yes   | Android      | [Google ADK](https://developer.android.com/ai/adk)                  | On-device Gemini Nano, with optional cloud Gemini          |
 | [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
-| [MLC](#mlc)         | ❌ No    | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm)                        | Run open-source LLMs via MLC runtime                       |
 
 ---
 
@@ -217,52 +216,6 @@ Any GGUF model from HuggingFace can be used. Use the format `owner/repo/filename
 - `Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf`
 
 📚 **[View full Llama documentation →](https://react-native-ai.dev/docs/llama/getting-started)**
-
----
-
-### MLC
-
-Run popular open-source LLMs directly on-device using [MLC LLM](https://github.com/mlc-ai/mlc-llm)'s optimized runtime. **Requires download** - models must be downloaded before use.
-
-#### Installation
-
-```bash
-npm install @react-native-ai/mlc
-```
-
-Requires the "Increased Memory Limit" capability in Xcode. See the [getting started guide](https://react-native-ai.dev/docs/mlc/getting-started) for setup instructions.
-
-#### Usage
-
-```typescript
-import { mlc } from '@react-native-ai/mlc'
-import { generateText } from 'ai'
-
-// Create model instance
-const model = mlc.languageModel('Llama-3.2-3B-Instruct')
-
-// Download and prepare model (one-time setup)
-await model.download()
-await model.prepare()
-
-// Generate response with Llama via MLC engine
-const { text } = await generateText({
-  model,
-  prompt: 'Explain quantum computing',
-})
-```
-
-#### Available Models
-
-| Model ID                 | Size   |
-| ------------------------ | ------ |
-| `Llama-3.2-3B-Instruct`  | ~2GB   |
-| `Phi-3-mini-4k-instruct` | ~2.5GB |
-| `Mistral-7B-Instruct`    | ~4.5GB |
-| `Qwen2.5-1.5B-Instruct`  | ~1GB   |
-
-> [!NOTE]
-> MLC requires iOS devices with sufficient memory (1-8GB depending on model). The prebuilt runtime supports the models listed above. For other models or custom configurations, you'll need to recompile the MLC runtime from source.
 
 ## JSON UI
 

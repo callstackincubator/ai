@@ -42,13 +42,6 @@
   },
   {
     "type": "dir",
-    "name": "mlc",
-    "label": "MLC",
-    "collapsible": true,
-    "collapsed": false
-  },
-  {
-    "type": "dir",
     "name": "json-ui",
     "label": "JSON UI",
     "collapsible": true,

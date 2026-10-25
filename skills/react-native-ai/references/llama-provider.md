@@ -113,4 +113,3 @@ await model.unload() // Release when done
 
 - [quick-start](quick-start.md)
 - [apple-provider](apple-provider.md)
-- [mlc-provider](mlc-provider.md)

@@ -86,4 +86,3 @@ const info = getModelInfo()
 
 - [quick-start](quick-start.md)
 - [llama-provider](llama-provider.md)
-- [mlc-provider](mlc-provider.md)
