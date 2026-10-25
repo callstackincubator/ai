@@ -258,7 +258,9 @@ export function buildLlamaCompletionOptions(
     ...(options.providerOptions?.llama ?? {}),
   }
 
-  if (options.tools) {
+  // Tools offered with tool choice none still prompt the model to call them,
+  // and the call then comes back as plain text
+  if (options.tools && options.toolChoice?.type !== 'none') {
     const { toolChoice } = options
     // llama.cpp reads OpenAI-style tools, with the schema under `parameters`
     completionOptions.tools = options.tools.flatMap((tool) => {
