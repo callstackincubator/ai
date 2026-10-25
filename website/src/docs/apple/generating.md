@@ -180,8 +180,20 @@ request.
 
 ### Enabling Private Cloud Compute
 
-Once your team has the entitlement, add it to your app's `.entitlements` file
-and set the `AppleLLMPrivateCloudCompute` Info.plist key:
+Once your team has the entitlement, enable it with the package's Expo config
+plugin. It adds the entitlement and the `AppleLLMPrivateCloudCompute`
+Info.plist key:
+
+```json title="app.json"
+{
+  "expo": {
+    "plugins": [["@react-native-ai/apple", { "privateCloudCompute": true }]]
+  }
+}
+```
+
+Without Expo, add the entitlement to your app's `.entitlements` file and set
+the Info.plist key yourself:
 
 ```xml title="Info.plist"
 <key>AppleLLMPrivateCloudCompute</key>
