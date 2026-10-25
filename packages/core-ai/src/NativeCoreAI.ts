@@ -62,30 +62,30 @@ export interface Spec extends TurboModule {
   inspectModel(config: NativeCoreAIModelConfig): Promise<CoreAIModelInfo>
   loadModel(
     config: NativeCoreAIModelConfig,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CoreAILoadedModel>
   unloadModel(modelHandle: string): Promise<void>
   removeModel(config: NativeCoreAIModelConfig): Promise<void>
   specializeModel(
     config: NativeCoreAIModelConfig,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CoreAIModelInfo>
 
   createLanguageSession(
     modelHandle: string,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<string>
   releaseLanguageSession(sessionHandle: string): Promise<void>
   respondToLanguageSession(
     sessionHandle: string,
     prompt: string,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject[]>
   streamLanguageSession(
     streamId: string,
     sessionHandle: string,
     prompt: string,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): void
 
   // AI SDK calls on a loaded language model. The last message is the prompt
@@ -94,13 +94,13 @@ export interface Spec extends TurboModule {
     requestId: string,
     modelHandle: string,
     messages: CoreAIMessage[],
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
   streamText(
     streamId: string,
     modelHandle: string,
     messages: CoreAIMessage[],
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): void
   // Cancels a stream or a generateText request
   cancelStream(streamId: string): void
@@ -108,31 +108,31 @@ export interface Spec extends TurboModule {
   embed(
     config: NativeCoreAIModelConfig,
     values: string[],
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
   transcribe(
     config: NativeCoreAIModelConfig,
     audioBase64: string,
     mediaType: string,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
   generateImage(
     config: NativeCoreAIModelConfig,
     prompt: string,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
 
   runTask(
     task: string,
     config: NativeCoreAIModelConfig,
     input: CodegenTypes.UnsafeObject,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
   runRawFunction(
     modelHandle: string,
     functionName: string,
     inputs: CodegenTypes.UnsafeObject,
-    options?: CodegenTypes.UnsafeObject
+    options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
 
   onStreamUpdate: CodegenTypes.EventEmitter<CoreAIStreamUpdateEvent>
