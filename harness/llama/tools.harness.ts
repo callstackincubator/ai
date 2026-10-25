@@ -1,4 +1,4 @@
-import { generateText } from 'ai'
+import { generateText, streamText } from 'ai'
 import { describe, expect, it } from 'react-native-harness'
 
 import { createTools, setupLanguageModel } from './helpers'
@@ -20,6 +20,27 @@ describe('llama tools', () => {
       { name: 'getWeather', input: expect.objectContaining({ city: 'Paris' }) },
     ])
     expect(result.finishReason).toBe('tool-calls')
+  })
+
+  it('streams each tool call once', async () => {
+    const { calls, tools } = createTools()
+
+    const result = streamText({
+      model: model(),
+      tools,
+      reasoning: 'none',
+      prompt: 'What time is it right now? Use your tool.',
+    })
+
+    const toolCallIds: string[] = []
+    for await (const part of result.fullStream) {
+      if (part.type === 'tool-call') {
+        toolCallIds.push(part.toolCallId)
+      }
+    }
+
+    expect(toolCallIds).toHaveLength(1)
+    expect(calls).toHaveLength(1)
   })
 
   it('calls no tools for none tool choice', async () => {

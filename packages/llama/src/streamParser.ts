@@ -80,8 +80,8 @@ export function createLlamaStreamParser(
   let currentChunkId = generateId()
   let state: LLMState = 'none'
   let pendingText = ''
-  let pendingToolCallIds = new Set<string>()
   let pendingToolCalls: NonNullable<TokenData['tool_calls']> = []
+  let emittedToolCallCount = 0
   let lastNativeContent = ''
   let lastNativeReasoning = ''
 
@@ -155,20 +155,10 @@ export function createLlamaStreamParser(
     })
   }
 
+  // Each token carries every tool call parsed so far, the last one possibly
+  // still partial, so the latest list replaces the queued calls
   const queueToolCalls = (toolCalls: TokenData['tool_calls']) => {
-    for (const toolCall of toolCalls ?? []) {
-      if (!toolCall.id) {
-        pendingToolCalls.push(toolCall)
-        continue
-      }
-
-      if (pendingToolCallIds.has(toolCall.id)) {
-        continue
-      }
-
-      pendingToolCallIds.add(toolCall.id)
-      pendingToolCalls.push(toolCall)
-    }
+    pendingToolCalls = (toolCalls ?? []).slice(emittedToolCallCount)
   }
 
   const emitPendingToolCalls = () => {
@@ -180,7 +170,7 @@ export function createLlamaStreamParser(
         input: toolCall.function.arguments,
       })
     }
-    pendingToolCallIds.clear()
+    emittedToolCallCount += pendingToolCalls.length
     pendingToolCalls = []
   }
 
