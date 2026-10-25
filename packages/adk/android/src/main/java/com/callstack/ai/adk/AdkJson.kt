@@ -2,24 +2,15 @@ package com.callstack.ai.adk
 
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 
 object AdkJson {
   fun encode(value: Map<String, Any?>): String {
     return mapToJsonObject(value).toString()
   }
 
-  fun decodeResult(value: String): Any? {
-    val trimmed = value.trim()
-    return when {
-      trimmed.startsWith("{") -> jsonObjectToMap(JSONObject(trimmed))
-      trimmed.startsWith("[") -> jsonArrayToList(JSONArray(trimmed))
-      trimmed == "true" -> true
-      trimmed == "false" -> false
-      trimmed == "null" -> null
-      trimmed.toDoubleOrNull() != null -> trimmed.toDouble()
-      else -> trimmed.removeSurrounding("\"")
-    }
-  }
+  /** Decodes a tool result, which JS always sends as JSON. */
+  fun decodeResult(value: String): Any? = jsonValue(JSONTokener(value).nextValue())
 
   private fun mapToJsonObject(value: Map<String, Any?>): JSONObject {
     val json = JSONObject()

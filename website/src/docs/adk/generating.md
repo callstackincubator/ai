@@ -248,7 +248,7 @@ Configure model behavior with generation options:
 | `temperature`      | number   | Controls randomness            | Yes         |
 | `maxOutputTokens`  | number   | Maximum tokens to generate     | Yes         |
 | `topK`             | number   | Top-K sampling parameter       | Yes         |
-| `seed`             | number   | Seed for repeatable sampling   | Yes         |
+| `seed`             | number   | Seed for repeatable sampling   | No          |
 | `topP`             | number   | Nucleus sampling threshold     | No          |
 | `stopSequences`    | string[] | Stop generating at these texts | No          |
 | `presencePenalty`  | number   | Penalize repeated topics       | No          |
@@ -268,7 +268,6 @@ const { text } = await generateText({
   temperature: 0.8,
   maxOutputTokens: 500,
   topK: 40,
-  seed: 42,
 })
 ```
 

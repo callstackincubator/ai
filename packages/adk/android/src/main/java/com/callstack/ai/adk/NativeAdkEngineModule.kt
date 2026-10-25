@@ -8,6 +8,7 @@ import com.facebook.react.bridge.ReadableMap
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -25,17 +26,15 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val runner = AdkAgentRunner(
     context = reactContext,
-    onToolCall = { toolCallId, toolId, arguments, toolCallScope ->
-      toolCallScope?.streamId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
-      toolCallScope?.runId?.let { AdkToolBridge.registerToolCall(it, toolCallId) }
-      val args = Arguments.createMap().apply {
-        putString("toolCallId", toolCallId)
-        putString("toolId", toolId)
-        putString("arguments", arguments)
-        toolCallScope?.streamId?.let { putString("streamId", it) }
-        toolCallScope?.runId?.let { putString("runId", it) }
-      }
-      emitOnToolCall(args)
+    onToolCall = { runId, toolCallId, toolName, arguments ->
+      emitOnToolCall(
+        Arguments.createMap().apply {
+          putString("runId", runId)
+          putString("toolCallId", toolCallId)
+          putString("toolName", toolName)
+          putString("arguments", arguments)
+        },
+      )
     },
     onDownloadProgress = { phase, bytesDownloaded, bytesToDownload ->
       emitOnNanoDownloadProgress(
@@ -125,7 +124,8 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     tools: ReadableArray?,
     promise: Promise,
   ) {
-    val job = scope.launch {
+    // Started after it is tracked, so a run that ends at once is still removed
+    val job = scope.launch(start = CoroutineStart.LAZY) {
       try {
         val result = runner.generateText(messages, config, options, tools, runId)
         val response = Arguments.createMap().apply {
@@ -168,10 +168,11 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         promise.rejectWithCode(error)
       } finally {
         activeRuns.remove(runId)
-        AdkToolBridge.cancelForStream(runId)
+        AdkToolBridge.cancel(runId)
       }
     }
     activeRuns[runId] = job
+    job.start()
   }
 
   override fun streamText(
@@ -187,9 +188,11 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    val job = scope.launch {
+    val job = scope.launch(start = CoroutineStart.LAZY) {
       try {
-        var latestUsage: UsageMetadata? = null
+        // Summed over complete events, with the latest partial usage as a fallback
+        var totalUsage: UsageMetadata? = null
+        var partialUsage: UsageMetadata? = null
         // Per-turn state. Gemini Nano emits ```tool_code blocks (as streamed text) instead
         // of native function calls, and the marker can be split across stream chunks.
         //
@@ -214,7 +217,8 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         runner.streamText(messages, config, options, tools, streamId).collect { event ->
           if (!isActive) return@collect
 
-          event.usageMetadata?.let { latestUsage = it }
+          totalUsage = AdkUsage.add(totalUsage, event)
+          if (event.partial) event.usageMetadata?.let { partialUsage = it }
           toolCallEmitter.handleEvent(event)
           toolCallEmitter.handleResults(event)
 
@@ -274,7 +278,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
               emittedText = currentTurnText
             }
 
-            emitComplete(streamId, event, latestUsage)
+            emitComplete(streamId, event, totalUsage ?: partialUsage)
           }
         }
       } catch (error: Exception) {
@@ -286,10 +290,12 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         emitOnStreamError(errorArgs)
       } finally {
         activeRuns.remove(streamId)
+        AdkToolBridge.cancel(streamId)
       }
     }
 
     activeRuns[streamId] = job
+    job.start()
     promise.resolve(null)
   }
 
@@ -303,12 +309,12 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     )
   }
 
-  private fun emitComplete(streamId: String, event: Event, latestUsage: UsageMetadata?) {
+  private fun emitComplete(streamId: String, event: Event, usage: UsageMetadata?) {
     emitOnStreamComplete(
       Arguments.createMap().apply {
         putString("streamId", streamId)
         event.finishReason?.name?.let { putString("finishReason", it) }
-        AdkUsage.toWritableMap(latestUsage ?: event.usageMetadata)?.let {
+        AdkUsage.toWritableMap(usage)?.let {
           putMap("usage", it)
         }
       },
@@ -317,12 +323,12 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
 
   override fun cancelStream(streamId: String, promise: Promise) {
     activeRuns.remove(streamId)?.cancel()
-    AdkToolBridge.cancelForStream(streamId)
+    AdkToolBridge.cancel(streamId)
     promise.resolve(null)
   }
 
-  override fun submitToolResult(toolCallId: String, result: String) {
-    AdkToolBridge.submitResult(toolCallId, result)
+  override fun submitToolResult(runId: String, toolCallId: String, result: String) {
+    AdkToolBridge.submitResult(runId, toolCallId, result)
   }
 
   override fun invalidate() {

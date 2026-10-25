@@ -31,7 +31,6 @@ import {
   type AdkModelType,
   type AdkNanoModelConfig,
   type AdkTool,
-  type AdkToolParameter,
   type AdkUsageMetadata,
   getNativeAdkEngine,
   type NanoDownloadProgressEvent,
@@ -386,24 +385,6 @@ const convertFinishReason = (
   }
 }
 
-const schemaPropertyToAdkParameter = (
-  name: string,
-  value: unknown,
-  required: boolean
-): AdkToolParameter => {
-  const schema = value as {
-    type?: string
-    description?: string
-  }
-
-  return {
-    name,
-    description: schema?.description,
-    type: (schema?.type as AdkToolParameter['type']) ?? 'string',
-    required,
-  }
-}
-
 const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
   let binary = ''
   for (let index = 0; index < bytes.length; index++) {
@@ -668,8 +649,10 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       {}) as AdkProviderOptions
 
     if (this.isNano) {
+      // ADK's ML Kit model only passes on temperature, topK and maxOutputTokens
       const unsupported = {
         topP: options.topP,
+        seed: options.seed,
         stopSequences: options.stopSequences,
         presencePenalty: options.presencePenalty,
         frequencyPenalty: options.frequencyPenalty,
@@ -707,8 +690,8 @@ class AdkChatLanguageModel implements AdkLanguageModel {
   }
 
   private prepareTools(tools: Tool[], warnings: SharedV4Warning[]) {
-    return tools
-      .filter((tool): tool is LanguageModelV4FunctionTool => {
+    const functionTools = tools.filter(
+      (tool): tool is LanguageModelV4FunctionTool => {
         if (tool.type === 'function') {
           return true
         }
@@ -717,59 +700,46 @@ class AdkChatLanguageModel implements AdkLanguageModel {
           feature: `provider-defined tool ${tool.name}`,
         })
         return false
+      }
+    )
+
+    for (const tool of functionTools) {
+      if (!this.tools[tool.name]?.execute) {
+        warnings.push({
+          type: 'other',
+          message: `Tool "${tool.name}" has no executor. Pass it to createAdkProvider via availableTools so ADK can run it.`,
+        })
+      }
+    }
+
+    return functionTools.map(
+      (tool): AdkTool => ({
+        name: tool.name,
+        description: tool.description ?? '',
+        inputSchema: tool.inputSchema,
       })
-      .map((tool) => {
-        const required = Array.isArray(tool.inputSchema.required)
-          ? tool.inputSchema.required
-          : []
-        const properties = tool.inputSchema.properties ?? {}
+    )
+  }
 
-        const parameters = Object.entries(properties).map(([name, value]) =>
-          schemaPropertyToAdkParameter(name, value, required.includes(name))
-        )
+  private async executeTool(
+    tool: LanguageModelV4FunctionTool,
+    event: ToolCallEvent
+  ) {
+    const execute = this.tools[tool.name]?.execute
+    if (!execute) {
+      return { error: `Tool "${tool.name}" is not available in this app.` }
+    }
 
-        const schema = jsonSchema(tool.inputSchema)
-
-        if (!this.tools[tool.name]?.execute) {
-          warnings.push({
-            type: 'other',
-            message: `Tool "${tool.name}" has no executor. Pass it to createAdkProvider via availableTools so ADK can run it.`,
-          })
-        }
-
-        return {
-          native: {
-            id: generateId(),
-            name: tool.name,
-            description: tool.description ?? '',
-            inputSchema: tool.inputSchema,
-            parameters,
-          } satisfies AdkTool,
-          execute: async (modelInput: unknown) => {
-            const execute = this.tools[tool.name]?.execute
-            if (!execute) {
-              return {
-                error: `Tool "${tool.name}" is not available in this app.`,
-              }
-            }
-
-            const text =
-              typeof modelInput === 'string'
-                ? modelInput
-                : JSON.stringify(modelInput ?? {})
-            const toolCallArguments = await parseJSON({
-              text,
-              schema,
-            })
-            const opts: ToolExecutionOptions<unknown> = {
-              toolCallId: generateId(),
-              messages: [],
-              context: undefined,
-            }
-            return execute(toolCallArguments, opts)
-          },
-        }
-      })
+    const input = await parseJSON({
+      text: event.arguments,
+      schema: jsonSchema(tool.inputSchema),
+    })
+    const options: ToolExecutionOptions<unknown> = {
+      toolCallId: event.toolCallId,
+      messages: [],
+      context: undefined,
+    }
+    return execute(input, options)
   }
 
   private prepareCall(options: LanguageModelV4CallOptions) {
@@ -779,78 +749,46 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     )
     const messages = this.prepareMessages(options.prompt, warnings)
     const generationOptions = this.prepareGenerationOptions(options, warnings)
-    const preparedTools = this.prepareTools(tools, warnings)
 
     return {
       messages,
       generationOptions,
-      preparedTools,
-      nativeTools: preparedTools.map((tool) => tool.native),
-      ownedToolIds: new Set(preparedTools.map((tool) => tool.native.id)),
+      tools,
+      nativeTools: this.prepareTools(tools, warnings),
       agentConfig: this.prepareAgentConfig(options),
       warnings,
     }
   }
 
-  private registerTools(
-    preparedTools: ReturnType<AdkChatLanguageModel['prepareTools']>
-  ) {
-    globalThis.__ADK_TOOLS__ = globalThis.__ADK_TOOLS__ ?? {}
-
-    for (const tool of preparedTools) {
-      globalThis.__ADK_TOOLS__[tool.native.id] = tool.execute
-    }
-  }
-
-  private unregisterTools(
-    preparedTools: ReturnType<AdkChatLanguageModel['prepareTools']>
-  ) {
-    for (const tool of preparedTools) {
-      delete globalThis.__ADK_TOOLS__?.[tool.native.id]
-    }
-  }
-
-  private createToolCallListener(scope: {
-    streamId?: string
-    runId?: string
-    ownedToolIds: Set<string>
-  }) {
+  // Runs the tools that native code calls during `runId`
+  private listenForToolCalls(runId: string, tools: Tool[]) {
     const native = getNativeAdkEngine()
 
     return native.onToolCall(async (event: ToolCallEvent) => {
-      if (scope.streamId !== undefined && event.streamId !== scope.streamId) {
-        return
-      }
-      if (scope.runId !== undefined && event.runId !== scope.runId) {
-        return
-      }
-      if (!scope.ownedToolIds.has(event.toolId)) {
+      if (event.runId !== runId) {
         return
       }
 
-      const executor = globalThis.__ADK_TOOLS__?.[event.toolId]
-      if (!executor) {
-        native.submitToolResult(
-          event.toolCallId,
-          JSON.stringify({ error: `Tool not found: ${event.toolId}` })
-        )
-        return
-      }
-
+      const tool = tools.find(
+        (candidate): candidate is LanguageModelV4FunctionTool =>
+          candidate.type === 'function' && candidate.name === event.toolName
+      )
+      let result: unknown
       try {
-        const result = await executor(event.arguments)
-        native.submitToolResult(
-          event.toolCallId,
-          typeof result === 'string' ? result : JSON.stringify(result ?? {})
-        )
+        result = tool
+          ? await this.executeTool(tool, event)
+          : { error: `Tool not found: ${event.toolName}` }
       } catch (error) {
-        native.submitToolResult(
-          event.toolCallId,
-          JSON.stringify({
-            error: error instanceof Error ? error.message : String(error),
-          })
-        )
+        result = {
+          error: error instanceof Error ? error.message : String(error),
+        }
       }
+      // Always JSON, so native code can tell strings from other values
+      native.submitToolResult(
+        runId,
+        event.toolCallId,
+        JSON.stringify(result ?? null)
+      )
     })
   }
 
@@ -858,9 +796,8 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     const {
       messages,
       generationOptions,
-      preparedTools,
+      tools,
       nativeTools,
-      ownedToolIds,
       agentConfig,
       warnings,
     } = this.prepareCall(options)
@@ -878,8 +815,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         .catch((error) => console.warn('[adk] cancel failed:', error))
     }
 
-    this.registerTools(preparedTools)
-    const toolListener = this.createToolCallListener({ runId, ownedToolIds })
+    const toolListener = this.listenForToolCalls(runId, tools)
     abortSignal?.addEventListener('abort', onAbort, { once: true })
 
     try {
@@ -936,7 +872,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     } finally {
       abortSignal?.removeEventListener('abort', onAbort)
       toolListener.remove()
-      this.unregisterTools(preparedTools)
     }
   }
 
@@ -944,9 +879,8 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     const {
       messages,
       generationOptions,
-      preparedTools,
+      tools,
       nativeTools,
-      ownedToolIds,
       agentConfig,
       warnings,
     } = this.prepareCall(options)
@@ -965,11 +899,9 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       throw getAbortReason(abortSignal)
     }
 
-    this.registerTools(preparedTools)
-
     let listeners: { remove(): void }[] = []
     let cleanedUp = false
-    const toolListener = this.createToolCallListener({ streamId, ownedToolIds })
+    const toolListener = this.listenForToolCalls(streamId, tools)
     const toolNames = new Map<string, string>()
 
     let onAbort = () => {}
@@ -985,7 +917,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       listeners = []
       abortSignal?.removeEventListener('abort', onAbort)
       toolListener.remove()
-      this.unregisterTools(preparedTools)
     }
 
     const cancelNative = () => {
