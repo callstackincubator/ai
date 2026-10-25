@@ -49,6 +49,16 @@ ADK requires Android `minSdkVersion` 26 or greater (ML Kit GenAI). This example 
 npx expo prebuild --clean
 ```
 
+### Core AI (iOS 27 devices)
+
+Core AI is opt-in, because it raises the deployment target to iOS 27 and can't build for the Simulator. Set `CORE_AI=1` when you prebuild to link `@react-native-ai/core-ai` and its config plugin:
+
+```bash
+CORE_AI=1 npx expo prebuild --clean --platform ios
+```
+
+Run `npx expo prebuild --clean` without it to go back to the default build.
+
 ## Running the App
 
 After building the MLC runtime, navigate back to this directory and run:
