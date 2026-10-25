@@ -81,30 +81,72 @@ export interface CoreAILanguageSession {
 export interface CoreAIMessage {
   role: 'assistant' | 'system' | 'tool' | 'user'
   content: string
+  attachments?: CodegenTypes.UnsafeObject[]
+  // Structured assistant and tool content replayed as transcript entries
+  parts?: CodegenTypes.UnsafeObject[]
 }
 
 export interface CoreAIGenerationOptions {
   temperature?: number
   maxTokens?: number
-  topP?: number
-  topK?: number
+  // JSON schema of the structured output
   schema?: CodegenTypes.UnsafeObject
-  tools?: CodegenTypes.UnsafeObject
+  providerOptions?: { reasoningLevel?: CoreAIReasoningLevel }
+}
+
+/**
+ * Foundation Models reasoning level. Core AI maps it to the chat template's
+ * thinking effort, and `none` turns thinking off
+ */
+export type CoreAIReasoningLevel = 'none' | 'light' | 'moderate' | 'deep'
+
+/**
+ * Options under `providerOptions['core-ai']` of AI SDK calls
+ */
+export interface CoreAIProviderOptions {
+  reasoningLevel?: CoreAIReasoningLevel
 }
 
 export type CoreAIGenerationPart =
   | { type: 'text'; text: string }
-  | { type: 'reasoning'; text: string }
-  | { type: 'tool-call'; toolName: string; input: string }
-  | { type: 'tool-result'; toolName: string; output: string }
+  | { type: 'reasoning'; id: string; text: string; signature?: string }
+  | {
+      type: 'tool-call'
+      toolCallId: string
+      toolName: string
+      input: string
+    }
+  | {
+      type: 'tool-result'
+      toolCallId: string
+      toolName: string
+      output: string
+    }
+
+export interface CoreAIUsage {
+  inputTokens: number
+  cachedInputTokens: number
+  outputTokens: number
+  reasoningTokens: number
+}
+
+export interface CoreAIGenerationResult {
+  content: CoreAIGenerationPart[]
+  usage: CoreAIUsage
+}
 
 export interface CoreAIStreamUpdateEvent {
   streamId: string
+  // Full response text so far
   content: string
+  // Reasoning entries generated so far, sent when they change
+  entries?: CodegenTypes.UnsafeObject[]
 }
 
 export interface CoreAIStreamCompleteEvent {
   streamId: string
+  // CoreAIUsage of the response
+  usage?: CodegenTypes.UnsafeObject
 }
 
 export interface CoreAIStreamErrorEvent {

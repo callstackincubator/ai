@@ -4,6 +4,11 @@
     "rootDir": "src",
     "outDir": "lib/typescript",
     "noEmit": false,
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "paths": {
+      "@react-native-ai/apple": [
+        "../../node_modules/@react-native-ai/apple/src/index.ts"
+      ]
+    }
   }
 }

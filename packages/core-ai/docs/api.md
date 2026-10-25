@@ -21,14 +21,18 @@ await generateText({ model: language, prompt: 'Hello' })
 
 AI SDK adapter status:
 
-| Capability        | AI SDK API                                    | Core AI API                      | Status                   |
-| ----------------- | --------------------------------------------- | -------------------------------- | ------------------------ |
-| Text generation   | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Supported                |
-| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Not supported yet        |
-| Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Not supported yet        |
-| Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Supported                |
-| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Throws unsupported error |
-| Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Throws unsupported error |
+| Capability        | AI SDK API                                    | Core AI API                      | Status                        |
+| ----------------- | --------------------------------------------- | -------------------------------- | ----------------------------- |
+| Text generation   | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Supported                     |
+| Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Supported, with a JSON schema |
+| Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Not supported yet (warns)     |
+| Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Supported                     |
+| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Throws unsupported error      |
+| Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Throws unsupported error      |
+
+Structured output needs a JSON schema and runs as guided generation, so the output always matches it. Models whose inference engine cannot do guided generation reject with a `CORE_AI_UNSUPPORTED_CAPABILITY` error. When streaming, the JSON arrives in one piece once it is complete.
+
+The `reasoning` call option sets the model's thinking effort (`minimal`/`low` → `light`, `medium` → `moderate`, `high` and above → `deep`), and `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence. Reasoning comes back as reasoning parts. Core AI ignores `topP`, `topK`, `seed`, stop sequences and penalties, and returns a warning when they are set.
 
 `coreAI.embeddingModel(...)` and `coreAI.transcriptionModel(...)` exist so the API is in place, but they throw until the package has native runners for CLIP/CLAP and wav2vec2/Whisper models ([#237](https://github.com/callstackincubator/ai/issues/237)).
 
@@ -75,7 +79,7 @@ Native-only API status:
 
 When the AI SDK owns message history, every request sends the whole chat. To
 keep it inside the context window, see
-[Conversation History](../history.md).
+[Conversation History](https://react-native-ai.dev/docs/history).
 
 ## Loading Models
 
@@ -83,4 +87,4 @@ Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them
 
 ## Starter Models
 
-The package does not ship a model catalog. The [starter models](./models) page is a reference list of models known to work; your app decides which models to bundle or download.
+The package does not ship a model catalog. The [starter models](./models.md) page is a reference list of models known to work; your app decides which models to bundle or download.

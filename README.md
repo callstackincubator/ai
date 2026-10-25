@@ -48,7 +48,6 @@ keep the panel mounted without receiving telemetry.
 | Provider            | Built-in | Platforms    | Runtime                                                             | Description                                                |
 | ------------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
 | [Apple](#apple)     | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
-| [Core AI](#core-ai) | ❌ No    | iOS          | [Core AI](https://developer.apple.com/core-ai/)                     | Run app-provided Core AI model bundles                     |
 | [ADK](#google-adk)  | ✅ Yes   | Android      | [Google ADK](https://developer.android.com/ai/adk)                  | On-device Gemini Nano, with optional cloud Gemini          |
 | [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
 | [MLC](#mlc)         | ❌ No    | iOS, Android | [MLC LLM](https://github.com/mlc-ai/mlc-llm)                        | Run open-source LLMs via MLC runtime                       |
@@ -118,47 +117,6 @@ const { audio } = await speech({
 | Speech Synthesis | iOS 13+     | iOS 17+ for Personal Voice |
 
 See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
-
----
-
-### Core AI
-
-Run your own Core AI model bundles (`.aimodel`) exported with [`apple/coreai-models`](https://github.com/apple/coreai-models). For Apple's built-in system models, use [Apple](#apple) instead.
-
-- **Text Generation** - `generateText` and `streamText`, plus persistent native sessions
-- **Image Generation** - `generateImage` with diffusion models such as FLUX.2 and Sana Sprint
-- **Segmentation and Object Detection** - Direct native APIs, since the AI SDK has no equivalent
-
-Embeddings and transcription are not supported yet ([#237](https://github.com/callstackincubator/ai/issues/237)).
-
-#### Installation
-
-```bash
-npm install @react-native-ai/core-ai
-```
-
-> [!IMPORTANT]
-> Apps need an iOS 27 deployment target and build for physical devices only, since the iOS Simulator SDK has no `CoreAI` framework.
-
-#### Usage
-
-```typescript
-import { coreAI } from '@react-native-ai/core-ai'
-import { generateText } from 'ai'
-
-const model = coreAI.languageModel({
-  id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
-})
-
-const { text } = await generateText({
-  model,
-  prompt: 'Explain Core AI',
-})
-```
-
-See the [Core AI documentation](https://react-native-ai.dev/docs/core-ai/getting-started) for setup, starter models, and direct native APIs.
 
 ---
 

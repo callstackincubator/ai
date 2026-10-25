@@ -49,16 +49,6 @@ No model downloads or API key for on-device use. Works on supported Android devi
 
 These run open-source models that you download or bundle with your app.
 
-#### Apple Core AI
-
-Run open-source models on Apple's on-device runtime, Core AI, through `@react-native-ai/core-ai`:
-
-- **Text Generation** - `generateText` and `streamText`, plus persistent native sessions
-- **Image Generation** - `generateImage` with diffusion models
-- **Segmentation and Object Detection** - Direct native APIs, since the AI SDK has no equivalent
-
-Models are exported with Apple's `coreai-models`. Requires an iOS 27 deployment target and a physical device. See the [Core AI docs](./core-ai/getting-started) and [starter models](./core-ai/models).
-
 #### Llama Engine
 
 Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-native-ai/llama`:

@@ -116,8 +116,12 @@
         "react-native": "0.88.0",
       },
       "peerDependencies": {
+        "expo": "*",
         "react-native": ">=0.76.0",
       },
+      "optionalPeers": [
+        "expo",
+      ],
     },
     "packages/core-ai": {
       "name": "@react-native-ai/core-ai",
@@ -127,9 +131,17 @@
         "@ai-sdk/provider-utils": "^5.0.67",
         "zod": "^4.2.1",
       },
+      "devDependencies": {
+        "@react-native-ai/apple": "workspace:*",
+      },
       "peerDependencies": {
+        "@react-native-ai/apple": "^0.12.0",
+        "expo": "*",
         "react-native": ">=0.76.0",
       },
+      "optionalPeers": [
+        "expo",
+      ],
     },
     "packages/dev-tools": {
       "name": "@react-native-ai/dev-tools",

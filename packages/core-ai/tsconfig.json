@@ -3,6 +3,9 @@
   "include": ["src"],
   "exclude": ["src/**/__tests__/**"],
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@react-native-ai/apple": ["../apple-llm/src/index.ts"]
+    }
   }
 }
