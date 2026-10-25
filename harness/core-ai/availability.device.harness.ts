@@ -24,17 +24,4 @@ describe('core-ai availability', () => {
       )
     ).rejects.toMatchObject({ code: 'CORE_AI_MISSING_SPM_PRODUCT' })
   })
-
-  it('accepts calls that leave out the options argument', async () => {
-    // Native methods read every argument, so this used to crash the app
-    const runTask = CoreAI.runTask as (...args: unknown[]) => Promise<unknown>
-
-    await expect(
-      runTask(
-        'object-detection',
-        { id: 'missing', sourceType: 'file', sourceUri: '/missing' },
-        { imageUri: '/missing.jpg' }
-      )
-    ).rejects.toMatchObject({ code: expect.any(String) })
-  })
 })

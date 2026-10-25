@@ -7,7 +7,7 @@ export {
   CoreAITranscriptionModel,
   createCoreAIProvider,
 } from './ai-sdk'
-export { CoreAI } from './CoreAI'
+export { default as CoreAI } from './NativeCoreAI'
 export type {
   CoreAICapabilities,
   CoreAIEmbeddingResult,
