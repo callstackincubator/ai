@@ -76,6 +76,7 @@ export type AppleModelAvailability =
   | 'appleIntelligenceNotEnabled'
   | 'modelNotReady'
   | 'systemNotReady'
+  | 'missingEntitlement'
   | 'unknown'
 
 export interface AppleModelInfo {

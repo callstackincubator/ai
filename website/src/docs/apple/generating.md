@@ -123,20 +123,21 @@ console.log(info.supportsVisionTools)
 
 `getModelInfo` returns availability, locale support, supported languages,
 context size when Apple exposes it, and feature flags for token counting,
-image prompts, Private Cloud Compute, Dynamic Profiles, and Vision built-in
-tools.
+image prompts, reasoning, Private Cloud Compute, Dynamic Profiles, and Vision
+built-in tools.
 
 When the model is unavailable, `availability` tells you why, so you can show
 something more useful than a generic error:
 
-| `availability`                | Model                   | Meaning                                                      |
-| ----------------------------- | ----------------------- | ------------------------------------------------------------ |
-| `available`                   | both                    | The model is ready to use                                    |
-| `deviceNotEligible`           | both                    | The device does not support this model                       |
-| `appleIntelligenceNotEnabled` | `system`                | Apple Intelligence is turned off, ask the user to enable it  |
-| `modelNotReady`               | `system`                | The model is still downloading, try again later              |
-| `systemNotReady`              | `private-cloud-compute` | Private Cloud Compute is not ready yet, try again later      |
-| `unknown`                     | both                    | A reason this version of the library does not know about yet |
+| `availability`                | Model                   | Meaning                                                          |
+| ----------------------------- | ----------------------- | ---------------------------------------------------------------- |
+| `available`                   | both                    | The model is ready to use                                        |
+| `deviceNotEligible`           | both                    | The device does not support this model                           |
+| `appleIntelligenceNotEnabled` | `system`                | Apple Intelligence is turned off, ask the user to enable it      |
+| `modelNotReady`               | `system`                | The model is still downloading, try again later                  |
+| `systemNotReady`              | `private-cloud-compute` | Private Cloud Compute is not ready yet, try again later          |
+| `missingEntitlement`          | `private-cloud-compute` | The app is not signed with the Private Cloud Compute entitlement |
+| `unknown`                     | both                    | A reason this version of the library does not know about yet     |
 
 ```typescript
 const { availability } = await apple.getModelInfo()
@@ -173,7 +174,10 @@ const apple = createAppleProvider({
 ```
 
 Call `apple.getModelInfo({ model: 'private-cloud-compute' })` before enabling
-this path. It requires iOS 27 APIs. When the Private Cloud Compute quota is
+this path. It requires iOS 27 APIs and the managed
+`com.apple.developer.private-cloud-compute` entitlement, which Apple grants on
+request. Without it, Foundation Models would stop the app, so the model reports
+`missingEntitlement` and generation fails with `MODEL_UNAVAILABLE` instead. When the Private Cloud Compute quota is
 reached, generation fails with `RATE_LIMITED`.
 
 ## Guardrails
