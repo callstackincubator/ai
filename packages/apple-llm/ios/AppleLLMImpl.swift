@@ -394,7 +394,7 @@ public class AppleLLMImpl: NSObject {
     locale: Locale,
     modelName: String
   ) async throws -> [String: Any] {
-    let availability = availabilityString(model.availability)
+    let availability = privateCloudComputeAvailability(model)
     var info: [String: Any] = [
       "model": modelName,
       "availability": availability,
@@ -417,6 +417,19 @@ public class AppleLLMImpl: NSObject {
     info["supportsLocale"] = try await model.supportsLocale(locale)
     info["supportedLanguages"] = try await model.supportedLanguages.map(languageIdentifier).sorted()
     return info
+  }
+
+  /// Workaround: Foundation Models stops the app with a fatal error, which
+  /// cannot be caught, when it uses Private Cloud Compute without the managed
+  /// entitlement, and iOS has no API to check for it. Apps that have it say so
+  /// in their Info.plist. Remove once Foundation Models throws instead of
+  /// stopping the app
+  @available(iOS 27, *)
+  private func privateCloudComputeAvailability(_ model: PrivateCloudComputeLanguageModel) -> String {
+    guard Bundle.main.object(forInfoDictionaryKey: "AppleLLMPrivateCloudCompute") as? Bool == true else {
+      return "missingEntitlement"
+    }
+    return availabilityString(model.availability)
   }
 
   @available(iOS 27, *)
@@ -500,7 +513,7 @@ public class AppleLLMImpl: NSObject {
 #if compiler(>=6.4)
       if #available(iOS 27, *) {
         let model = PrivateCloudComputeLanguageModel()
-        let availability = availabilityString(model.availability)
+        let availability = privateCloudComputeAvailability(model)
         guard availability == "available" else {
           throw AppleLLMError.modelUnavailable(availability)
         }
