@@ -55,6 +55,19 @@ function convertFinishReason(
 }
 
 /**
+ * Text of a structured output completion. llama.rn's grammar for a response
+ * format can start with the chat template's generation prompt, so the model
+ * repeats it before the JSON and llama.rn parses no content from it
+ */
+function getStructuredOutputText(result: NativeCompletionResult): string {
+  if (result.content) {
+    return result.content
+  }
+  const start = result.text.search(/[[{]/)
+  return start === -1 ? '' : result.text.slice(start).trim()
+}
+
+/**
  * Stops the running completion when the call is aborted, so the native side
  * stops generating instead of running to completion in the background
  *
@@ -296,19 +309,27 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       completionOptions,
       options.abortSignal
     )
+    // A stopped completion resolves with what it generated so far, while an
+    // aborted AI SDK call is expected to reject
+    options.abortSignal?.throwIfAborted()
     let content: LanguageModelV4Content[] = []
 
-    if (response.content) {
-      content.push({
-        type: 'text',
-        text: response.content,
-      })
-    }
-
+    const text =
+      options.responseFormat?.type === 'json'
+        ? getStructuredOutputText(response)
+        : response.content
+    // Reasoning comes before the answer it led to
     if (response.reasoning_content) {
       content.push({
         type: 'reasoning',
         text: response.reasoning_content,
+      })
+    }
+
+    if (text) {
+      content.push({
+        type: 'text',
+        text,
       })
     }
 
@@ -377,11 +398,19 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       warnings,
     })
 
+    // llama.rn still delivers tokens queued before a cancel, and enqueueing on a
+    // cancelled stream throws inside the native callback, which takes down the
+    // JS runtime
+    let cancelled = false
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
         try {
           const streamParser = createLlamaStreamParser({
-            enqueue: (part) => controller.enqueue(part),
+            enqueue: (part) => {
+              if (!cancelled) {
+                controller.enqueue(part)
+              }
+            },
           })
 
           controller.enqueue({
@@ -389,16 +418,36 @@ export class LlamaLanguageModel implements LanguageModelV4 {
             warnings,
           })
 
+          // Structured output is sent once complete, since its partial text
+          // can start with the repeated generation prompt
+          const isStructuredOutput = options.responseFormat?.type === 'json'
           const result = await this.runCompletion(
             context,
             completionOptions,
             options.abortSignal,
-            (tokenData) => {
-              streamParser.processToken(tokenData)
-            }
+            isStructuredOutput
+              ? undefined
+              : (tokenData) => {
+                  streamParser.processToken(tokenData)
+                }
           )
 
-          streamParser.finish()
+          if (cancelled) {
+            return
+          }
+
+          if (isStructuredOutput) {
+            const id = generateId()
+            controller.enqueue({ type: 'text-start', id })
+            controller.enqueue({
+              type: 'text-delta',
+              id,
+              delta: getStructuredOutputText(result),
+            })
+            controller.enqueue({ type: 'text-end', id })
+          } else {
+            streamParser.finish()
+          }
 
           controller.enqueue({
             type: 'finish',
@@ -428,10 +477,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
           controller.close()
         } catch (error) {
-          controller.error(new Error(`Llama stream failed: ${error}`))
+          if (!cancelled) {
+            controller.error(new Error(`Llama stream failed: ${error}`))
+          }
         }
       },
       cancel: async () => {
+        cancelled = true
         await context.stopCompletion()
       },
     })

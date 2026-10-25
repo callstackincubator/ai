@@ -189,6 +189,19 @@ function getReasoningOptions(
     return { enable_thinking: false }
   }
 
+  // llama.rn crashes natively when a response format grammar is combined with
+  // thinking, which most reasoning templates enable by default
+  if (options.responseFormat?.type === 'json') {
+    if (isCustomReasoning(reasoning)) {
+      warnings.push({
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: 'Reasoning is turned off for structured output.',
+      })
+    }
+    return { enable_thinking: false }
+  }
+
   if (!isCustomReasoning(reasoning)) {
     // 'provider-default' keeps the chat template's default
     return {}

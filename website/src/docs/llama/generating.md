@@ -200,6 +200,10 @@ console.log(output)
 // { name: 'Alice', age: 28, hobbies: ['reading', 'hiking'] }
 ```
 
+Thinking is turned off for structured output, since llama.rn cannot combine a
+grammar with it, and an explicit `reasoning` level returns an `unsupported`
+warning.
+
 ## Available Options
 
 Configure model behavior with generation options:
