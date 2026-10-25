@@ -66,7 +66,7 @@ const model = llama.embeddingModel(modelPath, {
   contextParams: {
     n_ctx: 2048, // Context size (default: 2048)
     n_gpu_layers: 99, // GPU layers (default: 99)
-    n_parallel: 8, // Parallel embeddings (default: 8)
+    n_parallel: 8, // Values embedded per call (default: 8)
   },
 })
 ```
@@ -78,7 +78,7 @@ const model = llama.embeddingModel(modelPath, {
 | `normalize` | number | -1 | Embedding normalization mode |
 | `contextParams.n_ctx` | number | 2048 | Context window size |
 | `contextParams.n_gpu_layers` | number | 99 | GPU layers for acceleration |
-| `contextParams.n_parallel` | number | 8 | Number of parallel embeddings |
+| `contextParams.n_parallel` | number | 8 | Values embedded per call |
 
 ## Cleanup
 

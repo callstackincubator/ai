@@ -158,9 +158,11 @@ Creates a language model instance.
 - `options`:
   - `projectorPath`: Path to multimodal projector for vision/audio support
   - `projectorUseGpu`: Use GPU for multimodal processing (default: `true`)
+  - `projectorImageMaxTokens`: Most tokens an image can take, for models that size images dynamically (default: a quarter of `n_ctx`). Full-resolution photos can otherwise take more tokens than the context holds
   - `contextParams`: llama.rn context parameters
     - `n_ctx`: Context size (default: 2048, or 4096 for multimodal)
     - `n_gpu_layers`: Number of GPU layers (default: 99)
+    - `state_cache_budget_mb`: Prefix cache for recurrent and hybrid models such as Qwen3.5 (default: 0). llama.rn crashes on the completion after a tool call or structured output when it is on
 
 ### `llama.embeddingModel(modelPath, options?)`
 
@@ -172,7 +174,7 @@ Creates an embedding model instance.
   - `contextParams`: llama.rn context parameters
     - `n_ctx`: Context size (default: 2048)
     - `n_gpu_layers`: Number of GPU layers (default: 99)
-    - `n_parallel`: Parallel embeddings (default: 8)
+    - `n_parallel`: Values embedded per call (default: 8). Calls run one at a time, since a context embeds one value at a time
 
 ### `llama.speechModel(modelPath, options)`
 
@@ -180,9 +182,11 @@ Creates a speech model instance for text-to-speech.
 
 - `modelPath`: Path to the model file (from `downloadModel()` or `getModelPath()`)
 - `options`:
-  - `vocoderPath`: **Required** - Path to vocoder model file
+  - `vocoderPath`: **Required** - Path to a [codec.cpp](https://github.com/mybigday/codec.cpp) vocoder GGUF, e.g. `BricksDisplay/codec.cpp-gguf/wavtokenizer-large-speech-75tokens.gguf` for OuteTTS 0.3
   - `vocoderBatchSize`: Batch size for vocoder processing
   - `contextParams`: llama.rn context parameters
+
+Speech is returned as 16-bit mono WAV at the vocoder's sample rate.
 
 ### Storage Functions
 

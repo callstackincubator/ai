@@ -55,6 +55,19 @@ function convertFinishReason(
 }
 
 /**
+ * Text of a structured output completion. llama.rn's grammar for a response
+ * format can start with the chat template's generation prompt, so the model
+ * repeats it before the JSON and llama.rn parses no content from it
+ */
+function getStructuredOutputText(result: NativeCompletionResult): string {
+  if (result.content) {
+    return result.content
+  }
+  const start = result.text.search(/[[{]/)
+  return start === -1 ? '' : result.text.slice(start).trim()
+}
+
+/**
  * Stops the running completion when the call is aborted, so the native side
  * stops generating instead of running to completion in the background
  *
@@ -89,6 +102,12 @@ export interface LlamaModelOptions {
    */
   projectorUseGpu?: boolean
   /**
+   * Most tokens an image can take, for models that size images dynamically.
+   * Default: a quarter of the context size, since a full-resolution photo can
+   * take more tokens than the context holds, which crashes natively
+   */
+  projectorImageMaxTokens?: number
+  /**
    * llama.rn context params passed to initLlama()
    */
   contextParams?: Partial<ContextParams>
@@ -109,6 +128,7 @@ export class LlamaLanguageModel implements LanguageModelV4 {
   private modelPath: string
   private options: LlamaModelOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
   private multimodalInitialized: boolean = false
   private pendingCompletion: Promise<unknown> = Promise.resolve()
 
@@ -140,6 +160,10 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       contextParams: {
         n_ctx: Boolean(options.projectorPath) ? 4096 : 2048,
         n_gpu_layers: 99,
+        // llama.rn's prefix cache for recurrent and hybrid models (e.g. Qwen3.5)
+        // crashes natively on the completion after a tool call or structured
+        // output, so it is off unless enabled explicitly
+        state_cache_budget_mb: 0,
         ...options.contextParams,
       },
     }
@@ -154,6 +178,15 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       // Important: ctx_shift must be false for multimodal (required per docs)
@@ -183,9 +216,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       throw new Error('Projector path not provided in options')
     }
 
+    const contextSize = this.options.contextParams?.n_ctx
     this.multimodalInitialized = await this.context.initMultimodal({
       path: this.options.projectorPath,
       use_gpu: this.options.projectorUseGpu ?? true,
+      image_max_tokens:
+        this.options.projectorImageMaxTokens ??
+        (contextSize ? Math.floor(contextSize / 4) : undefined),
     })
 
     if (!this.multimodalInitialized) {
@@ -213,6 +250,8 @@ export class LlamaLanguageModel implements LanguageModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       // Releasing the context under a running completion crashes natively
       await this.context.stopCompletion()
@@ -270,19 +309,27 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       completionOptions,
       options.abortSignal
     )
+    // A stopped completion resolves with what it generated so far, while an
+    // aborted AI SDK call is expected to reject
+    options.abortSignal?.throwIfAborted()
     let content: LanguageModelV4Content[] = []
 
-    if (response.content) {
-      content.push({
-        type: 'text',
-        text: response.content,
-      })
-    }
-
+    const text =
+      options.responseFormat?.type === 'json'
+        ? getStructuredOutputText(response)
+        : response.content
+    // Reasoning comes before the answer it led to
     if (response.reasoning_content) {
       content.push({
         type: 'reasoning',
         text: response.reasoning_content,
+      })
+    }
+
+    if (text) {
+      content.push({
+        type: 'text',
+        text,
       })
     }
 
@@ -351,11 +398,19 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       warnings,
     })
 
+    // llama.rn still delivers tokens queued before a cancel, and enqueueing on a
+    // cancelled stream throws inside the native callback, which takes down the
+    // JS runtime
+    let cancelled = false
     const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start: async (controller) => {
         try {
           const streamParser = createLlamaStreamParser({
-            enqueue: (part) => controller.enqueue(part),
+            enqueue: (part) => {
+              if (!cancelled) {
+                controller.enqueue(part)
+              }
+            },
           })
 
           controller.enqueue({
@@ -363,16 +418,36 @@ export class LlamaLanguageModel implements LanguageModelV4 {
             warnings,
           })
 
+          // Structured output is sent once complete, since its partial text
+          // can start with the repeated generation prompt
+          const isStructuredOutput = options.responseFormat?.type === 'json'
           const result = await this.runCompletion(
             context,
             completionOptions,
             options.abortSignal,
-            (tokenData) => {
-              streamParser.processToken(tokenData)
-            }
+            isStructuredOutput
+              ? undefined
+              : (tokenData) => {
+                  streamParser.processToken(tokenData)
+                }
           )
 
-          streamParser.finish()
+          if (cancelled) {
+            return
+          }
+
+          if (isStructuredOutput) {
+            const id = generateId()
+            controller.enqueue({ type: 'text-start', id })
+            controller.enqueue({
+              type: 'text-delta',
+              id,
+              delta: getStructuredOutputText(result),
+            })
+            controller.enqueue({ type: 'text-end', id })
+          } else {
+            streamParser.finish()
+          }
 
           controller.enqueue({
             type: 'finish',
@@ -402,10 +477,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
 
           controller.close()
         } catch (error) {
-          controller.error(new Error(`Llama stream failed: ${error}`))
+          if (!cancelled) {
+            controller.error(new Error(`Llama stream failed: ${error}`))
+          }
         }
       },
       cancel: async () => {
+        cancelled = true
         await context.stopCompletion()
       },
     })
@@ -442,13 +520,13 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
   get maxEmbeddingsPerCall(): number {
     return this.options.contextParams?.n_parallel ?? 8
   }
-  get supportsParallelCalls(): boolean {
-    return this.maxEmbeddingsPerCall > 0
-  }
+  // A context runs one embedding at a time and rejects others as busy
+  readonly supportsParallelCalls = false
 
   private modelPath: string
   private options: LlamaEmbeddingOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
 
   /**
    * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
@@ -480,6 +558,15 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       ...this.options.contextParams,
@@ -499,6 +586,8 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       await this.context.release()
       this.context = null
@@ -520,6 +609,7 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
     const context = this.context ?? (await this.prepare())
 
     const embeddings: number[][] = []
+    let tokens = 0
     const embeddingParams: EmbeddingParams = {
       embd_normalize: this.options.normalize,
     }
@@ -535,13 +625,12 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
         embeddingParams
       )
       embeddings.push(result.embedding)
+      tokens += (await context.tokenize(value)).tokens.length
     }
 
     return {
       embeddings,
-      usage: {
-        tokens: options.values.reduce((acc, val) => acc + val.length, 0),
-      },
+      usage: { tokens },
       warnings: [],
     }
   }
@@ -574,6 +663,7 @@ export class LlamaRerankModel implements RerankingModelV4 {
   private modelPath: string
   private options: LlamaRerankOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
 
   /**
    * @param modelPath - Path to the reranker model file (from downloadModel() or getModelPath())
@@ -604,6 +694,15 @@ export class LlamaRerankModel implements RerankingModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       ...this.options.contextParams,
@@ -623,6 +722,8 @@ export class LlamaRerankModel implements RerankingModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       await this.context.release()
       this.context = null
@@ -669,6 +770,41 @@ export class LlamaRerankModel implements RerankingModelV4 {
 }
 
 /**
+ * Encodes mono float samples in [-1, 1], as decoded by llama.rn, as a 16-bit
+ * PCM WAV file
+ */
+export function encodeWav(samples: number[], sampleRate: number): Uint8Array {
+  const dataLength = samples.length * 2
+  const view = new DataView(new ArrayBuffer(44 + dataLength))
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i))
+    }
+  }
+
+  writeString(0, 'RIFF')
+  view.setUint32(4, 36 + dataLength, true)
+  writeString(8, 'WAVE')
+  writeString(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeString(36, 'data')
+  view.setUint32(40, dataLength, true)
+
+  samples.forEach((sample, index) => {
+    const clamped = Math.max(-1, Math.min(1, sample))
+    view.setInt16(44 + index * 2, clamped * 0x7fff, true)
+  })
+
+  return new Uint8Array(view.buffer)
+}
+
+/**
  * Configuration options for llama.rn speech model (vocoder-based TTS)
  */
 export interface LlamaSpeechOptions {
@@ -691,6 +827,7 @@ export class LlamaSpeechModel implements SpeechModelV4 {
   private modelPath: string
   private options: LlamaSpeechOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
   private vocoderInitialized: boolean = false
 
   /**
@@ -719,6 +856,15 @@ export class LlamaSpeechModel implements SpeechModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       ...this.options.contextParams,
@@ -765,6 +911,8 @@ export class LlamaSpeechModel implements SpeechModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       if (this.vocoderInitialized) {
         await this.context.releaseVocoder()
@@ -808,11 +956,10 @@ export class LlamaSpeechModel implements SpeechModelV4 {
       throw new Error('No audio tokens generated')
     }
 
-    const audioData = await context.decodeAudioTokens(
+    const samples = await context.decodeAudioTokens(
       completionResult.audio_tokens
     )
-
-    const audio = new Uint8Array(audioData)
+    const audio = encodeWav(samples, await context.getAudioSampleRate())
 
     return {
       audio,

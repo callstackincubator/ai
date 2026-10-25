@@ -367,3 +367,62 @@ describe('buildLlamaCompletionOptions tools', () => {
     ])
   })
 })
+
+describe('buildLlamaCompletionOptions defaults', () => {
+  // llama.rn keeps the previous n_predict when it is left out
+  test('sends an unlimited n_predict without maxOutputTokens', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      createCallOptions(),
+      []
+    )
+
+    expect(completionOptions.n_predict).toBe(-1)
+  })
+
+  test('sends maxOutputTokens as n_predict', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      { ...createCallOptions(), maxOutputTokens: 12 },
+      []
+    )
+
+    expect(completionOptions.n_predict).toBe(12)
+  })
+
+  test('turns thinking off for structured output and warns about reasoning', () => {
+    const warnings: SharedV4Warning[] = []
+    const completionOptions = buildLlamaCompletionOptions(
+      {
+        ...createCallOptions(),
+        reasoning: 'high',
+        responseFormat: { type: 'json', schema: { type: 'object' } },
+      },
+      [],
+      { warnings }
+    )
+
+    expect(completionOptions.enable_thinking).toBe(false)
+    expect(warnings).toEqual([
+      expect.objectContaining({ type: 'unsupported', feature: 'reasoning' }),
+    ])
+  })
+
+  test('does not offer tools for tool choice none', () => {
+    const completionOptions = buildLlamaCompletionOptions(
+      {
+        ...createCallOptions(),
+        tools: [
+          {
+            type: 'function',
+            name: 'getTime',
+            inputSchema: { type: 'object' },
+          },
+        ],
+        toolChoice: { type: 'none' },
+      },
+      []
+    )
+
+    expect(completionOptions.tools).toBeUndefined()
+    expect(completionOptions.tool_choice).toBeUndefined()
+  })
+})

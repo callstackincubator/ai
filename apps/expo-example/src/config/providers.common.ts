@@ -60,6 +60,8 @@ export const commonLanguageAdapters: SetupAdapter<LanguageModelV4>[] = [
 export const commonSpeechAdapters: SetupAdapter<SpeechModelV4>[] = [
   createLlamaSpeechSetupAdapter({
     modelId: 'OuteAI/OuteTTS-0.3-500M-GGUF/OuteTTS-0.3-500M-Q4_K_M.gguf',
-    vocoderId: 'ggml-org/WavTokenizer/WavTokenizer-Large-75-Q5_1.gguf',
+    // llama.rn decodes audio with codec.cpp, which needs its own WavTokenizer GGUF
+    vocoderId:
+      'BricksDisplay/codec.cpp-gguf/wavtokenizer-large-speech-75tokens.gguf',
   }),
 ]

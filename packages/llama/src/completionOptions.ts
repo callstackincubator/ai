@@ -189,6 +189,19 @@ function getReasoningOptions(
     return { enable_thinking: false }
   }
 
+  // llama.rn crashes natively when a response format grammar is combined with
+  // thinking, which most reasoning templates enable by default
+  if (options.responseFormat?.type === 'json') {
+    if (isCustomReasoning(reasoning)) {
+      warnings.push({
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: 'Reasoning is turned off for structured output.',
+      })
+    }
+    return { enable_thinking: false }
+  }
+
   if (!isCustomReasoning(reasoning)) {
     // 'provider-default' keeps the chat template's default
     return {}
@@ -230,7 +243,9 @@ export function buildLlamaCompletionOptions(
   const completionOptions: Partial<CompletionParams> = {
     messages,
     temperature: options.temperature,
-    n_predict: options.maxOutputTokens,
+    // llama.rn keeps the previous value when it is left out, so the limit of one
+    // call would apply to every later call on the same context
+    n_predict: options.maxOutputTokens ?? -1,
     top_p: options.topP,
     top_k: options.topK,
     penalty_present: options.presencePenalty,
@@ -243,7 +258,9 @@ export function buildLlamaCompletionOptions(
     ...(options.providerOptions?.llama ?? {}),
   }
 
-  if (options.tools) {
+  // Tools offered with tool choice none still prompt the model to call them,
+  // and the call then comes back as plain text
+  if (options.tools && options.toolChoice?.type !== 'none') {
     const { toolChoice } = options
     // llama.cpp reads OpenAI-style tools, with the schema under `parameters`
     completionOptions.tools = options.tools.flatMap((tool) => {
