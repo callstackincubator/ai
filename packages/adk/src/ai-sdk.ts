@@ -40,7 +40,7 @@ import {
 import { StreamTextFilter, stripJsonFences } from './streamText'
 
 const DEFAULT_NANO_MODEL = 'gemini-nano'
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
 
 export type AdkToolDefinitionSet = Record<string, FullToolDefinition>
 
@@ -48,9 +48,11 @@ export type AdkToolDefinitionSet = Record<string, FullToolDefinition>
 export type AdkLanguageModelId = 'gemini-nano' | (string & {})
 
 export interface AdkLanguageModelOptions {
-  /** Defaults to `genai-nano`, or `gemini` when `modelName` names a cloud model */
+  /** `gemini-nano` (default) runs on device, any other id is a cloud Gemini model */
+  model?: AdkLanguageModelId
+  /** @deprecated Use `model`. Without a model, `gemini` uses `gemini-3.8-flash` */
   modelType?: AdkModelType
-  /** Defaults to `gemini-nano` on device and `gemini-2.5-flash` in the cloud */
+  /** @deprecated Use `model` */
   modelName?: AdkLanguageModelId
   /** ADK agent name */
   name?: string
@@ -82,9 +84,11 @@ export type AdkModelAvailability =
   | 'unknown'
 
 export interface AdkModelInfo {
+  model: AdkLanguageModelId
   modelType: AdkModelType
-  modelName: string
   availability: AdkModelAvailability
+  /** Whether `countTokens` works, which only Gemini Nano supports */
+  supportsTokenCounting: boolean
   /** Name of the Gemini Nano base model, when ML Kit reports it */
   baseModelName?: string
   /** Gemini Nano input token limit, when ML Kit reports it */
@@ -102,8 +106,8 @@ export interface AdkPrepareOptions {
 }
 
 export interface AdkLanguageModel extends LanguageModelV4 {
-  /** Downloads and initializes Gemini Nano. No-op for cloud models */
-  prepare: () => Promise<void>
+  /** Downloads and initializes Gemini Nano, reporting progress. No-op for cloud models */
+  prepare: (options?: AdkPrepareOptions) => Promise<void>
   updateTools: (tools: AdkToolDefinitionSet) => void
   /** Counts tokens with the Gemini Nano tokenizer. Not available for cloud models */
   countTokens: (text: string) => Promise<number>
@@ -115,47 +119,54 @@ export interface AdkProvider {
   languageModel: (
     options?: AdkLanguageModelId | AdkLanguageModelOptions
   ) => AdkLanguageModel
-  /** Whether the device can run Gemini Nano at all. Returns `false` on non-Android */
-  isNanoSupported: () => Promise<boolean>
   /**
-   * Whether `modelType` can be used now. For `genai-nano`, Gemini Nano must be
-   * available or downloadable. Cloud `gemini` resolves to `true` on Android
+   * Whether the provider's model, or the default model of `modelType`, can be
+   * used now: its availability is `available` or `downloadable`
    */
   isAvailable: (modelType?: AdkModelType) => Promise<boolean>
-  /** Availability details for a model type */
+  /** Availability details for the provider's model, or for `model` */
   getModelInfo: (options?: {
-    modelType?: AdkModelType
+    model?: AdkLanguageModelId
     nano?: AdkNanoModelConfig
   }) => Promise<AdkModelInfo>
-  /** Downloads and initializes Gemini Nano, reporting download progress */
+  /** @deprecated Check `(await getModelInfo()).availability` instead */
+  isNanoSupported: () => Promise<boolean>
+  /** @deprecated Use `prepare()` on a Gemini Nano model */
   prepareNano: (options?: AdkPrepareOptions) => Promise<void>
 }
 
 type ResolvedModelOptions = Omit<
   AdkLanguageModelOptions,
-  'modelType' | 'modelName'
+  'model' | 'modelType' | 'modelName'
 > & {
+  model: string
   modelType: AdkModelType
-  modelName: string
 }
 
 function resolveModelOptions(
   defaults: AdkLanguageModelOptions,
   options: AdkLanguageModelId | AdkLanguageModelOptions = {}
 ): ResolvedModelOptions {
-  const overrides =
-    typeof options === 'string' ? { modelName: options } : options
-  const merged = { ...defaults, ...overrides }
+  const overrides = typeof options === 'string' ? { model: options } : options
+  const {
+    model: defaultModel,
+    modelName: defaultModelName,
+    ...defaultRest
+  } = defaults
+  const { model, modelName, ...rest } = overrides
+  const merged = { ...defaultRest, ...rest }
+  const id = model ?? modelName ?? defaultModel ?? defaultModelName
   const modelType =
     merged.modelType ??
-    (merged.modelName && merged.modelName !== DEFAULT_NANO_MODEL
-      ? 'gemini'
-      : 'genai-nano')
-  const modelName =
-    merged.modelName ??
-    (modelType === 'gemini' ? DEFAULT_GEMINI_MODEL : DEFAULT_NANO_MODEL)
+    (id && id !== DEFAULT_NANO_MODEL ? 'gemini' : 'genai-nano')
 
-  return { ...merged, modelType, modelName }
+  return {
+    ...merged,
+    modelType,
+    model:
+      id ??
+      (modelType === 'gemini' ? DEFAULT_GEMINI_MODEL : DEFAULT_NANO_MODEL),
+  }
 }
 
 const toModelAvailability = (value: string): AdkModelAvailability => {
@@ -170,27 +181,48 @@ const toModelAvailability = (value: string): AdkModelAvailability => {
   }
 }
 
-async function prepareNano(
-  nano: AdkNanoModelConfig | undefined,
-  options: AdkPrepareOptions = {}
-) {
-  const native = getNativeAdkEngine()
-  const listener = options.onProgress
-    ? native.onNanoDownloadProgress((event: NanoDownloadProgressEvent) => {
-        options.onProgress?.({
-          phase: event.phase as AdkDownloadProgress['phase'],
-          bytesDownloaded: event.bytesDownloaded,
-          bytesToDownload: event.bytesToDownload,
-        })
-      })
+const listenForDownloadProgress = (
+  onProgress: AdkPrepareOptions['onProgress']
+) =>
+  onProgress
+    ? getNativeAdkEngine().onNanoDownloadProgress(
+        (event: NanoDownloadProgressEvent) => {
+          onProgress({
+            phase: event.phase as AdkDownloadProgress['phase'],
+            bytesDownloaded: event.bytesDownloaded,
+            bytesToDownload: event.bytesToDownload,
+          })
+        }
+      )
     : null
 
-  try {
-    await native.prepareNano(nano)
-  } catch (error) {
-    throw toAdkError(error)
-  } finally {
-    listener?.remove()
+async function getModelInfo(
+  { model, modelType }: ResolvedModelOptions,
+  nano: AdkNanoModelConfig | undefined
+): Promise<AdkModelInfo> {
+  const supportsTokenCounting = modelType === 'genai-nano'
+
+  if (Platform.OS !== 'android') {
+    return {
+      model,
+      modelType,
+      availability: 'unavailable',
+      supportsTokenCounting,
+    }
+  }
+
+  const info = await getNativeAdkEngine()
+    .getModelInfo(modelType, nano)
+    .catch((error: unknown) => {
+      throw toAdkError(error)
+    })
+  return {
+    model,
+    modelType,
+    availability: toModelAvailability(info.availability),
+    supportsTokenCounting,
+    baseModelName: info.baseModelName,
+    contextSize: info.contextSize,
   }
 }
 
@@ -209,49 +241,34 @@ export function createAdkProvider(
   }
   provider.specificationVersion = 'v4' as const
   provider.languageModel = createLanguageModel
+  provider.isAvailable = async (modelType?: AdkModelType) => {
+    const resolved = modelType
+      ? resolveModelOptions({}, { modelType })
+      : resolveModelOptions(defaults)
+    const { availability } = await getModelInfo(resolved, defaults.nano)
+    return availability === 'available' || availability === 'downloadable'
+  }
+  provider.getModelInfo = (
+    options: { model?: AdkLanguageModelId; nano?: AdkNanoModelConfig } = {}
+  ) =>
+    getModelInfo(
+      options.model
+        ? resolveModelOptions({}, options.model)
+        : resolveModelOptions(defaults),
+      options.nano ?? defaults.nano
+    )
   provider.isNanoSupported = async () => {
-    if (Platform.OS !== 'android') {
-      return false
-    }
-    return getNativeAdkEngine().isNanoSupported(defaults.nano)
-  }
-  provider.isAvailable = async (modelType: AdkModelType = 'genai-nano') => {
-    if (Platform.OS !== 'android') {
-      return false
-    }
-    return getNativeAdkEngine()
-      .isAvailable(modelType, defaults.nano)
-      .then(Boolean)
-  }
-  provider.getModelInfo = async (
-    options: { modelType?: AdkModelType; nano?: AdkNanoModelConfig } = {}
-  ): Promise<AdkModelInfo> => {
-    const resolved = resolveModelOptions(defaults)
-    const { modelType, modelName } =
-      options.modelType && options.modelType !== resolved.modelType
-        ? resolveModelOptions({ modelType: options.modelType })
-        : resolved
-    const nano = options.nano ?? defaults.nano
-
-    if (Platform.OS !== 'android') {
-      return { modelType, modelName, availability: 'unavailable' }
-    }
-
-    const info = await getNativeAdkEngine()
-      .getModelInfo(modelType, nano)
-      .catch((error: unknown) => {
-        throw toAdkError(error)
-      })
-    return {
-      modelType,
-      modelName,
-      availability: toModelAvailability(info.availability),
-      baseModelName: info.baseModelName,
-      contextSize: info.contextSize,
-    }
+    const { availability } = await getModelInfo(
+      resolveModelOptions({}, DEFAULT_NANO_MODEL),
+      defaults.nano
+    )
+    return availability !== 'unavailable' && availability !== 'unknown'
   }
   provider.prepareNano = (options?: AdkPrepareOptions) =>
-    prepareNano(defaults.nano, options)
+    createLanguageModel({
+      model: DEFAULT_NANO_MODEL,
+      modelType: 'genai-nano',
+    }).prepare(options)
   return provider
 }
 
@@ -468,14 +485,14 @@ class AdkChatLanguageModel implements AdkLanguageModel {
   private nanoPreparePromise: Promise<void> | null = null
 
   constructor(options: ResolvedModelOptions) {
-    this.modelId = options.modelName
+    this.modelId = options.model
     this.agentConfig = {
       name: options.name ?? 'react_native_adk_agent',
       description: options.description ?? 'React Native ADK agent',
       instruction: options.instruction,
       model: {
         type: options.modelType,
-        name: options.modelName,
+        name: options.model,
         apiKey: options.apiKey,
         nano: options.nano,
       },
@@ -491,8 +508,17 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     this.tools = tools
   }
 
-  async prepare(): Promise<void> {
-    await this.ensureNanoPrepared()
+  async prepare(options: AdkPrepareOptions = {}): Promise<void> {
+    if (!this.isNano) {
+      return
+    }
+
+    const listener = listenForDownloadProgress(options.onProgress)
+    try {
+      await this.ensureNanoPrepared()
+    } finally {
+      listener?.remove()
+    }
   }
 
   async countTokens(text: string): Promise<number> {
@@ -519,12 +545,12 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     }
 
     if (!this.nanoPreparePromise) {
-      this.nanoPreparePromise = prepareNano(this.agentConfig.model.nano).catch(
-        (error) => {
+      this.nanoPreparePromise = getNativeAdkEngine()
+        .prepareNano(this.agentConfig.model.nano)
+        .catch((error: unknown) => {
           this.nanoPreparePromise = null
-          throw error
-        }
-      )
+          throw toAdkError(error)
+        })
     }
 
     return this.nanoPreparePromise

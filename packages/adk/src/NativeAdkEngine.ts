@@ -146,11 +146,6 @@ export interface NanoDownloadProgressEvent {
 }
 
 export interface Spec extends TurboModule {
-  isAvailable(
-    modelType: AdkModelType,
-    nano?: AdkNanoModelConfig
-  ): Promise<boolean>
-  isNanoSupported(nano?: AdkNanoModelConfig): Promise<boolean>
   getModelInfo(
     modelType: AdkModelType,
     nano?: AdkNanoModelConfig
