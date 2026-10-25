@@ -34,7 +34,17 @@ public class AppleLLMImpl: NSObject {
     let needsCleanup: Bool
   }
   
+  // Tasks start on the JS thread and finish on the cooperative pool
   private var streamTasks: [String: Task<Void, Never>] = [:]
+  private let streamTasksLock = NSLock()
+
+  private func setTask(_ task: Task<Void, Never>, for id: String) {
+    streamTasksLock.withLock { streamTasks[id] = task }
+  }
+
+  private func removeTask(for id: String) -> Task<Void, Never>? {
+    streamTasksLock.withLock { streamTasks.removeValue(forKey: id) }
+  }
   
   @objc
   public func isAvailable() -> Bool {
@@ -201,7 +211,14 @@ public class AppleLLMImpl: NSObject {
   ) {
 #if canImport(FoundationModels)
     if #available(iOS 26, *) {
-      Task {
+      // Lets cancelStream() stop the generation when the call is aborted
+      let requestId = createProviderOptions(from: options)["requestId"] as? String
+      let task = Task {
+        defer {
+          if let requestId {
+            _ = self.removeTask(for: requestId)
+          }
+        }
         do {
           let providerOptions = self.createProviderOptions(from: options)
           let tools = try self.createTools(from: options, providerOptions: providerOptions, toolInvoker: toolInvoker)
@@ -239,6 +256,9 @@ public class AppleLLMImpl: NSObject {
             reject("AppleLLM", error.localizedDescription, error)
           }
         }
+      }
+      if let requestId {
+        setTask(task, for: requestId)
       }
     } else {
       rejectWithAppleError(.unsupportedOS, reject: reject)
@@ -313,11 +333,11 @@ public class AppleLLMImpl: NSObject {
         }
         
         // Clean up task from map when completed
-        self.streamTasks.removeValue(forKey: streamId)
+        _ = self.removeTask(for: streamId)
       }
       
       // Store task in map
-      streamTasks[streamId] = task
+      setTask(task, for: streamId)
     } else {
       emitStreamError(.unsupportedOS, streamId: streamId, onError: onError)
     }
@@ -328,12 +348,7 @@ public class AppleLLMImpl: NSObject {
   
   @objc
   public func cancelStream(_ streamId: NSString) {
-    let streamIdString = streamId as String
-    
-    if let task = streamTasks[streamIdString] {
-      task.cancel()
-      streamTasks.removeValue(forKey: streamIdString)
-    }
+    removeTask(for: streamId as String)?.cancel()
   }
   
   // MARK: - Private Methods
