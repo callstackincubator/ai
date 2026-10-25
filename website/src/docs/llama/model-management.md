@@ -158,6 +158,7 @@ Creates a language model instance.
 - `options`:
   - `projectorPath`: Path to multimodal projector for vision/audio support
   - `projectorUseGpu`: Use GPU for multimodal processing (default: `true`)
+  - `projectorImageMaxTokens`: Most tokens an image can take, for models that size images dynamically (default: a quarter of `n_ctx`). Full-resolution photos can otherwise take more tokens than the context holds
   - `contextParams`: llama.rn context parameters
     - `n_ctx`: Context size (default: 2048, or 4096 for multimodal)
     - `n_gpu_layers`: Number of GPU layers (default: 99)

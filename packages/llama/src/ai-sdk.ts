@@ -89,6 +89,12 @@ export interface LlamaModelOptions {
    */
   projectorUseGpu?: boolean
   /**
+   * Most tokens an image can take, for models that size images dynamically.
+   * Default: a quarter of the context size, since a full-resolution photo can
+   * take more tokens than the context holds, which crashes natively
+   */
+  projectorImageMaxTokens?: number
+  /**
    * llama.rn context params passed to initLlama()
    */
   contextParams?: Partial<ContextParams>
@@ -197,9 +203,13 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       throw new Error('Projector path not provided in options')
     }
 
+    const contextSize = this.options.contextParams?.n_ctx
     this.multimodalInitialized = await this.context.initMultimodal({
       path: this.options.projectorPath,
       use_gpu: this.options.projectorUseGpu ?? true,
+      image_max_tokens:
+        this.options.projectorImageMaxTokens ??
+        (contextSize ? Math.floor(contextSize / 4) : undefined),
     })
 
     if (!this.multimodalInitialized) {
