@@ -61,13 +61,17 @@ Run `npx expo prebuild --clean` without it to go back to the default build.
 
 The model picker then lists **Core AI qwen3-0.6b**, which downloads (~460 MB) from [an iOS export](https://huggingface.co/grabbou/qwen3-0.6b-CoreAI) made with the [`apple/coreai-models`](https://github.com/apple/coreai-models) recipe.
 
-The tests in [`harness/core-ai`](../../harness/core-ai) run only with `CORE_AI=1`, on a device with a `CORE_AI=1` build installed:
+The tests in [`harness/core-ai`](../../harness/core-ai) are part of the [device tests](#on-device-tests). They download Qwen3 0.6B and the [YOLOS-tiny](https://huggingface.co/grabbou/yolos-tiny-CoreAI) and [EfficientSAM-Ti](https://huggingface.co/grabbou/EfficientSAM-Ti-CoreAI) exports on the first run.
+
+### Private Cloud Compute (iOS 27 devices)
+
+Private Cloud Compute needs Apple's managed `com.apple.developer.private-cloud-compute` entitlement on the signing team, and the app crashes without it. Set `PCC=1` when you prebuild to add the entitlement and the `AppleLLMPrivateCloudCompute` Info.plist key:
 
 ```bash
-CORE_AI=1 HARNESS_IOS_DEVICE="My iPhone" bun run test:harness:device ../../harness/core-ai
+PCC=1 npx expo prebuild --clean --platform ios
 ```
 
-They download Qwen3 0.6B and the [YOLOS-tiny](https://huggingface.co/grabbou/yolos-tiny-CoreAI) and [EfficientSAM-Ti](https://huggingface.co/grabbou/EfficientSAM-Ti-CoreAI) exports on the first run.
+The tests in [`harness/apple/pcc.device.harness.ts`](../../harness/apple/pcc.device.harness.ts) are part of the [device tests](#on-device-tests), and fail if Private Cloud Compute is not available.
 
 ## Running the App
 
@@ -89,13 +93,23 @@ bun run android
 
 The providers are tested with [React Native Harness](https://react-native-harness.dev), which runs the tests in [`harness/`](../../harness) at the repository root inside this app, against the real native modules and models. Each provider has a folder with one file per feature. Files ending in `.device.harness.ts` need a physical device.
 
-Install a debug build first (`bun run ios` for a simulator, `bun run ios --device` for a device), then run the tests on an iPhone 18 Pro simulator with iOS 27:
+Install a debug build on an iPhone 18 Pro simulator with iOS 27 first (`bun run ios`), then run the tests that don't need a physical device:
 
 ```bash
 bun run test:harness:simulator
 ```
 
-Or run every test on a physical device with Apple Intelligence, named as `xcrun devicectl list devices` shows it. Devices always connect to Metro on port 8081, so stop any Metro server running there first:
+Or run every test, including [Core AI](#core-ai-ios-27-devices) and [Private Cloud Compute](#private-cloud-compute-ios-27-devices), on a physical device with Apple Intelligence. Install a debug build with both enabled first. The team signing it needs the Private Cloud Compute entitlement, or those tests fail:
+
+```bash
+CORE_AI=1 PCC=1 npx expo prebuild --clean --platform ios
+```
+
+```bash
+CORE_AI=1 PCC=1 bun run ios --device
+```
+
+Then run the tests on the device, named as `xcrun devicectl list devices` shows it. Devices always connect to Metro on port 8081, so stop any Metro server running there first:
 
 ```bash
 HARNESS_IOS_DEVICE="My iPhone" bun run test:harness:device

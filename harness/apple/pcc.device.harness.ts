@@ -3,23 +3,21 @@ import type {
   LanguageModelV4TextPart,
 } from '@ai-sdk/provider'
 import { apple } from '@react-native-ai/apple'
-import { beforeAll, describe, expect, it } from 'react-native-harness'
+import { describe, expect, it } from 'react-native-harness'
 
 import { prompt, readAll } from './helpers'
 
-// Private Cloud Compute needs its entitlement, so apps without it, like the
-// example app, skip these
-let available = false
-
-beforeAll(async () => {
-  const info = await apple.getModelInfo({ model: 'private-cloud-compute' })
-  available = info.availability === 'available'
-})
+// Private Cloud Compute needs its entitlement, so these pass only when the app
+// was built with PCC=1 (see apps/expo-example/app.config.js)
 
 describe('apple private cloud compute', () => {
-  it('answers a prompt', async ({ skip }) => {
-    skip(!available, 'Private Cloud Compute is not available')
+  it('is available', async () => {
+    const info = await apple.getModelInfo({ model: 'private-cloud-compute' })
 
+    expect(info.availability).toBe('available')
+  })
+
+  it('answers a prompt', async () => {
     const result = await apple('private-cloud-compute').doGenerate({
       prompt: prompt('Reply with exactly the word BANANA and nothing else.'),
     })
@@ -29,9 +27,7 @@ describe('apple private cloud compute', () => {
     })
   })
 
-  it('returns apple reasoning before the answer', async ({ skip }) => {
-    skip(!available, 'Private Cloud Compute is not available')
-
+  it('returns apple reasoning before the answer', async () => {
     const result = await apple('private-cloud-compute').doGenerate({
       prompt: prompt('What is 17 times 23? Answer with the number only.'),
       reasoning: 'high',
@@ -48,9 +44,7 @@ describe('apple private cloud compute', () => {
     })
   })
 
-  it('streams reasoning before the text', async ({ skip }) => {
-    skip(!available, 'Private Cloud Compute is not available')
-
+  it('streams reasoning before the text', async () => {
     const { stream } = await apple('private-cloud-compute').doStream({
       prompt: prompt('What is 17 times 23? Answer with the number only.'),
       reasoning: 'high',
@@ -63,8 +57,7 @@ describe('apple private cloud compute', () => {
     )
   })
 
-  it('replays its reasoning in later turns', async ({ skip }) => {
-    skip(!available, 'Private Cloud Compute is not available')
+  it('replays its reasoning in later turns', async () => {
     const model = apple('private-cloud-compute')
     const first = await model.doGenerate({
       prompt: prompt('Pick a random fruit and tell me only its name.'),
