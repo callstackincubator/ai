@@ -173,6 +173,66 @@ model.updateTools({ getCurrentTime })
 
 During streaming, the provider emits `tool-input-start`, `tool-input-delta`, `tool-input-end`, `tool-call` and `tool-result` stream parts as ADK runs the tools.
 
+### Tool Approval
+
+Set `needsApproval` on a tool to ask the user before ADK runs it. It takes `true` or a function of the tool input:
+
+```typescript
+import { createAdkProvider } from '@react-native-ai/adk'
+import { streamText, tool } from 'ai'
+import { z } from 'zod'
+
+const deleteFile = tool({
+  description: 'Delete a file',
+  inputSchema: z.object({ path: z.string() }),
+  needsApproval: async ({ path }) => !path.startsWith('tmp/'),
+  execute: async ({ path }) => removeFile(path),
+})
+
+const adk = createAdkProvider({
+  availableTools: { deleteFile },
+})
+
+const result = streamText({
+  model: adk(),
+  tools: { deleteFile },
+  messages,
+})
+```
+
+When ADK calls the tool, the provider checks `needsApproval` before running it:
+
+1. If approval is needed, ADK waits and the step ends with the tool call and finish reason `tool-calls`. The AI SDK adds a `tool-approval-request` for the call
+2. Send the user's answer as a `tool-approval-response` in the next call. With `useChat`, call `addToolApprovalResponse`. With `generateText` or `streamText`, append a tool message to the response messages:
+
+```typescript
+const messages = [
+  ...previousMessages,
+  ...(await result.response).messages,
+  {
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-approval-response',
+        approvalId,
+        approved: true,
+        providerExecuted: true,
+      },
+    ],
+  },
+]
+```
+
+3. The next call continues the paused ADK run. An approved tool runs and ADK carries on. A denied tool returns an error with the denial reason to the model, and the AI SDK reports the call as denied
+
+ADK-specific details:
+
+- **Same tools on both sides** - The AI SDK creates the approval request from the tool passed to `generateText` or `streamText`, and the provider pauses ADK based on the tool in `availableTools`. Set `needsApproval` on both, which happens when you pass the same tool object. The call-level `toolApproval` option of `generateText` and `streamText` does not pause ADK
+- **Paused runs live in memory** - The paused ADK run is not saved. Answering an approval after the app restarts throws a `TOOL_CALL_ERROR`, and sending a new message instead of answering cancels the paused run
+- **The answering call continues the paused run** - Its new prompt and settings are not sent to ADK
+- **`needsApproval` options** - The function gets the tool call id. `messages` is empty and `context` is `undefined`
+- **`generateText`** - When a tool can need approval, the provider streams the native run and collects the result, so the call can return at the approval
+
 ### Tool Choice
 
 | `toolChoice`            | Behavior                                                      |
@@ -276,6 +336,7 @@ const { text } = await generateText({
 | --------------------------- | ----------------------------------------------------------- |
 | Native tool calling on Nano | Not in ML Kit - the provider parses `tool_code` blocks      |
 | Forcing a tool call         | `required` and specific tools run as `auto`, with a warning |
+| Tool approval               | Paused runs live in memory, `toolApproval` does not pause   |
 | Schema enforcement on Nano  | Prompted, then validated by the AI SDK                      |
 | Provider file references    | Throws - pass data or a URL                                 |
 | iOS / web                   | Android only                                                |
