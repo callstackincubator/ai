@@ -87,3 +87,10 @@ export async function answer(
     part.type === 'text' ? [part.text] : []
   )
 }
+
+// The features of unsupported-setting warnings, in order
+export function warnedFeatures(warnings: object[]) {
+  return warnings.flatMap((warning) =>
+    'feature' in warning ? [warning.feature] : []
+  )
+}
