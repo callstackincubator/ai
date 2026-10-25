@@ -353,6 +353,32 @@ describe('createLlamaStreamParser', () => {
     })
   })
 
+  // llama.rn sends every tool call parsed so far with each token
+  test('emits one tool call for partial snapshots without ids', () => {
+    const snapshot = (args: string) => ({
+      token: args.slice(-1),
+      tool_calls: [
+        {
+          type: 'function' as const,
+          function: { name: 'search', arguments: args },
+        },
+      ],
+    })
+    const parts = runParser([
+      { token: '<tool_call>' },
+      snapshot('{'),
+      snapshot('{"query":"'),
+      snapshot('{"query":"react native"}'),
+      { token: '</tool_call>' },
+      snapshot('{"query":"react native"}'),
+    ])
+
+    const toolCalls = parts.filter((part) => part.type === 'tool-call')
+
+    expect(toolCalls).toHaveLength(1)
+    expect(toolCalls[0]).toMatchObject({ input: '{"query":"react native"}' })
+  })
+
   test('preserves distinct no-id tool calls with identical payloads', () => {
     const parts = runParser([
       { token: '<tool_call>' },
