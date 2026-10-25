@@ -388,7 +388,7 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
 
     return {
       images: result.images,
-      warnings: [],
+      warnings: getImageWarnings(options, result.metadata),
       response: {
         timestamp: new Date(),
         modelId: this.modelId,
@@ -452,6 +452,37 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
         : undefined,
     }
   }
+}
+
+// Exported models generate one fixed size, which the metadata reports
+function getImageWarnings(
+  options: ImageModelV4CallOptions,
+  metadata: CoreAIImageGenerationResult['metadata']
+): SharedV4Warning[] {
+  const { width, height } = metadata ?? {}
+  if (!width || !height) {
+    return []
+  }
+
+  const warnings: SharedV4Warning[] = []
+  if (options.size && options.size !== `${width}x${height}`) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'size',
+      details: `This model only generates ${width}x${height} images.`,
+    })
+  }
+  if (options.aspectRatio) {
+    const [x, y] = options.aspectRatio.split(':').map(Number)
+    if (x * height !== y * width) {
+      warnings.push({
+        type: 'unsupported',
+        feature: 'aspectRatio',
+        details: `This model only generates ${width}x${height} images.`,
+      })
+    }
+  }
+  return warnings
 }
 
 function createLanguageSession(sessionHandle: string): CoreAILanguageSession {
