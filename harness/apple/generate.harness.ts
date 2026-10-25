@@ -110,4 +110,36 @@ describe('apple generate', () => {
       apple().doGenerate({ prompt: prompt('Say hi.'), topP: 0.9, topK: 40 })
     ).rejects.toMatchObject({ code: 'CONFLICTING_SAMPLING_METHODS' })
   })
+
+  it('rejects an aborted generation and stops it natively', async () => {
+    const controller = new AbortController()
+    const started = Date.now()
+    const generation = apple().doGenerate({
+      prompt: prompt('Write a 300 word story about a lighthouse.'),
+      abortSignal: controller.signal,
+    })
+    setTimeout(() => controller.abort(), 300)
+
+    await expect(generation).rejects.toMatchObject({ name: 'AbortError' })
+    expect(Date.now() - started).toBeLessThan(3000)
+
+    const result = await apple().doGenerate({
+      prompt: prompt('Reply with exactly the word BANANA and nothing else.'),
+    })
+    expect(result.content[0]).toMatchObject({
+      text: expect.stringMatching(/banana/i),
+    })
+  })
+
+  it('rejects a generation aborted before it starts', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      apple().doGenerate({
+        prompt: prompt('Say hi.'),
+        abortSignal: controller.signal,
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' })
+  })
 })
