@@ -66,6 +66,8 @@ export type AppleGuardrails = 'default' | 'permissiveContentTransformations'
 
 export interface AppleProviderOptions {
   builtInTools?: AppleBuiltInTool[]
+  // Most tool calls Apple runs in one generation, across all tools. Needs iOS 27
+  maxToolCalls?: number
   style?: AppleImageStyle
   personalization?: AppleImagePersonalization
 }
@@ -292,6 +294,7 @@ interface AppleNativeOptions {
   guardrails?: AppleGuardrails
   reasoningLevel?: AppleReasoningLevel
   builtInTools?: AppleBuiltInTool[]
+  maxToolCalls?: number
 }
 
 function getAppleNativeOptions(
@@ -310,6 +313,7 @@ function getAppleNativeOptions(
       options.toolChoice?.type === 'tool'
         ? undefined
         : appleOptions.builtInTools,
+    maxToolCalls: appleOptions.maxToolCalls,
   }
 }
 
