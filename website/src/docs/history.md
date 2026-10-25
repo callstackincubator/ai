@@ -84,14 +84,17 @@ each summarizer model and reuses it while the summarized messages are still the
 start of the history:
 
 - Tool steps within one turn reuse the summary without calling the model.
-- The next turn summarizes only the messages that left the window since,
-  together with the existing summary.
+- The next turn summarizes only the messages that left the window since, and
+  adds that summary to the existing one.
 - If earlier messages change, for example after editing a message or switching
   to another chat, the summary is rebuilt from scratch.
 
 Summarizing a long history at once could overflow the summarizer's own
-context, so messages are folded in chunks that fit the threshold. Each summary
-is capped at 400 output tokens.
+context, so messages are summarized in chunks that fit the threshold. Each
+chunk is summarized on its own and its summary is added to the earlier ones,
+so details from early in the chat are not rewritten away. Once the summaries
+together pass half the threshold, they are condensed into one. Each summary is
+capped at 400 output tokens.
 
 The summarizer call receives the request's `abortSignal`. If it throws, the
 request fails with that error. If it returns no text, older messages are dropped

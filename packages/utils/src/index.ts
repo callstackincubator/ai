@@ -204,23 +204,35 @@ async function summarizeMessages(
   let summary = reusable ? cached.summary : ''
   const pending = serialized.slice(reusable ? cached.messages.length : 0)
 
-  // Summarize in chunks that fit the threshold, so a long history does not
-  // overflow the summarizer's own context
+  // Each chunk that fits the threshold is summarized on its own and appended.
+  // Rewriting one summary for every chunk let small models drop the facts of
+  // earlier chunks
+  const addChunk = async (chunk: string[]) => {
+    const chunkSummary = await summarizeChunk(model, chunk, abortSignal)
+    if (!chunkSummary) {
+      return
+    }
+    summary = summary ? `${summary}\n\n${chunkSummary}` : chunkSummary
+    if ((await countTokens(summary, model)) > threshold / 2) {
+      summary = await condenseSummary(model, summary, abortSignal)
+    }
+  }
+
   let chunk: string[] = []
-  let chunkTokens = await countTokens(summary, model)
+  let chunkTokens = 0
   for (const message of pending) {
     const messageTokens = await countTokens(message, model)
     if (chunk.length > 0 && chunkTokens + messageTokens > threshold) {
-      summary = await summarizeChunk(model, summary, chunk, abortSignal)
+      await addChunk(chunk)
       chunk = []
-      chunkTokens = await countTokens(summary, model)
+      chunkTokens = 0
     }
     chunk.push(message)
     chunkTokens += messageTokens
   }
 
   if (chunk.length > 0) {
-    summary = await summarizeChunk(model, summary, chunk, abortSignal)
+    await addChunk(chunk)
   }
 
   if (summary) {
@@ -232,42 +244,49 @@ async function summarizeMessages(
 
 async function summarizeChunk(
   model: LanguageModelV4,
-  previousSummary: string,
   messages: string[],
   abortSignal: AbortSignal | undefined
 ): Promise<string> {
+  return generateSummary(
+    model,
+    'Summarize the conversation history for continued assistant use. First list every fact the user stated, such as names, numbers, codes, and preferences, word for word. Then briefly cover user goals, constraints, decisions, unresolved questions, and tool outcomes.',
+    `Summarize this conversation.\n\n<conversation>\n${messages.join('\n\n')}\n</conversation>`,
+    abortSignal
+  )
+}
+
+async function condenseSummary(
+  model: LanguageModelV4,
+  summary: string,
+  abortSignal: AbortSignal | undefined
+): Promise<string> {
+  const condensed = await generateSummary(
+    model,
+    'Condense these summaries of one conversation into a single summary. Keep every fact, number, name, decision, and unresolved question, and only remove repetition.',
+    `Condense these summaries.\n\n<summaries>\n${summary}\n</summaries>`,
+    abortSignal
+  )
+  return condensed || summary
+}
+
+// The text is wrapped in a request, since small models given a bare transcript
+// continue the conversation instead of summarizing it
+async function generateSummary(
+  model: LanguageModelV4,
+  instructions: string,
+  text: string,
+  abortSignal: AbortSignal | undefined
+): Promise<string> {
   const result = await model.doGenerate({
-    prompt: buildSummaryPrompt(previousSummary, messages),
+    prompt: [
+      { role: 'system', content: instructions },
+      { role: 'user', content: [{ type: 'text', text }] },
+    ],
     maxOutputTokens: SUMMARY_MAX_OUTPUT_TOKENS,
     abortSignal,
   } as LanguageModelV4CallOptions)
 
-  return extractTextFromGenerationResult(result).trim() || previousSummary
-}
-
-function buildSummaryPrompt(
-  previousSummary: string,
-  messages: string[]
-): LanguageModelV4Prompt {
-  const transcript = messages.join('\n\n')
-
-  return [
-    {
-      role: 'system',
-      content: `Summarize the conversation history for continued assistant use. Preserve user goals, constraints, factual details, decisions, unresolved questions, and tool outcomes. Be concise and structured.${previousSummary ? ' Merge the existing summary and the new messages into one updated summary.' : ''}`,
-    },
-    {
-      role: 'user',
-      content: [
-        {
-          type: 'text',
-          text: previousSummary
-            ? `Existing summary:\n${previousSummary}\n\nNew messages:\n${transcript}`
-            : transcript,
-        },
-      ],
-    },
-  ]
+  return extractTextFromGenerationResult(result).trim()
 }
 
 /**
