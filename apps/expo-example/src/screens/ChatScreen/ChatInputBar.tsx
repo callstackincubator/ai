@@ -1,7 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React, { useState } from 'react'
-import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native'
 
 import { AdaptiveGlass } from '../../components/AdaptiveGlass'
 import { RecordButton } from '../../components/RecordButton'
@@ -31,9 +38,13 @@ export function ChatInputBar({
 }: ChatInputBarProps) {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<ImageAttachment[]>([])
+  // Picked photos are processed after the picker closes, which can take a
+  // moment for several full-resolution photos
+  const [isPicking, setIsPicking] = useState(false)
   const canSend = input.trim().length > 0 || attachments.length > 0
 
   const handlePick = async (source: ImageSource) => {
+    setIsPicking(true)
     try {
       const picked = await pickImages(source)
       setAttachments((prev) => [...prev, ...picked])
@@ -42,6 +53,8 @@ export function ChatInputBar({
         'Could not attach image',
         error instanceof Error ? error.message : undefined
       )
+    } finally {
+      setIsPicking(false)
     }
   }
 
@@ -73,7 +86,11 @@ export function ChatInputBar({
       <View style={styles.inputRow}>
         {imageInputEnabled && (
           <AdaptiveGlass isInteractive style={styles.plusButton}>
-            <AttachmentMenu onPick={handlePick} />
+            {isPicking ? (
+              <ActivityIndicator accessibilityLabel="Attaching images" />
+            ) : (
+              <AttachmentMenu onPick={handlePick} />
+            )}
           </AdaptiveGlass>
         )}
 
