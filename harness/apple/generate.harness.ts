@@ -1,7 +1,7 @@
 import { apple, createAppleProvider } from '@react-native-ai/apple'
 import { describe, expect, it } from 'react-native-harness'
 
-import { prompt } from './helpers'
+import { prompt, warnedFeatures } from './helpers'
 
 describe('apple generate', () => {
   it('answers a prompt', async () => {
@@ -153,5 +153,23 @@ describe('apple generate', () => {
         abortSignal: controller.signal,
       })
     ).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('warns about settings Foundation Models has no equivalent for', async () => {
+    const result = await apple().doGenerate({
+      prompt: prompt('Say hi.'),
+      stopSequences: ['5'],
+      presencePenalty: 0.5,
+      frequencyPenalty: 0.5,
+      seed: 42,
+    })
+
+    expect(warnedFeatures(result.warnings)).toEqual([
+      'stopSequences',
+      'presencePenalty',
+      'frequencyPenalty',
+      'seed',
+    ])
+    expect(result.content[0]).toMatchObject({ type: 'text' })
   })
 })

@@ -326,6 +326,21 @@ function toAppleReasoningLevel(
   }
 }
 
+// Call settings Foundation Models has no equivalent for
+function getUnsupportedSettingWarnings(
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] {
+  const unsupported = [
+    options.stopSequences?.length ? 'stopSequences' : undefined,
+    options.presencePenalty !== undefined ? 'presencePenalty' : undefined,
+    options.frequencyPenalty !== undefined ? 'frequencyPenalty' : undefined,
+    options.seed !== undefined ? 'seed' : undefined,
+  ]
+  return unsupported.flatMap((feature) =>
+    feature ? [{ type: 'unsupported' as const, feature }] : []
+  )
+}
+
 /**
  * Rejects as soon as the call is aborted and cancels the native generation,
  * which would otherwise keep running to the end
@@ -624,9 +639,18 @@ class AppleImageModel implements ImageModelV4 {
         appleOptions.personalization ?? this.options.personalization,
     })
 
+    // Image Playground picks the size and has no seed
+    const warnings: SharedV4Warning[] = [
+      options.size !== undefined ? 'size' : undefined,
+      options.aspectRatio !== undefined ? 'aspectRatio' : undefined,
+      options.seed !== undefined ? 'seed' : undefined,
+    ].flatMap((feature) =>
+      feature ? [{ type: 'unsupported' as const, feature }] : []
+    )
+
     return {
       images,
-      warnings: [],
+      warnings,
       response: {
         timestamp: new Date(),
         modelId: this.modelId,
@@ -747,9 +771,20 @@ class AppleSpeechModel implements SpeechModelV4 {
         speechOptions
       )
 
+      // AVSpeechSynthesizer only writes WAV and has no speed or style controls
+      const warnings: SharedV4Warning[] = [
+        options.outputFormat !== undefined && options.outputFormat !== 'wav'
+          ? 'outputFormat'
+          : undefined,
+        options.speed !== undefined ? 'speed' : undefined,
+        options.instructions !== undefined ? 'instructions' : undefined,
+      ].flatMap((feature) =>
+        feature ? [{ type: 'unsupported' as const, feature }] : []
+      )
+
       return {
         audio: new Uint8Array(audio),
-        warnings: [],
+        warnings,
         response: {
           timestamp: new Date(),
           modelId: this.modelId,
@@ -850,7 +885,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   private async prepareCallOptions(options: LanguageModelV4CallOptions) {
     const appleOptions = getAppleNativeOptions(this.options, options)
-    const warnings: SharedV4Warning[] = []
+    const warnings = getUnsupportedSettingWarnings(options)
 
     // Foundation Models fails the whole call for a reasoning level the model
     // cannot use, so it is dropped with a warning like other unsupported settings

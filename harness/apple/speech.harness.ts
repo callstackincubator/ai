@@ -2,6 +2,8 @@ import { apple, AppleSpeech } from '@react-native-ai/apple'
 import { experimental_generateSpeech as generateSpeech } from 'ai'
 import { describe, expect, it } from 'react-native-harness'
 
+import { warnedFeatures } from './helpers'
+
 function readWav(wav: Uint8Array) {
   const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength)
   return {
@@ -53,5 +55,21 @@ describe('apple speech', () => {
     const audio = await AppleSpeech.generate('   ', { language: 'en-US' })
 
     expect(readWav(new Uint8Array(audio)).riff).toBe('RIFF')
+  })
+
+  it('warns about settings speech synthesis has no equivalent for', async () => {
+    const { warnings } = await generateSpeech({
+      model: apple.speechModel({ language: 'en-US' }),
+      text: 'Hello world.',
+      outputFormat: 'mp3',
+      speed: 1.5,
+      instructions: 'Speak cheerfully.',
+    })
+
+    expect(warnedFeatures(warnings)).toEqual([
+      'outputFormat',
+      'speed',
+      'instructions',
+    ])
   })
 })
