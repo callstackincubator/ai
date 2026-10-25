@@ -88,17 +88,34 @@ export async function downloadModel(
     return destPath
   }
 
-  const result = await RNBlobUtil.config({
-    path: destPath,
-    fileCache: true,
-  })
-    .fetch('GET', url)
-    .progress((received, total) => {
-      const percentage = Math.round((Number(received) / Number(total)) * 100)
-      progressCallback?.({ percentage })
+  // A download that fails midway leaves a partial file, which would otherwise
+  // count as downloaded and never be fetched again
+  const tempPath = `${destPath}.download`
+  try {
+    const result = await RNBlobUtil.config({
+      path: tempPath,
+      fileCache: true,
     })
+      .fetch('GET', url)
+      .progress((received, total) => {
+        const percentage = Math.round((Number(received) / Number(total)) * 100)
+        progressCallback?.({ percentage })
+      })
 
-  return result.path()
+    const { status } = result.info()
+    if (status < 200 || status >= 300) {
+      throw new Error(`Failed to download ${modelId}: HTTP ${status}`)
+    }
+
+    await RNBlobUtil.fs.mv(tempPath, destPath)
+  } catch (error) {
+    if (await RNBlobUtil.fs.exists(tempPath)) {
+      await RNBlobUtil.fs.unlink(tempPath)
+    }
+    throw error
+  }
+
+  return destPath
 }
 
 export async function removeModel(modelId: string): Promise<void> {
