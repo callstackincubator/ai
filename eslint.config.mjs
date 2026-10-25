@@ -11,6 +11,8 @@ export default defineConfig([
     '**/lib',
     '**/build',
     '**/dist',
+    // React Native Harness output
+    '**/.harness',
   ]),
   expoConfig,
   eslintPluginPrettierRecommended,

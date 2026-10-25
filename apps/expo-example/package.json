@@ -7,7 +7,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:harness:simulator": "HARNESS_SIMULATOR=true react-native-harness --harnessRunner ios-simulator",
+    "test:harness:device": "react-native-harness --harnessRunner ios"
   },
   "dependencies": {
     "@ai-sdk/otel": "^1.0.152",
@@ -59,9 +61,11 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@rozenite/metro": "^1.9.0",
     "@babel/core": "^7.20.0",
-    "@types/react": "~19.3.0"
+    "@react-native-harness/platform-apple": "1.6.0",
+    "@rozenite/metro": "^1.9.0",
+    "@types/react": "~19.3.0",
+    "react-native-harness": "1.6.0"
   },
   "private": true
 }

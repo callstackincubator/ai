@@ -14,7 +14,6 @@
     "clean": "del-cli lib",
     "typecheck": "tsc --noEmit",
     "typecheck:swift": "bash scripts/typecheck-swift.sh",
-    "test:swift": "bash scripts/test-swift.sh",
     "prepare": "bob build"
   },
   "dependencies": {
