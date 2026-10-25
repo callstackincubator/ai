@@ -230,7 +230,9 @@ export function buildLlamaCompletionOptions(
   const completionOptions: Partial<CompletionParams> = {
     messages,
     temperature: options.temperature,
-    n_predict: options.maxOutputTokens,
+    // llama.rn keeps the previous value when it is left out, so the limit of one
+    // call would apply to every later call on the same context
+    n_predict: options.maxOutputTokens ?? -1,
     top_p: options.topP,
     top_k: options.topK,
     penalty_present: options.presencePenalty,
