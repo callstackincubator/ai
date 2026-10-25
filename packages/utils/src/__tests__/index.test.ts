@@ -231,9 +231,12 @@ describe('summarizeHistory', () => {
       rollingWindowMessages: 1,
     })
 
-    expect(model.summarizedTexts()).toEqual([
-      '<conversation>\nUSER: Tell me about Paris\n\nASSISTANT: Paris is in France\n</conversation>',
-    ])
+    const [summarized] = model.summarizedTexts()
+    expect(model.doGenerate).toHaveBeenCalledTimes(1)
+    expect(summarized).toContain(
+      'USER: Tell me about Paris\n\nASSISTANT: Paris is in France'
+    )
+    expect(summarized).not.toContain('And Lyon?')
     expect(result).toEqual([
       system('Summary of earlier conversation:\nsummary 1'),
       user('And Lyon?'),
@@ -257,10 +260,14 @@ describe('summarizeHistory', () => {
       options
     )
 
+    // The earlier summary is kept as it is, not summarized again
+    const summarized = model.summarizedTexts()[1]
     expect(model.doGenerate).toHaveBeenCalledTimes(2)
-    expect(model.summarizedTexts()[1]).toBe(
-      '<conversation>\nUSER: And Lyon?\n\nASSISTANT: Lyon is in France\n</conversation>'
+    expect(summarized).toContain(
+      'USER: And Lyon?\n\nASSISTANT: Lyon is in France'
     )
+    expect(summarized).not.toContain('Tell me about Paris')
+    expect(summarized).not.toContain('summary 1')
   })
 
   test('keeps the summaries of earlier chunks', async () => {
@@ -285,11 +292,12 @@ describe('summarizeHistory', () => {
 
   test('condenses the summary once it outgrows half the threshold', async () => {
     const model = new TokenCountingModel()
+    // Chunks hold messages, the condensing call only earlier summaries
     model.doGenerate.mockImplementation(async (options) =>
       generationResult(
-        String(options.prompt[0].content).startsWith('Condense')
-          ? 'condensed'
-          : 'a long chunk summary'
+        /(USER|ASSISTANT):/.test(JSON.stringify(options.prompt))
+          ? 'a long chunk summary'
+          : 'condensed'
       )
     )
     const history = Array.from({ length: 6 }, (_, index) =>
@@ -317,15 +325,14 @@ describe('summarizeHistory', () => {
     })
 
     expect(model.doGenerate.mock.calls.length).toBeGreaterThan(1)
-    const transcripts = model
+    // Each chunk sent to the summarizer fits the threshold
+    const chunks = model
       .summarizedTexts()
-      .flatMap(
-        (text) =>
-          text.match(/<conversation>\n([\s\S]*)\n<\/conversation>/)?.[1] ?? []
-      )
-    expect(transcripts.length).toBeGreaterThan(1)
-    for (const transcript of transcripts) {
-      expect(transcript.length).toBeLessThanOrEqual(80)
+      .map((text) => text.match(/(USER|ASSISTANT): [^\n]*/g) ?? [])
+      .filter((messages) => messages.length > 0)
+    expect(chunks.length).toBeGreaterThan(1)
+    for (const messages of chunks) {
+      expect(messages.join('').length).toBeLessThanOrEqual(40)
     }
   })
 
