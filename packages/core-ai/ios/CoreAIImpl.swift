@@ -953,7 +953,19 @@ extension CoreAIImpl {
     }
 
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+          let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+          let width = properties[kCGImagePropertyPixelWidth] as? Int,
+          let height = properties[kCGImagePropertyPixelHeight] as? Int else {
+      throw CoreAIError.invalidInput("Could not load image at \(url.path).")
+    }
+    // Decode with the EXIF orientation applied, so pixel coordinates match
+    // the image as it is displayed
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceThumbnailMaxPixelSize: max(width, height)
+    ]
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
       throw CoreAIError.invalidInput("Could not load image at \(url.path).")
     }
     return image
