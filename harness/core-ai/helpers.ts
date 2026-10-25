@@ -63,6 +63,29 @@ export function setupVisionModel(name: keyof typeof VISION_MODELS) {
   }
 }
 
+// FLUX.2 klein 4B exported for iOS with the coreai-models recipe: the 512x512
+// transformer, text encoder and decoder, 4-bit
+const IMAGE_MODEL = {
+  id: 'flux2-klein-4b',
+  repo: 'grabbou/FLUX.2-klein-4B-CoreAI',
+  folder: 'ios',
+}
+
+export function setupImageModel() {
+  const path = `${CORE_AI_STORAGE_PATH}/${IMAGE_MODEL.id}`
+
+  beforeAll(async () => {
+    if (!(await RNBlobUtil.fs.exists(path))) {
+      await downloadHubFolder(IMAGE_MODEL.repo, IMAGE_MODEL.folder, path)
+    }
+  })
+
+  return coreAI.imageModel({
+    id: IMAGE_MODEL.id,
+    source: { type: 'file', uri: path },
+  })
+}
+
 // Native tasks read images from files, so the fixture is written to one
 export async function writeCatsImage() {
   const path = `${RNBlobUtil.fs.dirs.CacheDir}/harness-cats.jpg`
