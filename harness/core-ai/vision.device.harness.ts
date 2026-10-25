@@ -12,7 +12,8 @@ type Segment = {
   score: number
   maskWidth: number
   maskHeight: number
-  maskPngBase64: string
+  // Base64 PNG
+  mask: string
 }
 
 // The 320x240 fixture has a cat on each half and a remote next to each
@@ -34,7 +35,7 @@ const detect = async () =>
     )) as { output: { detections: Detection[] } }
   ).output.detections
 
-const segment = async (data: object) =>
+const runSegmentation = async (data: object) =>
   (await CoreAI.runTask('segmentation', segmenter, { imageUri, data }, {})) as {
     output: { segments: Segment[] }
     metadata: { imageWidth: number; imageHeight: number }
@@ -65,26 +66,27 @@ describe('core-ai object detection', () => {
 
 describe('core-ai segmentation', () => {
   it('segments the object in a box', async () => {
-    const result = await segment({ box: leftCat })
-    const [mask] = result.output.segments
+    const result = await runSegmentation({ box: leftCat })
+    const [segment] = result.output.segments
 
-    expect(mask.score).toBeGreaterThan(0.7)
+    expect(segment.score).toBeGreaterThan(0.7)
     expect(result.metadata).toEqual({ imageWidth: 320, imageHeight: 240 })
   })
 
   it('returns the mask as a png at image resolution', async () => {
-    const [mask] = (await segment({ box: leftCat })).output.segments
+    const [segment] = (await runSegmentation({ box: leftCat })).output.segments
 
-    expect(mask.maskWidth).toBe(320)
-    expect(mask.maskHeight).toBe(240)
+    expect(segment.maskWidth).toBe(320)
+    expect(segment.maskHeight).toBe(240)
     // PNG signature
-    expect(atob(mask.maskPngBase64).slice(1, 4)).toBe('PNG')
+    expect(atob(segment.mask).slice(1, 4)).toBe('PNG')
   })
 
   it('segments the object under a point', async () => {
-    const [mask] = (await segment({ points: [{ x: 235, y: 100, label: 1 }] }))
-      .output.segments
+    const [segment] = (
+      await runSegmentation({ points: [{ x: 235, y: 100, label: 1 }] })
+    ).output.segments
 
-    expect(mask.score).toBeGreaterThan(0.5)
+    expect(segment.score).toBeGreaterThan(0.5)
   })
 })

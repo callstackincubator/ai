@@ -891,9 +891,9 @@ extension CoreAIImpl {
           "box": serializeRect(segment.box),
           "maskWidth": segment.maskWidth,
           "maskHeight": segment.maskHeight,
-          // The mask is at input image resolution, so it is sent as a PNG
-          // instead of one boolean per pixel
-          "maskPngBase64": try pngBase64(maskImage(segment.mask, width: segment.maskWidth, height: segment.maskHeight))
+          // A base64 PNG, since the mask is at input image resolution and one
+          // boolean per pixel is too much to send over the bridge
+          "mask": try pngBase64(maskImage(segment.mask, width: segment.maskWidth, height: segment.maskHeight))
         ]
       }
     ]
