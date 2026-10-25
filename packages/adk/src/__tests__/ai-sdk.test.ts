@@ -66,8 +66,6 @@ mock.module('react-native', () => ({
       prepareNano,
       cancelStream,
       getModelInfo,
-      isNanoSupported: async () => true,
-      isAvailable: async () => true,
       onToolCall,
       submitToolResult,
       onStreamUpdate,
@@ -137,35 +135,57 @@ describe('model resolution', () => {
     expect(nano.modelId).toBe('gemini-nano')
   })
 
-  test('defaults cloud Gemini to gemini-2.5-flash', () => {
-    expect(gemini.modelId).toBe('gemini-2.5-flash')
+  test('defaults cloud Gemini to gemini-3.8-flash', () => {
+    expect(gemini.modelId).toBe('gemini-3.8-flash')
+  })
+
+  test('takes the model id as a model option', () => {
+    const provider = createAdkProvider({ model: 'gemini-3.5-flash-lite' })
+
+    expect(provider().modelId).toBe('gemini-3.5-flash-lite')
+    expect(provider({ modelName: 'gemini-nano' }).modelId).toBe('gemini-nano')
   })
 
   test('infers cloud Gemini from a model name', async () => {
-    const model = createAdkProvider()('gemini-2.5-pro')
+    const model = createAdkProvider()('gemini-4-argon')
     await model.doGenerate(createCallOptions())
 
     expect(lastGenerateCall()[2]).toMatchObject({
-      model: { type: 'gemini', name: 'gemini-2.5-pro' },
+      model: { type: 'gemini', name: 'gemini-4-argon' },
     })
   })
 
   test('per-model options override provider defaults', () => {
     const provider = createAdkProvider({ instruction: 'Be brief.' })
-    expect(provider({ modelName: 'gemini-2.5-pro' }).modelId).toBe(
-      'gemini-2.5-pro'
-    )
+    expect(provider({ model: 'gemini-4-argon' }).modelId).toBe('gemini-4-argon')
     expect(provider.languageModel().modelId).toBe('gemini-nano')
   })
 
   test('reports model availability', async () => {
     expect(await createAdkProvider().getModelInfo()).toEqual({
+      model: 'gemini-nano',
       modelType: 'genai-nano',
-      modelName: 'gemini-nano',
       availability: 'downloadable',
+      supportsTokenCounting: true,
       baseModelName: undefined,
       contextSize: undefined,
     })
+  })
+
+  test('reports availability for another model', async () => {
+    await createAdkProvider().getModelInfo({ model: 'gemini-3.8-flash' })
+
+    expect(getModelInfo.mock.calls.at(-1)![0]).toBe('gemini')
+  })
+
+  test('derives isAvailable from the model info', async () => {
+    const provider = createAdkProvider()
+    expect(await provider.isAvailable()).toBe(true)
+
+    getModelInfo.mockImplementationOnce(async () => ({
+      availability: 'downloading',
+    }))
+    expect(await provider.isAvailable()).toBe(false)
   })
 })
 
@@ -692,7 +712,7 @@ describe('Gemini Nano preparation', () => {
       onNanoDownloadProgress.emit({ phase: 'completed' })
     })
 
-    await provider.prepareNano({ onProgress: (event) => progress.push(event) })
+    await provider().prepare({ onProgress: (event) => progress.push(event) })
 
     expect(progress).toEqual([
       { phase: 'started', bytesDownloaded: undefined, bytesToDownload: 100 },
@@ -702,6 +722,18 @@ describe('Gemini Nano preparation', () => {
         bytesToDownload: undefined,
       },
     ])
+  })
+
+  test('keeps the deprecated prepareNano', async () => {
+    await createAdkProvider({ model: 'gemini-3.8-flash' }).prepareNano()
+
+    expect(prepareNano).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not prepare cloud models', async () => {
+    await gemini.prepare()
+
+    expect(prepareNano).not.toHaveBeenCalled()
   })
 
   test('passes the model selection to native code', async () => {

@@ -117,13 +117,6 @@ class AdkAgentRunner(
     )
   }
 
-  private suspend fun nanoStatus(config: NanoConfig): Int =
-    try {
-      nanoClient(config).checkStatus()
-    } catch (_: Exception) {
-      FeatureStatus.UNAVAILABLE
-    }
-
   /** Downloads Gemini Nano when needed, reporting progress, then warms it up. */
   suspend fun prepareNano(config: NanoConfig) {
     nanoPrepareMutex.withLock {
@@ -177,17 +170,6 @@ class AdkAgentRunner(
     prepareNano(config)
     return nanoModels.getValue(config)
   }
-
-  /** Whether this device supports Gemini Nano at all. Does not download the model. */
-  suspend fun isNanoSupported(config: NanoConfig): Boolean =
-    nanoStatus(config) != FeatureStatus.UNAVAILABLE
-
-  /** Whether Gemini Nano is downloaded or can be downloaded now. */
-  suspend fun isNanoAvailable(config: NanoConfig): Boolean =
-    when (nanoStatus(config)) {
-      FeatureStatus.DOWNLOADABLE, FeatureStatus.AVAILABLE -> true
-      else -> false
-    }
 
   suspend fun getModelInfo(modelType: String, config: NanoConfig): AdkModelInfo {
     if (modelType != "genai-nano") {

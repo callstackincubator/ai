@@ -54,30 +54,6 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     reject(AdkErrors.codeFor(error), error.message ?: "Unknown ADK error", error)
   }
 
-  override fun isAvailable(modelType: String, nano: ReadableMap?, promise: Promise) {
-    scope.launch {
-      try {
-        val available = when (modelType) {
-          "genai-nano" -> runner.isNanoAvailable(NanoConfig.from(nano))
-          else -> true
-        }
-        promise.resolve(available)
-      } catch (_: Exception) {
-        promise.resolve(false)
-      }
-    }
-  }
-
-  override fun isNanoSupported(nano: ReadableMap?, promise: Promise) {
-    scope.launch {
-      try {
-        promise.resolve(runner.isNanoSupported(NanoConfig.from(nano)))
-      } catch (_: Exception) {
-        promise.resolve(false)
-      }
-    }
-  }
-
   override fun getModelInfo(modelType: String, nano: ReadableMap?, promise: Promise) {
     scope.launch {
       try {
