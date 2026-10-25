@@ -1,10 +1,11 @@
-import { AppleFoundationModels } from '@react-native-ai/apple'
+import { apple, AppleFoundationModels } from '@react-native-ai/apple'
 import React, { useEffect, useState } from 'react'
 import { StyleSheet, Text } from 'react-native'
 
 import { colors } from '../../theme/colors'
 
-const APPLE_CONTEXT_WINDOW_TOKENS = 4096
+// Used until the model reports its context size, and on iOS versions that do not
+const DEFAULT_CONTEXT_WINDOW_TOKENS = 4096
 const TOKEN_COUNT_DEBOUNCE_MS = 250
 
 type AppleTokenCounterProps = {
@@ -17,7 +18,21 @@ export function AppleTokenCounter({
   isVisible,
 }: AppleTokenCounterProps) {
   const [tokenCount, setTokenCount] = useState<number | null>(0)
+  const [contextSize, setContextSize] = useState(DEFAULT_CONTEXT_WINDOW_TOKENS)
   const hasInput = input.trim().length > 0
+
+  useEffect(() => {
+    let isActive = true
+    apple
+      .getModelInfo()
+      .then((info) => {
+        if (isActive && info.contextSize) setContextSize(info.contextSize)
+      })
+      .catch(() => {})
+    return () => {
+      isActive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!isVisible || !hasInput) {
@@ -47,7 +62,7 @@ export function AppleTokenCounter({
 
   return (
     <Text style={styles.tokenCounter}>
-      {visibleTokenCount}/{APPLE_CONTEXT_WINDOW_TOKENS}
+      {visibleTokenCount}/{contextSize}
     </Text>
   )
 }
