@@ -400,7 +400,9 @@ public class CoreAIImpl: NSObject {
               "images": images,
               "metadata": [
                 "count": images.count,
-                "imageFormat": "image/png"
+                "imageFormat": "image/png",
+                "width": result.images.first?.width ?? 0,
+                "height": result.images.first?.height ?? 0
               ]
             ])
           } catch {

@@ -190,7 +190,12 @@ export interface CoreAIImageGenerationOptions {
 
 export interface CoreAIImageGenerationResult {
   images: string[]
-  metadata?: CodegenTypes.UnsafeObject
+  metadata?: {
+    count: number
+    imageFormat: 'image/png'
+    width: number
+    height: number
+  }
 }
 
 export interface CoreAITaskInput {

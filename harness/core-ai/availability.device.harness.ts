@@ -1,8 +1,7 @@
 import { CoreAI, type CoreAICapabilities } from '@react-native-ai/core-ai'
 import { describe, expect, it } from 'react-native-harness'
 
-// The example app links the language, object-detection and segmentation tasks
-// (see apps/expo-example/app.config.js)
+// The example app links every task (see apps/expo-example/app.config.js)
 
 describe('core-ai availability', () => {
   it('reports the linked products', async () => {
@@ -12,16 +11,17 @@ describe('core-ai availability', () => {
     expect(capabilities.isCoreAILMAvailable).toBe(true)
     expect(capabilities.isCoreAIObjectDetectionAvailable).toBe(true)
     expect(capabilities.isCoreAISegmentationAvailable).toBe(true)
-    expect(capabilities.missingProducts).toEqual(['CoreAIDiffusion'])
+    expect(capabilities.isCoreAIDiffusionAvailable).toBe(true)
+    expect(capabilities.missingProducts).toEqual([])
   })
 
-  it('rejects a task whose product is not linked', async () => {
+  it('rejects a model that is not on disk', async () => {
     await expect(
       CoreAI.generateImage(
         { id: 'missing', sourceType: 'file', sourceUri: '/missing' },
         'a cat',
         {}
       )
-    ).rejects.toMatchObject({ code: 'CORE_AI_MISSING_SPM_PRODUCT' })
+    ).rejects.toMatchObject({ code: expect.any(String) })
   })
 })

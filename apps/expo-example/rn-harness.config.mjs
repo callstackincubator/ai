@@ -33,6 +33,8 @@ export default {
   // fail well before the run does
   bridgeTimeout: 120000,
   bundleStartTimeout: 120000,
-  testTimeout: 120000,
+  // Also bounds the hooks that download models on the first run, and the
+  // 4 GB image model takes minutes to download
+  testTimeout: 600000,
   forwardClientLogs: true,
 }
