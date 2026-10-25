@@ -1,6 +1,8 @@
 import type { CodegenTypes, TurboModule } from 'react-native'
 import { Platform, TurboModuleRegistry } from 'react-native'
 
+import { AdkErrorCodes, createAdkError } from './errors'
+
 export type AdkMessageRole = 'assistant' | 'user'
 
 export type AdkMessagePart =
@@ -172,7 +174,7 @@ export interface Spec extends TurboModule {
     tools?: AdkTool[]
   ): Promise<void>
 
-  /** Cancels a stream or a `generateText` run by its id */
+  /** Cancels a `streamText` or `generateText` run by its id */
   cancelStream(streamId: string): Promise<void>
   /** `result` is JSON */
   submitToolResult(runId: string, toolCallId: string, result: string): void
@@ -194,11 +196,10 @@ export default NativeAdkEngine
 
 export function getNativeAdkEngine(): Spec {
   if (!NativeAdkEngine) {
-    const error = new Error(
-      '@react-native-ai/adk is only available on Android. See https://developer.android.com/ai/adk'
-    ) as Error & { code: string }
-    error.code = 'UNSUPPORTED_PLATFORM'
-    throw error
+    throw createAdkError(
+      '@react-native-ai/adk is only available on Android. See https://developer.android.com/ai/adk',
+      AdkErrorCodes.UnsupportedPlatform
+    )
   }
   return NativeAdkEngine
 }
