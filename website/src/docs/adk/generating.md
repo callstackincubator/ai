@@ -19,19 +19,18 @@ const { text } = await generateText({
 })
 ```
 
-The first call prepares Gemini Nano. To prepare it ahead of time, call `adk.prepareNano()` (see [Getting Started - Preparation](./getting-started.mdx#preparation)).
+The first call prepares Gemini Nano. To prepare it ahead of time, call `model.prepare()` (see [Getting Started - Preparation](./getting-started.mdx#preparation)).
 
 ### Cloud Gemini
 
-Cloud models use ADK's `LlmAgent` with the Gemini API. They are useful when Gemini Nano is unavailable, when you need a more capable model, or when you develop on an emulator without AICore. Create a provider with `modelType: 'gemini'`, a `modelName`, and an API key:
+Cloud models use ADK's `LlmAgent` with the Gemini API. They are useful when Gemini Nano is unavailable, when you need a more capable model, or when you develop on an emulator without AICore. Create a provider with a Gemini API model id and an API key:
 
 ```typescript
 import { createAdkProvider } from '@react-native-ai/adk'
 import { generateText } from 'ai'
 
 const adk = createAdkProvider({
-  modelType: 'gemini',
-  modelName: 'gemini-2.5-flash',
+  model: 'gemini-3.8-flash',
   apiKey: process.env.GOOGLE_API_KEY,
 })
 
@@ -91,7 +90,7 @@ Set the AI SDK `reasoning` option to turn on the model's thinking. The thoughts 
 import { createAdkProvider } from '@react-native-ai/adk'
 import { generateText } from 'ai'
 
-const adk = createAdkProvider({ modelName: 'gemini-2.5-flash', apiKey })
+const adk = createAdkProvider({ model: 'gemini-3.8-flash', apiKey })
 
 const { reasoningText, text } = await generateText({
   model: adk(),
