@@ -10,6 +10,7 @@ export const AdkErrorCodes = {
   GenerationError: 'GENERATION_ERROR',
   InvalidMessage: 'INVALID_MESSAGE',
   InvalidSchema: 'INVALID_SCHEMA',
+  ToolCallError: 'TOOL_CALL_ERROR',
   ContextWindowExceeded: 'CONTEXT_WINDOW_EXCEEDED',
   RateLimited: 'RATE_LIMITED',
   BackgroundUseBlocked: 'BACKGROUND_USE_BLOCKED',

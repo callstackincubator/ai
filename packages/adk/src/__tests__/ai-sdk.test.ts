@@ -2,7 +2,8 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4StreamPart,
 } from '@ai-sdk/provider'
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { jsonSchema, tool } from '@ai-sdk/provider-utils'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
 type Listener = (event: any) => void
 
@@ -742,6 +743,247 @@ describe('Gemini Nano preparation', () => {
 
     expect(prepareNano.mock.calls.at(-1)![0]).toEqual({
       releaseStage: 'preview',
+    })
+  })
+})
+
+describe('tool approval', () => {
+  const deleteFile = mock(async (_input: unknown) => ({ deleted: true }))
+  const needsApproval = mock(
+    async (input: { path: string }) => input.path !== 'tmp'
+  )
+  const model = createAdkProvider({
+    model: 'gemini-3.8-flash',
+    availableTools: {
+      deleteFile: tool({
+        inputSchema: jsonSchema<{ path: string }>({ type: 'object' }),
+        needsApproval,
+        execute: deleteFile,
+      }),
+    },
+  })()
+  const deleteFileTool = {
+    type: 'function' as const,
+    name: 'deleteFile',
+    inputSchema: {
+      type: 'object' as const,
+      properties: { path: { type: 'string' } },
+    },
+  }
+
+  beforeEach(() => {
+    deleteFile.mockClear()
+    needsApproval.mockClear()
+  })
+
+  // Moves the conversation past the approval, which cancels a paused run
+  const moveOn = () =>
+    model.doStream(
+      createCallOptions({
+        prompt: [
+          ...approvalPrompt(true).prompt.slice(0, 2),
+          { role: 'user', content: [{ type: 'text', text: 'Never mind' }] },
+        ],
+      })
+    )
+
+  afterEach(moveOn)
+
+  // Streams a call to deleteFile, which ADK then asks JS to run
+  const callDeleteFile = (streamId: string, path: string) => {
+    const input = JSON.stringify({ path })
+    onStreamToolCall.emit({
+      streamId,
+      phase: 'start',
+      toolCallId: 'call-1',
+      toolName: 'deleteFile',
+    })
+    onStreamToolCall.emit({
+      streamId,
+      phase: 'end',
+      toolCallId: 'call-1',
+      toolName: 'deleteFile',
+      input,
+    })
+    onToolCall.emit({
+      runId: streamId,
+      toolCallId: 'call-1',
+      toolName: 'deleteFile',
+      arguments: input,
+    })
+  }
+
+  // Completes the native run once the tool output is submitted
+  const completeAfterToolOutput = (streamId: string) => {
+    submitToolResult.mockImplementationOnce((_runId, _toolCallId, output) => {
+      onStreamToolCall.emit({
+        streamId,
+        phase: 'result',
+        toolCallId: 'call-1',
+        toolName: 'deleteFile',
+        output,
+      })
+      onStreamUpdate.emit({ streamId, delta: 'Done' })
+      onStreamComplete.emit({ streamId, finishReason: 'STOP' })
+    })
+  }
+
+  const pauseOnDeleteFile = async () => {
+    let streamId = ''
+    const parts = await runStream(
+      createCallOptions({ tools: [deleteFileTool] }),
+      (id) => {
+        streamId = id
+        callDeleteFile(id, 'notes.txt')
+      },
+      model
+    )
+    return { streamId, parts }
+  }
+
+  const approvalPrompt = (approved: boolean, reason?: string) =>
+    createCallOptions({
+      tools: [deleteFileTool],
+      prompt: [
+        { role: 'user', content: [{ type: 'text', text: 'Delete notes' }] },
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'tool-call',
+              toolCallId: 'call-1',
+              toolName: 'deleteFile',
+              input: '{"path":"notes.txt"}',
+              providerExecuted: true,
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          content: [
+            {
+              type: 'tool-approval-response',
+              approvalId: 'approval-1',
+              approved,
+              reason,
+            },
+          ],
+        },
+      ],
+    })
+
+  test('finishes the stream when a tool call needs approval', async () => {
+    const { parts } = await pauseOnDeleteFile()
+
+    expect(parts.map((part) => part.type)).toEqual([
+      'stream-start',
+      'tool-input-start',
+      'tool-input-end',
+      'tool-call',
+      'finish',
+    ])
+    expect(parts.at(-1)).toMatchObject({
+      finishReason: { unified: 'tool-calls' },
+    })
+    expect(needsApproval.mock.calls[0]![0]).toEqual({ path: 'notes.txt' })
+    expect(deleteFile).not.toHaveBeenCalled()
+    expect(submitToolResult).not.toHaveBeenCalled()
+    expect(cancelStream).not.toHaveBeenCalled()
+  })
+
+  test('resumes the paused run when the call is approved', async () => {
+    const { streamId } = await pauseOnDeleteFile()
+    completeAfterToolOutput(streamId)
+
+    const { stream } = await model.doStream(approvalPrompt(true))
+    const parts = await readAll(stream)
+
+    expect(streamText).toHaveBeenCalledTimes(1)
+    expect(deleteFile.mock.calls[0]![0]).toEqual({ path: 'notes.txt' })
+    expect(submitToolResult.mock.calls[0]).toEqual([
+      streamId,
+      'call-1',
+      '{"deleted":true}',
+    ])
+    expect(parts.map((part) => part.type)).toEqual([
+      'stream-start',
+      'tool-result',
+      'text-start',
+      'text-delta',
+      'text-end',
+      'finish',
+    ])
+    expect(parts[1]).toEqual({
+      type: 'tool-result',
+      toolCallId: 'call-1',
+      toolName: 'deleteFile',
+      result: { deleted: true },
+    })
+  })
+
+  test('tells the model when the call is denied', async () => {
+    const { streamId } = await pauseOnDeleteFile()
+    completeAfterToolOutput(streamId)
+
+    const { stream } = await model.doStream(approvalPrompt(false, 'Keep it'))
+    const parts = await readAll(stream)
+
+    expect(deleteFile).not.toHaveBeenCalled()
+    expect(JSON.parse(submitToolResult.mock.calls[0]![2])).toEqual({
+      error: 'The user denied this tool call.',
+      reason: 'Keep it',
+    })
+    // The AI SDK reports the denial itself
+    expect(parts.map((part) => part.type)).not.toContain('tool-result')
+    expect(parts.at(-1)).toMatchObject({ finishReason: { unified: 'stop' } })
+  })
+
+  test('runs tools that do not need approval right away', async () => {
+    let streamId = ''
+    streamText.mockImplementationOnce(async (id: string) => {
+      streamId = id
+      completeAfterToolOutput(id)
+      queueMicrotask(() => callDeleteFile(id, 'tmp'))
+    })
+    const { stream } = await model.doStream(
+      createCallOptions({ tools: [deleteFileTool] })
+    )
+    const parts = await readAll(stream)
+
+    expect(streamId).not.toBe('')
+    expect(deleteFile).toHaveBeenCalledTimes(1)
+    expect(parts.map((part) => part.type)).toContain('tool-result')
+  })
+
+  test('returns the approval step from doGenerate', async () => {
+    streamText.mockImplementationOnce(async (streamId: string) => {
+      queueMicrotask(() => callDeleteFile(streamId, 'notes.txt'))
+    })
+
+    const result = await model.doGenerate(
+      createCallOptions({ tools: [deleteFileTool] })
+    )
+
+    expect(generateText).not.toHaveBeenCalled()
+    expect(result.content).toEqual([
+      {
+        type: 'tool-call',
+        toolCallId: 'call-1',
+        toolName: 'deleteFile',
+        input: '{"path":"notes.txt"}',
+        providerExecuted: true,
+      },
+    ])
+    expect(result.finishReason.unified).toBe('tool-calls')
+  })
+
+  test('cancels the paused run when the conversation moves on', async () => {
+    const { streamId } = await pauseOnDeleteFile()
+    await moveOn()
+
+    expect(cancelStream).toHaveBeenCalledWith(streamId)
+    await expect(model.doStream(approvalPrompt(true))).rejects.toMatchObject({
+      code: 'TOOL_CALL_ERROR',
     })
   })
 })
