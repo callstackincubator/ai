@@ -1,15 +1,6 @@
 import { apple, AppleUtils } from '@react-native-ai/apple'
 import { describe, expect, it } from 'react-native-harness'
 
-const availabilities = [
-  'available',
-  'deviceNotEligible',
-  'appleIntelligenceNotEnabled',
-  'modelNotReady',
-  'systemNotReady',
-  'unknown',
-]
-
 describe('apple availability', () => {
   it('is available', () => {
     expect(apple.isAvailable()).toBe(true)
@@ -35,16 +26,27 @@ describe('apple availability', () => {
     )
   })
 
-  it('reports why private cloud compute is unavailable', async () => {
+  // The example app does not have the Private Cloud Compute entitlement
+  it('reports private cloud compute as missing its entitlement', async () => {
     const info = await apple.getModelInfo({ model: 'private-cloud-compute' })
 
-    expect(info.model).toBe('private-cloud-compute')
-    expect(availabilities).toContain(info.availability)
-    if (info.availability !== 'available') {
-      expect(info.contextSize).toBeUndefined()
-      expect(info.supportsLocale).toBe(false)
-      expect(info.supportedLanguages).toEqual([])
-    }
+    expect(info).toMatchObject({
+      model: 'private-cloud-compute',
+      availability: 'missingEntitlement',
+      supportsLocale: false,
+      supportedLanguages: [],
+    })
+    expect(info.contextSize).toBeUndefined()
+  })
+
+  it('rejects private cloud compute generation without its entitlement', async () => {
+    await expect(
+      apple('private-cloud-compute').doGenerate({
+        prompt: [
+          { role: 'user', content: [{ type: 'text', text: 'Say hi.' }] },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'MODEL_UNAVAILABLE' })
   })
 
   it('reads the current locale', () => {
