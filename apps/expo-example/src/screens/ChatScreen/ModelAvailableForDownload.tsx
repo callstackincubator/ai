@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { SymbolView } from 'expo-symbols'
 import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { AdaptiveGlass } from '../../components/AdaptiveGlass'
 import { useChatStore } from '../../store/chatStore'
@@ -21,7 +21,14 @@ export function ModelAvailableForDownload() {
   const isDownloading = downloadProgress !== undefined
 
   const handleDownload = () => {
-    downloadModel(modelId)
+    downloadModel(modelId).catch((error) => {
+      Alert.alert(
+        'Download Failed',
+        error instanceof Error
+          ? error.message
+          : 'The model could not be downloaded'
+      )
+    })
   }
 
   return (
