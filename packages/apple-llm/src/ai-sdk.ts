@@ -199,7 +199,8 @@ function prepareImageAttachment(
       { content: unknown[] }
     >['content'][number],
     { type: 'file' }
-  >
+  >,
+  index: number
 ): AppleMessageAttachment {
   const mediaType = part.mediaType.toLowerCase()
   if (mediaType !== 'image' && !mediaType.startsWith('image/')) {
@@ -217,8 +218,9 @@ function prepareImageAttachment(
     'Apple Foundation Models'
   )
 
-  // The filename becomes the attachment label, which the model and Vision tools use to name the image
-  const label = part.filename
+  // The label is how the model and Vision tools name the image, so images
+  // without a filename still need one
+  const label = part.filename ?? `image-${index + 1}`
 
   if (source.type === 'data') {
     return {
@@ -917,7 +919,9 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           const content = message.content.reduce((acc, part) => {
             if (part.type === 'file') {
               if (isFinalPrompt) {
-                attachments.push(prepareImageAttachment(part))
+                attachments.push(
+                  prepareImageAttachment(part, attachments.length)
+                )
               }
               return acc
             }

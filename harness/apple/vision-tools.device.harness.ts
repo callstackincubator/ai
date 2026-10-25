@@ -1,7 +1,7 @@
 import { apple } from '@react-native-ai/apple'
 import { beforeAll, describe, expect, it } from 'react-native-harness'
 
-import { invoice, qrCode } from '../fixtures'
+import { invoice, qrCode, redSquare } from '../fixtures'
 import { answer, imagePrompt } from './helpers'
 
 // Simulators do not have the Vision tools
@@ -45,5 +45,32 @@ describe('apple vision tools', () => {
         providerOptions: { apple: { builtInTools: ['barcode'] } },
       })
     ).toEqual(expect.arrayContaining([expect.stringContaining('HARNESS-42')]))
+  })
+
+  it('labels images without a filename so the tools can find them', async () => {
+    const image = (data: string) => ({
+      type: 'file' as const,
+      mediaType: 'image/png',
+      data: { type: 'data' as const, data },
+    })
+
+    expect(
+      await answer({
+        prompt: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Read the text in image-2 and tell me the invoice number.',
+              },
+              image(redSquare),
+              image(invoice),
+            ],
+          },
+        ],
+        providerOptions: ocr,
+      })
+    ).toEqual(expect.arrayContaining([expect.stringContaining('4721')]))
   })
 })
