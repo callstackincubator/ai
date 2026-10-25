@@ -613,7 +613,7 @@ public class CoreAIImpl: NSObject {
             }
             resolve([
               "task": "segmentation",
-              "output": Self.serializeSegmentationResponse(response),
+              "output": try Self.serializeSegmentationResponse(response),
               "metadata": [
                 "imageWidth": image.width,
                 "imageHeight": image.height
@@ -883,15 +883,17 @@ extension CoreAIImpl {
     return PointQuery.Point(x: Float(x), y: Float(y), label: label)
   }
 
-  private static func serializeSegmentationResponse(_ response: SegmentationResponse) -> [String: Any] {
+  private static func serializeSegmentationResponse(_ response: SegmentationResponse) throws -> [String: Any] {
     var output: [String: Any] = [
-      "segments": response.segments.map { segment in
+      "segments": try response.segments.map { segment in
         [
           "score": segment.score,
           "box": serializeRect(segment.box),
           "maskWidth": segment.maskWidth,
           "maskHeight": segment.maskHeight,
-          "mask": segment.mask
+          // A base64 PNG, since the mask is at input image resolution and one
+          // boolean per pixel is too much to send over the bridge
+          "mask": try pngBase64(maskImage(segment.mask, width: segment.maskWidth, height: segment.maskHeight))
         ]
       }
     ]
@@ -905,6 +907,32 @@ extension CoreAIImpl {
     }
 
     return output
+  }
+
+  // White where the mask is set and transparent elsewhere, so it can be
+  // tinted and drawn over the input image
+  private static func maskImage(_ mask: [Bool], width: Int, height: Int) throws -> CGImage {
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    for (index, isSet) in mask.enumerated() where isSet {
+      pixels.replaceSubrange(index * 4..<index * 4 + 4, with: [255, 255, 255, 255])
+    }
+    guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+          let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+          ) else {
+      throw CoreAIError.invalidInput("Could not create a segmentation mask image.")
+    }
+    return image
   }
 }
 #endif
@@ -953,7 +981,19 @@ extension CoreAIImpl {
     }
 
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+          let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+          let width = properties[kCGImagePropertyPixelWidth] as? Int,
+          let height = properties[kCGImagePropertyPixelHeight] as? Int else {
+      throw CoreAIError.invalidInput("Could not load image at \(url.path).")
+    }
+    // Decode with the EXIF orientation applied, so pixel coordinates match
+    // the image as it is displayed
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceThumbnailMaxPixelSize: max(width, height)
+    ]
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
       throw CoreAIError.invalidInput("Could not load image at \(url.path).")
     }
     return image

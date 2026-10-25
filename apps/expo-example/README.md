@@ -49,6 +49,26 @@ ADK requires Android `minSdkVersion` 26 or greater (ML Kit GenAI). This example 
 npx expo prebuild --clean
 ```
 
+### Core AI (iOS 27 devices)
+
+Core AI is opt-in, because it raises the deployment target to iOS 27 and can't build for the Simulator. Set `CORE_AI=1` when you prebuild to link `@react-native-ai/core-ai` and its config plugin:
+
+```bash
+CORE_AI=1 npx expo prebuild --clean --platform ios
+```
+
+Run `npx expo prebuild --clean` without it to go back to the default build.
+
+The model picker then lists **Core AI qwen3-0.6b**, which downloads (~460 MB) from [an iOS export](https://huggingface.co/grabbou/qwen3-0.6b-CoreAI) made with the [`apple/coreai-models`](https://github.com/apple/coreai-models) recipe.
+
+The tests in [`harness/core-ai`](../../harness/core-ai) run only with `CORE_AI=1`, on a device with a `CORE_AI=1` build installed:
+
+```bash
+CORE_AI=1 HARNESS_IOS_DEVICE="My iPhone" bun run test:harness:device ../../harness/core-ai
+```
+
+They download Qwen3 0.6B and the [YOLOS-tiny](https://huggingface.co/grabbou/yolos-tiny-CoreAI) and [EfficientSAM-Ti](https://huggingface.co/grabbou/EfficientSAM-Ti-CoreAI) exports on the first run.
+
 ## Running the App
 
 After building the MLC runtime, navigate back to this directory and run:
