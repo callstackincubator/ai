@@ -44,4 +44,12 @@ describe('apple transcription', () => {
 
     expect(result.text).toMatch(/fox/i)
   })
+
+  it('reports the language as an ISO-639-1 code', async () => {
+    const model = apple.transcriptionModel({ language: 'en_US' })
+
+    const result = await transcribe({ model, audio: speech })
+
+    expect(result.language).toBe('en')
+  })
 })
