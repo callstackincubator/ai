@@ -34,7 +34,9 @@ export async function pickImages(
     // camera re-encode its capture
     preferredAssetRepresentationMode:
       ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-    quality: 0.8,
+    // Below 1, every full-resolution photo is decoded and encoded again as
+    // JPEG before the picker returns
+    quality: 1,
   }
 
   let result: ImagePicker.ImagePickerResult
