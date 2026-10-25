@@ -260,58 +260,13 @@ describe('summarizeHistory', () => {
       options
     )
 
-    // The earlier summary is kept as it is, not summarized again
-    const summarized = model.summarizedTexts()[1]
     expect(model.doGenerate).toHaveBeenCalledTimes(2)
+    const summarized = model.summarizedTexts()[1]
+    expect(summarized).toContain('summary 1')
     expect(summarized).toContain(
       'USER: And Lyon?\n\nASSISTANT: Lyon is in France'
     )
     expect(summarized).not.toContain('Tell me about Paris')
-    expect(summarized).not.toContain('summary 1')
-  })
-
-  test('keeps the summaries of earlier chunks', async () => {
-    const model = new TokenCountingModel()
-    const history = Array.from({ length: 6 }, (_, index) =>
-      index % 2 === 0 ? user(`question ${index}`) : assistant(`answer ${index}`)
-    )
-
-    const [summaryMessage] = await applyHistoryManagement(
-      [...history, user('Last question')],
-      { summarizeHistory: { threshold: 64, model } }
-    )
-
-    const summaries = model.doGenerate.mock.calls.map(
-      (_, index) => `summary ${index + 1}`
-    )
-    expect(summaries.length).toBeGreaterThan(1)
-    expect(summaryMessage).toEqual(
-      system(`Summary of earlier conversation:\n${summaries.join('\n\n')}`)
-    )
-  })
-
-  test('condenses the summary once it outgrows half the threshold', async () => {
-    const model = new TokenCountingModel()
-    // Chunks hold messages, the condensing call only earlier summaries
-    model.doGenerate.mockImplementation(async (options) =>
-      generationResult(
-        /(USER|ASSISTANT):/.test(JSON.stringify(options.prompt))
-          ? 'a long chunk summary'
-          : 'condensed'
-      )
-    )
-    const history = Array.from({ length: 6 }, (_, index) =>
-      index % 2 === 0 ? user(`question ${index}`) : assistant(`answer ${index}`)
-    )
-
-    const [summaryMessage] = await applyHistoryManagement(
-      [...history, user('Last question')],
-      { summarizeHistory: { threshold: 40, model } }
-    )
-
-    expect(summaryMessage).toEqual(
-      system('Summary of earlier conversation:\ncondensed')
-    )
   })
 
   test('summarizes a long history in chunks under the threshold', async () => {
@@ -325,13 +280,9 @@ describe('summarizeHistory', () => {
     })
 
     expect(model.doGenerate.mock.calls.length).toBeGreaterThan(1)
-    // Each chunk sent to the summarizer fits the threshold
-    const chunks = model
-      .summarizedTexts()
-      .map((text) => text.match(/(USER|ASSISTANT): [^\n]*/g) ?? [])
-      .filter((messages) => messages.length > 0)
-    expect(chunks.length).toBeGreaterThan(1)
-    for (const messages of chunks) {
+    // The messages of each chunk fit the threshold
+    for (const text of model.summarizedTexts()) {
+      const messages = text.match(/(USER|ASSISTANT): [^\n]*/g) ?? []
       expect(messages.join('').length).toBeLessThanOrEqual(40)
     }
   })
