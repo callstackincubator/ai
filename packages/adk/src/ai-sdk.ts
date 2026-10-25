@@ -78,6 +78,18 @@ export interface AdkProviderOptions {
   thinkingBudget?: number
   /** Whether the model's thoughts come back as reasoning parts */
   includeThoughts?: boolean
+  /**
+   * Context cache that prefixes the prompt: a Gemini Nano cache created with
+   * `adk.caches.create`, or a cloud Gemini `cachedContents/...` resource
+   */
+  cachedContent?: string
+  /**
+   * Gemini Nano: sends the system prompt as a prompt prefix that ML Kit caches,
+   * so later calls with the same system prompt skip reprocessing it. The
+   * prefix is the instruction, which includes `system` messages. Ignored for
+   * prompts with images
+   */
+  cacheSystemPrompt?: boolean
 }
 
 export type AdkModelAvailability =
@@ -137,6 +149,22 @@ export interface AdkProvider {
   isNanoSupported: () => Promise<boolean>
   /** @deprecated Use `prepare()` on a Gemini Nano model */
   prepareNano: (options?: AdkPrepareOptions) => Promise<void>
+  /** Explicit Gemini Nano context caches, stored by ML Kit across app launches */
+  caches: AdkNanoCaches
+}
+
+export interface AdkNanoCaches {
+  /**
+   * Processes `prefix` once and stores it as `name`. Pass `name` as
+   * `providerOptions.adk.cachedContent` to put the prefix before the prompt
+   */
+  create: (name: string, prefix: string) => Promise<void>
+  /** Names of the stored caches */
+  list: () => Promise<string[]>
+  /** Resolves to `false` when no cache has this name */
+  delete: (name: string) => Promise<boolean>
+  /** Deletes the prefixes ML Kit cached for `cacheSystemPrompt` */
+  clearImplicit: () => Promise<void>
 }
 
 type ResolvedModelOptions = Omit<
@@ -184,6 +212,11 @@ const toModelAvailability = (value: string): AdkModelAvailability => {
       return 'unknown'
   }
 }
+
+const withAdkErrors = <T>(promise: Promise<T>) =>
+  promise.catch((error: unknown) => {
+    throw toAdkError(error)
+  })
 
 const listenForDownloadProgress = (
   onProgress: AdkPrepareOptions['onProgress']
@@ -273,6 +306,18 @@ export function createAdkProvider(
       model: DEFAULT_NANO_MODEL,
       modelType: 'genai-nano',
     }).prepare(options)
+  provider.caches = {
+    create: async (name: string, prefix: string) =>
+      withAdkErrors(
+        getNativeAdkEngine().createCache(name, prefix, defaults.nano)
+      ),
+    list: async () =>
+      withAdkErrors(getNativeAdkEngine().listCaches(defaults.nano)),
+    delete: async (name: string) =>
+      withAdkErrors(getNativeAdkEngine().deleteCache(name, defaults.nano)),
+    clearImplicit: async () =>
+      withAdkErrors(getNativeAdkEngine().clearImplicitCaches(defaults.nano)),
+  } satisfies AdkNanoCaches
   return provider
 }
 
@@ -673,6 +718,24 @@ class AdkChatLanguageModel implements AdkLanguageModel {
   ): AdkGenerationOptions {
     const adkOptions = (options.providerOptions?.adk ??
       {}) as AdkProviderOptions
+    let cacheSystemPrompt = adkOptions.cacheSystemPrompt
+
+    if (cacheSystemPrompt && !this.isNano) {
+      warnings.push({
+        type: 'unsupported',
+        feature: 'cacheSystemPrompt',
+        details:
+          'Only Gemini Nano supports it. Gemini caches repeated prefixes implicitly.',
+      })
+      cacheSystemPrompt = undefined
+    }
+    if (cacheSystemPrompt && adkOptions.cachedContent) {
+      warnings.push({
+        type: 'other',
+        message: 'cacheSystemPrompt is ignored because cachedContent is set.',
+      })
+      cacheSystemPrompt = undefined
+    }
 
     if (this.isNano) {
       // ADK's ML Kit model only passes on temperature, topK and maxOutputTokens
@@ -712,6 +775,8 @@ class AdkChatLanguageModel implements AdkLanguageModel {
             }
           : undefined,
       thinking: prepareThinking(options.reasoning, adkOptions),
+      cachedContent: adkOptions.cachedContent,
+      cacheSystemPrompt,
     }
   }
 

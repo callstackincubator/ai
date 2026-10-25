@@ -8,6 +8,7 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
@@ -26,15 +27,20 @@ import java.util.UUID
  * 2. After the final (non-partial) response: detects ```tool_code blocks in the text and converts
  *    each invocation to a proper [FunctionCall] part, allowing ADK's agent loop to execute the
  *    tools and continue the conversation.
+ *
+ * 3. Reports prompt tokens served from [promptCache] as usage, since ML Kit reports none.
  */
-internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Model {
+internal class NanoFunctionCallingModel(
+  private val delegate: GenaiPrompt,
+  private val promptCache: NanoPromptCache,
+) : Model {
 
   override val name: String get() = delegate.name
 
   override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> {
     val parameterNames = parameterNames(request)
     return delegate.generateContent(prepareRequest(request), stream).map { response ->
-      if (response.partial) response else parseToolCodeBlocks(response, parameterNames)
+      if (response.partial) response else withCachedUsage(parseToolCodeBlocks(response, parameterNames))
     }
   }
 
@@ -43,6 +49,12 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
     request.config?.tools.orEmpty()
       .flatMap { it.functionDeclarations.orEmpty() }
       .associate { it.name to it.parameters?.properties?.keys?.toList().orEmpty() }
+
+  private fun withCachedUsage(response: LlmResponse): LlmResponse {
+    val cachedTokens = promptCache.cachedTokenCount ?: return response
+    val usage = response.usageMetadata ?: UsageMetadata()
+    return response.copy(usageMetadata = usage.copy(cachedContentTokenCount = cachedTokens))
+  }
 
   /**
    * Request preparation: convert FunctionCall/FunctionResponse parts to text

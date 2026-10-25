@@ -30,7 +30,9 @@ import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
 import com.google.mlkit.genai.prompt.ModelPreference
 import com.google.mlkit.genai.prompt.ModelReleaseStage
+import com.google.mlkit.genai.prompt.PromptPrefix
 import com.google.mlkit.genai.prompt.TextPart
+import com.google.mlkit.genai.prompt.createCachedContextRequest
 import com.google.mlkit.genai.prompt.generateContentRequest
 import com.google.mlkit.genai.prompt.generationConfig
 import com.google.mlkit.genai.prompt.modelConfig
@@ -96,6 +98,10 @@ class AdkAgentRunner(
 ) {
   private val nanoModels = ConcurrentHashMap<NanoConfig, GenerativeModel>()
   private val nanoPrepareMutex = Mutex()
+  private val nanoCacheStates = ConcurrentHashMap<NanoConfig, NanoCacheState>()
+
+  private fun nanoCacheState(config: NanoConfig): NanoCacheState =
+    nanoCacheStates.getOrPut(config) { NanoCacheState() }
 
   private fun nanoClient(config: NanoConfig): GenerativeModel {
     if (config.releaseStage == null && config.preference == null) {
@@ -201,6 +207,28 @@ class AdkAgentRunner(
   suspend fun countTokens(text: String, config: NanoConfig): Int =
     preparedNano(config).countTokens(generateContentRequest(TextPart(text)) {}).totalTokens
 
+  /** Processes [prefix] once and stores it as an explicit ML Kit cache named [name]. */
+  suspend fun createCache(name: String, prefix: String, config: NanoConfig) {
+    val model = preparedNano(config)
+    val cache = model.caches.create(createCachedContextRequest(name, PromptPrefix(prefix)))
+    runCatching { countTokens(prefix, config) }
+      .getOrNull()
+      ?.let { nanoCacheState(config).cacheTokens[cache.name] = it }
+  }
+
+  suspend fun listCaches(config: NanoConfig): List<String> =
+    preparedNano(config).caches.list().map { it.name }
+
+  suspend fun deleteCache(name: String, config: NanoConfig): Boolean {
+    nanoCacheState(config).cacheTokens.remove(name)
+    return preparedNano(config).caches.delete(name)
+  }
+
+  suspend fun clearImplicitCaches(config: NanoConfig) {
+    preparedNano(config).clearImplicitCaches()
+    nanoCacheState(config).prefixTokens.clear()
+  }
+
   suspend fun generateText(
     messages: ReadableArray,
     config: ReadableMap,
@@ -275,7 +303,7 @@ class AdkAgentRunner(
     val parsedMessages = parseMessages(messages)
     val agentConfig = parseAgentConfig(config)
     val agentTools = parseTools(tools, runId)
-    val model = createModel(agentConfig)
+    val model = createModel(agentConfig, options)
     val generateContentConfig = parseGenerationConfig(options)
     val instructionText =
       if (agentConfig.modelType == "genai-nano") {
@@ -328,12 +356,19 @@ class AdkAgentRunner(
     )
   }
 
-  private suspend fun createModel(config: AgentConfig): Model {
+  private suspend fun createModel(config: AgentConfig, options: ReadableMap?): Model {
     return when (config.modelType) {
-      "genai-nano" ->
-        NanoFunctionCallingModel(
-          GenaiPrompt.create(NanoSingleTextPrompt(preparedNano(config.nano)), config.modelName),
-        )
+      "genai-nano" -> {
+        val promptCache =
+          NanoPromptCache(
+            delegate = NanoSingleTextPrompt(preparedNano(config.nano)),
+            state = nanoCacheState(config.nano),
+            cachedContent = options?.getString("cachedContent"),
+            cacheSystemPrompt =
+              options?.hasKey("cacheSystemPrompt") == true && options.getBoolean("cacheSystemPrompt"),
+          )
+        NanoFunctionCallingModel(GenaiPrompt.create(promptCache, config.modelName), promptCache)
+      }
       else -> Gemini(name = config.modelName, apiKey = config.apiKey)
     }
   }
@@ -386,6 +421,7 @@ class AdkAgentRunner(
       responseMimeType = responseMimeType,
       responseSchema = responseSchema,
       thinkingConfig = thinkingConfig,
+      cachedContent = options.getString("cachedContent"),
     )
   }
 

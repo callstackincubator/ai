@@ -63,6 +63,10 @@ export interface AdkGenerationOptions {
     includeThoughts: boolean
     budget?: number
   }
+  /** Context cache to prefix the prompt with */
+  cachedContent?: string
+  /** Gemini Nano: send the system instruction as an implicitly cached prompt prefix */
+  cacheSystemPrompt?: boolean
 }
 
 export interface AdkUsageMetadata {
@@ -152,6 +156,14 @@ export interface Spec extends TurboModule {
   ): Promise<AdkNativeModelInfo>
   prepareNano(nano?: AdkNanoModelConfig): Promise<void>
   countTokens(text: string, nano?: AdkNanoModelConfig): Promise<number>
+  createCache(
+    name: string,
+    prefix: string,
+    nano?: AdkNanoModelConfig
+  ): Promise<void>
+  listCaches(nano?: AdkNanoModelConfig): Promise<string[]>
+  deleteCache(name: string, nano?: AdkNanoModelConfig): Promise<boolean>
+  clearImplicitCaches(nano?: AdkNanoModelConfig): Promise<void>
 
   generateText(
     runId: string,

@@ -92,6 +92,49 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  override fun createCache(name: String, prefix: String, nano: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        runner.createCache(name, prefix, NanoConfig.from(nano))
+        promise.resolve(null)
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
+  override fun listCaches(nano: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        val names = runner.listCaches(NanoConfig.from(nano))
+        promise.resolve(Arguments.createArray().apply { names.forEach { pushString(it) } })
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
+  override fun deleteCache(name: String, nano: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        promise.resolve(runner.deleteCache(name, NanoConfig.from(nano)))
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
+  override fun clearImplicitCaches(nano: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        runner.clearImplicitCaches(NanoConfig.from(nano))
+        promise.resolve(null)
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
   override fun generateText(
     runId: String,
     messages: ReadableArray,

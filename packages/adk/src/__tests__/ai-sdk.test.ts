@@ -56,6 +56,12 @@ const submitToolResult = mock(
 const getModelInfo = mock(async (_modelType: string, _nano?: unknown) => ({
   availability: 'downloadable',
 }))
+const createCache = mock(
+  async (_name: string, _prefix: string, _nano?: unknown) => {}
+)
+const listCaches = mock(async (_nano?: unknown) => ['faq'])
+const deleteCache = mock(async (_name: string, _nano?: unknown) => true)
+const clearImplicitCaches = mock(async (_nano?: unknown) => {})
 
 mock.module('react-native', () => ({
   Platform: { OS: 'android' },
@@ -68,6 +74,10 @@ mock.module('react-native', () => ({
       getModelInfo,
       onToolCall,
       submitToolResult,
+      createCache,
+      listCaches,
+      deleteCache,
+      clearImplicitCaches,
       onStreamUpdate,
       onStreamToolCall,
       onStreamComplete,
@@ -491,6 +501,122 @@ describe('generation options', () => {
     expect(
       result.warnings.map((warning) => 'feature' in warning && warning.feature)
     ).toEqual(['topP', 'seed', 'stopSequences'])
+  })
+})
+
+describe('context caching', () => {
+  const systemPrompt = createCallOptions({
+    prompt: [
+      { role: 'system', content: 'You are a pirate.' },
+      { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+    ],
+    providerOptions: { adk: { cacheSystemPrompt: true } },
+  })
+
+  test('caches the Gemini Nano instruction with the system prompt', async () => {
+    const provider = createAdkProvider({ instruction: 'Be brief.' })
+    await provider().doGenerate(systemPrompt)
+
+    const [, messages, config, options] = lastGenerateCall() as [
+      string,
+      { role: string }[],
+      { instruction: string },
+      { cacheSystemPrompt?: boolean },
+    ]
+    expect(config.instruction).toBe('Be brief.\n\nYou are a pirate.')
+    expect(messages.map((message) => message.role)).toEqual(['user'])
+    expect(options.cacheSystemPrompt).toBe(true)
+  })
+
+  test('passes cachedContent and drops cacheSystemPrompt with a warning', async () => {
+    const result = await nano.doGenerate({
+      ...systemPrompt,
+      providerOptions: {
+        adk: { cachedContent: 'faq', cacheSystemPrompt: true },
+      },
+    })
+
+    const [, messages, , options] = lastGenerateCall() as [
+      string,
+      unknown[],
+      unknown,
+      { cachedContent?: string; cacheSystemPrompt?: boolean },
+    ]
+    expect(options.cachedContent).toBe('faq')
+    expect(options.cacheSystemPrompt).toBe(undefined)
+    expect(messages).toHaveLength(1)
+    expect(result.warnings).toEqual([
+      {
+        type: 'other',
+        message: 'cacheSystemPrompt is ignored because cachedContent is set.',
+      },
+    ])
+  })
+
+  test('warns that cloud Gemini does not support cacheSystemPrompt', async () => {
+    const result = await gemini.doGenerate(systemPrompt)
+
+    expect(
+      (lastGenerateCall()[3] as { cacheSystemPrompt?: boolean })
+        .cacheSystemPrompt
+    ).toBe(undefined)
+    expect(
+      result.warnings.map((warning) => 'feature' in warning && warning.feature)
+    ).toEqual(['cacheSystemPrompt'])
+  })
+
+  test('reports cached prompt tokens as cache reads', async () => {
+    generateTextResult = {
+      content: 'Arr.',
+      finishReason: 'STOP',
+      usage: { cachedContentTokenCount: 40 },
+    }
+
+    const result = await nano.doGenerate(systemPrompt)
+
+    expect(result.usage.inputTokens).toEqual({
+      total: undefined,
+      noCache: undefined,
+      cacheRead: 40,
+      cacheWrite: undefined,
+    })
+  })
+
+  test('manages Gemini Nano caches with the model selection', async () => {
+    const provider = createAdkProvider({ nano: { preference: 'fast' } })
+
+    await provider.caches.create('faq', 'Answer from this FAQ: ...')
+    expect(await provider.caches.list()).toEqual(['faq'])
+    expect(await provider.caches.delete('faq')).toBe(true)
+    await provider.caches.clearImplicit()
+
+    expect(createCache.mock.calls.at(-1)).toEqual([
+      'faq',
+      'Answer from this FAQ: ...',
+      { preference: 'fast' },
+    ])
+    expect(deleteCache.mock.calls.at(-1)).toEqual([
+      'faq',
+      { preference: 'fast' },
+    ])
+    expect(clearImplicitCaches).toHaveBeenCalledWith({ preference: 'fast' })
+  })
+
+  test('wraps native cache errors', async () => {
+    createCache.mockImplementationOnce(async () => {
+      throw Object.assign(
+        new Error('Prefix Caching feature is not available.'),
+        {
+          code: 'MODEL_UNAVAILABLE',
+        }
+      )
+    })
+
+    await expect(
+      createAdkProvider().caches.create('faq', 'prefix')
+    ).rejects.toMatchObject({
+      code: 'MODEL_UNAVAILABLE',
+    })
   })
 })
 
