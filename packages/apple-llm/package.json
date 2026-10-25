@@ -23,7 +23,13 @@
     "zod": "^4.2.1"
   },
   "peerDependencies": {
-    "react-native": ">=0.76.0"
+    "react-native": ">=0.76.0",
+    "expo": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "react-native": "0.88.0"

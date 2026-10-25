@@ -176,28 +176,40 @@ const apple = createAppleProvider({
 Call `apple.getModelInfo({ model: 'private-cloud-compute' })` before enabling
 this path. It requires iOS 27 APIs and the managed
 `com.apple.developer.private-cloud-compute` entitlement, which Apple grants on
-request. Without the entitlement, Foundation Models stops the app with a fatal
-error that cannot be caught, and iOS has no API to check for it. So once your
-app has the entitlement, also set `AppleLLMPrivateCloudCompute` in its
-Info.plist:
+request.
+
+### Enabling Private Cloud Compute
+
+Once your team has the entitlement, enable it with the package's Expo config
+plugin. It adds the entitlement and the `AppleLLMPrivateCloudCompute`
+Info.plist key:
 
 ```json title="app.json"
 {
   "expo": {
-    "ios": {
-      "entitlements": {
-        "com.apple.developer.private-cloud-compute": true
-      },
-      "infoPlist": {
-        "AppleLLMPrivateCloudCompute": true
-      }
-    }
+    "plugins": [["@react-native-ai/apple", { "privateCloudCompute": true }]]
   }
 }
 ```
 
-Until then, the model reports `missingEntitlement` and generation fails with
-`MODEL_UNAVAILABLE`. When the Private Cloud Compute quota is reached,
+Without Expo, add the entitlement to your app's `.entitlements` file and set
+the Info.plist key yourself:
+
+```xml title="Info.plist"
+<key>AppleLLMPrivateCloudCompute</key>
+<true/>
+```
+
+:::warning
+Foundation Models stops the app with a fatal error, which cannot be caught,
+when it uses Private Cloud Compute without the entitlement, and iOS has no API
+to check for it. As a workaround, the model reports `missingEntitlement` and
+generation fails with `MODEL_UNAVAILABLE` until the Info.plist key is set, so
+only set it in builds signed with the entitlement. This check will be removed
+once Foundation Models reports a missing entitlement as an error.
+:::
+
+When the Private Cloud Compute quota is reached,
 generation fails with `RATE_LIMITED`.
 
 ## Guardrails
