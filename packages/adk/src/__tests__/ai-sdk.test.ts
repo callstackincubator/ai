@@ -23,6 +23,7 @@ const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
 const onStreamToolCall = createEmitter()
 const onNanoDownloadProgress = createEmitter()
+const onToolCall = createEmitter()
 
 let generateTextResult: Record<string, unknown> = {
   content: 'ok',
@@ -49,6 +50,9 @@ const streamText = mock(
 )
 const prepareNano = mock(async (_nano?: unknown) => {})
 const cancelStream = mock(async (_id: string) => {})
+const submitToolResult = mock(
+  (_runId: string, _toolCallId: string, _result: string) => {}
+)
 const getModelInfo = mock(async (_modelType: string, _nano?: unknown) => ({
   availability: 'downloadable',
 }))
@@ -64,7 +68,8 @@ mock.module('react-native', () => ({
       getModelInfo,
       isNanoSupported: async () => true,
       isAvailable: async () => true,
-      onToolCall: () => ({ remove: () => {} }),
+      onToolCall,
+      submitToolResult,
       onStreamUpdate,
       onStreamToolCall,
       onStreamComplete,
@@ -123,6 +128,7 @@ beforeEach(() => {
   streamText.mockClear()
   prepareNano.mockClear()
   cancelStream.mockClear()
+  submitToolResult.mockClear()
   generateTextResult = { content: 'ok', finishReason: 'STOP' }
 })
 
@@ -343,6 +349,68 @@ describe('tool choice', () => {
   })
 })
 
+describe('tool execution', () => {
+  // Calls the tool from native code during the run, then waits for its result
+  async function callTool(
+    execute: (input: unknown, options: { toolCallId: string }) => unknown,
+    eventRunId = (runId: string) => runId
+  ) {
+    const model = createAdkProvider({
+      modelType: 'gemini',
+      availableTools: {
+        getWeather: { inputSchema: weatherTool.inputSchema, execute },
+      } as never,
+    })()
+    generateText.mockImplementationOnce(async (runId: string) => {
+      onToolCall.emit({
+        runId: eventRunId(runId),
+        toolCallId: 'adk-call-1',
+        toolName: 'getWeather',
+        arguments: '{"city":"Oslo"}',
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      return generateTextResult
+    })
+
+    await model.doGenerate(createCallOptions({ tools: [weatherTool] }))
+    return submitToolResult.mock.calls.at(-1)
+  }
+
+  test('runs the tool with the ADK tool call id', async () => {
+    const execute = mock(async () => ({ sky: 'clear' }))
+    const [, toolCallId, result] = (await callTool(execute))!
+
+    expect(execute.mock.calls[0]).toMatchObject([
+      { city: 'Oslo' },
+      { toolCallId: 'adk-call-1' },
+    ])
+    expect(toolCallId).toBe('adk-call-1')
+    expect(result).toBe('{"sky":"clear"}')
+  })
+
+  test('sends string results as JSON', async () => {
+    const [, , result] = (await callTool(async () => '42'))!
+
+    expect(result).toBe('"42"')
+  })
+
+  test('sends tool errors back to the model', async () => {
+    const [, , result] = (await callTool(async () => {
+      throw new Error('offline')
+    }))!
+
+    expect(result).toBe('{"error":"offline"}')
+  })
+
+  test('ignores tool calls from other runs', async () => {
+    const execute = mock(async () => 'ok')
+    await callTool(execute, () => 'other')
+
+    expect(execute).not.toHaveBeenCalled()
+    expect(submitToolResult).not.toHaveBeenCalled()
+  })
+})
+
 describe('generation options', () => {
   test('maps reasoning levels to a thinking budget', async () => {
     await gemini.doGenerate(createCallOptions({ reasoning: 'high' }))
@@ -397,12 +465,12 @@ describe('generation options', () => {
 
   test('warns about settings Gemini Nano ignores', async () => {
     const result = await nano.doGenerate(
-      createCallOptions({ topP: 0.5, stopSequences: ['END'] })
+      createCallOptions({ topP: 0.5, seed: 1, stopSequences: ['END'] })
     )
 
     expect(
       result.warnings.map((warning) => 'feature' in warning && warning.feature)
-    ).toEqual(['topP', 'stopSequences'])
+    ).toEqual(['topP', 'seed', 'stopSequences'])
   })
 })
 

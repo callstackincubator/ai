@@ -1,103 +1,63 @@
 package com.callstack.ai.adk
 
-import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.ToolContext
-import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionDeclaration
-import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import java.util.UUID
 
+/** An ADK tool whose `execute` runs in JavaScript. */
 class ReactNativeFunctionTool(
-  private val toolId: String,
   name: String,
   description: String,
   private val parameterSchema: Schema?,
-  private val parameters: List<ToolParameterSpec>,
-  private val injectPromptDescription: Boolean,
-  private val toolCallScope: ToolCallScope?,
+  private val runId: String,
   private val onToolCall: (
+    runId: String,
     toolCallId: String,
-    toolId: String,
+    toolName: String,
     arguments: String,
-    scope: ToolCallScope?,
   ) -> Unit,
 ) : FunctionTool(name = name, description = description) {
 
-  override fun declaration(): FunctionDeclaration {
-    val schema =
-      parameterSchema
-        ?: Schema(
-          type = Type.OBJECT,
-          properties =
-            parameters.associate { parameter ->
-              parameter.name to
-                Schema(
-                  type = parameter.type,
-                  description = parameter.description,
-                )
-            },
-          required = parameters.filter { it.required }.map { it.name }.ifEmpty { null },
-        )
-
-    return FunctionDeclaration(
+  override fun declaration(): FunctionDeclaration =
+    FunctionDeclaration(
       name = name,
       description = description,
-      parameters = schema,
+      parameters = parameterSchema ?: Schema(type = Type.OBJECT),
     )
-  }
 
-  override suspend fun processLlmRequest(
-    toolContext: ToolContext,
-    llmRequest: LlmRequest,
-  ): LlmRequest {
-    val requestWithTool = super.processLlmRequest(toolContext, llmRequest)
-
-    if (!injectPromptDescription) {
-      return requestWithTool
-    }
-
-    val declaration = declaration()
+  /** Describes the tool for models without native function calling. */
+  fun promptDescription(): String {
+    val parameters = declaration().parameters
     val parameterLines =
-      declaration.parameters?.properties?.entries?.joinToString("\n") { (paramName, paramSchema) ->
+      parameters?.properties?.entries?.joinToString("\n") { (paramName, paramSchema) ->
         val paramType = paramSchema.type?.name?.lowercase() ?: "string"
         val paramDescription = paramSchema.description?.let { " — $it" } ?: ""
-        val required =
-          declaration.parameters?.required?.contains(paramName) == true
+        val required = parameters.required?.contains(paramName) == true
         "    - $paramName ($paramType, required=$required)$paramDescription"
       } ?: ""
 
-    val toolDescription =
-      buildString {
-        append("Tool: ${declaration.name}")
-        if (declaration.description.isNotBlank()) {
-          append(" — ${declaration.description}")
-        }
-        if (parameterLines.isNotBlank()) {
-          append("\n  Parameters:\n$parameterLines")
-        }
+    return buildString {
+      append("- $name")
+      if (description.isNotBlank()) {
+        append(": $description")
       }
-
-    return requestWithTool.appendInstructions(
-      Content(parts = listOf(Part(text = toolDescription))),
-    )
+      if (parameterLines.isNotBlank()) {
+        append("\n  Parameters:\n$parameterLines")
+      }
+    }
   }
 
   override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
-    val toolCallId = UUID.randomUUID().toString()
-    val argumentsJson = AdkJson.encode(args)
-    onToolCall(toolCallId, toolId, argumentsJson, toolCallScope)
-    val result = AdkToolBridge.awaitResult(toolCallId)
-    return AdkJson.decodeResult(result)
-      ?: throw IllegalArgumentException("Failed to decode result in ReactNativeFunctionTool::execute")
+    // Use ADK's id so JS sees the same id as the reported tool call
+    val toolCallId = context.functionCallId ?: UUID.randomUUID().toString()
+    val result = AdkToolBridge.call(runId, toolCallId) {
+      onToolCall(runId, toolCallId, name, AdkJson.encode(args))
+    }
+    // ADK wraps values that are not maps under `result`
+    return AdkJson.decodeResult(result) ?: mapOf(BaseTool.RESULT_KEY to null)
   }
 }
-
-data class ToolParameterSpec(
-  val name: String,
-  val description: String?,
-  val type: Type,
-  val required: Boolean,
-)

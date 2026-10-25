@@ -34,19 +34,10 @@ export interface AdkAgentConfig {
   }
 }
 
-export interface AdkToolParameter {
-  name: string
-  description?: string
-  type?: 'string' | 'number' | 'boolean' | 'object' | 'array'
-  required?: boolean
-}
-
 export interface AdkTool {
-  id: string
   name: string
   description: string
   inputSchema?: CodegenTypes.UnsafeObject
-  parameters?: AdkToolParameter[]
 }
 
 export interface AdkResponseFormat {
@@ -138,11 +129,11 @@ export interface StreamToolCallEvent {
 }
 
 export interface ToolCallEvent {
+  /** The `generateText` or `streamText` run that called the tool */
+  runId: string
   toolCallId: string
-  toolId: string
+  toolName: string
   arguments: string
-  streamId?: string
-  runId?: string
 }
 
 export interface NanoDownloadProgressEvent {
@@ -183,7 +174,8 @@ export interface Spec extends TurboModule {
 
   /** Cancels a stream or a `generateText` run by its id */
   cancelStream(streamId: string): Promise<void>
-  submitToolResult(toolCallId: string, result: string): void
+  /** `result` is JSON */
+  submitToolResult(runId: string, toolCallId: string, result: string): void
 
   onStreamUpdate: CodegenTypes.EventEmitter<StreamUpdateEvent>
   onStreamComplete: CodegenTypes.EventEmitter<StreamCompleteEvent>
@@ -191,13 +183,6 @@ export interface Spec extends TurboModule {
   onStreamToolCall: CodegenTypes.EventEmitter<StreamToolCallEvent>
   onToolCall: CodegenTypes.EventEmitter<ToolCallEvent>
   onNanoDownloadProgress: CodegenTypes.EventEmitter<NanoDownloadProgressEvent>
-}
-
-declare global {
-  var __ADK_TOOLS__: Record<
-    string,
-    (args: string) => unknown | Promise<unknown>
-  >
 }
 
 const NativeAdkEngine: Spec | null =

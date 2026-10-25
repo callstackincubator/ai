@@ -16,7 +16,6 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
-import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Blob
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.GenerateContentConfig
@@ -84,10 +83,10 @@ fun Event.textParts(thoughts: Boolean): String =
 class AdkAgentRunner(
   private val context: Context,
   private val onToolCall: (
+    runId: String,
     toolCallId: String,
-    toolId: String,
+    toolName: String,
     arguments: String,
-    scope: ToolCallScope?,
   ) -> Unit,
   private val onDownloadProgress: (
     phase: String,
@@ -269,7 +268,7 @@ class AdkAgentRunner(
       toolCalls = toolCalls,
       toolResults = toolResults,
       finishReason = events.lastOrNull()?.finishReason?.name,
-      usage = AdkUsage.latestFromEvents(events),
+      usage = AdkUsage.fromEvents(events),
     )
   }
 
@@ -278,9 +277,9 @@ class AdkAgentRunner(
     config: ReadableMap,
     options: ReadableMap?,
     tools: ReadableArray?,
-    streamId: String,
+    runId: String,
   ): Flow<Event> {
-    return runAgent(messages, config, options, tools, stream = true, streamId = streamId)
+    return runAgent(messages, config, options, tools, stream = true, runId = runId)
   }
 
   private suspend fun runAgent(
@@ -289,17 +288,11 @@ class AdkAgentRunner(
     options: ReadableMap?,
     tools: ReadableArray?,
     stream: Boolean,
-    streamId: String? = null,
-    runId: String? = null,
+    runId: String,
   ): Flow<Event> {
     val parsedMessages = parseMessages(messages)
     val agentConfig = parseAgentConfig(config)
-    val toolCallScope = when {
-      stream && streamId != null -> ToolCallScope(streamId = streamId)
-      !stream && runId != null -> ToolCallScope(runId = runId)
-      else -> null
-    }
-    val agentTools = parseTools(tools, toolCallScope, agentConfig.modelType)
+    val agentTools = parseTools(tools, runId)
     val model = createModel(agentConfig)
     val generateContentConfig = parseGenerationConfig(options)
     val instructionText =
@@ -470,48 +463,32 @@ class AdkAgentRunner(
     context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
       ?: throw IllegalArgumentException("Cannot read file: $uri")
 
-  private fun parseTools(
-    tools: ReadableArray?,
-    toolCallScope: ToolCallScope?,
-    modelType: String,
-  ): List<BaseTool> {
+  private fun parseTools(tools: ReadableArray?, runId: String): List<ReactNativeFunctionTool> {
     if (tools == null) return emptyList()
 
-    val injectPromptDescription = modelType == "genai-nano"
-    val parsed = mutableListOf<BaseTool>()
+    val parsed = mutableListOf<ReactNativeFunctionTool>()
     for (index in 0 until tools.size()) {
       val tool = tools.getMap(index) ?: continue
-      val parametersArray = tool.getArray("parameters")
-      val parameters = mutableListOf<ToolParameterSpec>()
-
-      if (parametersArray != null) {
-        for (paramIndex in 0 until parametersArray.size()) {
-          val parameter = parametersArray.getMap(paramIndex) ?: continue
-          parameters.add(
-            ToolParameterSpec(
-              name = parameter.getString("name") ?: continue,
-              description = parameter.getString("description"),
-              type = parseParameterType(parameter.getString("type")),
-              required = parameter.hasKey("required") && parameter.getBoolean("required"),
-            )
-          )
-        }
-      }
-
+      val name = tool.getString("name") ?: continue
       val parameterSchema =
         tool.getMap("inputSchema")?.let { schemaMap ->
-          runCatching { AdkSchema.fromReadableMap(schemaMap) }.getOrNull()
+          try {
+            AdkSchema.fromReadableMap(schemaMap)
+          } catch (error: Exception) {
+            throw AdkErrors.AdkException(
+              AdkErrors.INVALID_SCHEMA,
+              "Unsupported input schema for tool $name: ${error.message}",
+              error,
+            )
+          }
         }
 
       parsed.add(
         ReactNativeFunctionTool(
-          toolId = tool.getString("id") ?: UUID.randomUUID().toString(),
-          name = tool.getString("name") ?: continue,
+          name = name,
           description = tool.getString("description") ?: "",
           parameterSchema = parameterSchema,
-          parameters = parameters,
-          injectPromptDescription = injectPromptDescription,
-          toolCallScope = toolCallScope,
+          runId = runId,
           onToolCall = onToolCall,
         )
       )
@@ -520,39 +497,23 @@ class AdkAgentRunner(
     return parsed
   }
 
+  /** Gemini Nano has no native function calling, so its tools are described in the instruction. */
   private fun buildInstruction(
     baseInstruction: String?,
-    tools: List<BaseTool>,
+    tools: List<ReactNativeFunctionTool>,
   ): String? {
     if (tools.isEmpty()) {
       return baseInstruction
     }
 
-    val toolSummary =
-      tools.joinToString("\n") { tool ->
-        "- ${tool.name}: ${tool.description}"
-      }
-
     val toolGuidance =
-      """
-      You have access to the following tools. Use them when they help answer the user:
-      $toolSummary
-      """.trimIndent()
+      "You have access to the following tools. Use them when they help answer the user:\n" +
+        tools.joinToString("\n") { it.promptDescription() }
 
     return if (baseInstruction.isNullOrBlank()) {
       toolGuidance
     } else {
       "$baseInstruction\n\n$toolGuidance"
-    }
-  }
-
-  private fun parseParameterType(type: String?): com.google.adk.kt.types.Type {
-    return when (type) {
-      "number", "integer" -> com.google.adk.kt.types.Type.NUMBER
-      "boolean" -> com.google.adk.kt.types.Type.BOOLEAN
-      "array" -> com.google.adk.kt.types.Type.ARRAY
-      "object" -> com.google.adk.kt.types.Type.OBJECT
-      else -> com.google.adk.kt.types.Type.STRING
     }
   }
 
@@ -592,9 +553,4 @@ private typealias ContentRole = String
 data class ParsedMessage(
   val role: ContentRole,
   val content: Content,
-)
-
-data class ToolCallScope(
-  val streamId: String? = null,
-  val runId: String? = null,
 )

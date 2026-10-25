@@ -18,6 +18,29 @@ object AdkUsage {
     }
   }
 
-  fun latestFromEvents(events: List<Event>): UsageMetadata? =
-    events.mapNotNull { it.usageMetadata }.lastOrNull()
+  /**
+   * Usage of a whole run. A tool loop makes one model call per step, and each complete event
+   * carries the usage of its call, so the run's usage is their sum.
+   */
+  fun fromEvents(events: List<Event>): UsageMetadata? =
+    events.filterNot { it.partial }.fold(null as UsageMetadata?) { total, event -> add(total, event) }
+      ?: events.mapNotNull { it.usageMetadata }.lastOrNull()
+
+  /** Adds a complete event's usage to [total]. Partial events repeat their call's usage. */
+  fun add(total: UsageMetadata?, event: Event): UsageMetadata? {
+    val usage = event.usageMetadata
+    if (event.partial || usage == null) return total
+    if (total == null) return usage
+
+    return UsageMetadata(
+      promptTokenCount = sum(total.promptTokenCount, usage.promptTokenCount),
+      candidatesTokenCount = sum(total.candidatesTokenCount, usage.candidatesTokenCount),
+      totalTokenCount = sum(total.totalTokenCount, usage.totalTokenCount),
+      thoughtsTokenCount = sum(total.thoughtsTokenCount, usage.thoughtsTokenCount),
+      toolUsePromptTokenCount = sum(total.toolUsePromptTokenCount, usage.toolUsePromptTokenCount),
+      cachedContentTokenCount = sum(total.cachedContentTokenCount, usage.cachedContentTokenCount),
+    )
+  }
+
+  private fun sum(a: Int?, b: Int?): Int? = if (a == null && b == null) null else (a ?: 0) + (b ?: 0)
 }
