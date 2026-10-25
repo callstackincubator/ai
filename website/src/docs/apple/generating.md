@@ -10,7 +10,7 @@ Apple-specific surface for runtime model information and Apple-only options.
 - iOS 26+ for Apple Foundation Models text generation.
 - iOS 26.4+ for token counting and Image Playground image generation.
 - iOS 27+ for multimodal image prompts, Private Cloud Compute language models,
-  reasoning levels, Dynamic Profiles, and Vision built-in tools.
+  reasoning levels, Vision built-in tools, and token usage.
 - Apple's managed Private Cloud Compute entitlement for the
   `private-cloud-compute` model. Private Cloud Compute does not run in the iOS
   Simulator, so test it on a physical device.
@@ -19,7 +19,8 @@ Apple-specific surface for runtime model information and Apple-only options.
 
 Some Apple Intelligence symbols are SDK-gated as well as OS-gated. If you build
 with an older Xcode SDK that does not expose a newer Apple API, the provider
-keeps that feature unavailable instead of failing native compilation.
+keeps that feature unavailable instead of failing native compilation. See
+[iOS Versions](./ios-versions) for what works on iOS 26, iOS 26.4, and iOS 27.
 
 ## Text Generation
 
