@@ -354,9 +354,6 @@ class AdkAgentRunner(
     }
   }
 
-  private fun parseAgentConfig(config: ReadableMap): AgentConfig =
-    parseAgentConfigStatic(config)
-
   private fun parseGenerationConfig(options: ReadableMap?): GenerateContentConfig? {
     if (options == null) return null
 
@@ -517,23 +514,23 @@ class AdkAgentRunner(
     }
   }
 
-  companion object {
-    fun parseAgentConfig(config: ReadableMap): AgentConfig = parseAgentConfigStatic(config)
+  // JS always sends the name and model, with defaults applied
+  private fun parseAgentConfig(config: ReadableMap): AgentConfig {
+    fun ReadableMap.require(key: String) =
+      getString(key) ?: throw IllegalArgumentException("Agent config requires $key")
 
-    private fun parseAgentConfigStatic(config: ReadableMap): AgentConfig {
-      val model = config.getMap("model")
-        ?: throw IllegalArgumentException("Agent config requires a model")
+    val model = config.getMap("model")
+      ?: throw IllegalArgumentException("Agent config requires a model")
 
-      return AgentConfig(
-        name = config.getString("name") ?: "react_native_adk_agent",
-        description = config.getString("description") ?: "",
-        instruction = config.getString("instruction"),
-        modelType = model.getString("type") ?: "genai-nano",
-        modelName = model.getString("name") ?: "gemini-nano",
-        apiKey = model.getString("apiKey"),
-        nano = NanoConfig.from(model.getMap("nano")),
-      )
-    }
+    return AgentConfig(
+      name = config.require("name"),
+      description = config.getString("description") ?: "",
+      instruction = config.getString("instruction"),
+      modelType = model.require("type"),
+      modelName = model.require("name"),
+      apiKey = model.getString("apiKey"),
+      nano = NanoConfig.from(model.getMap("nano")),
+    )
   }
 }
 
@@ -547,7 +544,7 @@ data class AgentConfig(
   val nano: NanoConfig,
 )
 
-/** ADK content role — one of [Role.USER], [Role.MODEL], or [Role.SYSTEM]. */
+/** ADK content role, [Role.USER] or [Role.MODEL]. */
 private typealias ContentRole = String
 
 data class ParsedMessage(
