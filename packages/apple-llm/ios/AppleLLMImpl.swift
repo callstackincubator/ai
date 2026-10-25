@@ -865,9 +865,9 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 26, *)
-  private static func createGenerationSchema(fromSchema schema: [String: Any]) throws -> GenerationSchema {
+  private static func createGenerationSchema(fromSchema schema: [String: Any], name: String = "Root") throws -> GenerationSchema {
     do {
-      return try AppleLLMSchemaParser.createGenerationSchema(from: schema)
+      return try AppleLLMSchemaParser.createGenerationSchema(from: schema, name: name)
     } catch let appleError as AppleLLMError {
       throw appleError
     } catch {
@@ -1396,7 +1396,7 @@ public class AppleLLMImpl: NSObject {
       self.name = name
       self.description = description
       self.invokeJavaScriptTool = javaScriptToolInvoker
-      self.parameters = try AppleLLMImpl.createGenerationSchema(fromSchema: parameters)
+      self.parameters = try AppleLLMImpl.createGenerationSchema(fromSchema: parameters, name: name)
     }
     
     func call(arguments: GeneratedContent) async throws -> String {
@@ -1420,40 +1420,75 @@ public class AppleLLMImpl: NSObject {
   
   @available(iOS 26, *)
   struct AppleLLMSchemaParser {
-    static func createGenerationSchema(from schemaDict: [String: Any]) throws -> GenerationSchema {
-      let dynamicSchemas = try parseDynamicSchema(from: schemaDict)
+    // Foundation Models resolves named schemas by name, so every object and
+    // anyOf gets one from its path. Schemas without titles (all of Zod's) would
+    // otherwise share an empty name and nested objects would resolve to the root
+    static func createGenerationSchema(from schemaDict: [String: Any], name: String = "Root") throws -> GenerationSchema {
+      let dynamicSchemas = try parseDynamicSchema(from: schemaDict, path: name)
       return try GenerationSchema(root: dynamicSchemas, dependencies: [])
     }
-    
-    static func parseDynamicSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
-      let type = schemaDict["type"] as? String
-      
-      if let anyOfArray = schemaDict["anyOf"] as? [[String: Any]] {
-        let parsedSchemas = try anyOfArray.map { try parseDynamicSchema(from: $0) }
-        return DynamicGenerationSchema(
-          name: schemaDict["title"] as? String ?? "",
-          description: schemaDict["description"] as? String,
-          anyOf: parsedSchemas
-        )
+
+    static func parseDynamicSchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {
+      // Nullable values become their non-null schema, since a value that is
+      // never null still matches
+      if let types = schemaDict["type"] as? [String] {
+        let nonNullTypes = types.filter { $0 != "null" }
+        let schemas = nonNullTypes.map { type in
+          schemaDict.merging(["type": type]) { _, new in new }
+        }
+        return try parseAnyOf(schemas, from: schemaDict, path: path)
       }
-      
+
+      if let anyOfArray = schemaDict["anyOf"] as? [[String: Any]] {
+        let nonNullSchemas = anyOfArray.filter { $0["type"] as? String != "null" }
+        return try parseAnyOf(nonNullSchemas, from: schemaDict, path: path)
+      }
+
+      // Some generators leave out the type of objects
+      let type = schemaDict["type"] as? String
+        ?? (schemaDict["properties"] != nil ? "object" : nil)
+
       switch type {
       case "object":
-        return try parseObjectSchema(from: schemaDict)
+        return try parseObjectSchema(from: schemaDict, path: path)
       case "array":
-        return try parseArraySchema(from: schemaDict)
+        return try parseArraySchema(from: schemaDict, path: path)
       case "string":
         return try parseStringSchema(from: schemaDict)
       case "number", "integer":
-        return try parseNumberSchema(from: schemaDict)
+        return try parseNumberSchema(from: schemaDict, path: path)
       case "boolean":
         return try parseBooleanSchema(from: schemaDict)
       default:
         throw AppleLLMError.invalidSchema("Unsupported schema type: \(type ?? "unknown"). Supported types: object, array, string, number, integer, boolean")
       }
     }
-    
-    static func parseObjectSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+
+    static func parseAnyOf(
+      _ schemas: [[String: Any]],
+      from schemaDict: [String: Any],
+      path: String
+    ) throws -> DynamicGenerationSchema {
+      if schemas.count == 1 {
+        // Keeps the description of the nullable property
+        let schema = schemas[0].merging(schemaDict.filter { $0.key == "description" || $0.key == "title" }) { current, _ in current }
+        return try parseDynamicSchema(from: schema, path: path)
+      }
+
+      guard !schemas.isEmpty else {
+        throw AppleLLMError.invalidSchema("Unsupported schema type: null. Supported types: object, array, string, number, integer, boolean")
+      }
+
+      return DynamicGenerationSchema(
+        name: schemaDict["title"] as? String ?? path,
+        description: schemaDict["description"] as? String,
+        anyOf: try schemas.enumerated().map { index, schema in
+          try parseDynamicSchema(from: schema, path: "\(path).anyOf\(index)")
+        }
+      )
+    }
+
+    static func parseObjectSchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {
       var properties: [DynamicGenerationSchema.Property] = []
       
       if let propertiesDict = schemaDict["properties"] as? [String: Any] {
@@ -1480,18 +1515,18 @@ public class AppleLLMImpl: NSObject {
       }
       
       return DynamicGenerationSchema(
-        name: schemaDict["title"] as? String ?? "",
+        name: schemaDict["title"] as? String ?? path,
         description: schemaDict["description"] as? String,
         properties: properties
       )
     }
-    
-    static func parseArraySchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+
+    static func parseArraySchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {
       guard let itemsSchema = schemaDict["items"] as? [String: Any] else {
         throw AppleLLMError.invalidSchema("Array schema must have items definition")
       }
-      
-      let itemDynamicSchema = try parseDynamicSchema(from: itemsSchema)
+
+      let itemDynamicSchema = try parseDynamicSchema(from: itemsSchema, path: "\(path).items")
       
       let minItems = schemaDict["minItems"] as? Int
       let maxItems = schemaDict["maxItems"] as? Int
@@ -1507,6 +1542,11 @@ public class AppleLLMImpl: NSObject {
       // Handle enum values
       if let enumValues = schemaDict["enum"] as? [String] {
         return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf(enumValues)])
+      }
+
+      // Literal values, e.g. z.literal()
+      if let constValue = schemaDict["const"] as? String {
+        return DynamicGenerationSchema(type: String.self, guides: [GenerationGuide.anyOf([constValue])])
       }
       
       // Handle regular expressions
@@ -1524,7 +1564,7 @@ public class AppleLLMImpl: NSObject {
       return DynamicGenerationSchema(type: String.self, guides: [])
     }
     
-    static func parseNumberSchema(from schemaDict: [String: Any]) throws -> DynamicGenerationSchema {
+    static func parseNumberSchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {
       let type = schemaDict["type"] as! String
       
       // Apple's GenerationGuide.anyOf only supports [String], so each numeric enum value
@@ -1537,7 +1577,7 @@ public class AppleLLMImpl: NSObject {
             : DynamicGenerationSchema(type: Double.self, guides: [GenerationGuide.range(value...value)])
         }
         return DynamicGenerationSchema(
-          name: schemaDict["title"] as? String ?? "",
+          name: schemaDict["title"] as? String ?? path,
           description: schemaDict["description"] as? String,
           anyOf: choices
         )
