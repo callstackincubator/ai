@@ -908,6 +908,32 @@ extension CoreAIImpl {
 
     return output
   }
+
+  // White where the mask is set and transparent elsewhere, so it can be
+  // tinted and drawn over the input image
+  private static func maskImage(_ mask: [Bool], width: Int, height: Int) throws -> CGImage {
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    for (index, isSet) in mask.enumerated() where isSet {
+      pixels.replaceSubrange(index * 4..<index * 4 + 4, with: [255, 255, 255, 255])
+    }
+    guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+          let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+          ) else {
+      throw CoreAIError.invalidInput("Could not create a segmentation mask image.")
+    }
+    return image
+  }
 }
 #endif
 
@@ -989,32 +1015,6 @@ extension CoreAIImpl {
       throw CoreAIError.invalidInput("Could not encode generated image as PNG.")
     }
     return (data as Data).base64EncodedString()
-  }
-
-  // White where the mask is set and transparent elsewhere, so it can be
-  // tinted and drawn over the input image
-  private static func maskImage(_ mask: [Bool], width: Int, height: Int) throws -> CGImage {
-    var pixels = [UInt8](repeating: 0, count: width * height * 4)
-    for (index, isSet) in mask.enumerated() where isSet {
-      pixels.replaceSubrange(index * 4..<index * 4 + 4, with: [255, 255, 255, 255])
-    }
-    guard let provider = CGDataProvider(data: Data(pixels) as CFData),
-          let image = CGImage(
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: false,
-            intent: .defaultIntent
-          ) else {
-      throw CoreAIError.invalidInput("Could not create a segmentation mask image.")
-    }
-    return image
   }
 
   private static func serializeRect(_ rect: CGRect) -> [String: Double] {
