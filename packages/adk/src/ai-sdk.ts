@@ -37,6 +37,7 @@ import {
   type StreamToolCallEvent,
   type ToolCallEvent,
 } from './NativeAdkEngine'
+import { StreamTextFilter, stripJsonFences } from './streamText'
 
 const DEFAULT_NANO_MODEL = 'gemini-nano'
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
@@ -439,11 +440,6 @@ const getAbortReason = (signal: AbortSignal) => {
 
 const stringifyToolOutput = (value: unknown) =>
   typeof value === 'string' ? value : JSON.stringify(value ?? null)
-
-// Gemini Nano often wraps JSON in a Markdown code fence
-const jsonFencePrefix = /^\s*```(?:json)?\s*\n?/
-const stripJsonFences = (text: string) =>
-  text.replace(jsonFencePrefix, '').replace(/\s*```\s*$/, '')
 
 const parseToolResult = (output: string): NonNullable<JSONValue> => {
   try {
@@ -931,9 +927,10 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         let textOpen = false
         let reasoningId: string | undefined
         let reasoningCount = 0
-        // JSON mode keeps the full text so code fences can be stripped
-        let rawText = ''
-        let emittedText = ''
+        const textFilter = new StreamTextFilter({
+          json: isJson,
+          toolCode: this.isNano,
+        })
 
         const addListener = (listener: { remove(): void }) => {
           listeners.push(listener)
@@ -956,21 +953,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
             textOpen = true
           }
           controller.enqueue({ type: 'text-delta', id: textId, delta })
-        }
-
-        const emitJsonText = (final: boolean) => {
-          const stripped = final
-            ? stripJsonFences(rawText)
-            : // Hold back trailing backticks that could start a closing fence
-              rawText.replace(jsonFencePrefix, '').replace(/\s*`{1,3}$/, '')
-          // Only emit once the opening fence can no longer change the prefix
-          if (!final && /^\s*`{0,3}(j(s(o(n)?)?)?)?$/.test(rawText)) {
-            return
-          }
-          if (stripped.startsWith(emittedText)) {
-            emitText(stripped.slice(emittedText.length))
-            emittedText = stripped
-          }
         }
 
         controller.enqueue({ type: 'stream-start', warnings })
@@ -1001,13 +983,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
               return
             }
 
-            if (isJson) {
-              rawText += data.delta
-              emitJsonText(false)
-              return
-            }
-
-            emitText(data.delta)
+            emitText(textFilter.push(data.delta))
           })
         )
 
@@ -1019,6 +995,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
 
             if (data.phase === 'start' && data.toolName) {
               closeReasoning()
+              textFilter.endTurn()
               toolNames.set(data.toolCallId, data.toolName)
               controller.enqueue({
                 type: 'tool-input-start',
@@ -1070,9 +1047,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
             if (data.streamId !== streamId) {
               return
             }
-            if (isJson) {
-              emitJsonText(true)
-            }
+            emitText(textFilter.flush())
             closeReasoning()
             if (textOpen) {
               controller.enqueue({ type: 'text-end', id: textId })
