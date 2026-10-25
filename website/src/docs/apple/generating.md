@@ -129,15 +129,15 @@ built-in tools.
 When the model is unavailable, `availability` tells you why, so you can show
 something more useful than a generic error:
 
-| `availability`                | Model                   | Meaning                                                          |
-| ----------------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `available`                   | both                    | The model is ready to use                                        |
-| `deviceNotEligible`           | both                    | The device does not support this model                           |
-| `appleIntelligenceNotEnabled` | `system`                | Apple Intelligence is turned off, ask the user to enable it      |
-| `modelNotReady`               | `system`                | The model is still downloading, try again later                  |
-| `systemNotReady`              | `private-cloud-compute` | Private Cloud Compute is not ready yet, try again later          |
-| `missingEntitlement`          | `private-cloud-compute` | The app is not signed with the Private Cloud Compute entitlement |
-| `unknown`                     | both                    | A reason this version of the library does not know about yet     |
+| `availability`                | Model                   | Meaning                                                              |
+| ----------------------------- | ----------------------- | -------------------------------------------------------------------- |
+| `available`                   | both                    | The model is ready to use                                            |
+| `deviceNotEligible`           | both                    | The device does not support this model                               |
+| `appleIntelligenceNotEnabled` | `system`                | Apple Intelligence is turned off, ask the user to enable it          |
+| `modelNotReady`               | `system`                | The model is still downloading, try again later                      |
+| `systemNotReady`              | `private-cloud-compute` | Private Cloud Compute is not ready yet, try again later              |
+| `missingEntitlement`          | `private-cloud-compute` | The app does not set `AppleLLMPrivateCloudCompute` in its Info.plist |
+| `unknown`                     | both                    | A reason this version of the library does not know about yet         |
 
 ```typescript
 const { availability } = await apple.getModelInfo()
@@ -176,9 +176,29 @@ const apple = createAppleProvider({
 Call `apple.getModelInfo({ model: 'private-cloud-compute' })` before enabling
 this path. It requires iOS 27 APIs and the managed
 `com.apple.developer.private-cloud-compute` entitlement, which Apple grants on
-request. Without it, Foundation Models would stop the app, so the model reports
-`missingEntitlement` and generation fails with `MODEL_UNAVAILABLE` instead. When the Private Cloud Compute quota is
-reached, generation fails with `RATE_LIMITED`.
+request. Without the entitlement, Foundation Models stops the app with a fatal
+error that cannot be caught, and iOS has no API to check for it. So once your
+app has the entitlement, also set `AppleLLMPrivateCloudCompute` in its
+Info.plist:
+
+```json title="app.json"
+{
+  "expo": {
+    "ios": {
+      "entitlements": {
+        "com.apple.developer.private-cloud-compute": true
+      },
+      "infoPlist": {
+        "AppleLLMPrivateCloudCompute": true
+      }
+    }
+  }
+}
+```
+
+Until then, the model reports `missingEntitlement` and generation fails with
+`MODEL_UNAVAILABLE`. When the Private Cloud Compute quota is reached,
+generation fails with `RATE_LIMITED`.
 
 ## Guardrails
 
