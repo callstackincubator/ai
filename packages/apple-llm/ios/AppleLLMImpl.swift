@@ -442,9 +442,11 @@ public class AppleLLMImpl: NSObject {
     return info
   }
 
-  /// Foundation Models stops the app with a fatal error, which cannot be caught,
-  /// when it uses Private Cloud Compute without the managed entitlement, and iOS
-  /// has no API to check for it. Apps that have it say so in their Info.plist
+  /// Workaround: Foundation Models stops the app with a fatal error, which
+  /// cannot be caught, when it uses Private Cloud Compute without the managed
+  /// entitlement, and iOS has no API to check for it. Apps that have it say so
+  /// in their Info.plist (the Expo plugin's privateCloudCompute option sets
+  /// both). Remove once Foundation Models throws instead of stopping the app
   @available(iOS 27, *)
   private func privateCloudComputeAvailability(_ model: PrivateCloudComputeLanguageModel) -> String {
     guard Bundle.main.object(forInfoDictionaryKey: "AppleLLMPrivateCloudCompute") as? Bool == true else {
