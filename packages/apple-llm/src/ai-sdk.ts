@@ -88,6 +88,7 @@ export interface AppleModelInfo {
   supportsImagePrompts: boolean
   supportsDynamicProfiles: boolean
   supportsVisionTools: boolean
+  supportsReasoning: boolean
   contextSize?: number
 }
 
@@ -198,7 +199,8 @@ function prepareImageAttachment(
       { content: unknown[] }
     >['content'][number],
     { type: 'file' }
-  >
+  >,
+  index: number
 ): AppleMessageAttachment {
   const mediaType = part.mediaType.toLowerCase()
   if (mediaType !== 'image' && !mediaType.startsWith('image/')) {
@@ -216,8 +218,9 @@ function prepareImageAttachment(
     'Apple Foundation Models'
   )
 
-  // The filename becomes the attachment label, which the model and Vision tools use to name the image
-  const label = part.filename
+  // The label is how the model and Vision tools name the image, so images
+  // without a filename still need one
+  const label = part.filename ?? `image-${index + 1}`
 
   if (source.type === 'data') {
     return {
@@ -283,6 +286,8 @@ function getImageModelFileUrlMediaType(url: string) {
 // Options read by the native module. The model comes from the language model
 // instance and the reasoning level from the AI SDK `reasoning` call option
 interface AppleNativeOptions {
+  // Lets cancelStream() stop a non-streaming generation
+  requestId?: string
   model?: AppleLanguageModelId
   guardrails?: AppleGuardrails
   reasoningLevel?: AppleReasoningLevel
@@ -321,6 +326,51 @@ function toAppleReasoningLevel(
       // 'provider-default' and 'none' keep Apple's default behavior
       return undefined
   }
+}
+
+// Call settings Foundation Models has no equivalent for
+function getUnsupportedSettingWarnings(
+  options: LanguageModelV4CallOptions
+): SharedV4Warning[] {
+  const unsupported = [
+    options.stopSequences?.length ? 'stopSequences' : undefined,
+    options.presencePenalty !== undefined ? 'presencePenalty' : undefined,
+    options.frequencyPenalty !== undefined ? 'frequencyPenalty' : undefined,
+    options.seed !== undefined ? 'seed' : undefined,
+  ]
+  return unsupported.flatMap((feature) =>
+    feature ? [{ type: 'unsupported' as const, feature }] : []
+  )
+}
+
+/**
+ * Rejects as soon as the call is aborted and cancels the native generation,
+ * which would otherwise keep running to the end
+ */
+function abortable<T>(
+  promise: Promise<T>,
+  abortSignal: AbortSignal | undefined,
+  cancel: () => void
+): Promise<T> {
+  if (!abortSignal) {
+    return promise
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      cancel()
+      const error = new Error('The operation was aborted')
+      error.name = 'AbortError'
+      reject(abortSignal.reason instanceof Error ? abortSignal.reason : error)
+    }
+    if (abortSignal.aborted) {
+      onAbort()
+      return
+    }
+    abortSignal.addEventListener('abort', onAbort, { once: true })
+    promise
+      .then(resolve, reject)
+      .finally(() => abortSignal.removeEventListener('abort', onAbort))
+  })
 }
 
 type AppleMessagePart =
@@ -590,9 +640,18 @@ class AppleImageModel implements ImageModelV4 {
         appleOptions.personalization ?? this.options.personalization,
     })
 
+    // Image Playground picks the size and has no seed
+    const warnings: SharedV4Warning[] = [
+      options.size !== undefined ? 'size' : undefined,
+      options.aspectRatio !== undefined ? 'aspectRatio' : undefined,
+      options.seed !== undefined ? 'seed' : undefined,
+    ].flatMap((feature) =>
+      feature ? [{ type: 'unsupported' as const, feature }] : []
+    )
+
     return {
       images,
-      warnings: [],
+      warnings,
       response: {
         timestamp: new Date(),
         modelId: this.modelId,
@@ -658,7 +717,8 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
       return {
         text: transcriptionText,
         segments: transcriptionResult.segments,
-        language: this.language,
+        // The AI SDK reports ISO-639-1 codes, while the locale can be en_US
+        language: this.language.split(/[-_]/)[0],
         durationInSeconds: transcriptionResult.duration,
         warnings: [],
         response: {
@@ -713,9 +773,20 @@ class AppleSpeechModel implements SpeechModelV4 {
         speechOptions
       )
 
+      // AVSpeechSynthesizer only writes WAV and has no speed or style controls
+      const warnings: SharedV4Warning[] = [
+        options.outputFormat !== undefined && options.outputFormat !== 'wav'
+          ? 'outputFormat'
+          : undefined,
+        options.speed !== undefined ? 'speed' : undefined,
+        options.instructions !== undefined ? 'instructions' : undefined,
+      ].flatMap((feature) =>
+        feature ? [{ type: 'unsupported' as const, feature }] : []
+      )
+
       return {
         audio: new Uint8Array(audio),
-        warnings: [],
+        warnings,
         response: {
           timestamp: new Date(),
           modelId: this.modelId,
@@ -787,6 +858,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   private tools: AppleToolDefinitionSet = {}
   private options: AppleLanguageModelOptions
+  private reasoningSupport?: Promise<boolean>
 
   constructor(options: AppleLanguageModelOptions = {}) {
     this.options = options
@@ -798,6 +870,37 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   countTokens(text: string): Promise<number> {
     return NativeAppleLLM.countTokens(text)
+  }
+
+  // Asked once per model, since reasoning depends on the model and the OS
+  private supportsReasoning(): Promise<boolean> {
+    this.reasoningSupport ??= NativeAppleLLM.getModelInfo(
+      undefined,
+      this.modelId
+    ).then(
+      (info) => (info as AppleModelInfo).supportsReasoning !== false,
+      // Older OS versions report the unsupported reasoning level natively
+      () => true
+    )
+    return this.reasoningSupport
+  }
+
+  private async prepareCallOptions(options: LanguageModelV4CallOptions) {
+    const appleOptions = getAppleNativeOptions(this.options, options)
+    const warnings = getUnsupportedSettingWarnings(options)
+
+    // Foundation Models fails the whole call for a reasoning level the model
+    // cannot use, so it is dropped with a warning like other unsupported settings
+    if (appleOptions.reasoningLevel && !(await this.supportsReasoning())) {
+      appleOptions.reasoningLevel = undefined
+      warnings.push({
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: `The ${this.modelId} model does not support reasoning.`,
+      })
+    }
+
+    return { appleOptions, warnings }
   }
 
   private prepareMessages(messages: LanguageModelV4Prompt): AppleMessage[] {
@@ -816,7 +919,9 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           const content = message.content.reduce((acc, part) => {
             if (part.type === 'file') {
               if (isFinalPrompt) {
-                attachments.push(prepareImageAttachment(part))
+                attachments.push(
+                  prepareImageAttachment(part, attachments.length)
+                )
               }
               return acc
             }
@@ -847,6 +952,11 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   private prepareTools(tools: Tool[] = []) {
     return tools.map((tool) => {
       if (tool.type === 'function') {
+        if (!this.tools[tool.name]) {
+          throw new Error(
+            `Tool "${tool.name}" is not registered with the Apple provider. Apple runs tools natively, so pass it in availableTools of createAppleProvider() or call updateTools() first.`
+          )
+        }
         const schema = jsonSchema(tool.inputSchema)
         return {
           ...tool,
@@ -878,13 +988,16 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doGenerate(options: LanguageModelV4CallOptions) {
-    const appleOptions = getAppleNativeOptions(this.options, options)
+    const { appleOptions, warnings: settingWarnings } =
+      await this.prepareCallOptions(options)
+    const requestId = generateId()
     const messages = this.prepareMessages(options.prompt)
     const {
       tools: callTools,
       toolCallingMode,
-      warnings,
+      warnings: toolWarnings,
     } = prepareToolChoice(options.tools, options.toolChoice)
+    const warnings = [...settingWarnings, ...toolWarnings]
     const tools = this.prepareTools(callTools)
 
     for (const tool of tools) {
@@ -892,19 +1005,26 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     }
 
     try {
-      const response = await NativeAppleLLM.generateText(messages, {
-        maxTokens: options.maxOutputTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        topK: options.topK,
-        tools,
-        toolCallingMode,
-        providerOptions: appleOptions as unknown as Record<string, unknown>,
-        schema:
-          options.responseFormat?.type === 'json'
-            ? options.responseFormat.schema
-            : undefined,
-      })
+      const response = await abortable(
+        NativeAppleLLM.generateText(messages, {
+          maxTokens: options.maxOutputTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          topK: options.topK,
+          tools,
+          toolCallingMode,
+          providerOptions: { ...appleOptions, requestId } as Record<
+            string,
+            unknown
+          >,
+          schema:
+            options.responseFormat?.type === 'json'
+              ? options.responseFormat.schema
+              : undefined,
+        }),
+        options.abortSignal,
+        () => NativeAppleLLM.cancelStream(requestId)
+      )
 
       return {
         content: response.content.map((part) => {
@@ -949,13 +1069,15 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   async doStream(options: LanguageModelV4CallOptions) {
-    const appleOptions = getAppleNativeOptions(this.options, options)
+    const { appleOptions, warnings: settingWarnings } =
+      await this.prepareCallOptions(options)
     const messages = this.prepareMessages(options.prompt)
     const {
       tools: callTools,
       toolCallingMode,
-      warnings,
+      warnings: toolWarnings,
     } = prepareToolChoice(options.tools, options.toolChoice)
+    const warnings = [...settingWarnings, ...toolWarnings]
     const tools = this.prepareTools(callTools)
 
     if (typeof ReadableStream === 'undefined') {

@@ -219,8 +219,10 @@ to `moderate`, and `high` and above to `deep`. `none` and `provider-default`
 keep Apple's default.
 
 Setting `reasoning` on older iOS versions fails with `UNSUPPORTED_OS`.
-The on-device system model can reject reasoning levels as an unsupported
-capability; Private Cloud Compute supports them.
+Models that cannot reason, such as the on-device system model on current
+hardware, ignore it and return an `unsupported` warning instead. Check
+`supportsReasoning` from `getModelInfo` to know ahead of time; Private Cloud
+Compute supports reasoning.
 
 Reasoning is returned as `reasoning` content (streamed as reasoning parts on
 iOS 27). Its `providerMetadata.apple` marks it as Apple reasoning, so it is

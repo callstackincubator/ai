@@ -26,6 +26,8 @@ const generateText = mock(
   })
 )
 const countTokens = mock(async (text: string) => text.length)
+const getModelInfo = mock(async () => ({ supportsReasoning: true }))
+const cancelStream = mock((_id: string) => {})
 const generateStream = mock(
   (_streamId: string, _messages: unknown, _options: unknown) => {}
 )
@@ -41,7 +43,8 @@ mock.module('react-native', () => ({
             generateText,
             generateStream,
             countTokens,
-            cancelStream: () => {},
+            getModelInfo,
+            cancelStream,
             onStreamUpdate,
             onStreamComplete,
             onStreamError,
@@ -270,6 +273,34 @@ describe('apple image labels', () => {
   })
 })
 
+describe('apple image default labels', () => {
+  test('labels images without a filename so vision tools can find them', async () => {
+    const image = {
+      type: 'file' as const,
+      mediaType: 'image/png',
+      data: { type: 'data' as const, data: 'iVBORw0KGgo=' },
+    }
+    await apple().doGenerate(
+      createCallOptions({
+        prompt: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'compare these' }, image, image],
+          },
+        ],
+      })
+    )
+
+    const [message] = generateText.mock.calls.at(-1)![0] as {
+      attachments: unknown[]
+    }[]
+    expect(message.attachments).toEqual([
+      expect.objectContaining({ label: 'image-1' }),
+      expect.objectContaining({ label: 'image-2' }),
+    ])
+  })
+})
+
 describe('apple image urls', () => {
   test('passes local file image urls through instead of downloading them', async () => {
     const { generateText: generate } = await import('ai')
@@ -310,6 +341,13 @@ describe('apple tool choice', () => {
     },
   ]
 
+  // Apple runs tools natively, so they have to be registered with the provider
+  const toolDefinition = {
+    inputSchema: { type: 'object', properties: {} },
+  } as never
+  const registered = () =>
+    apple({ availableTools: { weather: toolDefinition, time: toolDefinition } })
+
   function nativeToolNames() {
     return (lastNativeOptions().tools as { name: string }[]).map(
       (tool) => tool.name
@@ -317,7 +355,7 @@ describe('apple tool choice', () => {
   }
 
   test('keeps the default tool calling mode for auto', async () => {
-    await apple().doGenerate(
+    await registered().doGenerate(
       createCallOptions({ tools, toolChoice: { type: 'auto' } })
     )
 
@@ -326,7 +364,7 @@ describe('apple tool choice', () => {
   })
 
   test('disallows tool calls for none', async () => {
-    await apple().doGenerate(
+    await registered().doGenerate(
       createCallOptions({ tools, toolChoice: { type: 'none' } })
     )
 
@@ -344,7 +382,7 @@ describe('apple tool choice', () => {
   }
 
   test('warns that required tool choice is unsupported', async () => {
-    const result = await apple().doGenerate(
+    const result = await registered().doGenerate(
       createCallOptions({ tools, toolChoice: { type: 'required' } })
     )
 
@@ -354,7 +392,7 @@ describe('apple tool choice', () => {
   })
 
   test('narrows tools for a specific tool choice', async () => {
-    const result = await apple().doGenerate(
+    const result = await registered().doGenerate(
       createCallOptions({
         tools,
         toolChoice: { type: 'tool', toolName: 'time' },
@@ -367,7 +405,7 @@ describe('apple tool choice', () => {
   })
 
   test('reports tool choice warnings in stream-start', async () => {
-    const { stream } = await apple().doStream(
+    const { stream } = await registered().doStream(
       createCallOptions({ tools, toolChoice: { type: 'required' } })
     )
 
@@ -686,5 +724,102 @@ describe('apple transcription', () => {
 
     const sent = new Uint8Array(transcribe.mock.calls[0]![0])
     expect([...sent]).toEqual([2, 3])
+  })
+
+  test('reports the language as an ISO-639-1 code', async () => {
+    globalThis.__apple__llm__transcribe__ = async () => ({
+      segments: [],
+      duration: 0,
+    })
+
+    const model = apple.transcriptionModel({ language: 'en_US' })
+    await model.prepare()
+    const result = await model.doGenerate({
+      audio: new Uint8Array([0]),
+      mediaType: 'audio/wav',
+    })
+
+    expect(result.language).toBe('en')
+  })
+})
+
+describe('apple unsupported settings', () => {
+  test('drops reasoning with a warning when the model cannot reason', async () => {
+    getModelInfo.mockImplementationOnce(async () => ({
+      supportsReasoning: false,
+    }))
+
+    const result = await apple().doGenerate(
+      createCallOptions({ reasoning: 'high' })
+    )
+
+    expect(
+      (lastNativeOptions().providerOptions as Record<string, unknown>)
+        .reasoningLevel
+    ).toBeUndefined()
+    expect(result.warnings).toEqual([
+      expect.objectContaining({ type: 'unsupported', feature: 'reasoning' }),
+    ])
+  })
+
+  test('warns about settings Foundation Models has no equivalent for', async () => {
+    const result = await apple().doGenerate(
+      createCallOptions({
+        stopSequences: ['5'],
+        presencePenalty: 0.5,
+        frequencyPenalty: 0.5,
+        seed: 42,
+      })
+    )
+
+    expect(result.warnings.map((warning) => warning.feature)).toEqual([
+      'stopSequences',
+      'presencePenalty',
+      'frequencyPenalty',
+      'seed',
+    ])
+  })
+})
+
+describe('apple tool registration', () => {
+  test('explains how to register a tool the provider does not know', async () => {
+    const promise = apple().doGenerate(
+      createCallOptions({
+        tools: [
+          {
+            type: 'function',
+            name: 'weather',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+      })
+    )
+
+    await expect(promise).rejects.toThrow(
+      'Tool "weather" is not registered with the Apple provider'
+    )
+  })
+})
+
+describe('apple abort', () => {
+  test('rejects and cancels the native generation when aborted', async () => {
+    generateText.mockImplementationOnce(() => new Promise(() => {}))
+    cancelStream.mockClear()
+    const controller = new AbortController()
+
+    const promise = apple().doGenerate(
+      createCallOptions({ abortSignal: controller.signal })
+    )
+    // The native call starts once the call options are prepared
+    while (!generateText.mock.calls.length) {
+      await Promise.resolve()
+    }
+    controller.abort()
+
+    await expect(promise).rejects.toThrow('The operation was aborted')
+    const { requestId } = lastNativeOptions().providerOptions as {
+      requestId: string
+    }
+    expect(cancelStream).toHaveBeenCalledWith(requestId)
   })
 })
