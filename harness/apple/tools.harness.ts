@@ -6,13 +6,6 @@ import { z } from 'zod'
 
 import { createTools, prompt, readAll } from './helpers'
 
-const requiredWarning = {
-  type: 'unsupported',
-  feature: 'toolChoice',
-  details:
-    'Apple Foundation Models run tools natively and cannot be required to call a tool.',
-}
-
 const timeTool: LanguageModelV4FunctionTool = {
   type: 'function',
   name: 'getCurrentTime',
@@ -92,40 +85,47 @@ describe('apple tools', () => {
     expect(calls).toEqual([])
   })
 
-  it('offers only the named tool and warns it cannot be required', async () => {
+  it('requires the named tool and offers no other', async () => {
     const { calls, provider, tools } = createTools()
 
     const result = await generateText({
       model: provider(),
       tools,
       toolChoice: { type: 'tool', toolName: 'getCurrentTime' },
-      prompt:
-        'What is the weather in Paris, and what time is it? Use your tools.',
+      prompt: 'What is the weather in Paris?',
     })
 
     expect(calls.map((call) => call.name)).toEqual(['getCurrentTime'])
-    expect(result.warnings).toEqual([requiredWarning])
+    expect(result.warnings).toEqual([])
   })
 
-  it('warns that required tool choice is unsupported', async () => {
-    const { provider } = createTools()
+  it('requires a tool call and then lets the model answer', async () => {
+    const { calls, provider } = createTools()
 
     const result = await provider().doGenerate({
       prompt: prompt('Say hi.'),
       tools: [timeTool],
       toolChoice: { type: 'required' },
     })
+
+    expect(calls.map((call) => call.name)).toEqual(['getCurrentTime'])
+    expect(result.warnings).toEqual([])
+    expect(result.content.at(-1)).toMatchObject({ type: 'text' })
+  })
+
+  it('requires a tool call in a stream', async () => {
+    const { calls, provider } = createTools()
+
     const { stream } = await provider().doStream({
       prompt: prompt('Say hi.'),
       tools: [timeTool],
       toolChoice: { type: 'required' },
     })
+    const parts = await readAll(stream)
 
-    expect(result.warnings).toEqual([requiredWarning])
-    expect((await readAll(stream))[0]).toEqual({
-      type: 'stream-start',
-      warnings: [requiredWarning],
-    })
+    expect(parts[0]).toEqual({ type: 'stream-start', warnings: [] })
+    expect(calls.map((call) => call.name)).toEqual(['getCurrentTime'])
+    expect(parts.map((part) => part.type)).toContain('text-delta')
   })
 
   it('uses tools registered later with updateTools', async () => {

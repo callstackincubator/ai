@@ -29,22 +29,20 @@ completed tool-call pruning, use `@react-native-ai/utils`.
 The provider runs on both. iOS 26.4 and iOS 27 features also need an app built
 with an SDK that has them (Xcode 26 with Swift 6.3, and Xcode 27).
 
-| Feature                             | iOS 26 | iOS 26.4 | iOS 27                  |
-| ----------------------------------- | ------ | -------- | ----------------------- |
-| Text, streaming, structured output  | ✅     | ✅       | ✅                      |
-| JavaScript tools                    | ✅     | ✅       | ✅                      |
-| Tool calls while streaming          | ❌     | ❌       | ✅                      |
-| `toolChoice: 'auto'` and `'none'`   | ✅     | ✅       | ✅                      |
-| `toolChoice: 'required'`            | ❌     | ❌       | ❌                      |
-| Token counting and context size     | ❌     | ✅       | ✅                      |
-| Image Playground generation         | ❌     | ✅       | ✅ Adds more styles     |
-| Reasoning level and reasoning parts | ❌     | ❌       | ✅                      |
-| Image prompts                       | ❌     | ❌       | ✅                      |
-| Private Cloud Compute               | ❌     | ❌       | ✅ Physical device only |
-| Vision OCR and barcode tools        | ❌     | ❌       | ✅ Physical device only |
-| Token usage                         | ❌     | ❌       | ✅                      |
-
-Apple runs tools itself, so a tool call cannot be forced on any version.
+| Feature                              | iOS 26 | iOS 26.4 | iOS 27                  |
+| ------------------------------------ | ------ | -------- | ----------------------- |
+| Text, streaming, structured output   | ✅     | ✅       | ✅                      |
+| JavaScript tools                     | ✅     | ✅       | ✅                      |
+| Tool calls while streaming           | ❌     | ❌       | ✅                      |
+| `toolChoice: 'auto'` and `'none'`    | ✅     | ✅       | ✅                      |
+| `toolChoice: 'required'`, named tool | ❌     | ❌       | ✅                      |
+| Token counting and context size      | ❌     | ✅       | ✅                      |
+| Image Playground generation          | ❌     | ✅       | ✅ Adds more styles     |
+| Reasoning level and reasoning parts  | ❌     | ❌       | ✅                      |
+| Image prompts                        | ❌     | ❌       | ✅                      |
+| Private Cloud Compute                | ❌     | ❌       | ✅ Physical device only |
+| Vision OCR and barcode tools         | ❌     | ❌       | ✅ Physical device only |
+| Token usage                          | ❌     | ❌       | ✅                      |
 
 See [iOS Versions](https://react-native-ai.dev/docs/apple/ios-versions) for details.
 

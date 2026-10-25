@@ -386,6 +386,8 @@ Important Apple-specific behavior:
   `generateText` content and as stream parts in `streamText`.
 - You can update the registered tools on a model instance with
   `model.updateTools(...)` before generation.
+- On iOS 27, `toolChoice: 'required'` and a named tool make the model call a
+  tool before it answers. Earlier versions throw `UNSUPPORTED_OS`.
 
 ## Vision Built-In Tools
 

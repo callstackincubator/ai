@@ -23,7 +23,7 @@ Two things decide whether a feature is available:
 
 Features of `apple()` and `apple('private-cloud-compute')`. Options that ask
 for a missing feature (`reasoning`, image parts, the Private Cloud Compute
-model, Vision tools) throw `UNSUPPORTED_OS`. Missing output, such as reasoning
+model, Vision tools, a required tool choice) throw `UNSUPPORTED_OS`. Missing output, such as reasoning
 parts or usage, is left out.
 
 | Feature                                         | iOS 26 | iOS 26.4 | iOS 27                        |
@@ -35,8 +35,8 @@ parts or usage, is left out.
 | Tool calls and results in `generateText`        | ✅     | ✅       | ✅                            |
 | Tool calls and results while streaming          | ❌     | ❌       | ✅ Sent once the tool returns |
 | `toolChoice: 'auto'` and `'none'`               | ✅     | ✅       | ✅                            |
-| `toolChoice: 'required'`                        | ❌     | ❌       | ❌                            |
-| `toolChoice` with a named tool                  | ⚠️     | ⚠️       | ⚠️                            |
+| `toolChoice: 'required'`                        | ❌     | ❌       | ✅                            |
+| `toolChoice` with a named tool                  | ❌     | ❌       | ✅                            |
 | Guardrails (`permissiveContentTransformations`) | ✅     | ✅       | ✅                            |
 | `countTokens` and `contextSize`                 | ❌     | ✅       | ✅                            |
 | Reasoning level (`reasoning` option)            | ❌     | ❌       | ✅                            |
@@ -47,17 +47,17 @@ parts or usage, is left out.
 | Token usage and `'length'` finish reason        | ❌     | ❌       | ✅                            |
 | `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅     | ✅       | ✅                            |
 
-⚠️ means partly supported. Notes:
+Notes:
 
-- **Tool choice.** Apple runs tools itself, inside the session, so the
-  provider cannot make the model call one. iOS 27 has a native required mode,
-  but it applies to every step of Apple's tool loop: the model calls the tool
-  again after every result and never answers, so the provider does not use it.
+- **Tool choice.** Apple runs tools itself, inside the session. Its required
+  mode applies to every model request in that tool loop, so on its own the
+  model would keep calling tools and never answer. On iOS 27 the provider
+  requires a tool call only until the model has made one, then lets it answer.
   - `'none'` leaves the tools out. On iOS 27 it also sets Apple's disallowed
     mode, which turns off built-in tools.
-  - `'required'` keeps the tools optional and adds an `unsupported` warning.
-  - A named tool is the only tool offered, but the model may still answer
-    without calling it. This also adds the warning.
+  - `'required'` makes the model call at least one tool before it answers.
+  - A named tool is the only tool offered, without built-in tools, and the
+    model must call it.
 - **Guardrails** apply to the `system` model only. Private Cloud Compute
   ignores them.
 - **Streaming tool calls.** Before iOS 27 Apple does not expose tool activity
