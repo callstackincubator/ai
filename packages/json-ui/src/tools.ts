@@ -11,11 +11,12 @@ import {
 /**
  * Props arrive as a string, since some models cannot generate free-form
  * objects. Models often write them as JavaScript object literals, with unquoted
- * keys or single quotes, so those are accepted too
+ * keys or single quotes, so those are accepted too. Returns null for props that
+ * cannot be parsed
  */
 function smartParse(
   props: string | Record<string, unknown>
-): Record<string, unknown> {
+): Record<string, unknown> | null {
   if (typeof props !== 'string') return props
   try {
     return JSON.parse(props)
@@ -28,12 +29,17 @@ function smartParse(
     try {
       return JSON.parse(json)
     } catch {
-      throw new Error(
-        `Props must be a JSON object, e.g. {"text":"Hello"}. Received: ${props}`
-      )
+      return null
     }
   }
 }
+
+// Returned rather than thrown, since a thrown error ends the generation on
+// Apple Foundation Models, while models retry with valid props
+const invalidProps = (props: string) => ({
+  success: false,
+  message: `Props must be a JSON object, e.g. {"text":"Hello"}. Received: ${props}`,
+})
 
 const defaultCreateId = () =>
   `UI-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`
@@ -219,6 +225,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
       async ({ id, props: propsArg, replace = false }) =>
         withMutationLock(async () => {
           const parsedProps = smartParse(propsArg)
+          if (!parsedProps) return invalidProps(propsArg)
           const spec = readSpec()
           if (!spec) return { success: false, message: 'No UI spec' }
           if (!spec.elements[id]) {
@@ -291,6 +298,7 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
             }
           }
           const parsedProps = smartParse(propsArg ?? '{}')
+          if (!parsedProps) return invalidProps(propsArg!)
           const spec = readSpec()
           if (!spec) {
             console.warn(
