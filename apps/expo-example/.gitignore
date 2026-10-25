@@ -21,6 +21,9 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# React Native Harness
+.harness/
+
 # debug
 npm-debug.*
 yarn-debug.*
