@@ -116,8 +116,12 @@
         "react-native": "0.88.0",
       },
       "peerDependencies": {
+        "expo": "*",
         "react-native": ">=0.76.0",
       },
+      "optionalPeers": [
+        "expo",
+      ],
     },
     "packages/core-ai": {
       "name": "@react-native-ai/core-ai",

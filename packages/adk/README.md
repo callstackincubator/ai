@@ -9,23 +9,19 @@ A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://deve
 - Vercel AI SDK v7
 - If using on-device models: a device capable of running Gemini Nano (Android 14+ with AICore); you can consult the [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device) for more details.
 
-Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST`; exclude it in your app packaging. For Expo:
+Consuming apps must set `minSdkVersion` to at least 26. ADK pulls in Google GenAI libraries that duplicate `META-INF/INDEX.LIST` and `META-INF/DEPENDENCIES`; exclude them in your app packaging. For Expo, add the config plugin, which does both:
 
 ```json
-[
-  "expo-build-properties",
-  {
-    "android": {
-      "minSdkVersion": 26,
-      "packagingOptions": {
-        "exclude": ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
-      }
-    }
+{
+  "expo": {
+    "plugins": ["@react-native-ai/adk"]
   }
-]
+}
 ```
 
-For bare React Native, add to `android/app/build.gradle`:
+Then run `npx expo prebuild --clean` so the native Android project picks up the change. If you also set `android.minSdkVersion` in `expo-build-properties`, make it 26 or higher.
+
+For bare React Native, set `minSdkVersion` to 26 or higher and add to `android/app/build.gradle`:
 
 ```gradle
 android {
@@ -34,8 +30,6 @@ android {
   }
 }
 ```
-
-Then run `npx expo prebuild --clean` so the native Android project picks up the change.
 
 ```ts
 import { adk } from '@react-native-ai/adk'

@@ -11,6 +11,7 @@
     "src",
     "lib",
     "android",
+    "app.plugin.js",
     "!android/build",
     "!android/gradle",
     "!android/gradlew",
@@ -34,7 +35,9 @@
     "ai",
     "sdk",
     "vercel",
-    "android"
+    "android",
+    "expo",
+    "config-plugin"
   ],
   "repository": {
     "type": "git",
@@ -54,7 +57,13 @@
     "@ai-sdk/provider-utils": "^5.0.67"
   },
   "peerDependencies": {
-    "react-native": ">=0.76.0"
+    "react-native": ">=0.76.0",
+    "expo": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "react-native": "0.88.0"
