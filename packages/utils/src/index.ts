@@ -250,7 +250,7 @@ async function summarizeChunk(
   return generateSummary(
     model,
     'Summarize the conversation history for continued assistant use. First list every fact the user stated, such as names, numbers, codes, and preferences, word for word. Then briefly cover user goals, constraints, decisions, unresolved questions, and tool outcomes.',
-    `Summarize this conversation.\n\n<conversation>\n${messages.join('\n\n')}\n</conversation>`,
+    `<conversation>\n${messages.join('\n\n')}\n</conversation>`,
     abortSignal
   )
 }
@@ -263,13 +263,13 @@ async function condenseSummary(
   const condensed = await generateSummary(
     model,
     'Condense these summaries of one conversation into a single summary. Keep every fact, number, name, decision, and unresolved question, and only remove repetition.',
-    `Condense these summaries.\n\n<summaries>\n${summary}\n</summaries>`,
+    `<summaries>\n${summary}\n</summaries>`,
     abortSignal
   )
   return condensed || summary
 }
 
-// The text is wrapped in a request, since small models given a bare transcript
+// The text is wrapped in tags, since small models given a bare transcript
 // continue the conversation instead of summarizing it
 async function generateSummary(
   model: LanguageModelV4,

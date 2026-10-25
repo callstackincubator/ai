@@ -232,7 +232,7 @@ describe('summarizeHistory', () => {
     })
 
     expect(model.summarizedTexts()).toEqual([
-      'Summarize this conversation.\n\n<conversation>\nUSER: Tell me about Paris\n\nASSISTANT: Paris is in France\n</conversation>',
+      '<conversation>\nUSER: Tell me about Paris\n\nASSISTANT: Paris is in France\n</conversation>',
     ])
     expect(result).toEqual([
       system('Summary of earlier conversation:\nsummary 1'),
@@ -259,7 +259,7 @@ describe('summarizeHistory', () => {
 
     expect(model.doGenerate).toHaveBeenCalledTimes(2)
     expect(model.summarizedTexts()[1]).toBe(
-      'Summarize this conversation.\n\n<conversation>\nUSER: And Lyon?\n\nASSISTANT: Lyon is in France\n</conversation>'
+      '<conversation>\nUSER: And Lyon?\n\nASSISTANT: Lyon is in France\n</conversation>'
     )
   })
 
