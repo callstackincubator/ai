@@ -101,6 +101,12 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
   // Serialize mutating tool calls to avoid interleaving writes.
   let cachedSpec: TSpec | null = null
 
+  // Models change the case of type names (e.g. BUTTON), which would render as
+  // an empty container
+  const nodeTypes = Object.keys(nodeHints)
+  const resolveNodeType = (type: string) =>
+    nodeTypes.find((name) => name.toLowerCase() === type.toLowerCase())
+
   const readSpec = (): TSpec | null => {
     if (cachedSpec) return cloneSpec(cachedSpec)
     const spec = getSpec(contextId)
@@ -270,13 +276,20 @@ export function createGenUITools<TSpec extends JsonUISpec = JsonUISpec>({
       parentId: z.string().optional().describe('Parent node id; omit for root'),
       type: z
         .string()
-        .describe('Component type (e.g. Container, Column, Text, Button)'),
+        .describe(`Component type, one of: ${nodeTypes.join(', ')}`),
       props: z.string().optional().describe('Props object for the node'),
     }),
     execute: toolWrapper(
       'addUINode',
-      async ({ parentId, type, props: propsArg }) =>
+      async ({ parentId, type: typeArg, props: propsArg }) =>
         withMutationLock(async () => {
+          const type = resolveNodeType(typeArg)
+          if (!type) {
+            return {
+              success: false,
+              message: `Unknown type "${typeArg}". Use one of: ${nodeTypes.join(', ')}`,
+            }
+          }
           const parsedProps = smartParse(propsArg ?? '{}')
           const spec = readSpec()
           if (!spec) {

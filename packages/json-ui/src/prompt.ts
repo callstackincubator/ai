@@ -37,7 +37,7 @@ export function buildGenUISystemPrompt({
 
   if (requireLayoutReadBeforeAddingNodes) {
     parts.push(
-      'BEFORE ADDING ANY UI ELEMENTS, GET THE WHOLE UI TREE with getGenUILayout.'
+      'BEFORE ADDING ANY UI ELEMENTS, GET THE WHOLE UI TREE with getUILayout.'
     )
   }
 
