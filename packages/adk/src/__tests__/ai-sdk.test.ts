@@ -642,6 +642,31 @@ describe('doStream', () => {
     expect(text).toBe('{"a":1}')
   })
 
+  test('hides Gemini Nano tool_code text and streams the next turn', async () => {
+    const parts = await runStream(
+      createCallOptions(),
+      (streamId) => {
+        for (const delta of ['Checking.\n``', '`tool_code\nf()\n```']) {
+          onStreamUpdate.emit({ streamId, delta })
+        }
+        onStreamToolCall.emit({
+          streamId,
+          phase: 'start',
+          toolCallId: '1',
+          toolName: 'f',
+        })
+        onStreamUpdate.emit({ streamId, delta: 'Done.' })
+        onStreamComplete.emit({ streamId })
+      },
+      nano
+    )
+
+    const text = parts
+      .flatMap((part) => (part.type === 'text-delta' ? [part.delta] : []))
+      .join('')
+    expect(text).toBe('Checking.\nDone.')
+  })
+
   test('surfaces native stream errors with their code', async () => {
     const parts = await runStream(createCallOptions(), (streamId) => {
       onStreamError.emit({

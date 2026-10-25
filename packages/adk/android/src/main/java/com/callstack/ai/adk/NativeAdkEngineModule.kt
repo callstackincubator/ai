@@ -193,21 +193,11 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         // Summed over complete events, with the latest partial usage as a fallback
         var totalUsage: UsageMetadata? = null
         var partialUsage: UsageMetadata? = null
-        // Per-turn state. Gemini Nano emits ```tool_code blocks (as streamed text) instead
-        // of native function calls, and the marker can be split across stream chunks.
-        //
-        // ADK/GenaiPrompt may deliver text either cumulatively (each event repeats the full
-        // text) or incrementally (each event carries only the new delta). We can't rely on
-        // either, so we reconstruct the full turn text ourselves by appending the delta of
-        // each event, then run marker detection and hold-back on that reconstruction.
-        //
-        //   currentTurnText: full reconstructed text of the current agent turn
-        //   emittedText:     the prefix of currentTurnText already sent to JS
-        //   suppressCurrentTurn: true once we confirm this turn is a tool-code turn
-        //   currentTurnReasoning / emittedReasoning: the same for thought parts
+        // ADK may deliver text cumulatively (each event repeats the turn so far) or as
+        // deltas, so the turn text is rebuilt here and only the new part is sent to JS.
+        // JS hides Gemini Nano tool_code blocks. Reasoning is tracked the same way.
         var currentTurnText = ""
         var emittedText = ""
-        var suppressCurrentTurn = false
         var currentTurnReasoning = ""
         var emittedReasoning = ""
         val toolCallEmitter = AdkStreamToolCallEmitter(streamId) { args ->
@@ -236,48 +226,25 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
           }
 
           val text = event.textParts(thoughts = false)
-
           if (text.isNotEmpty()) {
-            // Reconstruct the full turn text. If the event repeats what we already have
-            // (cumulative mode) take it as-is; otherwise treat it as an incremental delta
-            // and append it. This keeps a split marker (e.g. "```tool_" + "code") intact.
             currentTurnText =
               if (text.startsWith(currentTurnText)) text else currentTurnText + text
-
-            // Once the full tool-code marker appears, suppress the rest of this turn.
-            if (currentTurnText.contains(TOOL_CODE_MARKER)) {
-              suppressCurrentTurn = true
-            }
           }
 
-          // When a tool-calling turn ends, reset per-turn state so the next turn
-          // (the actual answer) starts with a clean slate and streams normally.
           if (!event.partial && event.functionCalls().isNotEmpty()) {
+            // A tool call ends the turn, and the next turn starts with new text
             currentTurnText = ""
             emittedText = ""
-            suppressCurrentTurn = false
             currentTurnReasoning = ""
             emittedReasoning = ""
-          }
-
-          if (!suppressCurrentTurn && !(event.isFinalResponse && !event.partial)) {
-            // Hold back any trailing substring that could be the beginning of the marker,
-            // so we never emit a partial "```", "```tool", etc. that later completes.
-            val safeEnd = currentTurnText.length - pendingMarkerPrefixLength(currentTurnText)
-            if (safeEnd > emittedText.length) {
-              emitDelta(streamId, currentTurnText.substring(emittedText.length, safeEnd), "text")
-              emittedText = currentTurnText.substring(0, safeEnd)
-            }
+          } else if (currentTurnText.length > emittedText.length &&
+            currentTurnText.startsWith(emittedText)
+          ) {
+            emitDelta(streamId, currentTurnText.substring(emittedText.length), "text")
+            emittedText = currentTurnText
           }
 
           if (event.isFinalResponse && !event.partial) {
-            // Flush any held-back text for a normal turn (e.g. a response legitimately
-            // ending in backticks that turned out not to be a tool-code marker).
-            if (!suppressCurrentTurn && currentTurnText.length > emittedText.length) {
-              emitDelta(streamId, currentTurnText.substring(emittedText.length), "text")
-              emittedText = currentTurnText
-            }
-
             emitComplete(streamId, event, totalUsage ?: partialUsage)
           }
         }
@@ -339,25 +306,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     super.invalidate()
   }
 
-  /**
-   * Returns the length of the trailing suffix of [text] that is a proper prefix of
-   * [TOOL_CODE_MARKER] (e.g. "`", "``", "```", "```tool"). This portion is held back
-   * from streaming because a subsequent token could complete the marker, at which point
-   * the whole turn is suppressed. If no suffix could begin the marker, returns 0.
-   */
-  private fun pendingMarkerPrefixLength(text: String): Int {
-    val maxLen = minOf(text.length, TOOL_CODE_MARKER.length - 1)
-    for (len in maxLen downTo 1) {
-      val suffix = text.substring(text.length - len)
-      if (TOOL_CODE_MARKER.startsWith(suffix)) {
-        return len
-      }
-    }
-    return 0
-  }
-
   companion object {
     const val NAME = "AdkEngine"
-    private const val TOOL_CODE_MARKER = "```tool_code"
   }
 }
