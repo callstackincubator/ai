@@ -59,6 +59,8 @@ CORE_AI=1 npx expo prebuild --clean --platform ios
 
 Run `npx expo prebuild --clean` without it to go back to the default build.
 
+The model picker then lists **Core AI qwen3-0.6b**, which downloads (~460 MB) from [an iOS export](https://huggingface.co/grabbou/qwen3-0.6b-CoreAI) made with the [`apple/coreai-models`](https://github.com/apple/coreai-models) recipe.
+
 ## Running the App
 
 After building the MLC runtime, navigate back to this directory and run:
