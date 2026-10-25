@@ -180,7 +180,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
 
       return {
         content: response.content.flatMap(toLanguageModelContent),
-        finishReason: toFinishReason('stop'),
+        finishReason: toFinishReason(response.usage, options.maxOutputTokens),
         usage: toUsage(response.usage),
         warnings,
       }
@@ -242,7 +242,10 @@ export class CoreAILanguageModel implements LanguageModelV4 {
               snapshots.end()
               controller.enqueue({
                 type: 'finish',
-                finishReason: toFinishReason('stop'),
+                finishReason: toFinishReason(
+                  event.usage as CoreAIUsage | undefined,
+                  options.maxOutputTokens
+                ),
                 usage: toUsage(event.usage as CoreAIUsage | undefined),
               })
               cleanup()
@@ -673,13 +676,19 @@ function toLanguageModelContent(
   }
 }
 
+// Core AI does not say why generation ended, so reaching maxOutputTokens
+// counts as stopping for length
 function toFinishReason(
-  raw: 'stop' | 'length' | 'tool-calls' | 'error'
+  usage: CoreAIUsage | undefined,
+  maxOutputTokens: number | undefined
 ): LanguageModelV4FinishReason {
-  return {
-    unified: raw === 'tool-calls' ? 'tool-calls' : raw,
-    raw,
-  }
+  const raw =
+    maxOutputTokens !== undefined &&
+    usage !== undefined &&
+    usage.outputTokens >= maxOutputTokens
+      ? 'length'
+      : 'stop'
+  return { unified: raw, raw }
 }
 
 function toUsage(usage: CoreAIUsage | undefined): LanguageModelV4Usage {
