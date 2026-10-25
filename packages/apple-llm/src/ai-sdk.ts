@@ -283,6 +283,8 @@ function getImageModelFileUrlMediaType(url: string) {
 // Options read by the native module. The model comes from the language model
 // instance and the reasoning level from the AI SDK `reasoning` call option
 interface AppleNativeOptions {
+  // Lets cancelStream() stop a non-streaming generation
+  requestId?: string
   model?: AppleLanguageModelId
   guardrails?: AppleGuardrails
   reasoningLevel?: AppleReasoningLevel
@@ -321,6 +323,37 @@ function toAppleReasoningLevel(
       // 'provider-default' and 'none' keep Apple's default behavior
       return undefined
   }
+}
+
+/**
+ * Rejects as soon as the call is aborted and cancels the native generation,
+ * which would otherwise keep running to the end
+ */
+function abortable<T>(
+  promise: Promise<T>,
+  abortSignal: AbortSignal | undefined,
+  cancel: () => void
+): Promise<T> {
+  if (!abortSignal) {
+    return promise
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      cancel()
+      const error = new Error('The operation was aborted')
+      error.name = 'AbortError'
+      reject(abortSignal.reason instanceof Error ? abortSignal.reason : error)
+    }
+    // Handles the native promise even when aborted, so its rejection is not unhandled
+    promise
+      .then(resolve, reject)
+      .finally(() => abortSignal.removeEventListener('abort', onAbort))
+    if (abortSignal.aborted) {
+      onAbort()
+      return
+    }
+    abortSignal.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 type AppleMessagePart =
@@ -879,6 +912,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
   async doGenerate(options: LanguageModelV4CallOptions) {
     const appleOptions = getAppleNativeOptions(this.options, options)
+    const requestId = generateId()
     const messages = this.prepareMessages(options.prompt)
     const {
       tools: callTools,
@@ -892,19 +926,26 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     }
 
     try {
-      const response = await NativeAppleLLM.generateText(messages, {
-        maxTokens: options.maxOutputTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        topK: options.topK,
-        tools,
-        toolCallingMode,
-        providerOptions: appleOptions as unknown as Record<string, unknown>,
-        schema:
-          options.responseFormat?.type === 'json'
-            ? options.responseFormat.schema
-            : undefined,
-      })
+      const response = await abortable(
+        NativeAppleLLM.generateText(messages, {
+          maxTokens: options.maxOutputTokens,
+          temperature: options.temperature,
+          topP: options.topP,
+          topK: options.topK,
+          tools,
+          toolCallingMode,
+          providerOptions: { ...appleOptions, requestId } as Record<
+            string,
+            unknown
+          >,
+          schema:
+            options.responseFormat?.type === 'json'
+              ? options.responseFormat.schema
+              : undefined,
+        }),
+        options.abortSignal,
+        () => NativeAppleLLM.cancelStream(requestId)
+      )
 
       return {
         content: response.content.map((part) => {
