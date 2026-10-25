@@ -150,6 +150,35 @@ describe('apple tools', () => {
     expect(calls).toEqual(['getCurrentTime'])
   })
 
+  it('passes nested object arguments to a tool', async () => {
+    const calls: unknown[] = []
+    const getWeather = tool({
+      description: 'Get the current weather at a location.',
+      inputSchema: z.object({
+        location: z.object({ city: z.string(), country: z.string() }),
+      }),
+      execute: async (input) => {
+        calls.push(input)
+        return 'sunny'
+      },
+    })
+
+    await generateText({
+      model: createAppleProvider({ availableTools: { getWeather } })(),
+      tools: { getWeather },
+      prompt: 'What is the weather in Paris, France? Use your tool.',
+    })
+
+    expect(calls).toEqual([
+      {
+        location: {
+          city: expect.stringMatching(/paris/i),
+          country: expect.stringMatching(/france/i),
+        },
+      },
+    ])
+  })
+
   it('reports an error thrown by a tool as a tool call error', async () => {
     const getCurrentTime = tool({
       description: 'Get the current time.',

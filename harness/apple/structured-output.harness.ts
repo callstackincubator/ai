@@ -112,6 +112,85 @@ describe('apple structured output', () => {
     expect(value).toBeLessThanOrEqual(10.5)
   })
 
+  it('generates nested objects and arrays', async () => {
+    const output = await generateObject(
+      'Name the star our solar system orbits, and list Earth and Mars with their number of moons.',
+      {
+        type: 'object',
+        properties: {
+          star: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+          planets: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                moons: { type: 'integer' },
+              },
+              required: ['name', 'moons'],
+            },
+          },
+        },
+        required: ['star', 'planets'],
+      }
+    )
+
+    expect(output.star.name).toMatch(/sun/i)
+    expect(output.planets.length).toBeGreaterThan(0)
+    expect(Number.isInteger(output.planets[0].moons)).toBe(true)
+  })
+
+  it('picks only listed integer enum values', async () => {
+    const { value } = await generateObject(
+      'Pick the number 7.',
+      numberSchema({ type: 'integer', enum: [1, 2, 3] })
+    )
+
+    expect([1, 2, 3]).toContain(value)
+  })
+
+  it('picks only listed number enum values', async () => {
+    const { value } = await generateObject(
+      'Pick the number 9.',
+      numberSchema({ type: 'number', enum: [0.5, 1.5] })
+    )
+
+    expect([0.5, 1.5]).toContain(value)
+  })
+
+  it('accepts nullable fields', async () => {
+    const output = await generateObject('Describe a cat named Tom.', {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        nickname: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+      },
+      required: ['name', 'nickname'],
+    })
+
+    expect(output.name).toMatch(/tom/i)
+    expect(
+      output.nickname === null || typeof output.nickname === 'string'
+    ).toBe(true)
+  })
+
+  it('keeps string literals', async () => {
+    const output = await generateObject('Name a fruit.', {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', const: 'fruit' },
+        name: { type: 'string' },
+      },
+      required: ['kind', 'name'],
+    })
+
+    expect(output.kind).toBe('fruit')
+  })
+
   it('sends the final json once a stream completes', async () => {
     const { stream } = await apple().doStream({
       prompt: prompt('In which city is the Eiffel Tower?'),
