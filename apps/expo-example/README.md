@@ -65,6 +65,18 @@ bun run ios
 bun run android
 ```
 
+### Large models on iPhone
+
+iOS kills apps that use too much memory without a warning or crash report.
+In a debug build, Qwen3.5 with three full-resolution photos goes past the
+default limit (a release build stays under it). To get more headroom while
+developing, request the increased memory limit. The entitlement needs an App ID
+your team owns, so prebuild with your own bundle identifier:
+
+```bash
+IOS_BUNDLE_IDENTIFIER=com.example.ai IOS_INCREASED_MEMORY_LIMIT=1 npx expo prebuild --platform ios --clean
+```
+
 ## Rozenite DevTools
 
 The native example app includes Rozenite wiring for
