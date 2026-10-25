@@ -50,7 +50,18 @@ export function GenUINode({
     case GEN_UI_NODE_NAMES.Paragraph:
     case GEN_UI_NODE_NAMES.Label:
     case GEN_UI_NODE_NAMES.Heading:
-      return <Text style={[styles.text, baseStyle]}>{text ?? label ?? ''}</Text>
+      return (
+        <Text
+          style={[
+            styles.text,
+            type === GEN_UI_NODE_NAMES.Heading && styles.heading,
+            type === GEN_UI_NODE_NAMES.Label && styles.label,
+            baseStyle,
+          ]}
+        >
+          {text ?? label ?? ''}
+        </Text>
+      )
 
     case GEN_UI_NODE_NAMES.Button:
       return (
@@ -90,6 +101,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
     flex: 1,
+  },
+  heading: {
+    fontSize: 22,
+    fontWeight: '600',
+  },
+  label: {
+    fontSize: 13,
+    color: '#6b7280',
   },
   button: {
     paddingHorizontal: 16,
