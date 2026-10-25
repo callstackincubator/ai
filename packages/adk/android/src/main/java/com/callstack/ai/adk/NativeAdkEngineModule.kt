@@ -1,5 +1,6 @@
 package com.callstack.ai.adk
 
+import android.util.Base64
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -37,7 +38,20 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     },
   )
 
-  // Streams and generateText runs, by id, so both can be cancelled
+  private val transcriber = AdkTranscriber(
+    context = reactContext,
+    onDownloadProgress = { phase, bytesDownloaded, bytesToDownload ->
+      emitOnTranscriptionDownloadProgress(
+        Arguments.createMap().apply {
+          putString("phase", phase)
+          bytesDownloaded?.let { putDouble("bytesDownloaded", it.toDouble()) }
+          bytesToDownload?.let { putDouble("bytesToDownload", it.toDouble()) }
+        },
+      )
+    },
+  )
+
+  // Streams, generateText runs and transcriptions, by id, so all can be cancelled
   private val activeRuns = ConcurrentHashMap<String, Job>()
 
   private fun Promise.rejectWithCode(error: Exception) {
@@ -187,6 +201,58 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     activeRuns[streamId] = job
     job.start()
     promise.resolve(null)
+  }
+
+  override fun getTranscriptionAvailability(config: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        promise.resolve(transcriber.getAvailability(TranscriptionConfig.from(config)))
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
+  override fun prepareTranscription(config: ReadableMap?, promise: Promise) {
+    scope.launch {
+      try {
+        transcriber.prepare(TranscriptionConfig.from(config))
+        promise.resolve(null)
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      }
+    }
+  }
+
+  override fun transcribe(
+    requestId: String,
+    audio: String,
+    config: ReadableMap?,
+    promise: Promise,
+  ) {
+    val job = scope.launch(start = CoroutineStart.LAZY) {
+      try {
+        val bytes =
+          try {
+            Base64.decode(audio, Base64.DEFAULT)
+          } catch (error: IllegalArgumentException) {
+            throw AdkErrors.AdkException(AdkErrors.INVALID_MESSAGE, "Audio is not valid base64", error)
+          }
+        val result = transcriber.transcribe(bytes, TranscriptionConfig.from(config))
+        promise.resolve(
+          Arguments.createMap().apply {
+            putString("text", result.text)
+            putDouble("durationInSeconds", result.durationInSeconds)
+          },
+        )
+      } catch (error: Exception) {
+        promise.rejectWithCode(error)
+      } finally {
+        activeRuns.remove(requestId)
+      }
+    }
+    activeRuns[requestId] = job
+    job.start()
   }
 
   private fun emitDelta(streamId: String, delta: String, kind: String) {

@@ -22,6 +22,7 @@ const onStreamUpdate = createEmitter()
 const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
 const onNanoDownloadProgress = createEmitter()
+const onTranscriptionDownloadProgress = createEmitter()
 
 let generateTextResult: Record<string, unknown> = {
   content: 'ok',
@@ -50,6 +51,17 @@ const getModelInfo = mock(async (_nano?: unknown) => ({
   availability: 'downloadable',
 }))
 
+const transcribe = mock(
+  async (_requestId: string, _audio: string, _config?: unknown) => ({
+    text: 'Hello world',
+    durationInSeconds: 2.5,
+  })
+)
+const prepareTranscription = mock(async (_config?: unknown) => {})
+const getTranscriptionAvailability = mock(
+  async (_config?: unknown) => 'downloadable'
+)
+
 mock.module('react-native', () => ({
   Platform: { OS: 'android' },
   TurboModuleRegistry: {
@@ -63,6 +75,10 @@ mock.module('react-native', () => ({
       onStreamComplete,
       onStreamError,
       onNanoDownloadProgress,
+      transcribe,
+      prepareTranscription,
+      getTranscriptionAvailability,
+      onTranscriptionDownloadProgress,
     }),
   },
 }))
@@ -485,5 +501,102 @@ describe('Gemini Nano preparation', () => {
     expect(prepareNano.mock.calls.at(-1)![0]).toEqual({
       releaseStage: 'preview',
     })
+  })
+})
+
+describe('transcription', () => {
+  test('transcribes binary audio as base64', async () => {
+    const model = createAdkProvider().transcriptionModel({
+      language: 'en-US',
+      mode: 'advanced',
+    })
+
+    const result = await model.doGenerate({
+      audio: new Uint8Array([1, 2, 3]),
+      mediaType: 'audio/wav',
+    })
+
+    const [, audio, config] = transcribe.mock.calls.at(-1)!
+    expect(audio).toBe('AQID')
+    expect(config).toEqual({ language: 'en-US', mode: 'advanced' })
+    expect(result).toMatchObject({
+      text: 'Hello world',
+      segments: [],
+      language: 'en-US',
+      durationInSeconds: 2.5,
+      warnings: [],
+      response: { modelId: 'genai-speech-recognition' },
+    })
+  })
+
+  test('strips data URL prefixes from base64 audio', async () => {
+    await createAdkProvider().transcriptionModel().doGenerate({
+      audio: 'data:audio/wav;base64,AQID',
+      mediaType: 'audio/wav',
+    })
+
+    expect(transcribe.mock.calls.at(-1)![1]).toBe('AQID')
+  })
+
+  test('cancels the native request on abort', async () => {
+    const controller = new AbortController()
+    transcribe.mockImplementationOnce(async (requestId) => {
+      controller.abort()
+      expect(cancelStream.mock.calls.at(-1)![0]).toBe(requestId)
+      throw new Error('cancelled')
+    })
+
+    await expect(
+      createAdkProvider().transcriptionModel().doGenerate({
+        audio: 'AQID',
+        mediaType: 'audio/wav',
+        abortSignal: controller.signal,
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  test('maps native errors to AdkErrorCodes', async () => {
+    transcribe.mockImplementationOnce(async () => {
+      throw Object.assign(new Error('Not supported'), {
+        code: 'MODEL_UNAVAILABLE',
+      })
+    })
+
+    await expect(
+      createAdkProvider()
+        .transcriptionModel()
+        .doGenerate({ audio: 'AQID', mediaType: 'audio/wav' })
+    ).rejects.toMatchObject({ code: 'MODEL_UNAVAILABLE' })
+  })
+
+  test('reports availability', async () => {
+    const model = createAdkProvider().transcriptionModel({ language: 'fr-FR' })
+
+    expect(await model.getAvailability()).toBe('downloadable')
+    expect(await model.isAvailable()).toBe(true)
+    expect(getTranscriptionAvailability.mock.calls.at(-1)![0]).toEqual({
+      language: 'fr-FR',
+    })
+
+    getTranscriptionAvailability.mockImplementationOnce(async () => 'weird')
+    expect(await model.getAvailability()).toBe('unknown')
+  })
+
+  test('reports download progress while preparing', async () => {
+    const progress: unknown[] = []
+    prepareTranscription.mockImplementationOnce(async () => {
+      onTranscriptionDownloadProgress.emit({
+        phase: 'progress',
+        bytesDownloaded: 50,
+      })
+    })
+
+    await createAdkProvider()
+      .transcriptionModel()
+      .prepare({ onProgress: (event) => progress.push(event) })
+
+    expect(progress).toEqual([
+      { phase: 'progress', bytesDownloaded: 50, bytesToDownload: undefined },
+    ])
   })
 })

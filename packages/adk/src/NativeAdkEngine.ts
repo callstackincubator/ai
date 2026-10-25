@@ -88,6 +88,18 @@ export interface NanoDownloadProgressEvent {
   bytesToDownload?: number
 }
 
+export interface AdkTranscriptionConfig {
+  /** BCP 47 locale such as `en-US`. Defaults to the device locale */
+  language?: string
+  /** `basic` (default) or `advanced`, which uses a GenAI model on supported devices */
+  mode?: 'basic' | 'advanced'
+}
+
+export interface AdkTranscriptionResult {
+  text: string
+  durationInSeconds: number
+}
+
 export interface Spec extends TurboModule {
   getModelInfo(nano?: AdkNanoModelConfig): Promise<AdkNativeModelInfo>
   prepareNano(nano?: AdkNanoModelConfig): Promise<void>
@@ -107,13 +119,23 @@ export interface Spec extends TurboModule {
     options?: AdkGenerationOptions
   ): Promise<void>
 
-  /** Cancels a `streamText` or `generateText` run by its id */
+  getTranscriptionAvailability(config?: AdkTranscriptionConfig): Promise<string>
+  prepareTranscription(config?: AdkTranscriptionConfig): Promise<void>
+  /** Transcribes base64-encoded audio in any format Android can decode */
+  transcribe(
+    requestId: string,
+    audio: string,
+    config?: AdkTranscriptionConfig
+  ): Promise<AdkTranscriptionResult>
+
+  /** Cancels a stream, a `generateText` run or a transcription by its id */
   cancelStream(streamId: string): Promise<void>
 
   onStreamUpdate: CodegenTypes.EventEmitter<StreamUpdateEvent>
   onStreamComplete: CodegenTypes.EventEmitter<StreamCompleteEvent>
   onStreamError: CodegenTypes.EventEmitter<StreamErrorEvent>
   onNanoDownloadProgress: CodegenTypes.EventEmitter<NanoDownloadProgressEvent>
+  onTranscriptionDownloadProgress: CodegenTypes.EventEmitter<NanoDownloadProgressEvent>
 }
 
 const NativeAdkEngine: Spec | null =

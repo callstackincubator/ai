@@ -96,6 +96,7 @@ dependencies {
   implementation "com.google.adk:google-adk-kotlin-core:1.4.0"
   implementation "com.google.adk:google-adk-kotlin-mlkit-android:1.4.0-beta"
   implementation "com.google.mlkit:genai-prompt:1.0.0-beta4"
+  implementation "com.google.mlkit:genai-speech-recognition:1.0.0-alpha1"
 }
 
 react {
