@@ -109,6 +109,7 @@ export class LlamaLanguageModel implements LanguageModelV4 {
   private modelPath: string
   private options: LlamaModelOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
   private multimodalInitialized: boolean = false
   private pendingCompletion: Promise<unknown> = Promise.resolve()
 
@@ -154,6 +155,15 @@ export class LlamaLanguageModel implements LanguageModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       // Important: ctx_shift must be false for multimodal (required per docs)
@@ -213,6 +223,8 @@ export class LlamaLanguageModel implements LanguageModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       // Releasing the context under a running completion crashes natively
       await this.context.stopCompletion()
@@ -449,6 +461,7 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
   private modelPath: string
   private options: LlamaEmbeddingOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
 
   /**
    * @param modelPath - Path to the model file (from downloadModel() or getModelPath())
@@ -480,6 +493,15 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       ...this.options.contextParams,
@@ -499,6 +521,8 @@ export class LlamaEmbeddingModel implements EmbeddingModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       await this.context.release()
       this.context = null
@@ -574,6 +598,7 @@ export class LlamaRerankModel implements RerankingModelV4 {
   private modelPath: string
   private options: LlamaRerankOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
 
   /**
    * @param modelPath - Path to the reranker model file (from downloadModel() or getModelPath())
@@ -604,6 +629,15 @@ export class LlamaRerankModel implements RerankingModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       ...this.options.contextParams,
@@ -623,6 +657,8 @@ export class LlamaRerankModel implements RerankingModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       await this.context.release()
       this.context = null
@@ -691,6 +727,7 @@ export class LlamaSpeechModel implements SpeechModelV4 {
   private modelPath: string
   private options: LlamaSpeechOptions
   private context: LlamaContext | null = null
+  private loading: Promise<LlamaContext> | null = null
   private vocoderInitialized: boolean = false
 
   /**
@@ -719,6 +756,15 @@ export class LlamaSpeechModel implements SpeechModelV4 {
       return this.context
     }
 
+    // Loading a model twice at once crashes natively, so concurrent calls share
+    // one load
+    this.loading ??= this.load().finally(() => {
+      this.loading = null
+    })
+    return this.loading
+  }
+
+  private async load(): Promise<LlamaContext> {
     this.context = await initLlama({
       model: this.modelPath,
       ...this.options.contextParams,
@@ -765,6 +811,8 @@ export class LlamaSpeechModel implements SpeechModelV4 {
    * Unload model from memory
    */
   async unload(): Promise<void> {
+    // A model that is still loading is released once it is loaded
+    await this.loading?.catch(() => {})
     if (this.context) {
       if (this.vocoderInitialized) {
         await this.context.releaseVocoder()
