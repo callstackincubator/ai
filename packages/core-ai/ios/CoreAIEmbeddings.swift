@@ -49,10 +49,12 @@ enum Embeddings {
       }
       embeddings += try await run(function, inputs: inputs).prefix(batch.count)
     }
-    return result(embeddings)
+    // A fixed batch pads its last batch, whose extra rows are dropped
+    return result(Array(embeddings.prefix(texts.count)))
   }
 
-  static func embed(images: [CGImage], sourceURL: URL, options: [String: Any]) async throws -> [String: Any] {
+  /// Decodes the images one batch at a time, so only that batch is in memory
+  static func embed(imageUris: [String], sourceURL: URL, options: [String: Any]) async throws -> [String: Any] {
     let model = try await ModelCache.shared.model(at: try VisionTask.modelAsset(at: sourceURL), options: options)
     let function = try model.loadFunction(try functionName(options["imageFunction"], preferred: "encode_image", in: model))
     guard let inputName = function.descriptor.inputNames.first,
@@ -64,7 +66,8 @@ enum Embeddings {
     let width = descriptor.shape[3] == -1 ? 224 : descriptor.shape[3]
 
     var embeddings: [[Float]] = []
-    for batch in batches(of: images, fixedSize: descriptor.shape[0], options: options) {
+    for uris in batches(of: imageUris, fixedSize: descriptor.shape[0], options: options) {
+      let batch = try uris.map { try CoreAIImpl.loadCGImage(from: ["imageUri": $0]) }
       // CLIP resizes the shorter side and crops the center
       let pixels = try batch.flatMap { image in
         try VisionTask.normalized(
@@ -75,7 +78,7 @@ enum Embeddings {
       let input = try VisionTask.makeArray(pixels, shape: [batch.count, 3, height, width], descriptor: descriptor)
       embeddings += try await run(function, inputs: [inputName: input]).prefix(batch.count)
     }
-    return result(embeddings)
+    return result(Array(embeddings.prefix(imageUris.count)))
   }
 
   private static func result(_ embeddings: [[Float]]) -> [String: Any] {
