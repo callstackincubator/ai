@@ -1049,6 +1049,19 @@ public class AppleLLMImpl: NSObject {
         }
       }
 
+      // iOS 27 moves these GenerationError cases to their own types
+      if let systemModelError = error as? SystemLanguageModel.Error,
+         case .assetsUnavailable = systemModelError {
+        return .assetsUnavailable(systemModelError.localizedDescription)
+      }
+      if let sessionError = error as? LanguageModelSession.Error,
+         case .concurrentRequests = sessionError {
+        return .concurrentRequests(sessionError.localizedDescription)
+      }
+      if let parsingError = error as? GeneratedContent.ParsingError {
+        return .decodingFailure(parsingError.localizedDescription)
+      }
+
       if let privateCloudComputeError = error as? PrivateCloudComputeLanguageModel.Error {
         let message = privateCloudComputeError.localizedDescription
         switch privateCloudComputeError {
@@ -1169,14 +1182,15 @@ public class AppleLLMImpl: NSObject {
     }
 
     if #available(iOS 27, *) {
-      return try toolNames.map(createBuiltInTool)
+      let modelName = providerOptions["model"] as? String ?? "system"
+      return try toolNames.map { try createBuiltInTool(named: $0, modelName: modelName) }
     }
 
     throw AppleLLMError.unsupportedOS
   }
 
   @available(iOS 27, *)
-  private func createBuiltInTool(named toolName: String) throws -> any Tool {
+  private func createBuiltInTool(named toolName: String, modelName: String) throws -> any Tool {
 #if compiler(>=6.4) && canImport(_Vision_FoundationModels)
     switch toolName {
     case "ocr":
@@ -1189,8 +1203,15 @@ public class AppleLLMImpl: NSObject {
 #endif
 #if compiler(>=6.4) && canImport(_CoreSpotlight_FoundationModels)
     if toolName == "spotlight" {
-      // Searches the app's Core Spotlight index
-      return SpotlightSearchTool()
+      // Searches the app's Core Spotlight index. The default guide is sized for
+      // large context windows and overflows the on-device model's, so it gets
+      // the focused one Apple recommends
+      guard modelName == "system" else {
+        return SpotlightSearchTool()
+      }
+      return SpotlightSearchTool(
+        configuration: .init(sources: [.coreSpotlight], guide: .focused())
+      )
     }
 #endif
     // Known tools whose overlay the SDK does not ship, like Vision in the Simulator
