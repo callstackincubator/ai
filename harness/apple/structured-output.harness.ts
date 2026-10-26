@@ -37,6 +37,24 @@ describe('apple structured output', () => {
     expect(output.city).toMatch(/paris/i)
   })
 
+  it('orders properties of a property named properties', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      type: 'object',
+      properties: {
+        properties: {
+          type: 'object',
+          properties: Object.fromEntries(
+            orderedKeys.map((key) => [key, { type: 'string' }])
+          ),
+          required: orderedKeys,
+        },
+      },
+      required: ['properties'],
+    })
+
+    expect(Object.keys(output.properties)).toEqual(orderedKeys)
+  })
+
   it('orders properties of objects without a type', async () => {
     const output = await generateObject('Give each field a random word.', {
       properties: Object.fromEntries(
