@@ -97,7 +97,8 @@ console.log(result.output)
 ```
 
 Supported schema shapes include objects, arrays, strings, numbers, booleans,
-and enums. String formats, regular expressions, and unions are not currently
+and enums. References to `$defs` or `definitions` work too, including
+recursive schemas that reference themselves with `#`. String formats, regular expressions, and unions are not currently
 mapped to Apple Foundation Models.
 
 ## Availability And Model Info

@@ -127,6 +127,163 @@ describe('apple structured output', () => {
     expect(new Set(firstSnapshot).size).toBeGreaterThan(1)
   })
 
+  it('resolves references to definitions', async () => {
+    const output = await generateObject(
+      'Ship from 1 Main St, Springfield to 9 Elm St, Shelbyville by express.',
+      {
+        type: 'object',
+        properties: {
+          from: { $ref: '#/$defs/address' },
+          to: { $ref: '#/$defs/address' },
+          speed: { $ref: '#/$defs/speed' },
+        },
+        required: ['from', 'to', 'speed'],
+        $defs: {
+          address: {
+            type: 'object',
+            properties: {
+              street: { type: 'string' },
+              city: { type: 'string' },
+            },
+            required: ['street', 'city'],
+          },
+          speed: { type: 'string', enum: ['standard', 'express'] },
+        },
+      }
+    )
+
+    expect(output.from.city).toMatch(/springfield/i)
+    expect(output.to.city).toMatch(/shelbyville/i)
+    expect(output.speed).toBe('express')
+  })
+
+  it('keeps properties named like definitions', async () => {
+    const output = await generateObject('Define the word "apple" briefly.', {
+      type: 'object',
+      properties: { definitions: { type: 'string' } },
+      required: ['definitions'],
+    })
+
+    expect(typeof output.definitions).toBe('string')
+  })
+
+  it('inlines nullable definitions that are not objects', async () => {
+    const output = await generateObject('Label this item: a red apple.', {
+      type: 'object',
+      properties: { label: { $ref: '#/$defs/label' } },
+      required: ['label'],
+      $defs: { label: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+    })
+
+    expect(typeof output.label).toBe('string')
+  })
+
+  it('rejects references that cycle through definitions it inlines', async () => {
+    await expect(
+      generateObject('List some items.', {
+        type: 'object',
+        properties: { items: { $ref: '#/$defs/nested' } },
+        required: ['items'],
+        $defs: { nested: { type: 'array', items: { $ref: '#/$defs/nested' } } },
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
+  })
+
+  it('keeps the description of a property that references a definition', async () => {
+    const output = await generateObject('Fill in the fields.', {
+      type: 'object',
+      properties: {
+        fruit: {
+          $ref: '#/$defs/word',
+          description: 'Always exactly the word KIWI in uppercase.',
+        },
+      },
+      required: ['fruit'],
+      $defs: { word: { type: 'string' } },
+    })
+
+    expect(output.fruit).toMatch(/kiwi/i)
+  })
+
+  it('rejects references outside $defs and definitions', async () => {
+    await expect(
+      generateObject('Fill in the fields.', {
+        type: 'object',
+        properties: { address: { $ref: '#/other/address' } },
+        required: ['address'],
+        $defs: { address: { type: 'string' } },
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
+  })
+
+  it('keeps $defs and definitions apart', async () => {
+    const output = await generateObject('Fill in the fields.', {
+      type: 'object',
+      properties: {
+        modern: { $ref: '#/$defs/fruit' },
+        legacy: { $ref: '#/definitions/fruit' },
+      },
+      required: ['modern', 'legacy'],
+      $defs: {
+        fruit: {
+          type: 'object',
+          properties: { apple: { type: 'string' } },
+          required: ['apple'],
+        },
+      },
+      definitions: {
+        fruit: {
+          type: 'object',
+          properties: { banana: { type: 'string' } },
+          required: ['banana'],
+        },
+      },
+    })
+
+    expect(Object.keys(output.modern)).toEqual(['apple'])
+    expect(Object.keys(output.legacy)).toEqual(['banana'])
+  })
+
+  it('names definitions apart from a root with the same title', async () => {
+    const output = await generateObject('Describe a tree node named "a".', {
+      title: 'node',
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        label: { $ref: '#/$defs/node' },
+      },
+      required: ['name', 'label'],
+      $defs: {
+        node: {
+          type: 'object',
+          properties: { text: { type: 'string' } },
+          required: ['text'],
+        },
+      },
+    })
+
+    expect(typeof output.name).toBe('string')
+    expect(typeof output.label.text).toBe('string')
+  })
+
+  it('generates recursive schemas', async () => {
+    const output = await generateObject(
+      'Describe the folder "src" that contains the folder "lib", which contains no folders.',
+      {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          folders: { type: 'array', items: { $ref: '#' }, maxItems: 2 },
+        },
+        required: ['name', 'folders'],
+      }
+    )
+
+    expect(output.name).toMatch(/src/i)
+    expect(output.folders[0].name).toMatch(/lib/i)
+    expect(Array.isArray(output.folders[0].folders)).toBe(true)
+  })
+
   it('picks only listed string enum values', async () => {
     const output = await generateObject('The weather is awful today.', {
       type: 'object',

@@ -1525,11 +1525,122 @@ public class AppleLLMImpl: NSObject {
     // anyOf gets one from its path. Schemas without titles (all of Zod's) would
     // otherwise share an empty name and nested objects would resolve to the root
     static func createGenerationSchema(from schemaDict: [String: Any], name: String = "Root") throws -> GenerationSchema {
-      let dynamicSchemas = try parseDynamicSchema(from: schemaDict, path: name)
-      return try GenerationSchema(root: dynamicSchemas, dependencies: [])
+      let rootName = schemaDict["title"] as? String ?? name
+      // $defs and definitions are separate namespaces, and a definition can share
+      // its key with the root's title, so definitions are named after both their
+      // namespace and key
+      var definitions: [String: Any] = [:]
+      for namespace in ["$defs", "definitions"] {
+        for (key, definition) in schemaDict[namespace] as? [String: Any] ?? [:] {
+          definitions[definitionName(namespace: namespace, key: key)] = definition
+        }
+      }
+      let resolve = { (schema: [String: Any]) in
+        try resolveReferences(in: schema, definitions: definitions, rootName: rootName) as! [String: Any]
+      }
+
+      let dynamicSchemas = try parseDynamicSchema(from: resolve(schemaDict), path: name)
+      // Referenced definitions are named like their references, so they resolve to them
+      let dependencies = try definitions.keys.sorted().compactMap { definitionName -> DynamicGenerationSchema? in
+        guard let definition = definitions[definitionName] as? [String: Any], isNamedSchema(definition) else {
+          return nil
+        }
+        var namedDefinition = try resolve(definition)
+        namedDefinition["title"] = definitionName
+        return try parseDynamicSchema(from: namedDefinition, path: definitionName)
+      }
+      return try GenerationSchema(root: dynamicSchemas, dependencies: dependencies)
+    }
+
+    static func definitionName(namespace: String, key: String) -> String {
+      "\(namespace).\(key)"
+    }
+
+    // Objects and unions have a name that references can point to, so they can be
+    // recursive. Nullable schemas count as their non-null schema, which the parser
+    // turns them into
+    static func isNamedSchema(_ schema: [String: Any]) -> Bool {
+      if let anyOf = schema["anyOf"] as? [[String: Any]] {
+        let nonNullSchemas = anyOf.filter { $0["type"] as? String != "null" }
+        return nonNullSchemas.count == 1 ? isNamedSchema(nonNullSchemas[0]) : !nonNullSchemas.isEmpty
+      }
+      if let types = schema["type"] as? [String] {
+        let nonNullTypes = types.filter { $0 != "null" }
+        return nonNullTypes.count > 1 || nonNullTypes == ["object"]
+      }
+      return schema["type"] as? String == "object" || schema["properties"] != nil
+    }
+
+    /// Turns JSON schema references into the name of the schema they point to. "#"
+    /// points to the root. Definitions that are not objects or unions have no name,
+    /// so references to them are replaced with the definition
+    ///
+    /// - Parameter inlining: Definitions being inlined, to reject references that cycle
+    ///   through them instead of recursing forever
+    static func resolveReferences(
+      in value: Any,
+      definitions: [String: Any],
+      rootName: String,
+      inlining: Set<String> = []
+    ) throws -> Any {
+      let resolve = { (child: Any) in
+        try resolveReferences(in: child, definitions: definitions, rootName: rootName, inlining: inlining)
+      }
+      if let array = value as? [Any] {
+        return try array.map(resolve)
+      }
+      guard let schema = value as? [String: Any] else {
+        return value
+      }
+      guard let reference = schema["$ref"] as? String else {
+        var resolvedSchema: [String: Any] = [:]
+        for (key, child) in schema where key != "$defs" && key != "definitions" {
+          // Property names can be anything, including "definitions", so only
+          // their schemas are resolved
+          if key == "properties", let properties = child as? [String: Any] {
+            resolvedSchema[key] = try properties.mapValues(resolve)
+          } else {
+            resolvedSchema[key] = try resolve(child)
+          }
+        }
+        return resolvedSchema
+      }
+      // The description of the property that references a schema is kept, and
+      // wins over the description of an inlined definition
+      let referenceDescription = schema["description"].map { ["description": $0] } ?? [:]
+      if reference == "#" {
+        return referenceDescription.merging(["$ref": rootName]) { _, new in new }
+      }
+      // Only definitions directly under $defs or definitions can be referenced
+      let namespace = ["$defs", "definitions"].first { reference.hasPrefix("#/\($0)/") }
+      guard let namespace else {
+        throw AppleLLMError.invalidSchema("Unresolved reference '\(reference)'")
+      }
+      let key = String(reference.dropFirst("#/\(namespace)/".count))
+      let definitionName = definitionName(namespace: namespace, key: key)
+      guard !key.contains("/"), let definition = definitions[definitionName] as? [String: Any] else {
+        throw AppleLLMError.invalidSchema("Unresolved reference '\(reference)'")
+      }
+      if isNamedSchema(definition) {
+        return referenceDescription.merging(["$ref": definitionName]) { _, new in new }
+      }
+      guard !inlining.contains(definitionName) else {
+        throw AppleLLMError.invalidSchema("Reference cycle through '\(definitionName)', which is not an object or union")
+      }
+      let inlined = try resolveReferences(
+        in: definition,
+        definitions: definitions,
+        rootName: rootName,
+        inlining: inlining.union([definitionName])
+      )
+      return (inlined as? [String: Any])?.merging(referenceDescription) { _, new in new } ?? inlined
     }
 
     static func parseDynamicSchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {
+      if let reference = schemaDict["$ref"] as? String {
+        return DynamicGenerationSchema(referenceTo: reference)
+      }
+
       // Nullable values become their non-null schema, since a value that is
       // never null still matches
       if let types = schemaDict["type"] as? [String] {
