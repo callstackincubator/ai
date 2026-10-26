@@ -162,6 +162,28 @@ describe('apple generate', () => {
     ).rejects.toMatchObject({ code: 'GUARDRAIL_VIOLATION' })
   })
 
+  it('rejects tool call history with input that is not JSON', async () => {
+    await expect(
+      apple().doGenerate({
+        prompt: [
+          { role: 'user', content: [{ type: 'text', text: 'Weather?' }] },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'call-1',
+                toolName: 'getWeather',
+                input: '{not json',
+              },
+            ],
+          },
+          { role: 'user', content: [{ type: 'text', text: 'Thanks.' }] },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_MESSAGE' })
+  })
+
   it('rejects sampling with both topP and topK', async () => {
     await expect(
       apple().doGenerate({ prompt: prompt('Say hi.'), topP: 0.9, topK: 40 })
