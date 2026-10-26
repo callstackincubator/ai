@@ -104,7 +104,7 @@ import {
 
 const language = 'en'
 
-// Get embedding model information (getInfo is a deprecated alias)
+// Get embedding model information
 const modelInfo: AppleEmbeddingModelInfo =
   await AppleEmbeddings.getModelInfo(language)
 // { hasAvailableAssets, dimension, languages, maximumSequenceLength,

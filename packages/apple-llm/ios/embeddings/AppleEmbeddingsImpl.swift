@@ -14,7 +14,7 @@ import Accelerate
 @objc
 public class AppleEmbeddingsImpl: NSObject {
   @objc
-  public func getInfo(_ language: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
+  public func getModelInfo(_ language: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
     if #available(iOS 17.0, *) {
       guard let nlLanguage = try? convertToNLLanguage(language),
             let model = NLContextualEmbedding(language: nlLanguage) else {
