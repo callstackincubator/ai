@@ -1417,7 +1417,9 @@ public class AppleLLMImpl: NSObject {
   @_spi(CoreAI) public static func createGenerationOptions(from options: [String: Any]) throws -> GenerationOptions {
     var temperature: Double?
     var maximumResponseTokens: Int?
-    var samplingMode: GenerationOptions.SamplingMode = .greedy
+    // Left nil, Foundation Models uses its default random sampling, which
+    // temperature applies to
+    var samplingMode: GenerationOptions.SamplingMode?
     
     if let temp = options["temperature"] as? Double {
       temperature = temp

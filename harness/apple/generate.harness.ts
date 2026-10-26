@@ -117,6 +117,23 @@ describe('apple generate', () => {
     expect(result.content[0]).toMatchObject({ type: 'text' })
   })
 
+  it('samples with only a temperature set', async () => {
+    const answers = new Set<string>()
+    for (let i = 0; i < 3; i++) {
+      const result = await apple().doGenerate({
+        prompt: prompt(
+          'Invent a name for a new fantasy creature. Reply with the name only.'
+        ),
+        temperature: 1.5,
+      })
+      answers.add(
+        result.content[0].type === 'text' ? result.content[0].text : ''
+      )
+    }
+
+    expect(answers.size).toBeGreaterThan(1)
+  })
+
   it('rejects sampling with both topP and topK', async () => {
     await expect(
       apple().doGenerate({ prompt: prompt('Say hi.'), topP: 0.9, topK: 40 })
