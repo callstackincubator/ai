@@ -5,6 +5,9 @@ import type {
   Experimental_TranscriptionModelV4StreamOptions as TranscriptionModelV4StreamOptions,
   Experimental_TranscriptionModelV4StreamPart as TranscriptionModelV4StreamPart,
   Experimental_TranscriptionModelV4StreamResult as TranscriptionModelV4StreamResult,
+  Experimental_VideoModelV4 as VideoModelV4,
+  Experimental_VideoModelV4CallOptions as VideoModelV4CallOptions,
+  Experimental_VideoModelV4Result as VideoModelV4Result,
   ImageModelV4,
   ImageModelV4CallOptions,
   LanguageModelV4,
@@ -48,6 +51,8 @@ import type {
   CoreAIStreamUpdateEvent,
   CoreAITranscriptionResult,
   CoreAIUsage,
+  CoreAIVideoGenerationOptions,
+  CoreAIVideoGenerationResult,
 } from './types'
 import { toNativeModelConfig } from './types'
 
@@ -69,6 +74,9 @@ export function createCoreAIProvider() {
   }
   provider.transcriptionModel = (config: CoreAIModelConfig) => {
     return new CoreAITranscriptionModel(config)
+  }
+  provider.videoModel = (config: CoreAIModelConfig) => {
+    return new CoreAIVideoModel(config)
   }
 
   return provider
@@ -424,6 +432,108 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
             },
           } as any)
         : undefined,
+    }
+  }
+}
+
+// Wan 2.1 sizes for the aspect ratios it is trained on
+const VIDEO_SIZES: Record<string, { width: number; height: number }> = {
+  '16:9': { width: 832, height: 480 },
+  '9:16': { width: 480, height: 832 },
+  '1:1': { width: 480, height: 480 },
+}
+
+export class CoreAIVideoModel implements VideoModelV4 {
+  readonly specificationVersion = 'v4'
+  readonly provider = 'core-ai'
+  readonly modelId: string
+  readonly maxVideosPerCall = 1
+  readonly config: CoreAIModelConfig
+
+  constructor(config: CoreAIModelConfig) {
+    this.config = { ...config, task: 'video-diffusion' }
+    this.modelId = config.id
+  }
+
+  // Generates an MP4 from the prompt. Takes minutes on device, and the abort
+  // signal stops it after the current denoising step
+  async generate(
+    prompt: string,
+    options: CoreAIVideoGenerationOptions = {},
+    abortSignal?: AbortSignal
+  ): Promise<CoreAIVideoGenerationResult> {
+    abortSignal?.throwIfAborted()
+    const requestId = generateId()
+    const onAbort = () => NativeCoreAI.cancelStream(requestId)
+    abortSignal?.addEventListener('abort', onAbort)
+    try {
+      return (await NativeCoreAI.generateVideo(
+        requestId,
+        toNativeModelConfig(this.config),
+        prompt,
+        options
+      )) as CoreAIVideoGenerationResult
+    } finally {
+      abortSignal?.removeEventListener('abort', onAbort)
+    }
+  }
+
+  async doGenerate(
+    options: VideoModelV4CallOptions
+  ): Promise<VideoModelV4Result> {
+    const warnings: SharedV4Warning[] = []
+    for (const feature of [
+      'image',
+      'frameImages',
+      'inputReferences',
+      'generateAudio',
+    ] as const) {
+      if (options[feature]) {
+        warnings.push({
+          type: 'unsupported',
+          feature,
+          details: 'Core AI video models generate from text only.',
+        })
+      }
+    }
+
+    let size: { width: number; height: number } | undefined
+    if (options.resolution) {
+      const [width, height] = options.resolution.split('x').map(Number)
+      size = { width, height }
+    } else if (options.aspectRatio && options.aspectRatio !== 'adaptive') {
+      size = VIDEO_SIZES[options.aspectRatio]
+      if (!size) {
+        warnings.push({
+          type: 'unsupported',
+          feature: 'aspectRatio',
+          details: `Use resolution, or one of ${Object.keys(VIDEO_SIZES).join(', ')}.`,
+        })
+      }
+    }
+
+    const result = await this.generate(
+      options.prompt ?? '',
+      {
+        ...size,
+        duration: options.duration,
+        fps: options.fps,
+        seed: options.seed,
+        ...(options.providerOptions?.['core-ai'] ?? {}),
+      },
+      options.abortSignal
+    )
+    const { video, mediaType, ...metadata } = result
+
+    return {
+      videos: [{ type: 'base64', data: video, mediaType }],
+      warnings,
+      providerMetadata: { 'core-ai': metadata },
+      response: {
+        timestamp: new Date(),
+        modelId: this.modelId,
+        headers: undefined,
+      },
     }
   }
 }

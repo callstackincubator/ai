@@ -20,6 +20,7 @@ module.exports = ({ config }) => ({
                 'asr',
 
                 'video-segmentation',
+                'video-diffusion',
               ],
             },
           ],

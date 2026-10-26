@@ -137,6 +137,13 @@ export interface Spec extends TurboModule {
   finishTranscriptionStream(
     streamId: string
   ): Promise<CodegenTypes.UnsafeObject>
+  // Cancel with cancelStream(requestId)
+  generateVideo(
+    requestId: string,
+    config: NativeCoreAIModelConfig,
+    prompt: string,
+    options: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
   generateImage(
     config: NativeCoreAIModelConfig,
     prompt: string,

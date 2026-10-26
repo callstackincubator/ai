@@ -7,6 +7,7 @@ export type CoreAIModelTask =
   | 'embedding'
   | 'asr'
   | 'diffusion'
+  | 'video-diffusion'
   | 'segmentation'
   | 'video-segmentation'
   | 'object-detection'
@@ -334,6 +335,43 @@ export interface CoreAIVideoSegmentationOutput {
   video?: string
 }
 
+export interface CoreAIVideoGenerationOptions {
+  // Multiples of 16. Wan 2.1 defaults to 832x480
+  width?: number
+  height?: number
+  // 4n + 1 frames: 17, 33, 49, 65 or 81 (the default)
+  frameCount?: number
+  // Seconds, rounded to the nearest 4n + 1 frames when frameCount is not set
+  duration?: number
+  // 16 by default
+  fps?: number
+  seed?: number
+  negativePrompt?: string
+  // Denoising steps, 50 by default
+  stepCount?: number
+  // 5 by default
+  guidanceScale?: number
+  // Skips the unconditional pass for this fraction of the last steps
+  cfgCutoff?: number
+  // Decodes in tiles of this many latent pixels, to lower peak memory
+  vaeTileSize?: number
+  // Loads each component only while it runs, true by default
+  lazyModelLoading?: boolean
+}
+
+export interface CoreAIVideoGenerationResult {
+  // Base64 MP4
+  video: string
+  mediaType: 'video/mp4'
+  // file:// URL of the MP4 in the app's temporary directory
+  uri: string
+  width: number
+  height: number
+  frameCount: number
+  fps: number
+  seed: number
+}
+
 export interface CoreAITaskInput {
   imageUri?: string
   videoUri?: string
@@ -358,6 +396,7 @@ export interface CoreAICapabilities {
   isCoreAISpeechAvailable: boolean
 
   isCoreAIVideoSegmentationAvailable: boolean
+  isCoreAIVideoDiffusionAvailable: boolean
   supportedPlatform: boolean
   missingProducts: string[]
 }

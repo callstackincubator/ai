@@ -39,6 +39,10 @@ import CoreAISpeech
 import CoreAIVideoSegmenter
 #endif
 
+#if canImport(CoreAIVideoDiffusionPipeline)
+import CoreAIVideoDiffusionPipeline
+#endif
+
 @objc
 public class CoreAIImpl: NSObject {
   private let lock = NSLock()
@@ -76,6 +80,9 @@ public class CoreAIImpl: NSObject {
 #if !canImport(CoreAIVideoSegmenter)
     missingProducts.append("CoreAIVideoSegmentation")
 #endif
+#if !canImport(CoreAIVideoDiffusionPipeline)
+    missingProducts.append("CoreAIVideoDiffusion")
+#endif
 
     resolve([
       "isCoreAIRuntimeAvailable": Self.isCoreAIRuntimeAvailable(),
@@ -85,6 +92,7 @@ public class CoreAIImpl: NSObject {
       "isCoreAIObjectDetectionAvailable": Self.isCoreAIObjectDetectionAvailable(),
       "isCoreAISpeechAvailable": Self.isCoreAISpeechAvailable(),
       "isCoreAIVideoSegmentationAvailable": Self.isCoreAIVideoSegmentationAvailable(),
+      "isCoreAIVideoDiffusionAvailable": Self.isCoreAIVideoDiffusionAvailable(),
       "supportedPlatform": Self.isSupportedPlatform(),
       "missingProducts": missingProducts
     ])
@@ -567,6 +575,37 @@ public class CoreAIImpl: NSObject {
     }
 #else
     rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  /// Generates a video into an MP4 file. Takes minutes on device, so
+  /// cancelStream(requestId) stops it after the current denoising step
+  @objc
+  public func generateVideo(
+    _ requestId: String,
+    config: [String: Any],
+    prompt: String,
+    options: [String: Any]?,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAIVideoDiffusionPipeline)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        startTask(requestId, onError: { _, code, message in
+          reject(code, message, nil)
+        }) {
+          resolve(try await VideoGeneration.generate(prompt: prompt, sourceURL: sourceURL, options: options ?? [:]))
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAIVideoDiffusion"), reject: reject)
 #endif
   }
 
@@ -1115,6 +1154,14 @@ public class CoreAIImpl: NSObject {
 
   private static func isCoreAIVideoSegmentationAvailable() -> Bool {
 #if canImport(CoreAIVideoSegmenter)
+    return isSupportedPlatform()
+#else
+    return false
+#endif
+  }
+
+  private static func isCoreAIVideoDiffusionAvailable() -> Bool {
+#if canImport(CoreAIVideoDiffusionPipeline)
     return isSupportedPlatform()
 #else
     return false
