@@ -1039,8 +1039,14 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
     this.contextualStrings = options.contextualStrings
   }
 
+  /** Whether the device can transcribe. See getModelInfo for locale support */
   isAvailable(): boolean {
     return NativeAppleTranscription.isAvailable(this.language)
+  }
+
+  /** Locale support and asset status for the model's language */
+  getModelInfo() {
+    return NativeAppleTranscription.getModelInfo(this.language)
   }
 
   async prepare(): Promise<void> {
