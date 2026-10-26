@@ -2,77 +2,53 @@ import { PackageManagerTabs } from '@theme'
 
 # Getting Started
 
-The Llama provider enables you to run GGUF models directly on-device in React Native applications using [llama.rn](https://github.com/mybigday/llama.rn). This allows you to download and run any GGUF model from HuggingFace for privacy, performance, and offline capabilities.
+`@react-native-ai/llama` runs GGUF models from Hugging Face on device with
+[llama.rn](https://github.com/mybigday/llama.rn), the React Native bindings for
+llama.cpp. It works on iOS and Android.
+
+| Model                     | Create with                    | Use with                     |
+| ------------------------- | ------------------------------ | ---------------------------- |
+| [Language](./generating)  | `llama.languageModel(path)`    | `generateText`, `streamText` |
+| [Embedding](./embeddings) | `llama.embeddingModel(path)`   | `embed`, `embedMany`         |
+| [Reranking](./reranking)  | `llama.rerankingModel(path)`   | `rerank`                     |
+| [Speech](./speech)        | `llama.speechModel(path, ...)` | `generateSpeech`             |
 
 ## Installation
 
-Install the Llama provider and its peer dependencies:
+<PackageManagerTabs command="install @react-native-ai/llama llama.rn ai" />
 
-<PackageManagerTabs command="install @react-native-ai/llama llama.rn" />
+The provider works with AI SDK v7 and needs its [polyfills](../polyfills.md).
+It requires React Native 0.76 or newer, and llama.rn 0.13.0-rc.8 or newer on
+React Native 0.88.
 
-You can use the Llama provider standalone, but we recommend the Vercel AI SDK for its unified APIs and streaming. To use it with the AI SDK, you'll need v7+ and [required polyfills](../polyfills.md):
+### Expo
 
-<PackageManagerTabs command="install ai" />
+Add the llama.rn config plugin to your app config:
 
-## Requirements
-
-- **React Native >= 0.76.0** - Required for native module functionality
-- **llama.rn >= 0.13.0-rc.8** (required for React Native 0.88) - The underlying llama.cpp bindings
-
-## Expo Setup
-
-For use with the Expo framework and CNG builds, you will need `expo-build-properties` to utilize iOS and OpenCL features. Simply add the following to your `app.json` or `app.config.js` file:
-
-```javascript
-module.exports = {
-  expo: {
-    // ...
-    plugins: [
-      // ...
-      [
-        'llama.rn',
-        // optional fields, below are the default values
-        {
-          enableEntitlements: true,
-          entitlementsProfile: 'production',
-          forceCxx20: true,
-          enableOpenCL: true,
-        },
-      ],
-    ],
-  },
+```json title="app.json"
+{
+  "expo": {
+    "plugins": ["llama.rn"]
+  }
 }
 ```
 
-For all other installation tips and tricks, refer to the [llama.rn Expo documentation](https://github.com/mybigday/llama.rn?tab=readme-ov-file#expo).
+See [llama.rn's Expo setup](https://github.com/mybigday/llama.rn?tab=readme-ov-file#expo)
+for its options, such as entitlements and OpenCL on Android.
 
-## Available Model Types
+## Usage
 
-The Llama provider supports multiple model types:
-
-| Model Type      | Method                   | Use Case                            |
-| --------------- | ------------------------ | ----------------------------------- |
-| Language Model  | `llama.languageModel()`  | Text generation, chat, reasoning    |
-| Embedding Model | `llama.embeddingModel()` | Text embeddings for RAG, similarity |
-| Speech Model    | `llama.speechModel()`    | Text-to-speech with vocoder         |
-
-## Basic Usage
-
-Import the Llama provider and use it with the AI SDK:
+Download a model, load it, and generate:
 
 ```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
+import { downloadModel, llama } from '@react-native-ai/llama'
 import { streamText } from 'ai'
 
-// Download model from HuggingFace - returns the file path
 const modelPath = await downloadModel(
   'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
 )
 
-// Create model instance with the path
 const model = llama.languageModel(modelPath)
-
-// Initialize model (loads into memory)
 await model.prepare()
 
 const { textStream } = streamText({
@@ -84,24 +60,15 @@ for await (const delta of textStream) {
   console.log(delta)
 }
 
-// Cleanup when done
 await model.unload()
 ```
 
-## Model ID Format
+- **`downloadModel`** fetches the file from Hugging Face once and returns its
+  local path. Model IDs are `owner/repo/filename.gguf`.
+- **`prepare()`** loads the model into memory. Without it, the first request
+  loads the model and logs a warning.
+- **`unload()`** frees the memory when you are done.
 
-Models are identified using the HuggingFace format: `owner/repo/filename.gguf`
-
-For example:
-
-- `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`
-- `Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf`
-- `lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q3_K_M.gguf`
-
-You can find GGUF models on [HuggingFace](https://huggingface.co/models?library=gguf).
-
-## Next Steps
-
-- **[Model Management](./model-management.md)** - Complete guide to model lifecycle, downloading, and API reference
-- **[Generating](./generating.md)** - Learn how to generate text, use multimodal inputs, and stream responses
-- **[Embeddings](./embeddings.md)** - Generate text embeddings for RAG and similarity search
+The rest of these docs start from a prepared `model`. See
+[Model Management](./model-management) for downloading, recommended models, and
+all model options.

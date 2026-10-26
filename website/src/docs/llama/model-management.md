@@ -1,223 +1,163 @@
 # Model Management
 
-This guide covers the complete lifecycle of Llama models - from discovery and download to cleanup and removal.
+The llama provider runs any GGUF model from
+[Hugging Face](https://huggingface.co/models?library=gguf). This page covers
+choosing, downloading, loading, and removing models, and lists every model
+option.
 
-## Finding Models
+## Recommended Models
 
-The Llama provider can run any GGUF model from HuggingFace. You can browse available models at [HuggingFace GGUF Models](https://huggingface.co/models?library=gguf).
+These run well on recent phones and are used throughout these docs:
 
-### Recommended Models
+| Model ID                                                                                          | Size   | Use                                  |
+| ------------------------------------------------------------------------------------------------- | ------ | ------------------------------------ |
+| `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`                                      | 1.4 GB | Chat, reasoning, tool calling        |
+| `ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q4_0.gguf`                                           | 2.8 GB | Images and audio, with its projector |
+| `nomic-ai/nomic-embed-text-v1.5-GGUF/nomic-embed-text-v1.5.Q8_0.gguf`                             | 146 MB | [Embeddings](./embeddings)           |
+| `gpustack/jina-reranker-v2-base-multilingual-GGUF/jina-reranker-v2-base-multilingual-Q4_K_M.gguf` | 222 MB | [Reranking](./reranking)             |
+| `OuteAI/OuteTTS-0.3-500M-GGUF/OuteTTS-0.3-500M-Q4_K_M.gguf`                                       | 403 MB | [Speech](./speech), with a vocoder   |
 
-Here are some popular models that work well on mobile devices:
+The suffix is the quantization. Lower levels such as Q3 are smaller and faster
+but lose quality, and Q4_K_M is a good balance on mobile. The model also needs
+memory for its context on top of the file size.
 
-| Model ID                                                          | Size   | Best For                         |
-| ----------------------------------------------------------------- | ------ | -------------------------------- |
-| `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`                    | ~1.4GB | Reasoning and tool calling       |
-| `Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf`   | ~1.9GB | General conversations            |
-| `lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q3_K_M.gguf` | ~2.3GB | High quality responses           |
+## Downloading
 
-> **Note**: When selecting models, consider quantization levels (Q3, Q4, Q5, etc.). Lower quantization = smaller size but potentially lower quality. Q4_K_M is a good balance for mobile.
-
-## Model Lifecycle
-
-### Downloading Models
-
-Models are downloaded from HuggingFace using the storage API. The `downloadModel` function returns the path to the downloaded file:
+`downloadModel` fetches a model from Hugging Face and returns its local path.
+Model IDs are `owner/repo/filename.gguf`. A model that is already on the
+device is not downloaded again:
 
 ```typescript
 import { downloadModel } from '@react-native-ai/llama'
 
-const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
-
-console.log('Downloaded to:', modelPath)
-```
-
-You can track download progress:
-
-```typescript
 const modelPath = await downloadModel(
   'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf',
-  (progress) => {
-    console.log(`Download: ${progress.percentage}%`)
-  }
+  ({ percentage }) => console.log(`Downloaded ${percentage}%`)
 )
 ```
 
-### Checking Download Status
-
-Check if a model is already downloaded:
+To check for a model without downloading it:
 
 ```typescript
-import { isModelDownloaded, getModelPath } from '@react-native-ai/llama'
+import { getModelPath, isModelDownloaded } from '@react-native-ai/llama'
 
 const modelId = 'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
 
 if (await isModelDownloaded(modelId)) {
-  // Model already downloaded, get its path
   const modelPath = getModelPath(modelId)
 }
 ```
 
-### Creating Model Instances
+Models are stored in `llama-models/` in the app's documents directory, by
+file name. Two repositories with the same file name share one file.
 
-Create model instances using the provider methods. Pass the model path (from `downloadModel()` or `getModelPath()`):
+## Removing Models
 
-```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
-
-// Download and get the path
-const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
-
-// Create model with the path
-const languageModel = llama.languageModel(modelPath)
-
-// Embedding model
-const embeddingModel = llama.embeddingModel(modelPath)
-
-// Speech model (requires vocoder)
-const speechModel = llama.speechModel(modelPath, {
-  vocoderPath: '/path/to/vocoder.gguf'
-})
-```
-
-With configuration options:
+List what is on the device and delete models you no longer need:
 
 ```typescript
-const model = llama.languageModel(modelPath, {
-  contextParams: {
-    n_ctx: 4096, // Context window size (default: 2048)
-    n_gpu_layers: 99, // GPU layers for acceleration (default: 99)
-  },
-})
+import { getDownloadedModels, removeModel } from '@react-native-ai/llama'
+
+const models = await getDownloadedModels()
+// [{ model_id, path, filename, sizeBytes }]
+
+await removeModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
 ```
 
-### Preparing Models
+`getDownloadedModels` only knows file names, so each `model_id` is the file
+name rather than the full model ID.
 
-After creating a model instance, prepare it for inference (loads it into memory):
+## Creating Model Instances
+
+Create a model from the downloaded path. Each model type has its own factory,
+with the options listed in the [API reference](#api-reference):
+
+```typescript
+import { llama } from '@react-native-ai/llama'
+
+const languageModel = llama.languageModel(modelPath, {
+  contextParams: { n_ctx: 4096 },
+})
+const embeddingModel = llama.embeddingModel(embeddingModelPath)
+const rerankingModel = llama.rerankingModel(rerankingModelPath)
+const speechModel = llama.speechModel(speechModelPath, { vocoderPath })
+```
+
+## Loading and Unloading
+
+`prepare()` loads the model into memory. Call it ahead of time, since loading
+takes a while. Without it, the first request loads the model and logs a
+warning. `unload()` frees the memory:
 
 ```typescript
 await model.prepare()
-```
 
-> [!TIP]
-> Calling `prepare()` ahead of time is recommended for optimal performance. If not called, the model will auto-prepare when first used, but a warning will be logged.
+// ...use the model
 
-### Using Models
-
-Once prepared, use the model with AI SDK functions:
-
-```typescript
-import { streamText } from 'ai'
-
-const { textStream } = streamText({
-  model,
-  prompt: 'Hello! Introduce yourself briefly.',
-})
-
-for await (const delta of textStream) {
-  console.log(delta)
-}
-```
-
-### Accessing the Native Context
-
-For advanced usage, you can access the underlying `LlamaContext`:
-
-```typescript
-// Ensure the model is prepared before accessing the context
-await model.prepare()
-
-const context = model.getContext()
-
-if (!context) {
-  throw new Error(
-    'Model context is not available. Make sure prepare() has completed and the model has not been unloaded.',
-  )
-}
-```
-
-### Unloading Models
-
-Unload the model from memory to free resources:
-
-```typescript
 await model.unload()
+```
+
+For llama.rn features the provider does not cover, use the underlying
+`LlamaContext`, which is available once the model is prepared:
+
+```typescript
+await model.prepare()
+const context = model.getContext()
 ```
 
 ## API Reference
 
-### `llama`
-
-Default provider instance with the following methods:
+`llama` is the default provider. `createLlamaProvider()` creates another one.
+Every model has `prepare()`, `getContext()`, and `unload()`, and takes llama.rn
+[context parameters](https://github.com/mybigday/llama.rn) in `contextParams`.
 
 ### `llama.languageModel(modelPath, options?)`
 
-Creates a language model instance.
+| Option                       | Default                     | Description                                                                                                                    |
+| ---------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `projectorPath`              |                             | Multimodal projector (`mmproj`), required for images and audio                                                                 |
+| `projectorUseGpu`            | `true`                      | Run the projector on the GPU                                                                                                   |
+| `projectorImageMaxTokens`    | A quarter of `n_ctx`        | Most tokens one image can take, for models that size images dynamically. Full-resolution photos can otherwise fill the context |
+| `contextParams.n_ctx`        | 2048, 4096 with a projector | Context size in tokens                                                                                                         |
+| `contextParams.n_gpu_layers` | 99                          | Layers offloaded to the GPU                                                                                                    |
 
-- `modelPath`: Path to the model file (from `downloadModel()` or `getModelPath()`)
-- `options`:
-  - `projectorPath`: Path to multimodal projector for vision/audio support
-  - `projectorUseGpu`: Use GPU for multimodal processing (default: `true`)
-  - `projectorImageMaxTokens`: Most tokens an image can take, for models that size images dynamically (default: a quarter of `n_ctx`). Full-resolution photos can otherwise take more tokens than the context holds
-  - `contextParams`: llama.rn context parameters
-    - `n_ctx`: Context size (default: 2048, or 4096 for multimodal)
-    - `n_gpu_layers`: Number of GPU layers (default: 99)
-    - `state_cache_budget_mb`: Prefix cache for recurrent and hybrid models such as Qwen3.5 (default: 0). llama.rn crashes on the completion after a tool call or structured output when it is on
+:::warning
+Keep `contextParams.state_cache_budget_mb` at its default, `0`. It turns on
+llama.rn's prefix cache for recurrent and hybrid models such as Qwen3.5, and
+llama.rn crashes on the completion after a tool call or structured output when
+it is on.
+:::
 
 ### `llama.embeddingModel(modelPath, options?)`
 
-Creates an embedding model instance.
+| Option                       | Default | Description                                                                                   |
+| ---------------------------- | ------- | --------------------------------------------------------------------------------------------- |
+| `normalize`                  | -1      | -1 for none, 0 for max absolute int16, 1 for taxicab, 2 for euclidean, above 2 for p-norm     |
+| `contextParams.n_ctx`        | 2048    | Context size in tokens, the longest text one value can be                                     |
+| `contextParams.n_gpu_layers` | 99      | Layers offloaded to the GPU                                                                   |
+| `contextParams.n_parallel`   | 8       | Values embedded per call. Calls run one at a time, since a context embeds one value at a time |
 
-- `modelPath`: Path to the model file (from `downloadModel()` or `getModelPath()`)
-- `options`:
-  - `normalize`: Normalize embeddings (default: -1)
-  - `contextParams`: llama.rn context parameters
-    - `n_ctx`: Context size (default: 2048)
-    - `n_gpu_layers`: Number of GPU layers (default: 99)
-    - `n_parallel`: Values embedded per call (default: 8). Calls run one at a time, since a context embeds one value at a time
+### `llama.rerankingModel(modelPath, options?)`
+
+| Option                       | Default         | Description                 |
+| ---------------------------- | --------------- | --------------------------- |
+| `normalize`                  | The model's own | Score normalization         |
+| `contextParams.n_ctx`        | 2048            | Context size in tokens      |
+| `contextParams.n_gpu_layers` | 99              | Layers offloaded to the GPU |
 
 ### `llama.speechModel(modelPath, options)`
 
-Creates a speech model instance for text-to-speech.
-
-- `modelPath`: Path to the model file (from `downloadModel()` or `getModelPath()`)
-- `options`:
-  - `vocoderPath`: **Required** - Path to a [codec.cpp](https://github.com/mybigday/codec.cpp) vocoder GGUF, e.g. `BricksDisplay/codec.cpp-gguf/wavtokenizer-large-speech-75tokens.gguf` for OuteTTS 0.3
-  - `vocoderBatchSize`: Batch size for vocoder processing
-  - `contextParams`: llama.rn context parameters
-
-Speech is returned as 16-bit mono WAV at the vocoder's sample rate.
+| Option             | Default | Description                                                                                                                                                              |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `vocoderPath`      |         | Required. A [codec.cpp](https://github.com/mybigday/codec.cpp) vocoder GGUF, e.g. `BricksDisplay/codec.cpp-gguf/wavtokenizer-large-speech-75tokens.gguf` for OuteTTS 0.3 |
+| `vocoderBatchSize` |         | Batch size for the vocoder                                                                                                                                               |
 
 ### Storage Functions
 
-These functions are exported directly for model management. Models are stored in `${DocumentDir}/llama-models/`.
-
-### `downloadModel(modelId, progressCallback?)`
-
-Download a model from HuggingFace.
-
-- `modelId`: Model identifier in format `owner/repo/filename.gguf`
-- `progressCallback`: Optional callback with `{ percentage: number }`
-- Returns: `Promise<string>` - Path to the downloaded model file
-
-### `getModelPath(modelId)`
-
-Get the local file path for a model (without downloading).
-
-- `modelId`: Model identifier in format `owner/repo/filename.gguf`
-- Returns: `string` - Path where the model file is/would be stored
-
-### `isModelDownloaded(modelId)`
-
-Check if a model is downloaded.
-
-- `modelId`: Model identifier in format `owner/repo/filename.gguf`
-- Returns: `Promise<boolean>`
-
-### Model Instance Methods
-
-All model types share these common methods:
-
-- `prepare()`: Initialize/load model into memory
-- `getContext()`: Get the underlying LlamaContext (for advanced usage)
-- `unload()`: Release model from memory
+| Function                              | Returns                | Description                                           |
+| ------------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `downloadModel(modelId, onProgress?)` | `Promise<string>`      | Downloads a model if needed and returns its path      |
+| `getModelPath(modelId)`               | `string`               | Where the model is or would be stored                 |
+| `isModelDownloaded(modelId)`          | `Promise<boolean>`     | Whether the model file exists                         |
+| `getDownloadedModels()`               | `Promise<ModelInfo[]>` | Every downloaded `.gguf` file, with its size in bytes |
+| `removeModel(modelId)`                | `Promise<void>`        | Deletes the model file                                |
