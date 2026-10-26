@@ -18,6 +18,7 @@ describe('apple spotlight tool', () => {
       providerOptions: { apple: { builtInTools: ['spotlight'] } },
     })
 
+    expect(result.content.some((part) => part.type === 'tool-call')).toBe(true)
     expect(result.content.some((part) => part.type === 'text')).toBe(true)
   })
 })

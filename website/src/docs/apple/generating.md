@@ -37,8 +37,10 @@ const result = await generateText({
 console.log(result.text)
 ```
 
-Call `prepare()` shortly before the first generation, for example when the
-user opens a chat, to load the model into memory so it answers sooner:
+Call `prepare()` a little before the first generation, for example when the
+user opens a chat, to start loading the model into memory so it answers
+sooner. It resolves once loading has started, not when the model is ready, so
+call it at least a second ahead rather than right before generating:
 
 ```typescript
 const model = apple()
@@ -60,9 +62,10 @@ const result = await generateText({
 Do not pass both `topP` and `topK` in the same request. Apple Foundation Models
 supports one sampling strategy at a time.
 
-Pass `seed` to get the same answer for the same prompt and settings. Without
-`topP` or `topK`, a seed samples from every token like Apple's default
-sampling.
+Pass `seed`, a non-negative whole number, to make answers more repeatable for
+the same prompt and settings. Apple does not guarantee the exact same answer
+every time. Without `topP` or `topK`, a seed samples from every token like
+Apple's default sampling.
 
 ## Streaming
 
@@ -231,7 +234,10 @@ user, and offer Apple's way to raise it, such as iCloud+:
 ```typescript
 const { quota } = await apple.getModelInfo({ model: 'private-cloud-compute' })
 
-if (quota?.isApproachingLimit && quota.canIncreaseLimit) {
+if (
+  (quota?.isApproachingLimit || quota?.isLimitReached) &&
+  quota.canIncreaseLimit
+) {
   await apple.showQuotaLimitIncreaseSuggestion()
 }
 ```
