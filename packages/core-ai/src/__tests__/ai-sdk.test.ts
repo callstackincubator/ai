@@ -656,6 +656,57 @@ describe('core ai streaming transcription', () => {
     expect(finishTranscriptionStream).not.toHaveBeenCalled()
   })
 
+  test('cancels the audio source when transcription fails', async () => {
+    startTranscriptionStream.mockImplementationOnce(async () => {
+      throw new Error('no model')
+    })
+    let cancelReason: unknown
+    const audio = new ReadableStream<Uint8Array>({
+      cancel(reason) {
+        cancelReason = reason
+      },
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio,
+      inputAudioFormat: { type: 'audio/pcm' },
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('no model')
+    expect(cancelReason).toEqual(new Error('no model'))
+    expect(audio.locked).toBe(false)
+  })
+
+  test('does not start with an aborted signal', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      createTranscriptionModel().doStream({
+        audio: audioStream([]),
+        inputAudioFormat: { type: 'audio/pcm' },
+        abortSignal: controller.signal,
+      })
+    ).rejects.toThrow()
+    expect(startTranscriptionStream).not.toHaveBeenCalled()
+  })
+
+  test('errors when aborted while finishing', async () => {
+    const controller = new AbortController()
+    finishTranscriptionStream.mockImplementationOnce(async () => {
+      controller.abort(new Error('stopped'))
+      return transcriptionResult
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([0, 0])]),
+      inputAudioFormat: { type: 'audio/pcm' },
+      abortSignal: controller.signal,
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('stopped')
+  })
+
   test('rejects audio that is not pcm', async () => {
     await expect(
       createTranscriptionModel().doStream({
