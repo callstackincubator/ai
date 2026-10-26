@@ -1,5 +1,5 @@
 import type { JSONSchema7 } from '@ai-sdk/provider'
-import { apple } from '@react-native-ai/apple'
+import { apple, AppleFoundationModels } from '@react-native-ai/apple'
 import { describe, expect, it } from 'react-native-harness'
 
 import { prompt, readAll, textOf } from './helpers'
@@ -15,6 +15,8 @@ async function generateObject(text: string, schema: JSONSchema7) {
   }
   return JSON.parse(part.text)
 }
+
+const orderedKeys = ['zulu', 'alpha', 'mike', 'bravo', 'yankee']
 
 function numberSchema(value: JSONSchema7): JSONSchema7 {
   return {
@@ -33,6 +35,96 @@ describe('apple structured output', () => {
     })
 
     expect(output.city).toMatch(/paris/i)
+  })
+
+  it('orders properties of a property named properties', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      type: 'object',
+      properties: {
+        properties: {
+          type: 'object',
+          properties: Object.fromEntries(
+            orderedKeys.map((key) => [key, { type: 'string' }])
+          ),
+          required: orderedKeys,
+        },
+      },
+      required: ['properties'],
+    })
+
+    expect(Object.keys(output.properties)).toEqual(orderedKeys)
+  })
+
+  it('orders properties of objects without a type', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      properties: Object.fromEntries(
+        orderedKeys.map((key) => [key, { type: 'string' }])
+      ),
+      required: orderedKeys,
+    })
+
+    expect(Object.keys(output)).toEqual(orderedKeys)
+  })
+
+  it('returns properties in the order the schema declares them', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      type: 'object',
+      properties: Object.fromEntries(
+        orderedKeys.map((key) => [key, { type: 'string' }])
+      ),
+      required: orderedKeys,
+    })
+
+    expect(Object.keys(output)).toEqual(orderedKeys)
+  })
+
+  it('generates properties in the order the schema declares them', async () => {
+    // Native receives objects as dictionaries, so the provider sends the order
+    // in x-order. Snapshots show the order properties are generated in
+    const snapshots: string[] = []
+    await new Promise<void>((resolve, reject) => {
+      const listeners = [
+        AppleFoundationModels.onStreamUpdate(({ content }) => {
+          snapshots.push(content)
+        }),
+        AppleFoundationModels.onStreamComplete(() => done()),
+        AppleFoundationModels.onStreamError(({ error }) =>
+          done(new Error(error))
+        ),
+      ]
+      const done = (error?: Error) => {
+        listeners.forEach((listener) => listener.remove())
+        if (error) {
+          reject(error)
+        } else {
+          resolve()
+        }
+      }
+      AppleFoundationModels.generateStream(
+        'property-order',
+        [{ role: 'user', content: 'Give each field a random word.' }],
+        {
+          schema: {
+            'type': 'object',
+            'properties': Object.fromEntries(
+              orderedKeys.map((key) => [key, { type: 'string' }])
+            ),
+            'required': orderedKeys,
+            'x-order': orderedKeys,
+          },
+        }
+      )
+    })
+
+    // Properties that first appear in the same snapshot can be in any order,
+    // since the snapshot JSON does not keep key order
+    const firstSnapshot = orderedKeys.map((key) =>
+      snapshots.findIndex((snapshot) => key in JSON.parse(snapshot))
+    )
+    expect(firstSnapshot.every((index) => index >= 0)).toBe(true)
+    expect(firstSnapshot).toEqual([...firstSnapshot].sort((a, b) => a - b))
+    // Arbitrary order would almost never keep every snapshot index in order
+    expect(new Set(firstSnapshot).size).toBeGreaterThan(1)
   })
 
   it('picks only listed string enum values', async () => {

@@ -498,16 +498,59 @@ function isFractionalEnum(schema: unknown) {
   )
 }
 
+// Foundation Models generates properties in order, but native receives objects
+// as dictionaries, which have none, so the order is sent as a list
+// It walks the schema by its structure, since a property can be named like any
+// keyword, including "properties"
+function withPropertyOrder(
+  schema: JSONSchema7Definition
+): JSONSchema7Definition {
+  if (typeof schema !== 'object' || schema === null) {
+    return schema
+  }
+  const { properties, items, anyOf } = schema
+  const { $defs } = schema as { $defs?: Record<string, JSONSchema7Definition> }
+  const definitions = schema.definitions
+  const mapSchemas = (map: Record<string, JSONSchema7Definition>) =>
+    Object.fromEntries(
+      Object.entries(map).map(([name, value]) => [
+        name,
+        withPropertyOrder(value),
+      ])
+    )
+  // Like the native parser, objects can leave out their type or be nullable
+  const isObject =
+    schema.type === undefined ||
+    schema.type === 'object' ||
+    (Array.isArray(schema.type) && schema.type.includes('object'))
+
+  return {
+    ...schema,
+    ...(properties && { properties: mapSchemas(properties) }),
+    ...(properties && isObject && { 'x-order': Object.keys(properties) }),
+    ...(items && {
+      items: Array.isArray(items)
+        ? items.map(withPropertyOrder)
+        : withPropertyOrder(items),
+    }),
+    ...(anyOf && { anyOf: anyOf.map(withPropertyOrder) }),
+    ...($defs && { $defs: mapSchemas($defs) }),
+    ...(definitions && { definitions: mapSchemas(definitions) }),
+  } as JSONSchema7
+}
+
 function toNativeSchema<T extends JSONSchema7 | undefined>(schema: T): T {
   return (
     schema &&
-    JSON.parse(
-      JSON.stringify(schema, (_, value) =>
-        isFractionalEnum(value)
-          ? { ...value, type: 'string', enum: value.enum!.map(String) }
-          : value
+    (withPropertyOrder(
+      JSON.parse(
+        JSON.stringify(schema, (_, value) =>
+          isFractionalEnum(value)
+            ? { ...value, type: 'string', enum: value.enum!.map(String) }
+            : value
+        )
       )
-    )
+    ) as T)
   )
 }
 
@@ -529,11 +572,18 @@ function restoreNumbers(
     )
   }
   if (value && typeof value === 'object' && schema.properties) {
+    // Foundation Models generates properties in schema order, but its JSON
+    // does not keep that order, so it is restored here too
+    const order = Object.keys(schema.properties)
+    const rank = (key: string) =>
+      order.includes(key) ? order.indexOf(key) : order.length
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        restoreNumbers(item, schema.properties![key]),
-      ])
+      Object.entries(value)
+        .sort(([a], [b]) => rank(a) - rank(b))
+        .map(([key, item]) => [
+          key,
+          restoreNumbers(item, schema.properties![key]),
+        ])
     )
   }
   return (schema.anyOf ?? []).reduce(restoreNumbers, value)
