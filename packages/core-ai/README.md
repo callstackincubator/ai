@@ -20,7 +20,9 @@ Core AI exposes two layers:
 - Direct native APIs: model loading, persistent language sessions, model
   inspection, segmentation, video segmentation, object detection,
   super-resolution, classification, depth estimation, and raw `.aimodel`
-  function calls. `specializeModel` returns metadata only.
+  function calls.
+- Model management: downloads from Hugging Face with progress and resume,
+  ahead-of-time specialization, and removal.
 
 Video generation runs through `coreAI.videoModel(...)` and AI SDK
 `experimental_generateVideo`. Reranking and speech generation have no adapters, because
@@ -137,7 +139,23 @@ await CoreAI.inspectModel(toNativeModelConfig(modelConfig))
 
 ## Loading Models
 
-Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
+Core AI loads models from local `.aimodel` / `.aimodelc` files. Bundle them with your app, or download them into app storage and specialize them ahead of time:
+
+```ts
+import { coreAI, downloadModel } from '@react-native-ai/core-ai'
+
+const source = await downloadModel({
+  id: 'qwen3-0.6b',
+  repo: 'grabbou/qwen3-0.6b-CoreAI',
+  folder: 'ios',
+  onProgress: ({ percentage }) => console.log(`${percentage}%`),
+})
+
+const model = coreAI.languageModel({ id: 'qwen3-0.6b', source, variant: 'iOS' })
+await model.specialize()
+```
+
+Interrupted downloads resume, and `removeModel` deletes a model with its specialized assets. See [Loading Models](./docs/api.md#loading-models).
 
 ## Documentation
 

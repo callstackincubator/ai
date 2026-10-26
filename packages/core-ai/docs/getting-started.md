@@ -91,17 +91,23 @@ Start with Qwen3 0.6B because Apple’s registry includes an iOS preset:
 uv run coreai.llm.export Qwen/Qwen3-0.6B --platform iOS --output-dir ./models
 ```
 
-Then load it from React Native:
+Then bundle it with your app, or download it at runtime. The export is hosted on [Hugging Face](https://huggingface.co/grabbou/qwen3-0.6b-CoreAI):
 
 ```typescript
-import { coreAI } from '@react-native-ai/core-ai'
+import { coreAI, downloadModel } from '@react-native-ai/core-ai'
 import { streamText } from 'ai'
 
-const model = coreAI.languageModel({
+const source = await downloadModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  repo: 'grabbou/qwen3-0.6b-CoreAI',
+  folder: 'ios',
+  onProgress: ({ percentage }) => console.log(`${percentage}%`),
 })
+
+const model = coreAI.languageModel({ id: 'qwen3-0.6b', source, variant: 'iOS' })
+
+// Optional: specialize for this device now instead of on the first load
+await model.specialize()
 
 const result = streamText({
   model,

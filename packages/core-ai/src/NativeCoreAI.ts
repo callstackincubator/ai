@@ -66,6 +66,12 @@ export type CoreAITranscriptionUpdateEvent = {
   endSecond: number
 }
 
+export type CoreAIDownloadProgressEvent = {
+  downloadId: string
+  bytesWritten: number
+  totalBytes: number
+}
+
 export interface Spec extends TurboModule {
   getCapabilities(): Promise<CodegenTypes.UnsafeObject>
 
@@ -76,10 +82,23 @@ export interface Spec extends TurboModule {
   ): Promise<CoreAILoadedModel>
   unloadModel(modelHandle: string): Promise<void>
   removeModel(config: NativeCoreAIModelConfig): Promise<void>
+  // Specializes the model's .aimodel assets ahead of time into the default
+  // AIModelCache, with the options the loader of config.task uses
   specializeModel(
     config: NativeCoreAIModelConfig,
     options: CodegenTypes.UnsafeObject
   ): Promise<CoreAIModelInfo>
+  clearSpecializationCache(config: NativeCoreAIModelConfig): Promise<void>
+
+  // Where downloadModel stores models, each in a directory named by its id
+  getModelsDirectory(): string
+  isModelDownloaded(id: string): boolean
+  // Downloads a Hugging Face folder into the models directory and resolves
+  // its { uri }. Cancel with cancelStream(downloadId)
+  downloadModel(
+    downloadId: string,
+    options: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
 
   createLanguageSession(
     modelHandle: string,
@@ -112,7 +131,7 @@ export interface Spec extends TurboModule {
     messages: CoreAIMessage[],
     options: CodegenTypes.UnsafeObject
   ): void
-  // Cancels a stream or a generateText request
+  // Cancels a stream, a generateText request or a download
   cancelStream(streamId: string): void
 
   embed(
@@ -167,6 +186,7 @@ export interface Spec extends TurboModule {
   onStreamComplete: CodegenTypes.EventEmitter<CoreAIStreamCompleteEvent>
   onStreamError: CodegenTypes.EventEmitter<CoreAIStreamErrorEvent>
   onTranscriptionUpdate: CodegenTypes.EventEmitter<CoreAITranscriptionUpdateEvent>
+  onDownloadProgress: CodegenTypes.EventEmitter<CoreAIDownloadProgressEvent>
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeCoreAI')

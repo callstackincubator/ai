@@ -101,7 +101,7 @@ Native-only API status:
 | Capability           | API                                       | Status                                  | Why native-only                                                            |
 | -------------------- | ----------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------- |
 | Model inspection     | `CoreAI.inspectModel(...)`                | Supported                               | AI SDK does not manage Core AI asset metadata.                             |
-| Specialization       | `CoreAI.specializeModel(...)`             | Returns metadata only, does not compile | Core AI-specific preparation step.                                         |
+| Specialization       | `specializeModel(...)`                    | Supported                               | Core AI-specific preparation step.                                         |
 | Persistent sessions  | `model.createSession(...)`                | Supported for language models           | AI SDK owns message history; Core AI sessions own native transcript state. |
 | Segmentation         | `CoreAI.runTask('segmentation', ...)`     | Supported                               | AI SDK image APIs do not model segmentation masks.                         |
 | Object detection     | `CoreAI.runTask('object-detection', ...)` | Supported                               | AI SDK has no detection primitive.                                         |
@@ -194,7 +194,49 @@ keep it inside the context window, see
 
 ## Loading Models
 
-Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
+Core AI loads models from local `.aimodel` / `.aimodelc` files. Bundle them with your app (`source: { type: 'bundle', name }`), or download them into app storage:
+
+```typescript
+import {
+  coreAI,
+  downloadModel,
+  isModelDownloaded,
+  removeModel,
+  specializeModel,
+} from '@react-native-ai/core-ai'
+
+const source = await downloadModel({
+  id: 'qwen3-0.6b',
+  repo: 'grabbou/qwen3-0.6b-CoreAI',
+  folder: 'ios',
+  onProgress: ({ percentage }) => console.log(`${percentage}%`),
+})
+
+const model = coreAI.languageModel({ id: 'qwen3-0.6b', source, variant: 'iOS' })
+await model.specialize()
+```
+
+- `downloadModel` copies a folder of a Hugging Face repo (the whole repo when `folder` is omitted) to `Documents/coreai-models/<id>`, excluded from backups, and returns its `source`. `revision` picks a branch, tag or commit. A model that is there already returns at once, without a request.
+- Files download into `<id>.partial` and move into place once all of them are complete, so `isModelDownloaded(id)` (synchronous) never sees half a model. An interrupted download, from an aborted `signal`, a lost connection or the app being killed, resumes on the next `downloadModel` call: complete files are kept and the partial one continues with a range request.
+- `getModelSource(id)` returns where a model downloads to, for building configs before it is there.
+
+### Specialization
+
+Core AI specializes each `.aimodel` for the device the first time it loads, which can take from seconds to minutes, and keeps the result in the app's `AIModelCache`. `specializeModel(config)` (or `model.specialize()` on a language model) does that ahead of time, for example right after downloading, so the first generation doesn't wait:
+
+```typescript
+const info = await specializeModel(
+  { id: 'flux2-klein-4b', source, task: 'diffusion' },
+  { persistence: 'persistent' }
+)
+// One entry per .aimodel: { name, computeUnits, cached, durationMs }
+info.metadata.assets
+```
+
+- Pass the `task` the model is used for. Each `coreai-models` loader specializes with options of its own (GPU for diffusion, Neural Engine for static-shape language models, and so on), and a cache entry only matches the options it was made with. For raw models, embeddings and the vision tasks, pass the `computeUnits` you load them with.
+- `persistence: 'persistent'` keeps the specialized assets until the next OS update. By default the system may purge them when storage runs low or the source model changes. Every OS update purges them.
+- Assets that are cached already return `cached: true` without specializing again. Bookmarks of the cache entries are kept in Application Support and restored on the next launch.
+- `clearSpecializationCache(config)` deletes the specialized assets, so the next load specializes again. `removeModel(config)` (or `model.remove()`) deletes the model's files and its specialized assets. Unload the model first: entries a loaded model uses can't be deleted.
 
 ## Starter Models
 

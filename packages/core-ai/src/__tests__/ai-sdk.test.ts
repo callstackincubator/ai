@@ -89,6 +89,27 @@ const onStreamUpdate = createEmitter()
 const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
 const onTranscriptionUpdate = createEmitter()
+const onDownloadProgress = createEmitter()
+const downloadModel = mock(
+  async (
+    _downloadId: string,
+    options: Record<string, unknown>
+  ): Promise<Record<string, unknown>> => ({
+    uri: `/models/${options.id}`,
+  })
+)
+const specializeModel = mock(
+  async (
+    _config: Record<string, unknown>,
+    _options: Record<string, unknown>
+  ) => ({
+    task: 'language',
+    platforms: ['iOS'],
+    functions: [],
+    metadata: { specialized: true },
+  })
+)
+const removeModel = mock(async (_config: Record<string, unknown>) => {})
 
 const transcriptionResult = {
   text: 'hello world',
@@ -130,11 +151,22 @@ mock.module('react-native', () => ({
       appendTranscriptionAudio,
       finishTranscriptionStream,
       onTranscriptionUpdate,
+      onDownloadProgress,
+      downloadModel,
+      specializeModel,
+      removeModel,
+      getModelsDirectory: () => '/models',
+      isModelDownloaded: (id: string) => id === 'downloaded',
     }),
   },
 }))
 
 const { coreAI } = await import('../ai-sdk')
+const {
+  downloadModel: download,
+  getModelSource,
+  isModelDownloaded,
+} = await import('../storage')
 
 const createModel = () =>
   coreAI({ id: 'model', source: { type: 'bundle', name: 'm' } })
@@ -778,5 +810,82 @@ describe('core ai video generation', () => {
     await expect(
       videoModel().doGenerate(callOptions({ abortSignal: controller.signal }))
     ).rejects.toThrow('cancelled')
+  })
+})
+
+describe('core ai model storage', () => {
+  test('stores models by id in the models directory', () => {
+    expect(getModelSource('qwen3')).toEqual({
+      type: 'file',
+      uri: '/models/qwen3',
+    })
+    expect(isModelDownloaded('downloaded')).toBe(true)
+    expect(isModelDownloaded('qwen3')).toBe(false)
+  })
+
+  test('downloads a hub folder and reports its progress', async () => {
+    const progress: number[] = []
+    downloadModel.mockImplementationOnce(async (downloadId, options) => {
+      onDownloadProgress.emit({ downloadId, bytesWritten: 25, totalBytes: 100 })
+      onDownloadProgress.emit({
+        downloadId: 'other',
+        bytesWritten: 50,
+        totalBytes: 100,
+      })
+      onDownloadProgress.emit({
+        downloadId,
+        bytesWritten: 100,
+        totalBytes: 100,
+      })
+      return { uri: `/models/${options.id}` }
+    })
+
+    const source = await download({
+      id: 'qwen3',
+      repo: 'grabbou/qwen3-0.6b-CoreAI',
+      folder: 'ios',
+      onProgress: ({ percentage }) => progress.push(percentage),
+    })
+
+    expect(source).toEqual({ type: 'file', uri: '/models/qwen3' })
+    expect(downloadModel.mock.calls.at(-1)![1]).toEqual({
+      id: 'qwen3',
+      repo: 'grabbou/qwen3-0.6b-CoreAI',
+      folder: 'ios',
+    })
+    expect(progress).toEqual([25, 100])
+  })
+
+  test('cancels the native download on abort', async () => {
+    const controller = new AbortController()
+    downloadModel.mockImplementationOnce(async (downloadId) => {
+      controller.abort()
+      expect(cancelStream).toHaveBeenCalledWith(downloadId)
+      throw new Error('cancelled')
+    })
+
+    await expect(
+      download({ id: 'qwen3', repo: 'r', signal: controller.signal })
+    ).rejects.toThrow('aborted')
+  })
+
+  test('specializes and removes language models by their task', async () => {
+    const model = coreAI.languageModel({
+      id: 'qwen3',
+      source: { type: 'file', uri: '/models/qwen3' },
+    })
+
+    await model.specialize({ persistence: 'persistent' })
+    expect(specializeModel.mock.calls.at(-1)).toEqual([
+      expect.objectContaining({ task: 'language', sourceUri: '/models/qwen3' }),
+      { persistence: 'persistent' },
+    ])
+
+    await model.prepare()
+    await model.remove()
+    expect(unloadModel).toHaveBeenCalled()
+    expect(removeModel.mock.calls.at(-1)![0]).toEqual(
+      expect.objectContaining({ sourceUri: '/models/qwen3' })
+    )
   })
 })

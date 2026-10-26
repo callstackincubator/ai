@@ -46,6 +46,7 @@ import type {
   CoreAIModelInfo,
   CoreAIProviderOptions,
   CoreAIReasoningLevel,
+  CoreAISpecializationOptions,
   CoreAIStreamCompleteEvent,
   CoreAIStreamErrorEvent,
   CoreAIStreamUpdateEvent,
@@ -130,8 +131,9 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     return (await this.load(options)).info
   }
 
+  // Specializes the model ahead of time, so the first load doesn't
   async specialize(
-    options: CodegenTypes.UnsafeObject = {}
+    options: CoreAISpecializationOptions = {}
   ): Promise<CoreAIModelInfo> {
     return NativeCoreAI.specializeModel(
       toNativeModelConfig(this.config),
@@ -150,10 +152,10 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     await NativeCoreAI.unloadModel((await loading).modelHandle)
   }
 
+  // Unloads the model, then deletes its files and specialized assets
   async remove(): Promise<void> {
+    await this.unload()
     await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
-    this.loading = undefined
-    this.loadedModel = undefined
   }
 
   async createSession(
@@ -1001,7 +1003,7 @@ function toUsage(usage: CoreAIUsage | undefined): LanguageModelV4Usage {
   }
 }
 
-function toAbortError(signal: AbortSignal): Error {
+export function toAbortError(signal: AbortSignal): Error {
   if (signal.reason instanceof Error) {
     return signal.reason
   }

@@ -9,6 +9,19 @@ export {
   createCoreAIProvider,
 } from './ai-sdk'
 export { default as CoreAI } from './NativeCoreAI'
+export type {
+  CoreAIDownloadOptions,
+  CoreAIDownloadProgress,
+  CoreAIFileSource,
+} from './storage'
+export {
+  clearSpecializationCache,
+  downloadModel,
+  getModelSource,
+  isModelDownloaded,
+  removeModel,
+  specializeModel,
+} from './storage'
 export { createTensor, readTensor } from './tensor'
 export type {
   CoreAICapabilities,
@@ -32,6 +45,7 @@ export type {
   CoreAIRawFunctionResult,
   CoreAIRawModelOptions,
   CoreAIReasoningLevel,
+  CoreAISpecializationOptions,
   CoreAISuperResolutionOutput,
   CoreAITaskInput,
   CoreAITaskResult,

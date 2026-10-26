@@ -10,6 +10,7 @@ enum CoreAIError: LocalizedError {
   case invalidInput(String)
   case cancelled
   case unsupportedCapability(String)
+  case downloadFailed(String)
 
   var errorDescription: String? {
     switch self {
@@ -30,6 +31,8 @@ enum CoreAIError: LocalizedError {
     case .cancelled:
       return "Core AI request was cancelled."
     case .unsupportedCapability(let message):
+      return message
+    case .downloadFailed(let message):
       return message
     }
   }
@@ -77,6 +80,8 @@ enum CoreAIError: LocalizedError {
       return "CORE_AI_CANCELLED"
     case .unsupportedCapability:
       return "CORE_AI_UNSUPPORTED_CAPABILITY"
+    case .downloadFailed:
+      return "CORE_AI_DOWNLOAD_FAILED"
     }
   }
 }

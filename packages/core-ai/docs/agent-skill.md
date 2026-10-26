@@ -82,7 +82,7 @@ Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 uv run coreai.llm.export Qwen/Qwen3-0.6B --platform iOS --output-dir ./models
 ```
 
-Download or bundle the exported directory into app storage, and pass it as `source: { type: 'file', uri }`. There is no built-in downloader yet.
+Bundle the exported directory, or upload it to Hugging Face and download it with `downloadModel({ id, repo, folder, onProgress })`, which returns its `source` and resumes interrupted downloads. Then `specializeModel({ ...config, task })` (or `model.specialize()`) specializes it ahead of time, so the first load doesn't. `removeModel(config)` deletes the files and the specialized assets.
 
 ### 4. Use It
 
@@ -103,6 +103,7 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 - **Simulator builds fail**: Core AI is device-only. Exclude the package from simulator builds or test on a device.
 - **Structured output**: needs a JSON schema and runs as guided generation. Models whose engine cannot do guided generation reject with `CORE_AI_UNSUPPORTED_CAPABILITY`. Streamed JSON arrives in one piece once it is complete.
 - **Tools**: not supported yet. Tools are not passed to the model, and the call returns a warning.
+- **First load is slow**: Core AI specializes each `.aimodel` on its first load. Call `specializeModel` with the task the model is used for after downloading it, since cache entries only match the loader's specialization options.
 - **Wrong package**: Apple Intelligence (Foundation Models system model) is `@react-native-ai/apple`, not Core AI.
 
 ## Related Skills

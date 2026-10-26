@@ -207,10 +207,81 @@ public class CoreAIImpl: NSObject {
   ) {
     do {
       let sourceURL = try resolveSourceURL(config)
-      try FileManager.default.removeItem(at: sourceURL)
+#if canImport(CoreAI)
+      // Entries of a model that is still loaded stay until it is released.
+      // The default cache policy purges them once the source is deleted
+      if #available(iOS 27, macOS 27, *) {
+        try? Specialization.clearCache(at: sourceURL)
+      }
+#endif
+      if FileManager.default.fileExists(atPath: sourceURL.path) {
+        try FileManager.default.removeItem(at: sourceURL)
+      }
       resolve(nil)
     } catch {
       reject(errorCode(error), error.localizedDescription, error)
+    }
+  }
+
+  @objc
+  public func clearSpecializationCache(
+    _ config: [String: Any],
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAI)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        try Specialization.clearCache(at: try resolveSourceURL(config))
+        resolve(nil)
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
+  }
+
+  @objc
+  public func getModelsDirectory() -> String {
+    return ModelStorage.modelsDirectory.path
+  }
+
+  @objc
+  public func isModelDownloaded(_ id: String) -> Bool {
+    return ModelStorage.isDownloaded(id)
+  }
+
+  /// Downloads a Hugging Face folder into the models directory. Cancel with
+  /// cancelStream(downloadId)
+  @objc
+  public func downloadModel(
+    _ downloadId: String,
+    options: [String: Any],
+    onProgress: @escaping ([String: Any]) -> Void,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+    guard let id = options["id"] as? String, let repo = options["repo"] as? String else {
+      rejectCoreAI(.invalidInput("downloadModel needs an id and a Hugging Face repo."), reject: reject)
+      return
+    }
+    let folder = (options["folder"] as? String ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    let revision = options["revision"] as? String ?? "main"
+    startTask(downloadId, onError: { _, code, message in
+      reject(code, message, nil)
+    }) {
+      let url = try await ModelStorage.download(id: id, repo: repo, folder: folder, revision: revision) { progress in
+        onProgress([
+          "downloadId": downloadId,
+          "bytesWritten": Double(progress.bytesWritten),
+          "totalBytes": Double(progress.totalBytes)
+        ])
+      }
+      resolve(["uri": url.path])
     }
   }
 
@@ -221,10 +292,35 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    resolve(modelInfo(config: config, metadata: [
-      "specializationRequested": true,
-      "persistence": options?["persistence"] as? String ?? "default"
-    ]))
+#if canImport(CoreAI)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        Task {
+          do {
+            let assets = try await Specialization.specialize(
+              at: sourceURL,
+              task: config["task"] as? String,
+              options: options ?? [:]
+            )
+            resolve(self.modelInfo(config: config, metadata: [
+              "specialized": true,
+              "persistence": options?["persistence"] as? String ?? "default",
+              "assets": assets
+            ]))
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
   }
 
   @objc

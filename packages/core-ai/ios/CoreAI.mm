@@ -99,6 +99,33 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
   [_coreAI removeModel:CoreAIConfigToDictionary(config) resolve:resolve reject:reject];
 }
 
+- (void)clearSpecializationCache:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+                         resolve:(nonnull RCTPromiseResolveBlock)resolve
+                          reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI clearSpecializationCache:CoreAIConfigToDictionary(config) resolve:resolve reject:reject];
+}
+
+- (nonnull NSString *)getModelsDirectory {
+  return [_coreAI getModelsDirectory];
+}
+
+- (nonnull NSNumber *)isModelDownloaded:(nonnull NSString *)id {
+  return @([_coreAI isModelDownloaded:id]);
+}
+
+- (void)downloadModel:(nonnull NSString *)downloadId
+              options:(nonnull NSDictionary *)options
+              resolve:(nonnull RCTPromiseResolveBlock)resolve
+               reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI downloadModel:downloadId
+                 options:options
+              onProgress:^(NSDictionary *progress) {
+    [self emitOnDownloadProgress:progress];
+  }
+                 resolve:resolve
+                  reject:reject];
+}
+
 - (void)specializeModel:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
                 options:(nonnull NSDictionary *)options
                 resolve:(nonnull RCTPromiseResolveBlock)resolve

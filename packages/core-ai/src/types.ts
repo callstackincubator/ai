@@ -244,6 +244,18 @@ export interface CoreAIRawModelOptions {
   computeUnits?: 'default' | 'cpu' | 'gpu' | 'neural-engine'
 }
 
+// Options of `specializeModel`
+export interface CoreAISpecializationOptions {
+  // For tasks that take `computeUnits` (raw models, embeddings and the vision
+  // tasks): the compute unit they will load the model with. Other tasks
+  // specialize with the options their loader uses
+  computeUnits?: CoreAIRawModelOptions['computeUnits']
+  // `default` lets the system purge the specialized assets when it is low on
+  // storage or the model changes. `persistent` keeps them until the next OS
+  // update or until they are cleared
+  persistence?: 'default' | 'persistent'
+}
+
 export interface CoreAIRawFunctionOptions {
   // `float32` (default) converts float16 and bfloat16 outputs to float32.
   // `native` returns them as they are, as the bits of each element
