@@ -89,26 +89,6 @@ describe('apple transcription', () => {
     }
   })
 
-  it('recognizes words from its vocabulary', async () => {
-    const audio = new Uint8Array(
-      await AppleSpeech.generate('Yesterday Kwabena Oduro visited Zyrtania.', {
-        language: 'en-US',
-      })
-    )
-    const model = apple.transcriptionModel({ language: 'en-US' })
-
-    const result = await transcribe({
-      model,
-      audio,
-      providerOptions: {
-        apple: { contextualStrings: ['Kwabena Oduro', 'Zyrtania'] },
-      },
-    })
-
-    expect(result.text).toMatch(/Kwabena/)
-    expect(result.text).toMatch(/Zyrtania/)
-  })
-
   it('transcribes only the bytes of a typed array view', async () => {
     const model = apple.transcriptionModel({ language: 'en-US' })
     const padded = new Uint8Array(speech.length + 8)

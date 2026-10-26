@@ -75,20 +75,6 @@ if (model.isAvailable()) {
 
 `assets` is `supported` when the locale can be used once `prepare()` downloads it.
 
-## Custom Vocabulary
-
-Pass words and phrases the audio likely contains, such as names or jargon, so
-the transcriber recognizes them:
-
-```tsx
-const model = apple.transcriptionModel({
-  language: 'en',
-  contextualStrings: ['Kwabena Oduro', 'Callstack'],
-})
-```
-
-`providerOptions.apple.contextualStrings` sets them for a single call.
-
 ## Preparing the Model
 
 Apple's SpeechAnalyzer requires downloading language-specific assets to the device. While the provider automatically prepares assets when needed, you can call `prepare()` ahead of time for better performance:

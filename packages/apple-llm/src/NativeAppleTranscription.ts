@@ -36,8 +36,7 @@ export interface Spec extends TurboModule {
 declare global {
   function __apple__llm__transcribe__(
     data: ArrayBufferLike,
-    language: string,
-    contextualStrings?: string[]
+    language: string
   ): Promise<TranscriptionResult>
 }
 
@@ -46,11 +45,8 @@ const NativeAppleTranscription = TurboModuleRegistry.getEnforcing<Spec>(
 )
 
 export default {
-  transcribe: (
-    data: ArrayBufferLike,
-    language: string,
-    contextualStrings?: string[]
-  ) => globalThis.__apple__llm__transcribe__(data, language, contextualStrings),
+  transcribe: (data: ArrayBufferLike, language: string) =>
+    globalThis.__apple__llm__transcribe__(data, language),
   prepare: NativeAppleTranscription.prepare,
   // Whether the device can transcribe. getModelInfo reports locale support
   isAvailable: NativeAppleTranscription.isAvailable,

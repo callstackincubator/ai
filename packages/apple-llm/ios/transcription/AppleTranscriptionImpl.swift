@@ -128,7 +128,7 @@ public class AppleTranscriptionImpl: NSObject {
   }
 
   @objc
-  public func transcribe(_ audioData: Data, language: String, contextualStrings: [String], resolve: @escaping ([String: Any]) -> Void, reject: @escaping (String, String, Error?) -> Void) {
+  public func transcribe(_ audioData: Data, language: String, resolve: @escaping ([String: Any]) -> Void, reject: @escaping (String, String, Error?) -> Void) {
     if #available(iOS 26, *) {
       let tempDirectory = FileManager.default.temporaryDirectory
       let fileName = UUID().uuidString
@@ -175,12 +175,6 @@ public class AppleTranscriptionImpl: NSObject {
                 }
               }
               return (segments, words)
-            }
-            
-            if !contextualStrings.isEmpty {
-              let context = AnalysisContext()
-              context.contextualStrings[.general] = contextualStrings
-              try await analyzer.setContext(context)
             }
             
             let lastSampleTime = try await analyzer.analyzeSequence(from: audioFile)
