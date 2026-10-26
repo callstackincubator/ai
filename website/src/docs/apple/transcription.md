@@ -39,8 +39,28 @@ const words = response.providerMetadata.apple.words
 // [{ text: 'The', startSecond: 0.12, endSecond: 0.24 }, ...]
 ```
 
-> [!NOTE]
-> The API currently does not support streaming or live transcription. It is relatively easy to include, please let us know on Github if you need support for this.
+### Live Transcription
+
+On iOS 27 and newer, `AppleTranscription.transcribeLive` transcribes the microphone as it records. The AI SDK only transcribes recorded audio, so this is an Apple-specific API:
+
+```tsx
+import { AppleTranscription } from '@react-native-ai/apple'
+
+const live = await AppleTranscription.transcribeLive({
+  language: 'en-US',
+  onResult: ({ text, isFinal }) => {
+    // Volatile results (isFinal: false) are quick guesses that the next
+    // result for the same audio replaces
+    console.log(isFinal ? 'final' : 'volatile', text)
+  },
+  onError: (error) => console.error(error),
+})
+
+// Later, stops recording and waits for the last results
+await live.stop()
+```
+
+It asks for microphone access, so add `NSMicrophoneUsageDescription` to your app's Info.plist. It throws `UNSUPPORTED_OS` before iOS 27. It does not run in the iOS Simulator.
 
 ## Language Support
 
