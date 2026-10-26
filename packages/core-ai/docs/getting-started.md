@@ -78,7 +78,7 @@ CORE_AI_TASKS=language npx pod-install
 
 Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 
-Supported today: text generation, image generation, segmentation, object detection, super-resolution, classification, and depth estimation. Embeddings and transcription are tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
+Supported today: text generation, image generation, segmentation, object detection, super-resolution, classification, depth estimation, and text and image embeddings. Transcription is tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
 
 ## First iOS Model
 

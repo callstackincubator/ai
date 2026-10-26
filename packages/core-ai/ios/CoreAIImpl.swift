@@ -403,7 +403,26 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    rejectCoreAI(.unsupportedTask("embedding"), reject: reject)
+#if canImport(CoreAI) && canImport(CoreAIShared)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        Task {
+          do {
+            resolve(try await Embeddings.embed(texts: values, sourceURL: sourceURL, options: options ?? [:]))
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
   }
 
   @objc
@@ -599,6 +618,34 @@ public class CoreAIImpl: NSObject {
       runSegmentationTask(config: config, input: input, options: options, resolve: resolve, reject: reject)
     case "object-detection":
       runObjectDetectionTask(config: config, input: input, options: options, resolve: resolve, reject: reject)
+    case "embedding":
+#if canImport(CoreAI) && canImport(CoreAIShared)
+      if #available(iOS 27, macOS 27, *) {
+        do {
+          let sourceURL = try resolveSourceURL(config)
+          // One image, or a batch of them under data.imageUris
+          let uris = ((input["data"] as? [String: Any])?["imageUris"] as? [String]) ?? (input["imageUri"] as? String).map { [$0] } ?? []
+          guard !uris.isEmpty else {
+            throw CoreAIError.invalidInput("Expected input.imageUri or input.data.imageUris for image embeddings.")
+          }
+          let images = try uris.map { try Self.loadCGImage(from: ["imageUri": $0]) }
+          Task {
+            do {
+              let output = try await Embeddings.embed(images: images, sourceURL: sourceURL, options: options ?? [:])
+              resolve(["task": "embedding", "output": output])
+            } catch {
+              reject(errorCode(error), error.localizedDescription, error)
+            }
+          }
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      } else {
+        rejectCoreAI(.unsupportedOS, reject: reject)
+      }
+#else
+      rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
     case "super-resolution", "classification", "depth":
 #if canImport(CoreAI)
       if #available(iOS 27, macOS 27, *) {

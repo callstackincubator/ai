@@ -27,7 +27,7 @@ AI SDK adapter status:
 | Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Supported, with a JSON schema |
 | Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Not supported yet (warns)     |
 | Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Supported                     |
-| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Throws unsupported error      |
+| Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Supported, CLIP               |
 | Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Supported, Parakeet TDT       |
 
 Structured output needs a JSON schema and runs as guided generation, so the output always matches it. Models whose inference engine cannot do guided generation reject with a `CORE_AI_UNSUPPORTED_CAPABILITY` error. When streaming, the JSON arrives in one piece once it is complete.
@@ -36,7 +36,17 @@ The `reasoning` call option sets the model's thinking effort (`minimal`/`low` â†
 
 `coreAI.transcriptionModel(...)` runs `CoreAISpeech` bundles. Export Parakeet TDT with `--streaming` so the model transcribes audio of any length and returns segments with timestamps, closed at pauses. Other bundles transcribe only as much audio as their traced window holds (5 seconds by default) and return one segment. Audio can be any format AVFoundation decodes (WAV, MP3, M4A, FLAC, CAF, AIFF), picked by `mediaType`. The model stays loaded after the first call. Parakeet does not detect the language, so `language` is not set.
 
-`coreAI.embeddingModel(...)` exists so the API is in place, but it throws until the package has native runners for CLIP models ([#237](https://github.com/callstackincubator/ai/issues/237)).
+`coreAI.embeddingModel(...)` runs CLIP-style exports: an `.aimodel` with an `encode_text(input_ids, attention_mask)` function, next to a `tokenizer/` folder with the CLIP `tokenizer.json`. Point `source` at the folder holding both, like the [CLIP ViT-B/32 export](https://huggingface.co/grabbou/clip-vit-base-patch32-CoreAI). Values are tokenized to 77 tokens and embedded 16 at a time (`providerOptions['core-ai'].batchSize`). The AI SDK has no image embeddings, so `model.embedImages(imageUris)` embeds images into the same space with the `encode_image` function, which resizes the shorter side, crops the center and normalizes with the CLIP mean and std:
+
+```ts
+const model = coreAI.embeddingModel({ id: 'clip', source: { type: 'file', uri: folder } })
+
+const { embeddings } = await embedMany({ model, values: ['a photo of a cat', 'a photo of a car'] })
+const { embeddings: [image] } = await model.embedImages([imageUri])
+cosineSimilarity(embeddings[0], image) // higher for the matching caption
+```
+
+Embeddings need no `coreai-models` product of their own: the CLIP tokenizer comes with every product.
 
 There are no adapters for reranking, speech generation, or video generation, because `coreai-models` has no models for them. Use `@react-native-ai/apple` for system speech synthesis.
 

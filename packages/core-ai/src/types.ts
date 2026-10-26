@@ -152,6 +152,22 @@ export interface CoreAIStreamErrorEvent {
   error: string
 }
 
+// Options of embedding calls, under `providerOptions['core-ai']` with the AI
+// SDK
+export interface CoreAIEmbeddingOptions {
+  // See `CoreAIRawModelOptions`
+  computeUnits?: CoreAIRawModelOptions['computeUnits']
+  // Values embedded per model call, 16 by default
+  batchSize?: number
+  // The text function, `encode_text` (or `main`) by default
+  textFunction?: string
+  // The image function, `encode_image` (or `main`) by default
+  imageFunction?: string
+  // Per-channel RGB normalization of images, CLIP's by default
+  mean?: [number, number, number]
+  std?: [number, number, number]
+}
+
 export interface CoreAIEmbeddingResult {
   embeddings: number[][]
   metadata?: CodegenTypes.UnsafeObject

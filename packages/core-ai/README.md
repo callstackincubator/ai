@@ -15,10 +15,8 @@ Foundation Models, NLContextualEmbedding, SpeechAnalyzer, and AVSpeechSynthesize
 
 Core AI exposes two layers:
 
-- AI SDK adapters: language models, image generation and transcription. The
-  text embedding adapter exists, because Apple has starter export recipes for
-  it, but rejects with an unsupported error until its native runner lands
-  ([#237](https://github.com/callstackincubator/ai/issues/237)).
+- AI SDK adapters: language models, image generation, transcription and
+  text embeddings (CLIP).
 - Direct native APIs: model loading, persistent language sessions, model
   inspection, segmentation, object detection, super-resolution,
   classification, depth estimation, and raw `.aimodel` function calls.
