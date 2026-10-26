@@ -1629,7 +1629,9 @@ private actor TranscriptionStream {
       }
       try await model.finishStream()
     } catch {
-      await cancel()
+      // The session already ran its finalizer, so it isn't finalized again
+      collector.cancel()
+      end()
       throw error
     }
     defer { end() }
@@ -1646,10 +1648,18 @@ private actor TranscriptionStream {
   // Once the stream has ended, the model may run a newer session, so this
   // does nothing
   func cancel() async {
-    guard state != .ended else { return }
-    _ = try? await model.finishStream()
-    collector.cancel()
-    end()
+    switch state {
+    case .ended:
+      return
+    case .finishing:
+      // finish() is already finalizing the session, and ends the stream once
+      // that returns, so this only stops collecting its transcript
+      collector.cancel()
+    case .running:
+      _ = try? await model.finishStream()
+      collector.cancel()
+      end()
+    }
   }
 
   private func end() {

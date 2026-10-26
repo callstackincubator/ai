@@ -106,6 +106,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
 
   private loadedModel?: CoreAILoadedModel
   private loading?: Promise<CoreAILoadedModel>
+  private removing?: Promise<void>
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'language' }
@@ -150,10 +151,21 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     await NativeCoreAI.unloadModel((await loading).modelHandle)
   }
 
-  // Unloads the model before deleting its files
+  // Unloads the model before deleting its files. Loads that start meanwhile
+  // wait for the files to be gone
   async remove(): Promise<void> {
-    await this.unload().catch(() => {})
-    await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
+    const removal = (async () => {
+      await this.unload().catch(() => {})
+      await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
+    })()
+    this.removing = removal
+    try {
+      await removal
+    } finally {
+      if (this.removing === removal) {
+        this.removing = undefined
+      }
+    }
   }
 
   async createSession(
@@ -312,19 +324,36 @@ export class CoreAILanguageModel implements LanguageModelV4 {
   private load(
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAILoadedModel> {
-    this.loading ??= (
-      NativeCoreAI.loadModel(
-        toNativeModelConfig(this.config),
-        options
-      ) as Promise<CoreAILoadedModel>
-    ).then(
-      (loadedModel) => (this.loadedModel = loadedModel),
-      (error) => {
-        this.loading = undefined
-        throw error
-      }
-    )
-    return this.loading
+    if (this.loading) {
+      return this.loading
+    }
+    const removing = this.removing ?? Promise.resolve()
+    const loading: Promise<CoreAILoadedModel> = removing
+      .catch(() => {})
+      .then(
+        () =>
+          NativeCoreAI.loadModel(
+            toNativeModelConfig(this.config),
+            options
+          ) as Promise<CoreAILoadedModel>
+      )
+      .then(
+        (loadedModel) => {
+          // unload() during the load drops it, and the next call loads again
+          if (this.loading === loading) {
+            this.loadedModel = loadedModel
+          }
+          return loadedModel
+        },
+        (error) => {
+          if (this.loading === loading) {
+            this.loading = undefined
+          }
+          throw error
+        }
+      )
+    this.loading = loading
+    return loading
   }
 }
 
