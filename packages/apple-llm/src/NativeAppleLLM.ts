@@ -14,6 +14,7 @@ export interface AppleGenerationOptions {
   maxTokens?: number
   topP?: number
   topK?: number
+  seed?: number
   schema?: CodegenTypes.UnsafeObject
   tools?: CodegenTypes.UnsafeObject
   toolCallingMode?: string

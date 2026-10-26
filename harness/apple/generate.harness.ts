@@ -162,6 +162,33 @@ describe('apple generate', () => {
     ).rejects.toMatchObject({ code: 'GUARDRAIL_VIOLATION' })
   })
 
+  it('samples the same answer with the same seed', async () => {
+    const sample = async (seed: number) => {
+      const result = await apple().doGenerate({
+        prompt: prompt(
+          'Write one sentence about a fantasy creature you invent.'
+        ),
+        temperature: 1,
+        seed,
+      })
+      expect(result.warnings).toEqual([])
+      return result.content[0].type === 'text' ? result.content[0].text : ''
+    }
+
+    // Apple does not guarantee it, but with the seed forwarded the samples
+    // match, and without it random sampling makes them differ
+    expect(await sample(42)).toBe(await sample(42))
+  })
+
+  it('leaves out a seed that is not a whole number', async () => {
+    const result = await apple().doGenerate({
+      prompt: prompt('Say hi.'),
+      seed: 1.5,
+    })
+
+    expect(warnedFeatures(result.warnings)).toEqual(['seed'])
+  })
+
   it('rejects tool call history with input that is not JSON', async () => {
     await expect(
       apple().doGenerate({
@@ -250,14 +277,12 @@ describe('apple generate', () => {
       stopSequences: ['5'],
       presencePenalty: 0.5,
       frequencyPenalty: 0.5,
-      seed: 42,
     })
 
     expect(warnedFeatures(result.warnings)).toEqual([
       'stopSequences',
       'presencePenalty',
       'frequencyPenalty',
-      'seed',
     ])
     expect(result.content[0]).toMatchObject({ type: 'text' })
   })

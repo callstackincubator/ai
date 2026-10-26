@@ -52,6 +52,11 @@ const result = await generateText({
 Do not pass both `topP` and `topK` in the same request. Apple Foundation Models
 supports one sampling strategy at a time.
 
+Pass `seed`, a non-negative whole number, to make answers more repeatable for
+the same prompt and settings. Apple does not guarantee the exact same answer
+every time. Without `topP` or `topK`, a seed samples from every token like
+Apple's default sampling.
+
 ## Streaming
 
 ```typescript
