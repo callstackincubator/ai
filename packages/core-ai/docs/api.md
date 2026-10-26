@@ -27,6 +27,7 @@ AI SDK adapter status:
 | Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Supported, with a JSON schema |
 | Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Not supported yet (warns)     |
 | Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Supported                     |
+| Video generation  | `experimental_generateVideo`                  | `coreAI.videoModel(...)`         | Supported, text-to-video      |
 | Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Supported, CLIP               |
 | Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Supported, Parakeet TDT       |
 
@@ -48,7 +49,26 @@ cosineSimilarity(embeddings[0], image) // higher for the matching caption
 
 Embeddings need no `coreai-models` product of their own: the CLIP tokenizer comes with every product.
 
-There are no adapters for reranking, speech generation, or video generation, because `coreai-models` has no models for them. Use `@react-native-ai/apple` for system speech synthesis.
+`coreAI.videoModel(...)` runs `coreai-models` video diffusion bundles (Wan 2.1) with `experimental_generateVideo`, and returns an MP4:
+
+```ts
+import { experimental_generateVideo as generateVideo } from 'ai'
+
+const { video, providerMetadata } = await generateVideo({
+  model: coreAI.videoModel({ id: 'wan2.1', source: { type: 'file', uri: folder } }),
+  prompt: 'a red ball rolling across a wooden table',
+  providerOptions: { 'core-ai': { stepCount: 12 } },
+})
+// video.uint8Array: the MP4. providerMetadata['core-ai'].uri: the same file in the temporary directory
+```
+
+- iOS exports are traced for one size and length: the [hosted Wan 2.1 export](https://huggingface.co/grabbou/Wan2.1-T2V-1.3B-CoreAI) makes 832x480 videos of 81 frames (5 seconds at 16 fps), and the model rejects any other size or length. Exports with dynamic shapes (macOS) take other sizes.
+- On those, `resolution` sets the size (multiples of 16), or `aspectRatio` picks one of Wan's: `16:9` (832x480), `9:16` and `1:1` (480x480). `duration` is rounded to 4n + 1 frames at `fps` (16), up to 81 frames, and `providerOptions['core-ai'].frameCount` sets the frames directly.
+- `providerOptions['core-ai']` also takes `stepCount` (50), `guidanceScale` (5), `negativePrompt`, `cfgCutoff`, `vaeTileSize` and `lazyModelLoading`.
+- Generation takes minutes on device. The abort signal stops it after the current denoising step.
+- Image-to-video, reference inputs and audio are not supported, and return a warning.
+
+There are no adapters for reranking or speech generation, because `coreai-models` has no models for them. Use `@react-native-ai/apple` for system speech synthesis.
 
 ## Direct Native APIs
 

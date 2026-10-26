@@ -50,6 +50,23 @@ const streamText = mock(
   ) => {}
 )
 const cancelStream = mock((_streamId: string) => {})
+const generateVideo = mock(
+  async (
+    _requestId: string,
+    _config: Record<string, unknown>,
+    _prompt: string,
+    _options: Record<string, unknown>
+  ): Promise<Record<string, unknown>> => ({
+    video: 'AAAA',
+    mediaType: 'video/mp4',
+    uri: 'file:///tmp/video.mp4',
+    width: 832,
+    height: 480,
+    frameCount: 17,
+    fps: 16,
+    seed: 1,
+  })
+)
 const embed = mock(
   async (
     _config: Record<string, unknown>,
@@ -102,6 +119,7 @@ mock.module('react-native', () => ({
       generateText,
       streamText,
       cancelStream,
+      generateVideo,
       embed,
       runTask,
       createLanguageSession,
@@ -658,5 +676,107 @@ describe('core ai embeddings', () => {
     expect(config).toMatchObject({ sourceUri: '/clip', task: 'embedding' })
     expect(input).toEqual({ data: { imageUris: ['file:///a.jpg'] } })
     expect(result.embeddings).toEqual([[1, 0]])
+  })
+})
+
+describe('core ai video generation', () => {
+  const videoModel = () =>
+    coreAI.videoModel({ id: 'wan', source: { type: 'file', uri: '/wan' } })
+
+  const callOptions = (overrides: object = {}) => ({
+    prompt: 'a cat',
+    n: 1,
+    aspectRatio: undefined,
+    resolution: undefined,
+    duration: undefined,
+    fps: undefined,
+    seed: undefined,
+    image: undefined,
+    frameImages: undefined,
+    inputReferences: undefined,
+    generateAudio: undefined,
+    providerOptions: {},
+    ...overrides,
+  })
+
+  const lastOptions = () => generateVideo.mock.calls.at(-1)![3]
+
+  test('returns the mp4 and its metadata', async () => {
+    const result = await videoModel().doGenerate(callOptions())
+
+    expect(result.videos).toEqual([
+      { type: 'base64', data: 'AAAA', mediaType: 'video/mp4' },
+    ])
+    expect(result.providerMetadata).toEqual({
+      'core-ai': {
+        uri: 'file:///tmp/video.mp4',
+        width: 832,
+        height: 480,
+        frameCount: 17,
+        fps: 16,
+        seed: 1,
+      },
+    })
+    expect(result.warnings).toEqual([])
+  })
+
+  test('maps resolution, duration, fps and seed', async () => {
+    await videoModel().doGenerate(
+      callOptions({
+        resolution: '320x192',
+        duration: 2,
+        fps: 8,
+        seed: 7,
+        providerOptions: { 'core-ai': { stepCount: 4 } },
+      })
+    )
+
+    expect(lastOptions()).toEqual({
+      width: 320,
+      height: 192,
+      duration: 2,
+      fps: 8,
+      seed: 7,
+      stepCount: 4,
+    })
+  })
+
+  test('maps known aspect ratios and warns about others', async () => {
+    await videoModel().doGenerate(callOptions({ aspectRatio: '9:16' }))
+    expect(lastOptions()).toMatchObject({ width: 480, height: 832 })
+
+    const { warnings } = await videoModel().doGenerate(
+      callOptions({ aspectRatio: '4:3' })
+    )
+    expect(warnings).toEqual([
+      expect.objectContaining({ type: 'unsupported', feature: 'aspectRatio' }),
+    ])
+  })
+
+  test('warns about image and audio inputs', async () => {
+    const { warnings } = await videoModel().doGenerate(
+      callOptions({
+        image: { type: 'url', url: 'https://example.com/a.png' },
+        generateAudio: true,
+      })
+    )
+
+    expect(warnings).toEqual([
+      expect.objectContaining({ feature: 'image' }),
+      expect.objectContaining({ feature: 'generateAudio' }),
+    ])
+  })
+
+  test('cancels the native request on abort', async () => {
+    const controller = new AbortController()
+    generateVideo.mockImplementationOnce(async (requestId) => {
+      controller.abort()
+      expect(cancelStream).toHaveBeenCalledWith(requestId)
+      throw new Error('cancelled')
+    })
+
+    await expect(
+      videoModel().doGenerate(callOptions({ abortSignal: controller.signal }))
+    ).rejects.toThrow('cancelled')
   })
 })

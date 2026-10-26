@@ -50,6 +50,8 @@ enum CoreAIError: LocalizedError {
 
     case "CoreAIVideoSegmentation":
       return "video-segmentation"
+    case "CoreAIVideoDiffusion":
+      return "video-diffusion"
     default:
       return product
     }

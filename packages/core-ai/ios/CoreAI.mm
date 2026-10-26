@@ -247,6 +247,15 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
   [_coreAI finishTranscriptionStream:streamId resolve:resolve reject:reject];
 }
 
+- (void)generateVideo:(nonnull NSString *)requestId
+               config:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+               prompt:(nonnull NSString *)prompt
+              options:(nonnull NSDictionary *)options
+              resolve:(nonnull RCTPromiseResolveBlock)resolve
+               reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI generateVideo:requestId config:CoreAIConfigToDictionary(config) prompt:prompt options:options resolve:resolve reject:reject];
+}
+
 - (void)generateImage:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
                prompt:(nonnull NSString *)prompt
               options:(nonnull NSDictionary *)options
