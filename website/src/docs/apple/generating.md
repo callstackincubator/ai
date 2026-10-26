@@ -234,7 +234,10 @@ user, and offer Apple's way to raise it, such as iCloud+:
 ```typescript
 const { quota } = await apple.getModelInfo({ model: 'private-cloud-compute' })
 
-if (quota?.isApproachingLimit && quota.canIncreaseLimit) {
+if (
+  (quota?.isApproachingLimit || quota?.isLimitReached) &&
+  quota.canIncreaseLimit
+) {
   await apple.showQuotaLimitIncreaseSuggestion()
 }
 ```

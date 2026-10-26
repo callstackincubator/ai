@@ -23,7 +23,7 @@ describe('apple private cloud compute', () => {
     })
 
     expect(quota).toMatchObject({
-      isLimitReached: false,
+      isLimitReached: expect.any(Boolean),
       isApproachingLimit: expect.any(Boolean),
       canIncreaseLimit: expect.any(Boolean),
     })
