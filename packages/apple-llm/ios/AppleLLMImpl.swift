@@ -559,6 +559,19 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 26, *)
+  private func createSystemLanguageModel(from providerOptions: [String: Any]) -> SystemLanguageModel {
+    let isContentTagging = providerOptions["useCase"] as? String == "contentTagging"
+    let isPermissive = providerOptions["guardrails"] as? String == "permissiveContentTransformations"
+    guard isContentTagging || isPermissive else {
+      return SystemLanguageModel.default
+    }
+    return SystemLanguageModel(
+      useCase: isContentTagging ? .contentTagging : .general,
+      guardrails: isPermissive ? .permissiveContentTransformations : .default
+    )
+  }
+
+  @available(iOS 26, *)
   private func createSession(
     providerOptions: [String: Any],
     tools: [any Tool],
@@ -575,9 +588,7 @@ public class AppleLLMImpl: NSObject {
     // requests work even when the on-device model is not available
     switch modelName {
     case "system":
-      let model = providerOptions["guardrails"] as? String == "permissiveContentTransformations"
-        ? SystemLanguageModel(guardrails: .permissiveContentTransformations)
-        : SystemLanguageModel.default
+      let model = createSystemLanguageModel(from: providerOptions)
       let availability = availabilityString(model.availability)
       guard availability == "available" else {
         throw AppleLLMError.modelUnavailable(availability)

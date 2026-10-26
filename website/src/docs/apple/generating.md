@@ -251,6 +251,32 @@ ignored by `private-cloud-compute`. See
 [Improving the safety of generative model output](https://developer.apple.com/documentation/foundationmodels/improving-the-safety-of-generative-model-output#Use-permissive-guardrail-mode-for-sensitive-content)
 for when this mode is appropriate.
 
+## Content Tagging
+
+Apple ships an adapter of the on-device model for tagging, entity extraction,
+and topic detection. Use it with `useCase: 'contentTagging'`, usually with
+structured output:
+
+```typescript
+import { apple } from '@react-native-ai/apple'
+import { generateText, Output } from 'ai'
+import { z } from 'zod'
+
+const article =
+  'Lionel Messi scored twice as Inter Miami beat Orlando City 3-1 in Florida.'
+
+const result = await generateText({
+  model: apple({ useCase: 'contentTagging' }),
+  prompt: article,
+  output: Output.object({
+    schema: z.object({ topics: z.array(z.string()) }),
+  }),
+})
+```
+
+`createAppleProvider({ useCase: 'contentTagging' })` sets it for every model.
+Like guardrails, it applies to the on-device `system` model only.
+
 ## Reasoning Level
 
 On iOS 27 and newer, set how much reasoning the model should do before
