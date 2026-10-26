@@ -189,6 +189,33 @@ describe('apple structured output', () => {
     ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
   })
 
+  it('keeps the description of a property that references a definition', async () => {
+    const output = await generateObject('Fill in the fields.', {
+      type: 'object',
+      properties: {
+        fruit: {
+          $ref: '#/$defs/word',
+          description: 'Always exactly the word KIWI in uppercase.',
+        },
+      },
+      required: ['fruit'],
+      $defs: { word: { type: 'string' } },
+    })
+
+    expect(output.fruit).toMatch(/kiwi/i)
+  })
+
+  it('rejects references outside $defs and definitions', async () => {
+    await expect(
+      generateObject('Fill in the fields.', {
+        type: 'object',
+        properties: { address: { $ref: '#/other/address' } },
+        required: ['address'],
+        $defs: { address: { type: 'string' } },
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
+  })
+
   it('generates recursive schemas', async () => {
     const output = await generateObject(
       'Describe the folder "src" that contains the folder "lib", which contains no folders.',
