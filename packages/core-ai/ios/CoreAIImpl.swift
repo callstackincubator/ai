@@ -129,10 +129,14 @@ public class CoreAIImpl: NSObject {
           do {
             let model = try await AIModel(contentsOf: sourceURL)
             info["functions"] = Self.describeFunctions(of: model)
-            resolve(info)
           } catch {
-            reject(errorCode(error), error.localizedDescription, error)
+            // The file metadata still describes the model, so the load error
+            // goes with it
+            var metadata = info["metadata"] as? [String: Any] ?? [:]
+            metadata["functionsError"] = error.localizedDescription
+            info["metadata"] = metadata
           }
+          resolve(info)
         }
         return
       }
@@ -747,10 +751,9 @@ public class CoreAIImpl: NSObject {
           guard !uris.isEmpty else {
             throw CoreAIError.invalidInput("Expected input.imageUri or input.data.imageUris for image embeddings.")
           }
-          let images = try uris.map { try Self.loadCGImage(from: ["imageUri": $0]) }
           Task {
             do {
-              let output = try await Embeddings.embed(images: images, sourceURL: sourceURL, options: options ?? [:])
+              let output = try await Embeddings.embed(imageUris: uris, sourceURL: sourceURL, options: options ?? [:])
               resolve(["task": "embedding", "output": output])
             } catch {
               reject(errorCode(error), error.localizedDescription, error)

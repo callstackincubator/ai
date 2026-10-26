@@ -270,6 +270,12 @@ enum VisionTask {
 
   /// A float16, bfloat16 or float32 array from float elements in row-major order
   static func makeArray(_ values: [Float], shape: [Int], descriptor: NDArrayDescriptor) throws -> NDArray {
+    // The copy follows the model's shape, so the values have to fill it
+    guard shape.count == descriptor.rank,
+          zip(shape, descriptor.shape).allSatisfy({ $1 == -1 || $0 == $1 }),
+          values.count == shape.reduce(1, *) else {
+      throw CoreAIError.invalidInput("The model takes an input of \(descriptor.shape), which this task can't make \(shape) from.")
+    }
     var data = values.withUnsafeBytes { Data($0) }
     let type = descriptor.scalarType
     switch type {
