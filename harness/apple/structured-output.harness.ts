@@ -37,6 +37,17 @@ describe('apple structured output', () => {
     expect(output.city).toMatch(/paris/i)
   })
 
+  it('orders properties of objects without a type', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      properties: Object.fromEntries(
+        orderedKeys.map((key) => [key, { type: 'string' }])
+      ),
+      required: orderedKeys,
+    })
+
+    expect(Object.keys(output)).toEqual(orderedKeys)
+  })
+
   it('returns properties in the order the schema declares them', async () => {
     const output = await generateObject('Give each field a random word.', {
       type: 'object',
@@ -87,16 +98,15 @@ describe('apple structured output', () => {
       )
     })
 
-    const generated = snapshots.reduce<string[]>(
-      (keys, snapshot) => [
-        ...keys,
-        ...Object.keys(JSON.parse(snapshot)).filter(
-          (key) => !keys.includes(key)
-        ),
-      ],
-      []
+    // Properties that first appear in the same snapshot can be in any order,
+    // since the snapshot JSON does not keep key order
+    const firstSnapshot = orderedKeys.map((key) =>
+      snapshots.findIndex((snapshot) => key in JSON.parse(snapshot))
     )
-    expect(generated).toEqual(orderedKeys)
+    expect(firstSnapshot.every((index) => index >= 0)).toBe(true)
+    expect(firstSnapshot).toEqual([...firstSnapshot].sort((a, b) => a - b))
+    // Arbitrary order would almost never keep every snapshot index in order
+    expect(new Set(firstSnapshot).size).toBeGreaterThan(1)
   })
 
   it('resolves references to definitions', async () => {
@@ -127,6 +137,38 @@ describe('apple structured output', () => {
     expect(output.from.city).toMatch(/springfield/i)
     expect(output.to.city).toMatch(/shelbyville/i)
     expect(output.speed).toBe('express')
+  })
+
+  it('keeps properties named like definitions', async () => {
+    const output = await generateObject('Define the word "apple" briefly.', {
+      type: 'object',
+      properties: { definitions: { type: 'string' } },
+      required: ['definitions'],
+    })
+
+    expect(typeof output.definitions).toBe('string')
+  })
+
+  it('inlines nullable definitions that are not objects', async () => {
+    const output = await generateObject('Label this item: a red apple.', {
+      type: 'object',
+      properties: { label: { $ref: '#/$defs/label' } },
+      required: ['label'],
+      $defs: { label: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+    })
+
+    expect(typeof output.label).toBe('string')
+  })
+
+  it('rejects references that cycle through definitions it inlines', async () => {
+    await expect(
+      generateObject('List some items.', {
+        type: 'object',
+        properties: { items: { $ref: '#/$defs/nested' } },
+        required: ['items'],
+        $defs: { nested: { type: 'array', items: { $ref: '#/$defs/nested' } } },
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
   })
 
   it('generates recursive schemas', async () => {
