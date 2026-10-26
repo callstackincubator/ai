@@ -97,29 +97,27 @@ For advanced use cases, you can access the embeddings API directly:
 ### AppleEmbeddings
 
 ```tsx
-import { AppleEmbeddings } from '@react-native-ai/apple'
+import {
+  AppleEmbeddings,
+  type AppleEmbeddingModelInfo,
+} from '@react-native-ai/apple'
+
+const language = 'en'
 
 // Get embedding model information (getInfo is a deprecated alias)
-const modelInfo: AppleEmbeddingModelInfo = await AppleEmbeddings.getModelInfo(language: string)
+const modelInfo: AppleEmbeddingModelInfo =
+  await AppleEmbeddings.getModelInfo(language)
+// { hasAvailableAssets, dimension, languages, maximumSequenceLength,
+//   modelIdentifier, revision, scripts }
 
 // Prepare language assets
-await AppleEmbeddings.prepare(language: string)
+await AppleEmbeddings.prepare(language)
 
-// Generate embeddings
-const embeddings = await AppleEmbeddings.generateEmbeddings(
-  values: string[], 
-  language: string
-): Promise<number[][]>
-
-export interface AppleEmbeddingModelInfo {
-  hasAvailableAssets: boolean
-  dimension: number
-  languages: string[]
-  maximumSequenceLength: number
-  modelIdentifier: string
-  revision: number
-  scripts: string[]
-}
+// Generate embeddings, one number[] per value
+const embeddings: number[][] = await AppleEmbeddings.generateEmbeddings(
+  ['Hello world', 'How are you?'],
+  language
+)
 ```
 
 ## Benchmarks
