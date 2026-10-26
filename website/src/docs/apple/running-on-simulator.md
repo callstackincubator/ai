@@ -66,9 +66,9 @@ If Apple Intelligence is enabled but models aren't working:
 
 - Ensure the model download completed successfully on macOS
 - Restart the iOS Simulator
-- Verify that `apple.isAvailable()` returns `true` in your code (see [Availability Check](./generating#availability-check))
+- Verify that `apple.isAvailable()` returns `true` in your code (see [Availability And Model Info](./generating#availability-and-model-info))
 - Check that your app is running on iOS 26+ in the simulator
 
 ## API Availability
 
-Always check if Apple Intelligence is available before using it in your application. See the [Availability Check](./generating#availability-check) section in the Generating guide for details on how to implement this check.
+Always check if Apple Intelligence is available before using it in your application. See the [Availability And Model Info](./generating#availability-and-model-info) section in the Generating guide for details on how to implement this check.

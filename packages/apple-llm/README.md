@@ -62,7 +62,7 @@ See [iOS Versions](https://react-native-ai.dev/docs/apple/ios-versions) for deta
 
 ## Documentation
 
-For complete installation instructions and API documentation, visit our [documentation site](https://react-native-ai.com/docs/apple).
+For complete installation instructions and API documentation, visit our [documentation site](https://react-native-ai.dev/docs/apple/getting-started).
 
 ## License
 

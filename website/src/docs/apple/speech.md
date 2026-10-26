@@ -17,9 +17,9 @@ This provider uses Apple's [`AVSpeechSynthesizer`](https://developer.apple.com/d
 
 ```tsx
 import { apple } from '@react-native-ai/apple'
-import { generateSpeech as speech } from 'ai'
+import { generateSpeech } from 'ai'
 
-const response = await speech({
+const response = await generateSpeech({
   model: apple.speechModel(),
   text: 'Hello from Apple on-device speech!',
 })
@@ -45,7 +45,7 @@ const voices = await AppleSpeech.getVoices()
 Use a specific voice by passing its `identifier`:
 
 ```tsx
-await speech({
+await generateSpeech({
   model: apple.speechModel(),
   text: 'Custom voice synthesis',
   voice: 'com.apple.voice.super-compact.en-US.Samantha',
@@ -55,10 +55,10 @@ await speech({
 Or specify only `language` to use the system’s default voice for that locale:
 
 ```tsx
-await speech({
+await generateSpeech({
   model: apple.speechModel(),
   text: 'Bonjour tout le monde!',
-  language: 'en-US',
+  language: 'fr-FR',
 })
 ```
 
@@ -70,15 +70,12 @@ await speech({
 `speed` multiplies the voice's default speaking rate, so `2` speaks twice as fast and `0.5` half as fast. Apple caps the rate, so very high or low values are clamped:
 
 ```tsx
-await speech({
+await generateSpeech({
   model: apple.speechModel(),
   text: 'Speaking a little faster.',
   speed: 1.25,
 })
 ```
-
-> [!NOTE]
-> If only `language` is provided, the default system voice for that locale is used.
 
 ## Voices and Asset Management
 

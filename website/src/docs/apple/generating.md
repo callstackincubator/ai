@@ -111,10 +111,16 @@ const result = await generateText({
 console.log(result.output)
 ```
 
-Supported schema shapes include objects, arrays, strings, numbers, booleans,
-and enums. References to `$defs` or `definitions` work too, including
-recursive schemas that reference themselves with `#`. String formats, regular expressions, and unions are not currently
-mapped to Apple Foundation Models.
+The schema is converted to Apple's guided generation, which supports:
+
+- Objects, arrays, strings, numbers, integers, booleans, and enums
+- Unions (`anyOf`, e.g. `z.union`) and literals (`z.literal`)
+- Regular expressions (`z.string().regex()`)
+- Number bounds (`min`, `max`) and array length (`minItems`, `maxItems`)
+- References to `$defs` or `definitions`, including recursive schemas
+
+String formats such as `z.email()` are ignored, and `multipleOf` fails with
+`INVALID_SCHEMA`.
 
 ## Availability And Model Info
 
@@ -141,7 +147,7 @@ console.log(info.supportsVisionTools)
 
 `getModelInfo` returns availability, locale support, supported languages,
 context size when Apple exposes it, and feature flags for token counting,
-image prompts, reasoning, Private Cloud Compute, Dynamic Profiles, and Vision
+image prompts, reasoning, Private Cloud Compute, and the Vision and Spotlight
 built-in tools.
 
 When the model is unavailable, `availability` tells you why, so you can show

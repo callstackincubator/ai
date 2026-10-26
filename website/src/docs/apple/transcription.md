@@ -15,6 +15,9 @@ This provider uses Apple's [`SpeechAnalyzer`](https://developer.apple.com/docume
 ### Basic Transcription
 
 ```tsx
+import { apple } from '@react-native-ai/apple'
+import { transcribe } from 'ai'
+
 const file = await fetch(
   'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
 )

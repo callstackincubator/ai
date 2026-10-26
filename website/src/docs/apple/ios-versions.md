@@ -27,30 +27,30 @@ model, Vision tools, a required tool choice, `maxToolCalls`) throw
 `UNSUPPORTED_OS`. Missing output, such as reasoning
 parts or usage, is left out.
 
-| Feature                                         | iOS 26 | iOS 26.4 | iOS 27                        |
-| ----------------------------------------------- | ------ | -------- | ----------------------------- |
-| Text generation and streaming                   | ✅     | ✅       | ✅                            |
-| Structured output (`generateObject`)            | ✅     | ✅       | ✅                            |
-| Streaming structured output                     | ❌     | ❌       | ❌                            |
-| JavaScript tools                                | ✅     | ✅       | ✅                            |
-| Tool calls and results in `generateText`        | ✅     | ✅       | ✅                            |
-| Tool calls and results while streaming          | ❌     | ❌       | ✅ Sent once the tool returns |
-| `toolChoice: 'auto'` and `'none'`               | ✅     | ✅       | ✅                            |
-| `toolChoice: 'required'`                        | ❌     | ❌       | ✅                            |
-| `toolChoice` with a named tool                  | ❌     | ❌       | ✅                            |
-| `maxToolCalls` provider option                  | ❌     | ❌       | ✅                            |
-| Guardrails (`permissiveContentTransformations`) | ✅     | ✅       | ✅                            |
-| `countTokens` and `contextSize`                 | ❌     | ✅       | ✅                            |
-| Reasoning level (`reasoning` option)            | ❌     | ❌       | ✅                            |
-| Reasoning parts in results and streams          | ❌     | ❌       | ✅                            |
-| Image prompts                                   | ❌     | ❌       | ✅ Final user prompt only     |
-| Private Cloud Compute model                     | ❌     | ❌       | ✅ Physical device only       |
-| Vision OCR and barcode tools                    | ❌     | ❌       | ✅ Physical device only       |
-| Spotlight search tool                           | ❌     | ❌       | ✅ Physical device only       |
-| Token usage and `'length'` finish reason        | ❌     | ❌       | ✅                            |
-| `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅     | ✅       | ✅                            |
-| Guardrail, refusal, language and asset errors   | ✅     | ✅       | ✅                            |
-| Timeout and network errors                      | ❌     | ❌       | ✅                            |
+| Feature                                         | iOS 26                   | iOS 26.4                 | iOS 27                        |
+| ----------------------------------------------- | ------------------------ | ------------------------ | ----------------------------- |
+| Text generation and streaming                   | ✅                       | ✅                       | ✅                            |
+| Structured output (`Output.object`)             | ✅                       | ✅                       | ✅                            |
+| Structured output with `streamText`             | ✅ Sent whole at the end | ✅ Sent whole at the end | ✅ Sent whole at the end      |
+| JavaScript tools                                | ✅                       | ✅                       | ✅                            |
+| Tool calls and results in `generateText`        | ✅                       | ✅                       | ✅                            |
+| Tool calls and results while streaming          | ❌                       | ❌                       | ✅ Sent once the tool returns |
+| `toolChoice: 'auto'` and `'none'`               | ✅                       | ✅                       | ✅                            |
+| `toolChoice: 'required'`                        | ❌                       | ❌                       | ✅                            |
+| `toolChoice` with a named tool                  | ❌                       | ❌                       | ✅                            |
+| `maxToolCalls` provider option                  | ❌                       | ❌                       | ✅                            |
+| Guardrails (`permissiveContentTransformations`) | ✅                       | ✅                       | ✅                            |
+| `countTokens` and `contextSize`                 | ❌                       | ✅                       | ✅                            |
+| Reasoning level (`reasoning` option)            | ❌                       | ❌                       | ✅                            |
+| Reasoning parts in results and streams          | ❌                       | ❌                       | ✅                            |
+| Image prompts                                   | ❌                       | ❌                       | ✅ Final user prompt only     |
+| Private Cloud Compute model                     | ❌                       | ❌                       | ✅ Physical device only       |
+| Vision OCR and barcode tools                    | ❌                       | ❌                       | ✅ Physical device only       |
+| Spotlight search tool                           | ❌                       | ❌                       | ✅ Physical device only       |
+| Token usage and `'length'` finish reason        | ❌                       | ❌                       | ✅                            |
+| `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅                       | ✅                       | ✅                            |
+| Guardrail, refusal, language and asset errors   | ✅                       | ✅                       | ✅                            |
+| Timeout and network errors                      | ❌                       | ❌                       | ✅                            |
 
 Notes:
 
