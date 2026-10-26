@@ -19,6 +19,17 @@ describe('apple live transcription', () => {
     expect(errors.map((error) => error.message)).toEqual([])
   })
 
+  it('waits for the same stop when stopped twice at once', async () => {
+    const live = await AppleTranscription.transcribeLive({
+      language: 'en-US',
+      onResult: () => {},
+    })
+
+    const first = live.stop()
+    expect(live.stop()).toBe(first)
+    await first
+  })
+
   it('stops a session that already stopped', async () => {
     const live = await AppleTranscription.transcribeLive({
       language: 'en-US',

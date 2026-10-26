@@ -121,14 +121,15 @@ export default {
       throw error
     }
 
+    // Calls while a stop is in flight wait for it, instead of resolving before
+    // the last results arrive
+    let stopping: Promise<void> | undefined
     return {
-      stop: async () => {
-        try {
-          await NativeAppleTranscription.stopLiveTranscription(sessionId)
-        } finally {
-          removeListeners()
-        }
-      },
+      stop: () =>
+        (stopping ??=
+          NativeAppleTranscription.stopLiveTranscription(sessionId).finally(
+            removeListeners
+          )),
     }
   },
   isAvailable: NativeAppleTranscription.isAvailable,

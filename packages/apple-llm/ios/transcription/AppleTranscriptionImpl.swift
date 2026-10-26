@@ -263,6 +263,7 @@ enum LiveTranscriptionError: LocalizedError {
   case microphoneAccessDenied
   case noMicrophone
   case unsupportedLocale(String)
+  case captureFailed
 
   var errorDescription: String? {
     switch self {
@@ -272,6 +273,8 @@ enum LiveTranscriptionError: LocalizedError {
       return "No microphone is available"
     case .unsupportedLocale(let language):
       return "Locale not supported: \(language)"
+    case .captureFailed:
+      return "The microphone could not start recording"
     }
   }
 }
@@ -389,6 +392,13 @@ final class LiveTranscriptionSession: @unchecked Sendable {
         }
         continuation.resume()
       }
+    }
+    // startRunning() fails without throwing, leaving the session stopped
+    guard captureSession.isRunning else {
+      stopFlag.stop()
+      await analyzer.cancelAndFinishNow()
+      await results.value
+      throw LiveTranscriptionError.captureFailed
     }
 
     return LiveTranscriptionSession(provider: provider, analyzer: analyzer, results: results, stopFlag: stopFlag)
