@@ -99,6 +99,54 @@ describe('apple structured output', () => {
     expect(generated).toEqual(orderedKeys)
   })
 
+  it('resolves references to definitions', async () => {
+    const output = await generateObject(
+      'Ship from 1 Main St, Springfield to 9 Elm St, Shelbyville by express.',
+      {
+        type: 'object',
+        properties: {
+          from: { $ref: '#/$defs/address' },
+          to: { $ref: '#/$defs/address' },
+          speed: { $ref: '#/$defs/speed' },
+        },
+        required: ['from', 'to', 'speed'],
+        $defs: {
+          address: {
+            type: 'object',
+            properties: {
+              street: { type: 'string' },
+              city: { type: 'string' },
+            },
+            required: ['street', 'city'],
+          },
+          speed: { type: 'string', enum: ['standard', 'express'] },
+        },
+      }
+    )
+
+    expect(output.from.city).toMatch(/springfield/i)
+    expect(output.to.city).toMatch(/shelbyville/i)
+    expect(output.speed).toBe('express')
+  })
+
+  it('generates recursive schemas', async () => {
+    const output = await generateObject(
+      'Describe the folder "src" that contains the folder "lib", which contains no folders.',
+      {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          folders: { type: 'array', items: { $ref: '#' }, maxItems: 2 },
+        },
+        required: ['name', 'folders'],
+      }
+    )
+
+    expect(output.name).toMatch(/src/i)
+    expect(output.folders[0].name).toMatch(/lib/i)
+    expect(Array.isArray(output.folders[0].folders)).toBe(true)
+  })
+
   it('picks only listed string enum values', async () => {
     const output = await generateObject('The weather is awful today.', {
       type: 'object',

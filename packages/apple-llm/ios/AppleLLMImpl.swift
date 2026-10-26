@@ -1525,11 +1525,64 @@ public class AppleLLMImpl: NSObject {
     // anyOf gets one from its path. Schemas without titles (all of Zod's) would
     // otherwise share an empty name and nested objects would resolve to the root
     static func createGenerationSchema(from schemaDict: [String: Any], name: String = "Root") throws -> GenerationSchema {
-      let dynamicSchemas = try parseDynamicSchema(from: schemaDict, path: name)
-      return try GenerationSchema(root: dynamicSchemas, dependencies: [])
+      let rootName = schemaDict["title"] as? String ?? name
+      let definitions = (schemaDict["definitions"] as? [String: Any] ?? [:])
+        .merging(schemaDict["$defs"] as? [String: Any] ?? [:]) { _, new in new }
+      let resolve = { (schema: [String: Any]) in
+        try resolveReferences(in: schema, definitions: definitions, rootName: rootName) as! [String: Any]
+      }
+
+      let dynamicSchemas = try parseDynamicSchema(from: resolve(schemaDict), path: name)
+      // Referenced definitions are named after their key, so references resolve to them
+      let dependencies = try definitions.keys.sorted().compactMap { definitionName -> DynamicGenerationSchema? in
+        guard let definition = definitions[definitionName] as? [String: Any], isNamedSchema(definition) else {
+          return nil
+        }
+        var namedDefinition = try resolve(definition)
+        namedDefinition["title"] = definitionName
+        return try parseDynamicSchema(from: namedDefinition, path: definitionName)
+      }
+      return try GenerationSchema(root: dynamicSchemas, dependencies: dependencies)
+    }
+
+    // Objects and unions have a name that references can point to, so they can be recursive
+    static func isNamedSchema(_ schema: [String: Any]) -> Bool {
+      schema["type"] as? String == "object" || schema["properties"] != nil || schema["anyOf"] != nil
+    }
+
+    /// Turns JSON schema references into the name of the schema they point to. "#"
+    /// points to the root. Definitions that are not objects or unions have no name,
+    /// so references to them are replaced with the definition
+    static func resolveReferences(in value: Any, definitions: [String: Any], rootName: String) throws -> Any {
+      if let array = value as? [Any] {
+        return try array.map { try resolveReferences(in: $0, definitions: definitions, rootName: rootName) }
+      }
+      guard let schema = value as? [String: Any] else {
+        return value
+      }
+      guard let reference = schema["$ref"] as? String else {
+        return try schema
+          .filter { $0.key != "$defs" && $0.key != "definitions" }
+          .mapValues { try resolveReferences(in: $0, definitions: definitions, rootName: rootName) }
+      }
+      if reference == "#" {
+        return ["$ref": rootName]
+      }
+      let definitionName = String(reference.split(separator: "/").last ?? "")
+      guard reference.hasPrefix("#/"), let definition = definitions[definitionName] as? [String: Any] else {
+        throw AppleLLMError.invalidSchema("Unresolved reference '\(reference)'")
+      }
+      if isNamedSchema(definition) {
+        return ["$ref": definitionName]
+      }
+      return try resolveReferences(in: definition, definitions: definitions, rootName: rootName)
     }
 
     static func parseDynamicSchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {
+      if let reference = schemaDict["$ref"] as? String {
+        return DynamicGenerationSchema(referenceTo: reference)
+      }
+
       // Nullable values become their non-null schema, since a value that is
       // never null still matches
       if let types = schemaDict["type"] as? [String] {
