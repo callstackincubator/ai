@@ -254,16 +254,16 @@ function buildSummaryPrompt(
   return [
     {
       role: 'system',
-      content: `Summarize the conversation history for continued assistant use. Preserve user goals, constraints, factual details, decisions, unresolved questions, and tool outcomes. Be concise and structured.${previousSummary ? ' Merge the existing summary and the new messages into one updated summary.' : ''}`,
+      content: `Summarize the conversation in <conversation> for continued assistant use. Preserve user goals, constraints, factual details, decisions, unresolved questions, and tool outcomes. Be concise and structured.${previousSummary ? ' Merge it with the earlier summary in <summary> into one updated summary.' : ''}`,
     },
     {
       role: 'user',
       content: [
         {
           type: 'text',
-          text: previousSummary
-            ? `Existing summary:\n${previousSummary}\n\nNew messages:\n${transcript}`
-            : transcript,
+          // Tagged, since small models given a bare transcript continue the
+          // conversation instead of summarizing it
+          text: `${previousSummary ? `<summary>\n${previousSummary}\n</summary>\n\n` : ''}<conversation>\n${transcript}\n</conversation>`,
         },
       ],
     },

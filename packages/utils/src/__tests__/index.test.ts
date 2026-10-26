@@ -231,9 +231,12 @@ describe('summarizeHistory', () => {
       rollingWindowMessages: 1,
     })
 
-    expect(model.summarizedTexts()).toEqual([
-      'USER: Tell me about Paris\n\nASSISTANT: Paris is in France',
-    ])
+    const [summarized] = model.summarizedTexts()
+    expect(model.doGenerate).toHaveBeenCalledTimes(1)
+    expect(summarized).toContain(
+      '<conversation>\nUSER: Tell me about Paris\n\nASSISTANT: Paris is in France\n</conversation>'
+    )
+    expect(summarized).not.toContain('And Lyon?')
     expect(result).toEqual([
       system('Summary of earlier conversation:\nsummary 1'),
       user('And Lyon?'),
@@ -258,9 +261,12 @@ describe('summarizeHistory', () => {
     )
 
     expect(model.doGenerate).toHaveBeenCalledTimes(2)
-    expect(model.summarizedTexts()[1]).toBe(
-      'Existing summary:\nsummary 1\n\nNew messages:\nUSER: And Lyon?\n\nASSISTANT: Lyon is in France'
+    const summarized = model.summarizedTexts()[1]
+    expect(summarized).toContain('<summary>\nsummary 1\n</summary>')
+    expect(summarized).toContain(
+      '<conversation>\nUSER: And Lyon?\n\nASSISTANT: Lyon is in France\n</conversation>'
     )
+    expect(summarized).not.toContain('Tell me about Paris')
   })
 
   test('summarizes a long history in chunks under the threshold', async () => {
@@ -274,8 +280,10 @@ describe('summarizeHistory', () => {
     })
 
     expect(model.doGenerate.mock.calls.length).toBeGreaterThan(1)
+    // The messages of each chunk fit the threshold
     for (const text of model.summarizedTexts()) {
-      expect(text.length).toBeLessThanOrEqual(80)
+      const messages = text.match(/(USER|ASSISTANT): [^\n]*/g) ?? []
+      expect(messages.join('').length).toBeLessThanOrEqual(40)
     }
   })
 
