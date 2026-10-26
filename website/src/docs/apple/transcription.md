@@ -106,19 +106,21 @@ For advanced use cases, you can access the speech transcription API directly:
 ```tsx
 import { AppleTranscription } from '@react-native-ai/apple'
 
+const language = 'fr'
+
 // Check whether the device can transcribe
-const isAvailable: boolean = AppleTranscription.isAvailable(language: string)
+const isAvailable: boolean = AppleTranscription.isAvailable(language)
 
 // Locale support and asset status for a language
-const info = await AppleTranscription.getModelInfo(language: string)
+const info = await AppleTranscription.getModelInfo(language)
 
 // Prepare language assets
-await AppleTranscription.prepare(language: string)
+await AppleTranscription.prepare(language)
 
 // Transcribe audio with timing information
 const { segments, duration } = await AppleTranscription.transcribe(
   arrayBuffer,
-  language: string
+  language
 )
 ```
 
