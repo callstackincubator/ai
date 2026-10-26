@@ -228,7 +228,22 @@ once Foundation Models reports a missing entitlement as an error.
 :::
 
 When the Private Cloud Compute quota is reached,
-generation fails with `RATE_LIMITED`.
+generation fails with `RATE_LIMITED`. Check the quota ahead of time to warn the
+user, and offer Apple's way to raise it, such as iCloud+:
+
+```typescript
+const { quota } = await apple.getModelInfo({ model: 'private-cloud-compute' })
+
+if (
+  (quota?.isApproachingLimit || quota?.isLimitReached) &&
+  quota.canIncreaseLimit
+) {
+  await apple.showQuotaLimitIncreaseSuggestion()
+}
+```
+
+`quota` is set once Private Cloud Compute is available, and `resetDate` tells
+when a reached limit resets.
 
 ## Guardrails
 

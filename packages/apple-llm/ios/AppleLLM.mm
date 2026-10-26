@@ -172,6 +172,11 @@ static NSString *AppleLLMToolRejectionMessage(jsi::Runtime &rt, const jsi::Value
   [_llm getModelInfo:locale model:model resolve:resolve reject:reject];
 }
 
+- (void)showQuotaLimitIncreaseSuggestion:(nonnull RCTPromiseResolveBlock)resolve
+                                  reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_llm showQuotaLimitIncreaseSuggestion:resolve reject:reject];
+}
+
 - (void)prewarm:(nonnull NSDictionary *)options
         resolve:(nonnull RCTPromiseResolveBlock)resolve
          reject:(nonnull RCTPromiseRejectBlock)reject {

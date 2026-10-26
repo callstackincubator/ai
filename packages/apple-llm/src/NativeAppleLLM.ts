@@ -57,6 +57,7 @@ export interface Spec extends TurboModule {
   ): Promise<CodegenTypes.UnsafeObject>
   countTokens(text: string): Promise<number>
   prewarm(options: CodegenTypes.UnsafeObject): Promise<void>
+  showQuotaLimitIncreaseSuggestion(): Promise<boolean>
   generateImages(options: CodegenTypes.UnsafeObject): Promise<string[]>
   generateText(
     messages: AppleMessage[],

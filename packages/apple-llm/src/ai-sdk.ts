@@ -100,6 +100,17 @@ export interface AppleModelInfo {
   supportsSpotlightTool: boolean
   supportsReasoning: boolean
   contextSize?: number
+  // Private Cloud Compute usage, once it is available (iOS 27)
+  quota?: AppleQuotaInfo
+}
+
+export interface AppleQuotaInfo {
+  isLimitReached: boolean
+  isApproachingLimit: boolean
+  // Whether showQuotaLimitIncreaseSuggestion() has something to show
+  canIncreaseLimit: boolean
+  // ISO 8601 date when the limit resets
+  resetDate?: string
 }
 
 export interface AppleLanguageModelOptions {
@@ -943,6 +954,12 @@ export function createAppleProvider({
       options.locale,
       options.model
     ) as Promise<AppleModelInfo>
+  /**
+   * Shows Apple's suggestion to raise the Private Cloud Compute limit, such as
+   * upgrading to iCloud+. Resolves to false when there is none (iOS 27)
+   */
+  provider.showQuotaLimitIncreaseSuggestion = () =>
+    NativeAppleLLM.showQuotaLimitIncreaseSuggestion()
   provider.languageModel = createLanguageModel
   provider.embeddingModel = (options: AppleEmbeddingOptions = {}) => {
     return new AppleTextEmbeddingModel(options)

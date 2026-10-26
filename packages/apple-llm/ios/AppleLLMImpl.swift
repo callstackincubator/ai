@@ -147,6 +147,31 @@ public class AppleLLMImpl: NSObject {
 #endif
   }
 
+  /// Shows Apple's suggestion to raise the Private Cloud Compute limit, such as
+  /// iCloud+. Resolves false when there is none to show
+  @objc
+  public func showQuotaLimitIncreaseSuggestion(
+    _ resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if compiler(>=6.4)
+    if #available(iOS 27, *) {
+      let model = PrivateCloudComputeLanguageModel()
+      guard privateCloudComputeAvailability(model) == "available",
+            let suggestion = model.quotaUsage.limitIncreaseSuggestion else {
+        resolve(false)
+        return
+      }
+      Task { @MainActor in
+        suggestion.show()
+        resolve(true)
+      }
+      return
+    }
+#endif
+    rejectWithAppleError(.unsupportedOS, reject: reject)
+  }
+
   /// Loads the model into memory ahead of the first request, so it answers sooner
   @objc
   public func prewarm(
@@ -502,9 +527,26 @@ public class AppleLLMImpl: NSObject {
     }
 
     info["contextSize"] = try await model.contextSize
+    info["quota"] = quotaInfo(model.quotaUsage)
     info["supportsLocale"] = try await model.supportsLocale(locale)
     info["supportedLanguages"] = try await model.supportedLanguages.map(languageIdentifier).sorted()
     return info
+  }
+
+  @available(iOS 27, *)
+  private func quotaInfo(_ quotaUsage: PrivateCloudComputeLanguageModel.QuotaUsage) -> [String: Any] {
+    var quota: [String: Any] = [
+      "isLimitReached": quotaUsage.isLimitReached,
+      "isApproachingLimit": false,
+      "canIncreaseLimit": quotaUsage.limitIncreaseSuggestion != nil,
+    ]
+    if case .belowLimit(let belowLimit) = quotaUsage.status {
+      quota["isApproachingLimit"] = belowLimit.isApproachingLimit
+    }
+    if let resetDate = quotaUsage.resetDate {
+      quota["resetDate"] = ISO8601DateFormatter().string(from: resetDate)
+    }
+    return quota
   }
 
   /// Workaround: Foundation Models stops the app with a fatal error, which

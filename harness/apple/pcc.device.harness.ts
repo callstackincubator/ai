@@ -17,6 +17,18 @@ describe('apple private cloud compute', () => {
     expect(info.availability).toBe('available')
   })
 
+  it('reports its quota', async () => {
+    const { quota } = await apple.getModelInfo({
+      model: 'private-cloud-compute',
+    })
+
+    expect(quota).toMatchObject({
+      isLimitReached: expect.any(Boolean),
+      isApproachingLimit: expect.any(Boolean),
+      canIncreaseLimit: expect.any(Boolean),
+    })
+  })
+
   it('answers a prompt', async () => {
     const result = await apple('private-cloud-compute').doGenerate({
       prompt: prompt('Reply with exactly the word BANANA and nothing else.'),
