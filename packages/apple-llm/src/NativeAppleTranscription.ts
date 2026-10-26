@@ -31,8 +31,21 @@ export type LiveTranscriptionErrorEvent = {
   error: string
 }
 
+export interface AppleTranscriptionModelInfo {
+  // Whether the device can transcribe at all
+  isAvailable: boolean
+  // Whether the language resolves to a locale the transcriber supports
+  supportsLocale: boolean
+  // The supported locale the language resolves to, e.g. en-US for en
+  locale?: string
+  // Whether the locale's assets are on the device. prepare() installs them
+  assets?: 'installed' | 'downloading' | 'supported' | 'unsupported'
+  supportedLocales: string[]
+}
+
 export interface Spec extends TurboModule {
   isAvailable(language: string): boolean
+  getModelInfo(language: string): Promise<CodegenTypes.UnsafeObject>
   prepare(language: string): Promise<void>
   startLiveTranscription(
     sessionId: string,
@@ -66,8 +79,7 @@ export interface LiveTranscription {
 declare global {
   function __apple__llm__transcribe__(
     data: ArrayBufferLike,
-    language: string,
-    contextualStrings?: string[]
+    language: string
   ): Promise<TranscriptionResult>
 }
 
@@ -76,11 +88,8 @@ const NativeAppleTranscription = TurboModuleRegistry.getEnforcing<Spec>(
 )
 
 export default {
-  transcribe: (
-    data: ArrayBufferLike,
-    language: string,
-    contextualStrings?: string[]
-  ) => globalThis.__apple__llm__transcribe__(data, language, contextualStrings),
+  transcribe: (data: ArrayBufferLike, language: string) =>
+    globalThis.__apple__llm__transcribe__(data, language),
   prepare: NativeAppleTranscription.prepare,
   /**
    * Transcribes the microphone as it records (iOS 27). Asks for microphone
@@ -132,5 +141,10 @@ export default {
           )),
     }
   },
+  // Whether the device can transcribe. getModelInfo reports locale support
   isAvailable: NativeAppleTranscription.isAvailable,
+  getModelInfo: (language: string) =>
+    NativeAppleTranscription.getModelInfo(
+      language
+    ) as Promise<AppleTranscriptionModelInfo>,
 }

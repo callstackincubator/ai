@@ -33,6 +33,7 @@ export type {
   VoiceInfo,
 } from './NativeAppleSpeech'
 export { default as AppleSpeech } from './NativeAppleSpeech'
+export type { AppleTranscriptionModelInfo } from './NativeAppleTranscription'
 export type {
   LiveTranscription,
   LiveTranscriptionOptions,
