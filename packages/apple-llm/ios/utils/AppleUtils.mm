@@ -29,8 +29,19 @@ using namespace facebook;
   return std::make_shared<react::NativeAppleUtilsSpecJSI>(params);
 }
 
+// A BCP 47 code such as en-US or zh-Hans-CN. The locale identifier can carry
+// keywords such as "@rg=plzzzz" (when language and region differ), which
+// AVSpeechSynthesisVoice and other APIs taking a language code do not accept
 - (NSString *)getCurrentLocale {
-  return [NSLocale currentLocale].localeIdentifier;
+  NSLocale *locale = [NSLocale currentLocale];
+  NSMutableArray<NSString *> *parts = [NSMutableArray arrayWithObject:locale.languageCode];
+  if (locale.scriptCode != nil) {
+    [parts addObject:locale.scriptCode];
+  }
+  if (locale.countryCode != nil) {
+    [parts addObject:locale.countryCode];
+  }
+  return [parts componentsJoinedByString:@"-"];
 }
 
 @end
