@@ -116,5 +116,18 @@ Returned voice objects include:
 - `isPersonalVoice`: boolean (iOS 17+)
 - `isNoveltyVoice`: boolean (iOS 17+)
 
-> [!NOTE]
-> On iOS 17+, the provider requests Personal Voice authorization before listing voices so your Personal Voice can be surfaced if available.
+### Personal Voice
+
+On iOS 17+, a Personal Voice the user created is only listed once they let your app use it. Ask when your app needs it, for example when it opens a voice picker. iOS shows the prompt once, and later calls return the saved answer:
+
+```tsx
+const status = await AppleSpeech.requestPersonalVoiceAuthorization()
+// 'authorized' | 'denied' | 'notDetermined' | 'unsupported'
+
+if (status === 'authorized') {
+  const personalVoices = (await AppleSpeech.getVoices()).filter(
+    (voice) => voice.isPersonalVoice
+  )
+}
+```
+

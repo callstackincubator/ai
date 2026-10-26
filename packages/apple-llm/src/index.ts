@@ -26,7 +26,10 @@ export type { AppleLLMError, AppleLLMErrorCode } from './errors'
 export { AppleLLMErrorCodes } from './errors'
 export { default as AppleEmbeddings } from './NativeAppleEmbeddings'
 export { default as AppleFoundationModels } from './NativeAppleLLM'
-export type { VoiceInfo } from './NativeAppleSpeech'
+export type {
+  PersonalVoiceAuthorizationStatus,
+  VoiceInfo,
+} from './NativeAppleSpeech'
 export { default as AppleSpeech } from './NativeAppleSpeech'
 export { default as AppleTranscription } from './NativeAppleTranscription'
 export { default as AppleUtils } from './NativeAppleUtils'

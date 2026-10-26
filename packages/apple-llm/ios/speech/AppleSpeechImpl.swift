@@ -12,20 +12,34 @@ import AVFoundation
 public class AppleSpeechImpl: NSObject {
   private let speechSynthesizer = AVSpeechSynthesizer()
   
+  // Personal voices are only listed once the app is authorized, which
+  // requestPersonalVoiceAuthorization asks for
   @objc
   public func getVoices(_ resolve: @escaping ([Any]) -> Void, reject: @escaping (String, String, Error?) -> Void) {
-    Task {
-      if #available(iOS 17.0, *) {
-        await withCheckedContinuation { continuation in
-          AVSpeechSynthesizer.requestPersonalVoiceAuthorization { _ in
-            continuation.resume()
-          }
-        }
+    let allVoices = AVSpeechSynthesisVoice.speechVoices()
+    let voiceInfos = allVoices.map { $0.toDictionary() }
+    resolve(voiceInfos)
+  }
+
+  @objc
+  public func requestPersonalVoiceAuthorization(_ resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
+    guard #available(iOS 17.0, *) else {
+      resolve("unsupported")
+      return
+    }
+    AVSpeechSynthesizer.requestPersonalVoiceAuthorization { status in
+      switch status {
+      case .authorized:
+        resolve("authorized")
+      case .denied:
+        resolve("denied")
+      case .notDetermined:
+        resolve("notDetermined")
+      case .unsupported:
+        resolve("unsupported")
+      @unknown default:
+        resolve("unsupported")
       }
-      
-      let allVoices = AVSpeechSynthesisVoice.speechVoices()
-      let voiceInfos = allVoices.map { $0.toDictionary() }
-      resolve(voiceInfos)
     }
   }
   
