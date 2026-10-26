@@ -124,10 +124,10 @@ export default {
     let stopping: Promise<void> | undefined
     return {
       stop: () =>
-        (stopping ??=
-          NativeAppleTranscription.stopLiveTranscription(sessionId).finally(
-            removeListeners
-          )),
+        (stopping ??= NativeAppleTranscription.stopLiveTranscription(sessionId)
+          // Native resolves with null, but stop() resolves with nothing
+          .then(() => {})
+          .finally(removeListeners)),
     }
   },
   // Whether the device can transcribe. getModelInfo reports locale support
