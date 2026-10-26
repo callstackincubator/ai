@@ -348,7 +348,6 @@ function getUnsupportedSettingWarnings(
     options.stopSequences?.length ? 'stopSequences' : undefined,
     options.presencePenalty !== undefined ? 'presencePenalty' : undefined,
     options.frequencyPenalty !== undefined ? 'frequencyPenalty' : undefined,
-    options.seed !== undefined ? 'seed' : undefined,
   ]
   return unsupported.flatMap((feature) =>
     feature ? [{ type: 'unsupported' as const, feature }] : []
@@ -1276,6 +1275,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           temperature: options.temperature,
           topP: options.topP,
           topK: options.topK,
+          seed: options.seed,
           tools,
           toolCallingMode,
           providerOptions: { ...appleOptions, requestId } as Record<
@@ -1454,6 +1454,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             temperature: options.temperature,
             topP: options.topP,
             topK: options.topK,
+            seed: options.seed,
             tools,
             toolCallingMode,
             providerOptions: appleOptions as unknown as Record<string, unknown>,

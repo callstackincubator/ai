@@ -1456,10 +1456,16 @@ public class AppleLLMImpl: NSObject {
       throw AppleLLMError.conflictingSamplingMethods
     }
     
+    // Seeds need random sampling. Without topP or topK, a threshold of 1 samples
+    // from every token, like the default
+    let seed = (options["seed"] as? NSNumber).map { UInt64(truncatingIfNeeded: $0.int64Value) }
+
     if let topP {
-      samplingMode = .random(probabilityThreshold: topP)
+      samplingMode = .random(probabilityThreshold: topP, seed: seed)
     } else if let topK {
-      samplingMode = .random(top: topK)
+      samplingMode = .random(top: topK, seed: seed)
+    } else if let seed {
+      samplingMode = .random(probabilityThreshold: 1, seed: seed)
     }
     
     let toolCallingMode = options["toolCallingMode"] as? String

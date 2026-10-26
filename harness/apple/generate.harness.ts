@@ -160,6 +160,25 @@ describe('apple generate', () => {
     ).rejects.toMatchObject({ code: 'GUARDRAIL_VIOLATION' })
   })
 
+  it('samples the same answer with the same seed', async () => {
+    const sample = async (seed: number) => {
+      const result = await apple().doGenerate({
+        prompt: prompt(
+          'Write one sentence about a fantasy creature you invent.'
+        ),
+        temperature: 1.5,
+        seed,
+      })
+      expect(result.warnings).toEqual([])
+      return result.content[0].type === 'text' ? result.content[0].text : ''
+    }
+
+    const first = await sample(42)
+
+    expect(await sample(42)).toBe(first)
+    expect(await sample(7)).not.toBe(first)
+  })
+
   it('rejects sampling with both topP and topK', async () => {
     await expect(
       apple().doGenerate({ prompt: prompt('Say hi.'), topP: 0.9, topK: 40 })
@@ -204,14 +223,12 @@ describe('apple generate', () => {
       stopSequences: ['5'],
       presencePenalty: 0.5,
       frequencyPenalty: 0.5,
-      seed: 42,
     })
 
     expect(warnedFeatures(result.warnings)).toEqual([
       'stopSequences',
       'presencePenalty',
       'frequencyPenalty',
-      'seed',
     ])
     expect(result.content[0]).toMatchObject({ type: 'text' })
   })
