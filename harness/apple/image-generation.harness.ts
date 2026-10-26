@@ -1,14 +1,42 @@
 import { apple } from '@react-native-ai/apple'
 import { generateImage } from 'ai'
+import { Platform } from 'react-native'
 import { describe, expect, it } from 'react-native-harness'
 
 import { warnedFeatures } from './helpers'
 
-// Image Playground does not run on simulators
-
 const pngSignature = [0x89, 0x50, 0x4e, 0x47]
 
+// Apple discontinued ImageCreator in iOS 27
+const hasImageCreator = parseInt(String(Platform.Version), 10) < 27
+
+describe('apple image generation on iOS 27', () => {
+  if (hasImageCreator) {
+    return
+  }
+
+  it('rejects as unsupported', async () => {
+    await expect(
+      apple.imageModel().doGenerate({
+        prompt: 'A friendly robot watering balcony herbs',
+        n: 1,
+        size: undefined,
+        aspectRatio: undefined,
+        seed: undefined,
+        files: undefined,
+        mask: undefined,
+        providerOptions: {},
+      })
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_OS' })
+  })
+})
+
+// Image Playground does not run on simulators, which only run iOS 27 here
 describe('apple image generation', () => {
+  if (!hasImageCreator) {
+    return
+  }
+
   it('generates a png', async () => {
     const { images } = await generateImage({
       model: apple.imageModel({ style: 'illustration' }),

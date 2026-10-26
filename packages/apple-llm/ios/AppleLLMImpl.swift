@@ -141,6 +141,11 @@ public class AppleLLMImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
+    // Apple discontinued ImageCreator in iOS 27, where it throws notSupported
+    if #available(iOS 27, *) {
+      rejectWithAppleError(.unsupportedOS, reject: reject)
+      return
+    }
 #if canImport(ImagePlayground)
     if #available(iOS 26.4, *) {
       Task {
@@ -1340,25 +1345,6 @@ public class AppleLLMImpl: NSObject {
       return .illustration
     case "sketch":
       return .sketch
-#if compiler(>=6.4)
-    case "any":
-      if #available(iOS 27, *) {
-        return .any
-      }
-      return .illustration
-    case "emoji":
-      if #available(iOS 27, *) {
-        return .emoji
-      }
-      return .illustration
-#endif
-#if compiler(>=6.3)
-    case "externalProvider":
-      if #available(iOS 27, *) {
-        return .externalProvider
-      }
-      return .illustration
-#endif
     default:
       return .illustration
     }
