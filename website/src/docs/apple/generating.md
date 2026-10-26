@@ -539,16 +539,27 @@ for await (const part of result.stream) {
 
 Stable public codes are:
 
-- `MODEL_UNAVAILABLE`
-- `UNSUPPORTED_OS`
-- `GENERATION_ERROR`
-- `INVALID_MESSAGE`
-- `CONFLICTING_SAMPLING_METHODS`
-- `INVALID_SCHEMA`
-- `TOOL_CALL_ERROR`
-- `UNKNOWN_TOOL_CALL_ERROR`
-- `CONTEXT_WINDOW_EXCEEDED`
-- `RATE_LIMITED`
+| Code                           | Meaning                                                          |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `MODEL_UNAVAILABLE`            | The model is not available, see `getModelInfo` for why           |
+| `UNSUPPORTED_OS`               | The feature needs a newer iOS version or SDK                     |
+| `GENERATION_ERROR`             | Any other generation failure                                     |
+| `INVALID_MESSAGE`              | The prompt cannot be sent to Foundation Models                   |
+| `CONFLICTING_SAMPLING_METHODS` | Both `topP` and `topK` were set                                  |
+| `INVALID_SCHEMA`               | The schema or one of its constraints is not supported            |
+| `TOOL_CALL_ERROR`              | A tool threw                                                     |
+| `UNKNOWN_TOOL_CALL_ERROR`      | A tool returned something that is not text or JSON               |
+| `CONTEXT_WINDOW_EXCEEDED`      | The transcript does not fit in the context window                |
+| `RATE_LIMITED`                 | Too many requests, or the Private Cloud Compute quota is reached |
+| `GUARDRAIL_VIOLATION`          | Apple's guardrails flagged the prompt or response                |
+| `REFUSAL`                      | The model refused to answer                                      |
+| `UNSUPPORTED_LANGUAGE`         | The model does not support the language of the prompt            |
+| `ASSETS_UNAVAILABLE`           | The model's assets are not on the device yet                     |
+| `CONCURRENT_REQUESTS`          | The model is busy with another request                           |
+| `DECODING_FAILURE`             | The model could not produce output that matches the schema       |
+| `TIMEOUT`                      | The request took too long (iOS 27)                               |
+| `NETWORK_FAILURE`              | Private Cloud Compute could not be reached                       |
+| `SERVICE_UNAVAILABLE`          | Private Cloud Compute is temporarily unavailable                 |
 
 ## Direct Native API
 
