@@ -498,6 +498,14 @@ function isFractionalEnum(schema: unknown) {
   )
 }
 
+// Foundation Models generates properties in order, but native receives objects
+// as dictionaries, which have none, so the order is sent as a list
+function withPropertyOrder(value: JSONSchema7) {
+  return value?.type === 'object' && value.properties
+    ? { ...value, 'x-order': Object.keys(value.properties) }
+    : value
+}
+
 function toNativeSchema<T extends JSONSchema7 | undefined>(schema: T): T {
   return (
     schema &&
@@ -505,7 +513,7 @@ function toNativeSchema<T extends JSONSchema7 | undefined>(schema: T): T {
       JSON.stringify(schema, (_, value) =>
         isFractionalEnum(value)
           ? { ...value, type: 'string', enum: value.enum!.map(String) }
-          : value
+          : withPropertyOrder(value)
       )
     )
   )
@@ -529,11 +537,18 @@ function restoreNumbers(
     )
   }
   if (value && typeof value === 'object' && schema.properties) {
+    // Foundation Models generates properties in schema order, but its JSON
+    // does not keep that order, so it is restored here too
+    const order = Object.keys(schema.properties)
+    const rank = (key: string) =>
+      order.includes(key) ? order.indexOf(key) : order.length
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        restoreNumbers(item, schema.properties![key]),
-      ])
+      Object.entries(value)
+        .sort(([a], [b]) => rank(a) - rank(b))
+        .map(([key, item]) => [
+          key,
+          restoreNumbers(item, schema.properties![key]),
+        ])
     )
   }
   return (schema.anyOf ?? []).reduce(restoreNumbers, value)

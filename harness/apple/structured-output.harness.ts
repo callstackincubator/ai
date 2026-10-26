@@ -1,5 +1,5 @@
 import type { JSONSchema7 } from '@ai-sdk/provider'
-import { apple } from '@react-native-ai/apple'
+import { apple, AppleFoundationModels } from '@react-native-ai/apple'
 import { describe, expect, it } from 'react-native-harness'
 
 import { prompt, readAll, textOf } from './helpers'
@@ -15,6 +15,8 @@ async function generateObject(text: string, schema: JSONSchema7) {
   }
   return JSON.parse(part.text)
 }
+
+const orderedKeys = ['zulu', 'alpha', 'mike', 'bravo', 'yankee']
 
 function numberSchema(value: JSONSchema7): JSONSchema7 {
   return {
@@ -33,6 +35,68 @@ describe('apple structured output', () => {
     })
 
     expect(output.city).toMatch(/paris/i)
+  })
+
+  it('returns properties in the order the schema declares them', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      type: 'object',
+      properties: Object.fromEntries(
+        orderedKeys.map((key) => [key, { type: 'string' }])
+      ),
+      required: orderedKeys,
+    })
+
+    expect(Object.keys(output)).toEqual(orderedKeys)
+  })
+
+  it('generates properties in the order the schema declares them', async () => {
+    // Native receives objects as dictionaries, so the provider sends the order
+    // in x-order. Snapshots show the order properties are generated in
+    const snapshots: string[] = []
+    await new Promise<void>((resolve, reject) => {
+      const listeners = [
+        AppleFoundationModels.onStreamUpdate(({ content }) => {
+          snapshots.push(content)
+        }),
+        AppleFoundationModels.onStreamComplete(() => done()),
+        AppleFoundationModels.onStreamError(({ error }) =>
+          done(new Error(error))
+        ),
+      ]
+      const done = (error?: Error) => {
+        listeners.forEach((listener) => listener.remove())
+        if (error) {
+          reject(error)
+        } else {
+          resolve()
+        }
+      }
+      AppleFoundationModels.generateStream(
+        'property-order',
+        [{ role: 'user', content: 'Give each field a random word.' }],
+        {
+          schema: {
+            'type': 'object',
+            'properties': Object.fromEntries(
+              orderedKeys.map((key) => [key, { type: 'string' }])
+            ),
+            'required': orderedKeys,
+            'x-order': orderedKeys,
+          },
+        }
+      )
+    })
+
+    const generated = snapshots.reduce<string[]>(
+      (keys, snapshot) => [
+        ...keys,
+        ...Object.keys(JSON.parse(snapshot)).filter(
+          (key) => !keys.includes(key)
+        ),
+      ],
+      []
+    )
+    expect(generated).toEqual(orderedKeys)
   })
 
   it('picks only listed string enum values', async () => {

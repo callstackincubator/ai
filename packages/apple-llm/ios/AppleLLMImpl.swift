@@ -1594,8 +1594,12 @@ public class AppleLLMImpl: NSObject {
       
       if let propertiesDict = schemaDict["properties"] as? [String: Any] {
         let requiredFields = schemaDict["required"] as? [String] ?? []
+        // Properties are generated in this order. JS sends it, since dictionaries have none
+        let order = (schemaDict["x-order"] as? [String] ?? []).filter { propertiesDict[$0] != nil }
+        let propertyNames = order + propertiesDict.keys.filter { !order.contains($0) }.sorted()
         
-        for (propertyName, propertySchema) in propertiesDict {
+        for propertyName in propertyNames {
+          let propertySchema = propertiesDict[propertyName]!
           guard let propertySchemaDict = propertySchema as? [String: Any] else {
             throw AppleLLMError.invalidSchema("Property \(propertyName) schema must be an object")
           }
