@@ -106,15 +106,16 @@ them.
 
 ## Image Generation
 
-`apple.imageModel()` uses Image Playground. Before iOS 26.4 it throws
-`UNSUPPORTED_OS`.
+`apple.imageModel()` uses Image Playground's `ImageCreator`, which Apple added
+in iOS 26.4 and discontinued in iOS 27. It throws `UNSUPPORTED_OS` on other
+versions, and is deprecated.
 
 | Feature                                   | iOS 26 | iOS 26.4                     | iOS 27 |
 | ----------------------------------------- | ------ | ---------------------------- | ------ |
-| Image generation                          | ❌     | ✅                           | ✅     |
-| `animation`, `illustration`, `sketch`     | ❌     | ✅                           | ✅     |
-| `any`, `emoji`, `externalProvider` styles | ❌     | Falls back to `illustration` | ✅     |
-| `personalization` option                  | ❌     | ✅                           | ✅     |
+| Image generation                          | ❌     | ✅                           | ❌     |
+| `animation`, `illustration`, `sketch`     | ❌     | ✅                           | ❌     |
+| `any`, `emoji`, `externalProvider` styles | ❌     | Falls back to `illustration` | ❌     |
+| `personalization` option                  | ❌     | ✅                           | ❌     |
 
 ## Other Models
 

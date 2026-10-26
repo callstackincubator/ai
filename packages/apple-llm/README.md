@@ -5,7 +5,8 @@ A Vercel AI SDK provider for Apple Foundation Models, enabling access to Apple I
 **Requirements:**
 
 - iOS 26+ for text generation
-- iOS 26.4+ for token counting and Image Playground generation
+- iOS 26.4+ for token counting
+- iOS 26.4 for Image Playground generation, which Apple removed in iOS 27
 - iOS 27+ for image prompts, Private Cloud Compute, and Vision built-in tools
 - Apple Intelligence enabled device
 - Vercel AI SDK v7
@@ -37,7 +38,7 @@ with an SDK that has them (Xcode 26 with Swift 6.3, and Xcode 27).
 | `toolChoice: 'auto'` and `'none'`    | ✅     | ✅       | ✅                      |
 | `toolChoice: 'required'`, named tool | ❌     | ❌       | ✅                      |
 | Token counting and context size      | ❌     | ✅       | ✅                      |
-| Image Playground generation          | ❌     | ✅       | ✅ Adds more styles     |
+| Image Playground generation          | ❌     | ✅       | ❌ Removed by Apple     |
 | Reasoning level and reasoning parts  | ❌     | ❌       | ✅                      |
 | Image prompts                        | ❌     | ❌       | ✅                      |
 | Private Cloud Compute                | ❌     | ❌       | ✅ Physical device only |
@@ -57,7 +58,7 @@ See [iOS Versions](https://react-native-ai.dev/docs/apple/ios-versions) for deta
 - ✅ Tool calling
 - ✅ Vision OCR and barcode built-in tools on iOS 27+
 - ✅ Streaming
-- ✅ Image Playground generation through the AI SDK image API
+- ✅ Image Playground generation through the AI SDK image API on iOS 26.4 (deprecated)
 
 ## Documentation
 

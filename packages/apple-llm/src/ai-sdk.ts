@@ -55,6 +55,8 @@ export interface AppleLanguageModel extends LanguageModelV4 {
 }
 export type AppleLanguageModelId = 'system' | 'private-cloud-compute'
 export type AppleBuiltInTool = 'ocr' | 'barcode'
+// 'any', 'emoji' and 'externalProvider' need iOS 27, which has no ImageCreator,
+// so they fall back to 'illustration'
 export type AppleImageStyle =
   | 'animation'
   | 'any'
@@ -859,6 +861,12 @@ export function createAppleProvider({
   }
   /** @deprecated Use `embeddingModel` */
   provider.textEmbeddingModel = provider.embeddingModel
+  /**
+   * @deprecated Apple discontinued Image Playground's ImageCreator in iOS 27,
+   * where this model throws `UNSUPPORTED_OS`. It will be removed in the next
+   * major version. Present `imagePlaygroundSheet` from native code or use
+   * another image provider instead
+   */
   provider.imageModel = (options: AppleImageModelOptions = {}) => {
     return new AppleImageModel(options)
   }

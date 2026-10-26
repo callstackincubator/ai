@@ -8,7 +8,8 @@ Apple-specific surface for runtime model information and Apple-only options.
 ## Requirements
 
 - iOS 26+ for Apple Foundation Models text generation.
-- iOS 26.4+ for token counting and Image Playground image generation.
+- iOS 26.4+ for token counting.
+- iOS 26.4 for Image Playground image generation. Apple removed it in iOS 27.
 - iOS 27+ for multimodal image prompts, Private Cloud Compute language models,
   reasoning levels, Vision built-in tools, and token usage.
 - Apple's managed Private Cloud Compute entitlement for the
@@ -305,7 +306,14 @@ parts on older OS versions throws `AppleLLMErrorCodes.UnsupportedOS`.
 
 ## Image Generation
 
-Use the AI SDK image API with Apple's Image Playground framework:
+:::warning
+`apple.imageModel()` is deprecated and will be removed in the next major
+version. Apple discontinued Image Playground's `ImageCreator` in iOS 27, so the
+model throws `UNSUPPORTED_OS` there. To generate images on iOS 27, present
+Apple's `imagePlaygroundSheet` from native code or use another image provider.
+:::
+
+On iOS 26.4, use the AI SDK image API with Apple's Image Playground framework:
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
@@ -323,9 +331,10 @@ const result = await generateImage({
 const base64Png = result.images[0].base64
 ```
 
-The provider uses `ImageCreator` on iOS 26.4 and newer and returns PNG images.
-Supported styles are `animation`, `illustration`, and `sketch`; iOS 27 adds
-`any`, `emoji`, and `externalProvider`. Apple supports at most one source image
+The provider uses `ImageCreator` and returns PNG images. Supported styles are
+`animation`, `illustration`, and `sketch`. `any`, `emoji`, and
+`externalProvider` fall back to `illustration`, since Apple only added them in
+iOS 27, where the model rejects with `UNSUPPORTED_OS`. Apple supports at most one source image
 concept for generation, so pass no more than one file. Personalization is
 applied when the app is built with an SDK that exposes `ImagePlaygroundOptions`.
 
