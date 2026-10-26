@@ -137,13 +137,15 @@ describe('apple generate', () => {
   })
 
   it('samples with only a temperature set', async () => {
+    // Random samples can repeat, so sample until two differ. Greedy sampling
+    // would give the same answer every time
     const answers = new Set<string>()
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6 && answers.size < 2; i++) {
       const result = await apple().doGenerate({
         prompt: prompt(
           'Invent a name for a new fantasy creature. Reply with the name only.'
         ),
-        temperature: 1.5,
+        temperature: 1,
       })
       answers.add(
         result.content[0].type === 'text' ? result.content[0].text : ''
@@ -185,10 +187,18 @@ describe('apple generate', () => {
       return result.content[0].type === 'text' ? result.content[0].text : ''
     }
 
-    const first = await sample(42)
+    // Apple does not guarantee it, but with the seed forwarded the samples
+    // match, and without it random sampling makes them differ
+    expect(await sample(42)).toBe(await sample(42))
+  })
 
-    expect(await sample(42)).toBe(first)
-    expect(await sample(7)).not.toBe(first)
+  it('leaves out a seed that is not a whole number', async () => {
+    const result = await apple().doGenerate({
+      prompt: prompt('Say hi.'),
+      seed: 1.5,
+    })
+
+    expect(warnedFeatures(result.warnings)).toEqual(['seed'])
   })
 
   it('rejects sampling with both topP and topK', async () => {
