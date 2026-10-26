@@ -163,4 +163,8 @@ using namespace react;
   [_speech getVoices:resolve reject:reject];
 }
 
+- (void)requestPersonalVoiceAuthorization:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_speech requestPersonalVoiceAuthorization:resolve reject:reject];
+}
+
 @end

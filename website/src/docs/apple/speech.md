@@ -82,7 +82,7 @@ await speech({
 
 ## Voices and Asset Management
 
-The system provides a catalog of built‑in voices, including enhanced and premium variants, which may require a one‑time system download. If you have created a Personal Voice on device (iOS 17+), it appears in the list and is flagged accordingly.
+The system provides a catalog of built‑in voices, including enhanced and premium variants, which may require a one‑time system download. If the user created a Personal Voice (iOS 17+), it appears in the list, flagged with `isPersonalVoice`, once they allow your app to use it with [`requestPersonalVoiceAuthorization()`](#personal-voice).
 
 > [!NOTE]
 > Voice assets are managed by the operating system. To add or manage voices, use iOS Settings → Accessibility → Read & Speak → Voices. This provider does not bundle or manage voice downloads.
@@ -116,5 +116,20 @@ Returned voice objects include:
 - `isPersonalVoice`: boolean (iOS 17+)
 - `isNoveltyVoice`: boolean (iOS 17+)
 
-> [!NOTE]
-> On iOS 17+, the provider requests Personal Voice authorization before listing voices so your Personal Voice can be surfaced if available.
+### Personal Voice
+
+On iOS 17+, a Personal Voice the user created is only listed once they let your app use it. Ask when your app needs it, for example when it opens a voice picker. iOS shows the prompt once, and later calls return the saved answer:
+
+```tsx
+const status = await AppleSpeech.requestPersonalVoiceAuthorization()
+// 'authorized' | 'denied' | 'notDetermined' | 'unsupported'
+
+if (status === 'authorized') {
+  const personalVoices = (await AppleSpeech.getVoices()).filter(
+    (voice) => voice.isPersonalVoice
+  )
+}
+```
+
+Right after the user allows access, iOS can take a moment to add the Personal Voice to the voice list, so if it is missing, call `getVoices()` again shortly after, for example when your voice picker next appears.
+

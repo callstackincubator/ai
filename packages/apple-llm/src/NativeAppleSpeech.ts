@@ -19,8 +19,15 @@ export interface VoiceInfo {
   isNoveltyVoice: boolean
 }
 
+export type PersonalVoiceAuthorizationStatus =
+  | 'authorized'
+  | 'denied'
+  | 'notDetermined'
+  | 'unsupported'
+
 export interface Spec extends TurboModule {
   getVoices(): Promise<VoiceInfo[]>
+  requestPersonalVoiceAuthorization(): Promise<string>
 }
 
 const NativeAppleSpeech =
@@ -43,6 +50,12 @@ declare global {
 
 export default {
   getVoices: NativeAppleSpeech.getVoices,
+  /**
+   * Asks the user to let the app use their Personal Voice (iOS 17+). Once
+   * authorized, getVoices() lists it
+   */
+  requestPersonalVoiceAuthorization: () =>
+    NativeAppleSpeech.requestPersonalVoiceAuthorization() as Promise<PersonalVoiceAuthorizationStatus>,
   generate: async (
     text: string,
     options: SpeechOptions = {}
