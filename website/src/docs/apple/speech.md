@@ -82,7 +82,7 @@ await speech({
 
 ## Voices and Asset Management
 
-The system provides a catalog of built‑in voices, including enhanced and premium variants, which may require a one‑time system download. If you have created a Personal Voice on device (iOS 17+), it appears in the list and is flagged accordingly.
+The system provides a catalog of built‑in voices, including enhanced and premium variants, which may require a one‑time system download. If the user created a Personal Voice (iOS 17+), it appears in the list, flagged with `isPersonalVoice`, once they allow your app to use it with [`requestPersonalVoiceAuthorization()`](#personal-voice).
 
 > [!NOTE]
 > Voice assets are managed by the operating system. To add or manage voices, use iOS Settings → Accessibility → Read & Speak → Voices. This provider does not bundle or manage voice downloads.
