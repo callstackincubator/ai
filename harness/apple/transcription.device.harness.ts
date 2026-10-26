@@ -57,10 +57,13 @@ describe('apple transcription', () => {
       endSecond: number
     }[]
 
-    expect(words.map((word) => word.text.toLowerCase())).toEqual(
-      expect.arrayContaining(['quick', 'brown', 'fox'])
-    )
+    const texts = words.map((word) => word.text.toLowerCase())
+    const quick = texts.indexOf('quick')
+    expect(quick).toBeGreaterThanOrEqual(0)
+    expect(texts.indexOf('brown')).toBeGreaterThan(quick)
+    expect(texts.indexOf('fox')).toBeGreaterThan(texts.indexOf('brown'))
     for (const [index, word] of words.entries()) {
+      expect(word.startSecond).toBeGreaterThanOrEqual(0)
       expect(word.endSecond).toBeGreaterThanOrEqual(word.startSecond)
       if (index > 0) {
         expect(word.startSecond).toBeGreaterThanOrEqual(
