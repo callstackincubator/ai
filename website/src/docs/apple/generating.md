@@ -480,6 +480,28 @@ const result = await generateText({
 These tools require iOS 27. On older systems the provider throws
 `AppleLLMErrorCodes.UnsupportedOS`.
 
+## Spotlight Search Tool
+
+iOS 27 also adds a built-in tool that searches your app's Core Spotlight
+index, so the model can answer from content your app indexed with
+`CSSearchableIndex`, entirely on device:
+
+```typescript
+const result = await generateText({
+  model: apple(),
+  prompt: 'What did I note about the Kyoto trip?',
+  providerOptions: {
+    apple: {
+      builtInTools: ['spotlight'],
+    },
+  },
+})
+```
+
+Check `supportsSpotlightTool` from `getModelInfo` to know whether the device
+and SDK have it. It does not run in the iOS Simulator. Index content from native code; the tool only finds what your
+app has indexed.
+
 ## Context Window
 
 Apple's available context depends on the model and OS version. Prefer runtime

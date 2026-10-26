@@ -54,7 +54,7 @@ export interface AppleLanguageModel extends LanguageModelV4 {
   countTokens: (text: string) => Promise<number>
 }
 export type AppleLanguageModelId = 'system' | 'private-cloud-compute'
-export type AppleBuiltInTool = 'ocr' | 'barcode'
+export type AppleBuiltInTool = 'ocr' | 'barcode' | 'spotlight'
 // 'any', 'emoji' and 'externalProvider' need iOS 27, which has no ImageCreator,
 // so they fall back to 'illustration'
 export type AppleImageStyle =
@@ -97,6 +97,7 @@ export interface AppleModelInfo {
   supportsImagePrompts: boolean
   supportsDynamicProfiles: boolean
   supportsVisionTools: boolean
+  supportsSpotlightTool: boolean
   supportsReasoning: boolean
   contextSize?: number
 }
