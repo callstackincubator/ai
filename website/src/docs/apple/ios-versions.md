@@ -26,7 +26,7 @@ for a missing feature (image parts, the Private Cloud Compute model, Vision
 tools, a required or named tool choice, `maxToolCalls`) throw `UNSUPPORTED_OS`.
 A `reasoning` level the model cannot use, which includes every model before
 iOS 27, is dropped with an `unsupported` warning. Missing output, such as
-reasoning parts or usage, is left out.
+reasoning parts, is left out, and missing usage has undefined token counts.
 
 | Feature                                         | iOS 26                        | iOS 26.4                      | iOS 27                        |
 | ----------------------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
@@ -48,7 +48,7 @@ reasoning parts or usage, is left out.
 | Private Cloud Compute model                     | ❌                            | ❌                            | ✅ Physical device only       |
 | Vision OCR and barcode tools                    | ❌                            | ❌                            | ✅ Physical device only       |
 | Spotlight search tool                           | ❌                            | ❌                            | ✅ Physical device only       |
-| Token usage and `'length'` finish reason        | ❌                            | ❌                            | ✅                            |
+| Token usage and `'length'` finish reason        | ❌                            | ✅ Counted with the tokenizer | ✅                            |
 | `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅                            | ✅                            | ✅                            |
 | Guardrail, refusal, language and asset errors   | ✅                            | ✅                            | ✅                            |
 | Timeout and network errors                      | ❌                            | ❌                            | ✅                            |
@@ -68,10 +68,11 @@ Notes:
   replayed in later turns.
 - **Images in history.** Apple only reads images on the prompt being answered.
   Images in earlier user turns are left out on every version.
-- **Usage and finish reason.** Before iOS 27 usage is `undefined` and the
-  finish reason is always `'stop'`. Apple does not report when a response
-  stops at `maxOutputTokens`, so on iOS 27 the finish reason is `'length'` when
-  the response used every allowed token.
+- **Usage and finish reason.** iOS 27 reports the usage Foundation Models
+  measured, and iOS 26.4 counts it with the on-device tokenizer. On iOS 26,
+  `usage` has undefined token counts and the finish reason is always `'stop'`.
+  Apple does not report when a response stops at `maxOutputTokens`, so the
+  finish reason is `'length'` when the response used every allowed token.
 - **Simulator.** Private Cloud Compute does not run in the iOS Simulator, and
   the simulator SDK does not include the Vision tools.
 

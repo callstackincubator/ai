@@ -184,8 +184,8 @@ To keep long chats inside it, wrap the model with
 older messages. See [Conversation History](../history.md).
 
 **Token usage.** `result.usage` is measured by Foundation Models on iOS 27, for
-both models. On iOS 26.4 it is counted with the on-device tokenizer, and before
-that it is `undefined`. Apple does not say when a response stops at
+both models. On iOS 26.4 it is counted with the on-device tokenizer, and on
+iOS 26 its token counts are `undefined`. Apple does not say when a response stops at
 `maxOutputTokens`, so `finishReason` is `'length'` when the response used every
 allowed token.
 
