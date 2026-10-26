@@ -1,10 +1,38 @@
-import { apple } from '@react-native-ai/apple'
+import type { LanguageModelV4StreamPart } from '@ai-sdk/provider'
+import { apple, createSnapshotStreamHandler } from '@react-native-ai/apple'
 import { streamText } from 'ai'
 import { describe, expect, it } from 'react-native-harness'
 
 import { prompt, readAll, textOf } from './helpers'
 
 describe('apple stream', () => {
+  it('drops held structured output when told not to flush it', async () => {
+    const schema = {
+      type: 'object' as const,
+      properties: { steps: { type: 'array' as const } },
+    }
+    // Feeds the handler one structured snapshot, then ends it
+    const run = (flushHeldText: boolean) =>
+      readAll(
+        new ReadableStream<LanguageModelV4StreamPart>({
+          start(controller) {
+            const snapshots = createSnapshotStreamHandler(
+              controller,
+              'id',
+              'apple',
+              { schema }
+            )
+            snapshots.update('{"steps": ["one"]}')
+            snapshots.end({ flushHeldText })
+            controller.close()
+          },
+        })
+      )
+
+    expect(textOf(await run(true))).toBe('{"steps":["one"]}')
+    expect(await run(false)).toEqual([])
+  })
+
   it('finishes with content-filter when the guardrails flag a prompt', async () => {
     const { stream } = await apple().doStream({
       prompt: prompt(
