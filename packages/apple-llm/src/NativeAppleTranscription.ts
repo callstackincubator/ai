@@ -1,4 +1,5 @@
-import type { TurboModule } from 'react-native'
+import { generateId } from '@ai-sdk/provider-utils'
+import type { CodegenTypes, TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
 
 // A type rather than an interface, so it fits JSON provider metadata
@@ -15,9 +16,51 @@ export interface TranscriptionResult {
   duration: number
 }
 
+export type LiveTranscriptionResultEvent = {
+  sessionId: string
+  text: string
+  // Volatile results are quick guesses that a later result replaces, final
+  // results are settled
+  isFinal: boolean
+  startSecond: number
+  endSecond: number
+}
+
+export type LiveTranscriptionErrorEvent = {
+  sessionId: string
+  error: string
+}
+
 export interface Spec extends TurboModule {
   isAvailable(language: string): boolean
   prepare(language: string): Promise<void>
+  startLiveTranscription(
+    sessionId: string,
+    language: string,
+    contextualStrings: string[]
+  ): Promise<void>
+  stopLiveTranscription(sessionId: string): Promise<void>
+
+  onLiveTranscriptionResult: CodegenTypes.EventEmitter<LiveTranscriptionResultEvent>
+  onLiveTranscriptionError: CodegenTypes.EventEmitter<LiveTranscriptionErrorEvent>
+}
+
+export type LiveTranscriptionResult = Omit<
+  LiveTranscriptionResultEvent,
+  'sessionId'
+>
+
+export interface LiveTranscriptionOptions {
+  language: string
+  // Words and phrases the audio likely contains, such as names or jargon
+  contextualStrings?: string[]
+  onResult: (result: LiveTranscriptionResult) => void
+  onError?: (error: Error) => void
+}
+
+export interface LiveTranscription {
+  // Stops recording and resolves once the last results were delivered
+  stop: () => Promise<void>
 }
 
 declare global {
@@ -39,5 +82,54 @@ export default {
     contextualStrings?: string[]
   ) => globalThis.__apple__llm__transcribe__(data, language, contextualStrings),
   prepare: NativeAppleTranscription.prepare,
+  /**
+   * Transcribes the microphone as it records (iOS 27). Asks for microphone
+   * access, so the app needs NSMicrophoneUsageDescription
+   */
+  transcribeLive: async ({
+    language,
+    contextualStrings = [],
+    onResult,
+    onError,
+  }: LiveTranscriptionOptions): Promise<LiveTranscription> => {
+    const sessionId = generateId()
+    const listeners = [
+      NativeAppleTranscription.onLiveTranscriptionResult(
+        ({ sessionId: id, ...result }) => {
+          if (id === sessionId) {
+            onResult(result)
+          }
+        }
+      ),
+      NativeAppleTranscription.onLiveTranscriptionError((event) => {
+        if (event.sessionId === sessionId) {
+          onError?.(new Error(event.error))
+        }
+      }),
+    ]
+    const removeListeners = () =>
+      listeners.forEach((listener) => listener.remove())
+
+    try {
+      await NativeAppleTranscription.startLiveTranscription(
+        sessionId,
+        language,
+        contextualStrings
+      )
+    } catch (error) {
+      removeListeners()
+      throw error
+    }
+
+    return {
+      stop: async () => {
+        try {
+          await NativeAppleTranscription.stopLiveTranscription(sessionId)
+        } finally {
+          removeListeners()
+        }
+      },
+    }
+  },
   isAvailable: NativeAppleTranscription.isAvailable,
 }

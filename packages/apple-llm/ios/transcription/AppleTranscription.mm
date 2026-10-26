@@ -128,4 +128,34 @@ using namespace react;
   [_transcription prepare:language resolve:resolve reject:reject];
 }
 
+- (void)startLiveTranscription:(nonnull NSString *)sessionId
+                      language:(nonnull NSString *)language
+             contextualStrings:(nonnull NSArray *)contextualStrings
+                       resolve:(nonnull RCTPromiseResolveBlock)resolve
+                        reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_transcription startLiveTranscription:sessionId
+                                language:language
+                       contextualStrings:contextualStrings
+                                onResult:^(NSString *sessionId, NSString *text, BOOL isFinal, double startSecond, double endSecond) {
+    [self emitOnLiveTranscriptionResult:@{
+      @"sessionId": sessionId,
+      @"text": text,
+      @"isFinal": @(isFinal),
+      @"startSecond": @(startSecond),
+      @"endSecond": @(endSecond),
+    }];
+  }
+                                 onError:^(NSString *sessionId, NSString *error) {
+    [self emitOnLiveTranscriptionError:@{@"sessionId": sessionId, @"error": error}];
+  }
+                                 resolve:resolve
+                                  reject:reject];
+}
+
+- (void)stopLiveTranscription:(nonnull NSString *)sessionId
+                      resolve:(nonnull RCTPromiseResolveBlock)resolve
+                       reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_transcription stopLiveTranscription:sessionId resolve:resolve reject:reject];
+}
+
 @end
