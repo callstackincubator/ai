@@ -1,4 +1,4 @@
-import { apple, AppleSpeech } from '@react-native-ai/apple'
+import { apple, AppleSpeech, AppleTranscription } from '@react-native-ai/apple'
 import { experimental_transcribe as transcribe } from 'ai'
 import { beforeAll, describe, expect, it } from 'react-native-harness'
 
@@ -41,6 +41,12 @@ describe('apple transcription', () => {
     expect(info.supportsLocale).toBe(false)
     expect(info.locale).toBeUndefined()
     expect(info.supportedLocales).toContain('en-US')
+  })
+
+  it('rejects transcription in a language it does not support', async () => {
+    await expect(
+      AppleTranscription.transcribe(speech.slice().buffer, 'tlh')
+    ).rejects.toMatch(/Locale not supported/)
   })
 
   it('transcribes with a language code without a region', async () => {
