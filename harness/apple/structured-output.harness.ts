@@ -139,6 +139,38 @@ describe('apple structured output', () => {
     expect(output.speed).toBe('express')
   })
 
+  it('keeps properties named like definitions', async () => {
+    const output = await generateObject('Define the word "apple" briefly.', {
+      type: 'object',
+      properties: { definitions: { type: 'string' } },
+      required: ['definitions'],
+    })
+
+    expect(typeof output.definitions).toBe('string')
+  })
+
+  it('inlines nullable definitions that are not objects', async () => {
+    const output = await generateObject('Label this item: a red apple.', {
+      type: 'object',
+      properties: { label: { $ref: '#/$defs/label' } },
+      required: ['label'],
+      $defs: { label: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+    })
+
+    expect(typeof output.label).toBe('string')
+  })
+
+  it('rejects references that cycle through definitions it inlines', async () => {
+    await expect(
+      generateObject('List some items.', {
+        type: 'object',
+        properties: { items: { $ref: '#/$defs/nested' } },
+        required: ['items'],
+        $defs: { nested: { type: 'array', items: { $ref: '#/$defs/nested' } } },
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
+  })
+
   it('generates recursive schemas', async () => {
     const output = await generateObject(
       'Describe the folder "src" that contains the folder "lib", which contains no folders.',
