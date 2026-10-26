@@ -766,6 +766,18 @@ function toUsage(usage: AppleUsage | undefined): LanguageModelV4Usage {
   }
 }
 
+// Guardrail violations and refusals end the response like other providers'
+// content filters, instead of failing the call
+function isContentFilterError(code: unknown) {
+  return code === 'GUARDRAIL_VIOLATION' || code === 'REFUSAL'
+}
+
+function toContentFilterFinishReason(
+  code: string
+): LanguageModelV4FinishReason {
+  return { unified: 'content-filter', raw: code }
+}
+
 // Foundation Models stops at maxOutputTokens without saying so, so a response
 // that used every allowed token is reported as cut off
 function toFinishReason(
@@ -1274,7 +1286,25 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
         }),
         options.abortSignal,
         () => NativeAppleLLM.cancelStream(requestId)
-      )
+      ).catch((error) => {
+        if (isContentFilterError(error?.code)) {
+          return {
+            content: [],
+            usage: undefined,
+            filtered: error.code as string,
+          }
+        }
+        throw error
+      })
+
+      if ('filtered' in response) {
+        return {
+          content: [],
+          finishReason: toContentFilterFinishReason(response.filtered),
+          usage: toUsage(undefined),
+          warnings,
+        }
+      }
 
       return {
         content: response.content.map((part) => {
@@ -1396,7 +1426,16 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           })
 
           const errorListener = NativeAppleLLM.onStreamError((data) => {
-            if (data.streamId === streamId) {
+            if (data.streamId === streamId && isContentFilterError(data.code)) {
+              snapshots.end()
+              controller.enqueue({
+                type: 'finish',
+                finishReason: toContentFilterFinishReason(data.code!),
+                usage: toUsage(undefined),
+              })
+              cleanup()
+              controller.close()
+            } else if (data.streamId === streamId) {
               controller.enqueue({
                 type: 'error',
                 error: isAppleLLMErrorCode(data.code)
