@@ -48,6 +48,8 @@ parts or usage, is left out.
 | Vision OCR and barcode tools                    | ❌     | ❌       | ✅ Physical device only       |
 | Token usage and `'length'` finish reason        | ❌     | ❌       | ✅                            |
 | `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅     | ✅       | ✅                            |
+| Guardrail, refusal, language and asset errors   | ✅     | ✅       | ✅                            |
+| Timeout and network errors                      | ❌     | ❌       | ✅                            |
 
 Notes:
 

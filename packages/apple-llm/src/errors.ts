@@ -13,6 +13,15 @@ export const AppleLLMErrorCodes = {
   UnknownToolCallError: 'UNKNOWN_TOOL_CALL_ERROR',
   ContextWindowExceeded: 'CONTEXT_WINDOW_EXCEEDED',
   RateLimited: 'RATE_LIMITED',
+  GuardrailViolation: 'GUARDRAIL_VIOLATION',
+  Refusal: 'REFUSAL',
+  UnsupportedLanguage: 'UNSUPPORTED_LANGUAGE',
+  AssetsUnavailable: 'ASSETS_UNAVAILABLE',
+  ConcurrentRequests: 'CONCURRENT_REQUESTS',
+  DecodingFailure: 'DECODING_FAILURE',
+  Timeout: 'TIMEOUT',
+  NetworkFailure: 'NETWORK_FAILURE',
+  ServiceUnavailable: 'SERVICE_UNAVAILABLE',
 } as const
 
 export type AppleLLMErrorCode =

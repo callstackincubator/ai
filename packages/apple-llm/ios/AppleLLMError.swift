@@ -19,6 +19,15 @@ enum AppleLLMError: Error, LocalizedError {
   case unknownToolCallError
   case contextWindowExceeded
   case rateLimited
+  case guardrailViolation(String)
+  case refusal(String)
+  case unsupportedLanguage(String)
+  case assetsUnavailable(String)
+  case concurrentRequests(String)
+  case decodingFailure(String)
+  case timeout(String)
+  case networkFailure(String)
+  case serviceUnavailable(String)
   
   var errorDescription: String? {
     switch self {
@@ -44,6 +53,16 @@ enum AppleLLMError: Error, LocalizedError {
       return "Context window exceeded"
     case .rateLimited:
       return "Apple Intelligence request limit reached"
+    case .guardrailViolation(let message),
+         .refusal(let message),
+         .unsupportedLanguage(let message),
+         .assetsUnavailable(let message),
+         .concurrentRequests(let message),
+         .decodingFailure(let message),
+         .timeout(let message),
+         .networkFailure(let message),
+         .serviceUnavailable(let message):
+      return message
     }
     
   }
@@ -70,6 +89,24 @@ enum AppleLLMError: Error, LocalizedError {
       return "CONTEXT_WINDOW_EXCEEDED"
     case .rateLimited:
       return "RATE_LIMITED"
+    case .guardrailViolation:
+      return "GUARDRAIL_VIOLATION"
+    case .refusal:
+      return "REFUSAL"
+    case .unsupportedLanguage:
+      return "UNSUPPORTED_LANGUAGE"
+    case .assetsUnavailable:
+      return "ASSETS_UNAVAILABLE"
+    case .concurrentRequests:
+      return "CONCURRENT_REQUESTS"
+    case .decodingFailure:
+      return "DECODING_FAILURE"
+    case .timeout:
+      return "TIMEOUT"
+    case .networkFailure:
+      return "NETWORK_FAILURE"
+    case .serviceUnavailable:
+      return "SERVICE_UNAVAILABLE"
     case .streamNotFound:
       return nil
     }
@@ -88,6 +125,15 @@ enum AppleLLMError: Error, LocalizedError {
     case .toolCallError: return 9
     case .contextWindowExceeded: return 10
     case .rateLimited: return 11
+    case .guardrailViolation: return 12
+    case .refusal: return 13
+    case .unsupportedLanguage: return 14
+    case .assetsUnavailable: return 15
+    case .concurrentRequests: return 16
+    case .decodingFailure: return 17
+    case .timeout: return 18
+    case .networkFailure: return 19
+    case .serviceUnavailable: return 20
     }
   }
 }

@@ -927,19 +927,52 @@ public class AppleLLMImpl: NSObject {
 #if compiler(>=6.4)
     if #available(iOS 27, *) {
       if let languageModelError = error as? LanguageModelError {
+        let message = languageModelError.localizedDescription
         switch languageModelError {
         case .contextSizeExceeded:
           return .contextWindowExceeded
         case .rateLimited:
           return .rateLimited
+        case .guardrailViolation:
+          return .guardrailViolation(message)
+        case .refusal:
+          return .refusal(message)
+        case .unsupportedLanguageOrLocale:
+          return .unsupportedLanguage(message)
+        case .unsupportedGenerationGuide:
+          return .invalidSchema(message)
+        case .timeout:
+          return .timeout(message)
         default:
           return nil
         }
       }
 
-      if let privateCloudComputeError = error as? PrivateCloudComputeLanguageModel.Error,
-         case .quotaLimitReached = privateCloudComputeError {
-        return .rateLimited
+      // iOS 27 moves these GenerationError cases to their own types
+      if let systemModelError = error as? SystemLanguageModel.Error,
+         case .assetsUnavailable = systemModelError {
+        return .assetsUnavailable(systemModelError.localizedDescription)
+      }
+      if let sessionError = error as? LanguageModelSession.Error,
+         case .concurrentRequests = sessionError {
+        return .concurrentRequests(sessionError.localizedDescription)
+      }
+      if let parsingError = error as? GeneratedContent.ParsingError {
+        return .decodingFailure(parsingError.localizedDescription)
+      }
+
+      if let privateCloudComputeError = error as? PrivateCloudComputeLanguageModel.Error {
+        let message = privateCloudComputeError.localizedDescription
+        switch privateCloudComputeError {
+        case .quotaLimitReached:
+          return .rateLimited
+        case .networkFailure:
+          return .networkFailure(message)
+        case .serviceUnavailable:
+          return .serviceUnavailable(message)
+        @unknown default:
+          return nil
+        }
       }
     }
 #endif
@@ -948,15 +981,29 @@ public class AppleLLMImpl: NSObject {
       return nil
     }
 
-    if case .exceededContextWindowSize = generationError {
+    let message = generationError.localizedDescription
+    switch generationError {
+    case .exceededContextWindowSize:
       return .contextWindowExceeded
-    }
-
-    if case .rateLimited = generationError {
+    case .rateLimited:
       return .rateLimited
+    case .guardrailViolation:
+      return .guardrailViolation(message)
+    case .refusal:
+      return .refusal(message)
+    case .unsupportedLanguageOrLocale:
+      return .unsupportedLanguage(message)
+    case .assetsUnavailable:
+      return .assetsUnavailable(message)
+    case .concurrentRequests:
+      return .concurrentRequests(message)
+    case .decodingFailure:
+      return .decodingFailure(message)
+    case .unsupportedGuide:
+      return .invalidSchema(message)
+    @unknown default:
+      return nil
     }
-
-    return nil
   }
 
   @available(iOS 26, *)
@@ -1177,7 +1224,17 @@ public class AppleLLMImpl: NSObject {
         if !pendingText.isEmpty {
           flush()
         }
-        let arguments = try GeneratedContent(json: input)
+        // Malformed input is a problem with the prompt, not a decoding failure of the model
+        let arguments: GeneratedContent
+        do {
+          arguments = try GeneratedContent(json: input)
+        } catch {
+          throw AppleLLMError.invalidMessage("Tool call input of '\(toolName)' is not valid JSON")
+        }
+        // Partial JSON parses too, so incomplete input is rejected here
+        guard arguments.isComplete else {
+          throw AppleLLMError.invalidMessage("Tool call input of '\(toolName)' is not complete JSON")
+        }
         pendingToolCalls.append(Transcript.ToolCall(id: toolCallId, toolName: toolName, arguments: arguments))
       case "tool-result":
         guard let toolCallId = part["toolCallId"] as? String,
