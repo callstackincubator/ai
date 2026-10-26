@@ -54,17 +54,18 @@ enum ModelStorage {
     defer { _ = lock.withLock { activeDownloads.remove(id) } }
 
     // Files download from the commit the revision points to, so a resumed file
-    // never mixes two versions of it. A partial download of another commit
-    // starts over
+    // never mixes two versions of it. A partial download of another repo,
+    // folder or commit starts over
     let commit = try await resolveCommit(repo: repo, revision: revision)
     let files = try await listFiles(repo: repo, folder: folder, revision: commit)
     let totalBytes = files.reduce(0) { $0 + $1.size }
     let partial = modelsDirectory.appendingPathComponent("\(id).partial", isDirectory: true)
     let commitMarker = modelsDirectory.appendingPathComponent("\(id).partial-commit")
-    if (try? String(contentsOf: commitMarker, encoding: .utf8)) != commit {
+    let source = "\(repo)\n\(folder)\n\(commit)"
+    if (try? String(contentsOf: commitMarker, encoding: .utf8)) != source {
       try? FileManager.default.removeItem(at: partial)
       try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
-      try commit.write(to: commitMarker, atomically: true, encoding: .utf8)
+      try source.write(to: commitMarker, atomically: true, encoding: .utf8)
     }
     let reporter = ProgressReporter(totalBytes: totalBytes, onProgress: onProgress)
 
@@ -99,7 +100,8 @@ enum ModelStorage {
   }
 
   private static func resolveCommit(repo: String, revision: String) async throws -> String {
-    let encodedRevision = revision.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? revision
+    // A branch such as refs/pr/1 is one path component
+    let encodedRevision = revision.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? revision
     guard let url = URL(string: "https://huggingface.co/api/models/\(repo)/revision/\(encodedRevision)") else {
       throw CoreAIError.invalidInput("Invalid Hugging Face repo \"\(repo)\".")
     }
