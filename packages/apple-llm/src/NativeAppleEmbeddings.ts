@@ -1,7 +1,7 @@
 import type { TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
 
-export interface EmbeddingInfo {
+export interface AppleEmbeddingModelInfo {
   hasAvailableAssets: boolean
   dimension: number
   languages: string[]
@@ -12,7 +12,7 @@ export interface EmbeddingInfo {
 }
 
 export interface Spec extends TurboModule {
-  getInfo(language: string): Promise<EmbeddingInfo>
+  getModelInfo(language: string): Promise<AppleEmbeddingModelInfo>
   prepare(language: string): Promise<void>
   generateEmbeddings(values: string[], language: string): Promise<number[][]>
 }
