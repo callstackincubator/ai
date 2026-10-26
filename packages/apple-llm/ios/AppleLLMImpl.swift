@@ -1355,6 +1355,10 @@ public class AppleLLMImpl: NSObject {
         } catch {
           throw AppleLLMError.invalidMessage("Tool call input of '\(toolName)' is not valid JSON")
         }
+        // Partial JSON parses too, so incomplete input is rejected here
+        guard arguments.isComplete else {
+          throw AppleLLMError.invalidMessage("Tool call input of '\(toolName)' is not complete JSON")
+        }
         pendingToolCalls.append(Transcript.ToolCall(id: toolCallId, toolName: toolName, arguments: arguments))
       case "tool-result":
         guard let toolCallId = part["toolCallId"] as? String,
