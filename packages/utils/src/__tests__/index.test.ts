@@ -234,7 +234,7 @@ describe('summarizeHistory', () => {
     const [summarized] = model.summarizedTexts()
     expect(model.doGenerate).toHaveBeenCalledTimes(1)
     expect(summarized).toContain(
-      'USER: Tell me about Paris\n\nASSISTANT: Paris is in France'
+      '<conversation>\nUSER: Tell me about Paris\n\nASSISTANT: Paris is in France\n</conversation>'
     )
     expect(summarized).not.toContain('And Lyon?')
     expect(result).toEqual([
@@ -262,9 +262,9 @@ describe('summarizeHistory', () => {
 
     expect(model.doGenerate).toHaveBeenCalledTimes(2)
     const summarized = model.summarizedTexts()[1]
-    expect(summarized).toContain('summary 1')
+    expect(summarized).toContain('<summary>\nsummary 1\n</summary>')
     expect(summarized).toContain(
-      'USER: And Lyon?\n\nASSISTANT: Lyon is in France'
+      '<conversation>\nUSER: And Lyon?\n\nASSISTANT: Lyon is in France\n</conversation>'
     )
     expect(summarized).not.toContain('Tell me about Paris')
   })
