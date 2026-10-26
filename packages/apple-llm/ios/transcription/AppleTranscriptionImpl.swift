@@ -276,6 +276,20 @@ enum LiveTranscriptionError: LocalizedError {
   }
 }
 
+/// Set once a session is ending, so the results stream ending is not an error
+final class LiveTranscriptionStopFlag: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stopped = false
+
+  var isStopped: Bool {
+    lock.withLock { stopped }
+  }
+
+  func stop() {
+    lock.withLock { stopped = true }
+  }
+}
+
 /// Transcribes the microphone as it records, with CaptureInputSequenceProvider
 /// feeding the capture session's audio to a SpeechAnalyzer
 @available(iOS 27, *)
@@ -283,13 +297,20 @@ final class LiveTranscriptionSession: @unchecked Sendable {
   private let provider: CaptureInputSequenceProvider
   private let analyzer: SpeechAnalyzer
   private let results: Task<Void, Never>
+  private let stopFlag: LiveTranscriptionStopFlag
   // startRunning() and stopRunning() block until the session changes state
   private static let captureQueue = DispatchQueue(label: "com.callstack.ai.live-transcription")
 
-  private init(provider: CaptureInputSequenceProvider, analyzer: SpeechAnalyzer, results: Task<Void, Never>) {
+  private init(
+    provider: CaptureInputSequenceProvider,
+    analyzer: SpeechAnalyzer,
+    results: Task<Void, Never>,
+    stopFlag: LiveTranscriptionStopFlag
+  ) {
     self.provider = provider
     self.analyzer = analyzer
     self.results = results
+    self.stopFlag = stopFlag
   }
 
   static func start(
@@ -331,6 +352,7 @@ final class LiveTranscriptionSession: @unchecked Sendable {
       try await analyzer.setContext(context)
     }
 
+    let stopFlag = LiveTranscriptionStopFlag()
     let results = Task {
       do {
         for try await result in transcriber.results {
@@ -343,11 +365,22 @@ final class LiveTranscriptionSession: @unchecked Sendable {
           )
         }
       } catch {
-        onError(sessionId, error.localizedDescription)
+        // Stopping cancels the analyzer, which ends the results with an error
+        if !stopFlag.isStopped {
+          onError(sessionId, error.localizedDescription)
+        }
       }
     }
 
-    try await analyzer.start(inputSequence: provider.analyzerInputs)
+    do {
+      try await analyzer.start(inputSequence: provider.analyzerInputs)
+    } catch {
+      // Ends the results, so their task does not wait forever
+      stopFlag.stop()
+      await analyzer.cancelAndFinishNow()
+      await results.value
+      throw error
+    }
     let captureSession = provider.captureSession
     await withCheckedContinuation { continuation in
       captureQueue.async {
@@ -358,7 +391,7 @@ final class LiveTranscriptionSession: @unchecked Sendable {
       }
     }
 
-    return LiveTranscriptionSession(provider: provider, analyzer: analyzer, results: results)
+    return LiveTranscriptionSession(provider: provider, analyzer: analyzer, results: results, stopFlag: stopFlag)
   }
 
   /// Stops recording, finalizes what was heard so far and waits for its results
@@ -370,9 +403,20 @@ final class LiveTranscriptionSession: @unchecked Sendable {
         continuation.resume()
       }
     }
-    try await analyzer.finalize(through: nil)
+    // The analyzer always finishes, so the results task ends even when
+    // finalizing fails
+    var finalizeError: Error?
+    do {
+      try await analyzer.finalize(through: nil)
+    } catch {
+      finalizeError = error
+    }
+    stopFlag.stop()
     await analyzer.cancelAndFinishNow()
     await results.value
+    if let finalizeError {
+      throw finalizeError
+    }
   }
 }
 #endif

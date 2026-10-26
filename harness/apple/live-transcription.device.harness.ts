@@ -16,7 +16,7 @@ describe('apple live transcription', () => {
     await new Promise((resolve) => setTimeout(resolve, 2000))
     await live.stop()
 
-    expect(errors).toEqual([])
+    expect(errors.map((error) => error.message)).toEqual([])
   })
 
   it('stops a session that already stopped', async () => {
