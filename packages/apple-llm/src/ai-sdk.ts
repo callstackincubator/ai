@@ -512,8 +512,14 @@ function isFractionalEnum(schema: unknown) {
 
 // Foundation Models generates properties in order, but native receives objects
 // as dictionaries, which have none, so the order is sent as a list
-function withPropertyOrder(value: JSONSchema7) {
-  return value?.type === 'object' && value.properties
+function withPropertyOrder(key: string, value: JSONSchema7) {
+  // Like the native parser, objects can leave out their type or be nullable.
+  // The values of a properties map are schemas, but the map itself is not
+  const isObject =
+    value?.type === undefined ||
+    value.type === 'object' ||
+    (Array.isArray(value.type) && value.type.includes('object'))
+  return key !== 'properties' && isObject && value?.properties
     ? { ...value, 'x-order': Object.keys(value.properties) }
     : value
 }
@@ -522,10 +528,10 @@ function toNativeSchema<T extends JSONSchema7 | undefined>(schema: T): T {
   return (
     schema &&
     JSON.parse(
-      JSON.stringify(schema, (_, value) =>
+      JSON.stringify(schema, (key, value) =>
         isFractionalEnum(value)
           ? { ...value, type: 'string', enum: value.enum!.map(String) }
-          : withPropertyOrder(value)
+          : withPropertyOrder(key, value)
       )
     )
   )
