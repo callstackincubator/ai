@@ -14,6 +14,7 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4Content,
   LanguageModelV4FinishReason,
+  LanguageModelV4Prompt,
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
   SharedV4Warning,
@@ -901,11 +902,38 @@ function prepareCall(options: LanguageModelV4CallOptions): {
   messages: CoreAIMessage[]
   warnings: SharedV4Warning[]
 } {
+  const warnings = getCallWarnings(options)
+
   // Image parts of the last user message become transcript attachments, read
-  // by vision language model bundles
+  // by vision language model bundles. Other files, and images of earlier
+  // turns, are left out
+  let hasOmittedFiles = false
+  const prompt = options.prompt.map((message, index) => {
+    if (message.role !== 'user') {
+      return message
+    }
+    const isFinalPrompt = index === options.prompt.length - 1
+    const content = message.content.filter(
+      (part) =>
+        part.type !== 'file' ||
+        (isFinalPrompt && part.mediaType.toLowerCase().startsWith('image'))
+    )
+    hasOmittedFiles ||= content.length !== message.content.length
+    return { ...message, content }
+  }) as LanguageModelV4Prompt
+
+  if (hasOmittedFiles) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'file parts',
+      details:
+        'Core AI language models accept images in the last user message only, so other files were left out of the prompt.',
+    })
+  }
+
   return {
-    messages: prepareAppleMessages(options.prompt) as CoreAIMessage[],
-    warnings: getCallWarnings(options),
+    messages: prepareAppleMessages(prompt) as CoreAIMessage[],
+    warnings,
   }
 }
 

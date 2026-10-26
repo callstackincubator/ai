@@ -526,6 +526,57 @@ describe('core ai language model warnings', () => {
     expect(result.warnings).toEqual([])
   })
 
+  test('leaves out files that are not images of the last message', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({
+        prompt: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Earlier' },
+              {
+                type: 'file',
+                mediaType: 'image/png',
+                data: { type: 'data', data: 'iVBORw0KGgo=' },
+              },
+            ],
+          },
+          { role: 'assistant', content: [{ type: 'text', text: 'Ok' }] },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Summarize' },
+              {
+                type: 'file',
+                mediaType: 'application/pdf',
+                data: { type: 'data', data: 'JVBERi0=' },
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    expect(generateText.mock.calls[0]![2][0]).toEqual({
+      role: 'user',
+      content: 'Earlier',
+      attachments: [],
+    })
+    expect(generateText.mock.calls[0]![2][2]).toEqual({
+      role: 'user',
+      content: 'Summarize',
+      attachments: [],
+    })
+    expect(result.warnings).toEqual([
+      {
+        type: 'unsupported',
+        feature: 'file parts',
+        details:
+          'Core AI language models accept images in the last user message only, so other files were left out of the prompt.',
+      },
+    ])
+  })
+
   test('keeps base64 that starts with a slash as data', async () => {
     await createModel().doGenerate(
       createCallOptions({
