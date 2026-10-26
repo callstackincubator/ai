@@ -12,6 +12,7 @@ export type {
   AppleProviderOptions,
   AppleReasoningLevel,
   AppleToolDefinitionSet,
+  AppleUseCase,
 } from './ai-sdk'
 export { apple, createAppleProvider } from './ai-sdk'
 // Foundation Models helpers shared with @react-native-ai/core-ai, whose language

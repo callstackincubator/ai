@@ -67,6 +67,9 @@ export type AppleImageStyle =
 export type AppleImagePersonalization = 'automatic' | 'disabled' | 'enabled'
 export type AppleReasoningLevel = 'light' | 'moderate' | 'deep'
 export type AppleGuardrails = 'default' | 'permissiveContentTransformations'
+// contentTagging runs the on-device model with Apple's adapter for tagging,
+// entity extraction and topic detection
+export type AppleUseCase = 'general' | 'contentTagging'
 
 export interface AppleProviderOptions {
   builtInTools?: AppleBuiltInTool[]
@@ -102,6 +105,8 @@ export interface AppleLanguageModelOptions {
   model?: AppleLanguageModelId
   availableTools?: AppleToolDefinitionSet
   guardrails?: AppleGuardrails
+  // Applies to the on-device system model only
+  useCase?: AppleUseCase
 }
 
 type AppleMessageAttachment = {
@@ -296,6 +301,7 @@ interface AppleNativeOptions {
   requestId?: string
   model?: AppleLanguageModelId
   guardrails?: AppleGuardrails
+  useCase?: AppleUseCase
   reasoningLevel?: AppleReasoningLevel
   builtInTools?: AppleBuiltInTool[]
   maxToolCalls?: number
@@ -311,6 +317,7 @@ function getAppleNativeOptions(
   return {
     model: defaults.model,
     guardrails: defaults.guardrails,
+    useCase: defaults.useCase,
     reasoningLevel: toAppleReasoningLevel(options.reasoning),
     // A named tool choice only offers that tool
     builtInTools:
@@ -855,6 +862,7 @@ export function createAppleProvider({
   availableTools,
   model,
   guardrails,
+  useCase,
 }: AppleLanguageModelOptions = {}) {
   const createLanguageModel = (
     options: AppleLanguageModelId | AppleLanguageModelOptions = {}
@@ -865,6 +873,7 @@ export function createAppleProvider({
       availableTools: modelOptions.availableTools ?? availableTools,
       model: modelOptions.model ?? model,
       guardrails: modelOptions.guardrails ?? guardrails,
+      useCase: modelOptions.useCase ?? useCase,
     })
   }
   const provider = function (
@@ -1181,6 +1190,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     return NativeAppleLLM.prewarm({
       model: this.options.model,
       guardrails: this.options.guardrails,
+      useCase: this.options.useCase,
     })
   }
 

@@ -191,6 +191,28 @@ describe('apple generate', () => {
     expect(await sample(7)).not.toBe(first)
   })
 
+  it('tags content with the content tagging use case', async () => {
+    const result = await apple({ useCase: 'contentTagging' }).doGenerate({
+      prompt: prompt(
+        'Lionel Messi scored twice as Inter Miami beat Orlando City 3-1 in Florida.'
+      ),
+      responseFormat: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          properties: {
+            topics: { type: 'array', items: { type: 'string' }, maxItems: 3 },
+          },
+          required: ['topics'],
+        },
+      },
+    })
+
+    const [part] = result.content
+    const { topics } = JSON.parse(part.type === 'text' ? part.text : '{}')
+    expect(topics.length).toBeGreaterThan(0)
+  })
+
   it('rejects sampling with both topP and topK', async () => {
     await expect(
       apple().doGenerate({ prompt: prompt('Say hi.'), topP: 0.9, topK: 40 })
