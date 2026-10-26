@@ -491,7 +491,6 @@ response ends like other providers' content filters instead of throwing:
 as its raw value, and any text streamed before it is kept. The low-level
 `AppleFoundationModels` API rejects with those codes instead.
 
-
 Use public error codes for app control flow:
 
 ```typescript
