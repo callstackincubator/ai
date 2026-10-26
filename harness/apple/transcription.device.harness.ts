@@ -21,10 +21,26 @@ describe('apple transcription', () => {
     )
   })
 
-  it('is unavailable for a language it does not support', () => {
-    expect(apple.transcriptionModel({ language: 'tlh' }).isAvailable()).toBe(
-      false
-    )
+  it('describes the locale a language resolves to', async () => {
+    const model = apple.transcriptionModel({ language: 'en' })
+    await model.prepare()
+
+    expect(await model.getModelInfo()).toMatchObject({
+      isAvailable: true,
+      supportsLocale: true,
+      locale: expect.stringMatching(/^en-/),
+      assets: 'installed',
+    })
+  })
+
+  it('reports a language it does not support', async () => {
+    const info = await apple
+      .transcriptionModel({ language: 'tlh' })
+      .getModelInfo()
+
+    expect(info.supportsLocale).toBe(false)
+    expect(info.locale).toBeUndefined()
+    expect(info.supportedLocales).toContain('en-US')
   })
 
   it('transcribes with a language code without a region', async () => {

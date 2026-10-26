@@ -56,7 +56,24 @@ await transcribe({
 ```
 
 > [!NOTE]
-> By default, the transcription model will use device language. Language codes such as `fr` resolve to a supported locale, and `isAvailable()` returns `false` for languages the transcriber does not support.
+> By default, the transcription model will use device language. Language codes such as `fr` resolve to a supported locale.
+
+## Availability
+
+`isAvailable()` is a quick, synchronous check that the device can transcribe at all. Whether it supports a language is only known asynchronously, so `getModelInfo()` reports it, along with the locale the language resolves to and whether its assets are on the device:
+
+```tsx
+const model = apple.transcriptionModel({ language: 'fr' })
+
+if (model.isAvailable()) {
+  const info = await model.getModelInfo()
+  // { isAvailable: true, supportsLocale: true, locale: 'fr-FR',
+  //   assets: 'installed' | 'downloading' | 'supported' | 'unsupported',
+  //   supportedLocales: [...] }
+}
+```
+
+`assets` is `supported` when the locale can be used once `prepare()` downloads it.
 
 ## Preparing the Model
 
@@ -89,8 +106,11 @@ For advanced use cases, you can access the speech transcription API directly:
 ```tsx
 import { AppleTranscription } from '@react-native-ai/apple'
 
-// Check availability for a language
-const isAvailable: boolean = await AppleTranscription.isAvailable(language: string)
+// Check whether the device can transcribe
+const isAvailable: boolean = AppleTranscription.isAvailable(language: string)
+
+// Locale support and asset status for a language
+const info = await AppleTranscription.getModelInfo(language: string)
 
 // Prepare language assets
 await AppleTranscription.prepare(language: string)
