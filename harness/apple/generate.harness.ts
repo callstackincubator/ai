@@ -83,6 +83,18 @@ describe('apple generate', () => {
     expect(result.usage.outputTokens.total).toBeLessThanOrEqual(10)
   })
 
+  it('prewarms the model before generating', async () => {
+    const model = apple()
+    await model.prepare()
+
+    const result = await model.doGenerate({
+      prompt: prompt('Reply with exactly the word BANANA and nothing else.'),
+    })
+    expect(result.content[0]).toMatchObject({
+      text: expect.stringMatching(/banana/i),
+    })
+  })
+
   it('counts tokens', async () => {
     const model = apple()
     const short = await model.countTokens('hello')

@@ -37,6 +37,14 @@ const result = await generateText({
 console.log(result.text)
 ```
 
+Call `prepare()` shortly before the first generation, for example when the
+user opens a chat, to load the model into memory so it answers sooner:
+
+```typescript
+const model = apple()
+await model.prepare()
+```
+
 Configure the model with the normal AI SDK generation options:
 
 ```typescript

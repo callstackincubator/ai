@@ -1173,7 +1173,16 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
     this.updateTools(options.availableTools ?? {})
   }
 
-  async prepare(): Promise<void> {}
+  /**
+   * Loads the model into memory, so the first generation answers sooner. Call
+   * it shortly before generating, e.g. when the user opens a chat
+   */
+  prepare(): Promise<void> {
+    return NativeAppleLLM.prewarm({
+      model: this.options.model,
+      guardrails: this.options.guardrails,
+    })
+  }
 
   countTokens(text: string): Promise<number> {
     return NativeAppleLLM.countTokens(text)

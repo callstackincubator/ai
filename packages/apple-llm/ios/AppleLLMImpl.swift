@@ -135,6 +135,39 @@ public class AppleLLMImpl: NSObject {
 #endif
   }
 
+  /// Loads the model into memory ahead of the first request, so it answers sooner
+  @objc
+  public func prewarm(
+    _ options: [String: Any],
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(FoundationModels)
+    if #available(iOS 26, *) {
+      do {
+        let session = try createSession(
+          providerOptions: options,
+          tools: [],
+          transcript: Transcript(),
+          toolCallingMode: nil
+        )
+        session.prewarm()
+        resolve(nil)
+      } catch {
+        if let appleError = mapKnownAppleLLMError(error) {
+          rejectWithAppleError(appleError, reject: reject)
+        } else {
+          reject("AppleLLM", error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectWithAppleError(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectWithAppleError(.unsupportedOS, reject: reject)
+#endif
+  }
+
   @objc
   public func generateImages(
     _ options: [String: Any],
