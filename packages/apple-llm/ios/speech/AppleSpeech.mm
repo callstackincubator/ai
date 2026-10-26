@@ -75,6 +75,13 @@ using namespace react;
             }
           }
           
+          if (opts.hasProperty(rt, "speed")) {
+            auto speedProp = opts.getProperty(rt, "speed");
+            if (speedProp.isNumber()) {
+              options[@"speed"] = @(speedProp.asNumber());
+            }
+          }
+          
           if (opts.hasProperty(rt, "voice")) {
             auto voiceProp = opts.getProperty(rt, "voice");
             if (voiceProp.isString()) {

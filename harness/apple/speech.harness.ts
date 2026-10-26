@@ -85,6 +85,23 @@ describe('apple speech', () => {
     ])
   })
 
+  it('speaks faster with a higher speed', async () => {
+    const speak = async (speed?: number) => {
+      const { audio, warnings } = await generateSpeech({
+        model: apple.speechModel({ language: 'en-US' }),
+        text: 'The quick brown fox jumps over the lazy dog.',
+        speed,
+      })
+      expect(warnings).toEqual([])
+      return readWav(audio.uint8Array).dataSize
+    }
+
+    const normal = await speak()
+
+    expect(await speak(2)).toBeLessThan(normal)
+    expect(await speak(0.5)).toBeGreaterThan(normal)
+  })
+
   it('settles for whitespace-only text', async () => {
     const audio = await AppleSpeech.generate('   ', { language: 'en-US' })
 
@@ -96,14 +113,9 @@ describe('apple speech', () => {
       model: apple.speechModel({ language: 'en-US' }),
       text: 'Hello world.',
       outputFormat: 'mp3',
-      speed: 1.5,
       instructions: 'Speak cheerfully.',
     })
 
-    expect(warnedFeatures(warnings)).toEqual([
-      'outputFormat',
-      'speed',
-      'instructions',
-    ])
+    expect(warnedFeatures(warnings)).toEqual(['outputFormat', 'instructions'])
   })
 })

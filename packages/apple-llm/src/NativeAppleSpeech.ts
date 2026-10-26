@@ -6,6 +6,8 @@ import { addWAVHeader } from './utils'
 export interface SpeechOptions {
   language?: string
   voice?: string
+  // Multiplies the default speaking rate, so 2 speaks twice as fast
+  speed?: number
 }
 
 export interface VoiceInfo {

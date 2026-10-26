@@ -1054,6 +1054,7 @@ class AppleSpeechModel implements SpeechModelV4 {
           ? options.language
           : this.language,
       voice: options.voice,
+      speed: options.speed,
     }
 
     try {
@@ -1062,12 +1063,11 @@ class AppleSpeechModel implements SpeechModelV4 {
         speechOptions
       )
 
-      // AVSpeechSynthesizer only writes WAV and has no speed or style controls
+      // AVSpeechSynthesizer only writes WAV and has no style controls
       const warnings: SharedV4Warning[] = [
         options.outputFormat !== undefined && options.outputFormat !== 'wav'
           ? 'outputFormat'
           : undefined,
-        options.speed !== undefined ? 'speed' : undefined,
         options.instructions !== undefined ? 'instructions' : undefined,
       ].flatMap((feature) =>
         feature ? [{ type: 'unsupported' as const, feature }] : []
