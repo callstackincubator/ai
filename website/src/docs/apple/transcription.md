@@ -39,9 +39,52 @@ const words = response.providerMetadata.apple.words
 // [{ text: 'The', startSecond: 0.12, endSecond: 0.24 }, ...]
 ```
 
+### Streaming Transcription
+
+`experimental_streamTranscribe` transcribes audio as it arrives, e.g. from a recorder, and reports text while the speech goes on. Pass raw mono PCM chunks in a `ReadableStream`:
+
+```tsx
+import { apple } from '@react-native-ai/apple'
+import { experimental_streamTranscribe as streamTranscribe } from 'ai'
+
+const result = streamTranscribe({
+  model: apple.transcriptionModel({ language: 'en-US' }),
+  // ReadableStream<Uint8Array> of 16-bit samples, e.g. from your recorder
+  audio,
+  inputAudioFormat: { type: 'audio/pcm', rate: 16000 },
+})
+
+for await (const part of result.fullStream) {
+  if (part.type === 'transcript-partial') {
+    // A quick guess that the next result for the same audio replaces
+    console.log('partial', part.text)
+  } else if (part.type === 'transcript-final') {
+    console.log('final', part.text, part.startSecond, part.endSecond)
+  }
+}
+
+console.log(await result.text)
+```
+
+Samples are 16-bit integers by default. Recorders built on the Web Audio API, such as `react-native-audio-api`, deliver 32-bit floats, which you can pass as they are:
+
+```tsx
+const result = streamTranscribe({
+  model: apple.transcriptionModel(),
+  audio,
+  inputAudioFormat: { type: 'audio/pcm', rate: 16000 },
+  providerOptions: { apple: { encoding: 'float32' } },
+})
+```
+
+Chunks can be any size and any sample rate. They are converted to the format the transcriber takes. Closing the audio stream finalizes the transcript, and `abortSignal` stops it early. Recording is up to your app, so this works from iOS 26 and with any recorder.
+
+> [!NOTE]
+> Streaming transcription is experimental in the AI SDK, so its API may change in a patch release.
+
 ### Live Transcription
 
-On iOS 27 and newer, `AppleTranscription.transcribeLive` transcribes the microphone as it records. The AI SDK only transcribes recorded audio, so this is an Apple-specific API:
+On iOS 27 and newer, `AppleTranscription.transcribeLive` records the microphone itself and transcribes it, for when your app has no recorder of its own:
 
 ```tsx
 import { AppleTranscription } from '@react-native-ai/apple'
@@ -142,6 +185,17 @@ const { segments, duration } = await AppleTranscription.transcribe(
   arrayBuffer,
   language
 )
+
+// Transcribe audio as you append it, with the options of transcribeLive and
+// the format of the samples
+const stream = await AppleTranscription.transcribeStream({
+  language,
+  sampleRate: 16000,
+  encoding: 'int16', // or 'float32'
+  onResult: ({ text, isFinal }) => console.log(isFinal, text),
+})
+stream.append(chunk) // ArrayBuffer or typed array
+await stream.stop() // waits for the last results
 ```
 
 ## Benchmarks

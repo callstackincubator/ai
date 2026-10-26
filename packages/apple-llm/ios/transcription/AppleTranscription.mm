@@ -99,6 +99,32 @@ using namespace react;
     );
     
     global.setProperty(rt, "__apple__llm__transcribe__", transcribeFunc);
+
+    // Copies the chunk synchronously, so JS can reuse its buffer right away
+    auto appendAudioFunc = jsi::Function::createFromHostFunction(
+      rt,
+      jsi::PropNameID::forAscii(rt, "appendTranscriptionAudio"),
+      2,
+      [transcriptionModule](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+        auto sessionIdStr = args[0].asString(rt).utf8(rt);
+        NSString *sessionId = [NSString stringWithUTF8String:sessionIdStr.c_str()];
+
+        auto arrayBuffer = args[1].asObject(rt);
+        if (!arrayBuffer.isArrayBuffer(rt)) {
+          throw jsi::JSError(rt, "Audio must be an ArrayBuffer");
+        }
+        auto buffer = arrayBuffer.getArrayBuffer(rt);
+        NSData *audioData = [NSData dataWithBytes:buffer.data(rt) length:buffer.size(rt)];
+
+        NSError *error = nil;
+        if (![transcriptionModule appendTranscriptionAudio:sessionId data:audioData error:&error]) {
+          throw jsi::JSError(rt, [error.localizedDescription UTF8String]);
+        }
+        return jsi::Value::undefined();
+      }
+    );
+
+    global.setProperty(rt, "__apple__llm__append_transcription_audio__", appendAudioFunc);
   } @catch (NSException *exception) {
     throw jsi::JSError(rt, [[NSString stringWithFormat:@"Failed to install transcribe handler: %@", exception.reason] UTF8String]);
   }
@@ -140,6 +166,32 @@ using namespace react;
   }
                                  resolve:resolve
                                   reject:reject];
+}
+
+- (void)startStreamTranscription:(nonnull NSString *)sessionId
+                        language:(nonnull NSString *)language
+                      sampleRate:(double)sampleRate
+                        encoding:(nonnull NSString *)encoding
+                         resolve:(nonnull RCTPromiseResolveBlock)resolve
+                          reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_transcription startStreamTranscription:sessionId
+                                  language:language
+                                sampleRate:sampleRate
+                                  encoding:encoding
+                                  onResult:^(NSString *sessionId, NSString *text, BOOL isFinal, double startSecond, double endSecond) {
+    [self emitOnLiveTranscriptionResult:@{
+      @"sessionId": sessionId,
+      @"text": text,
+      @"isFinal": @(isFinal),
+      @"startSecond": @(startSecond),
+      @"endSecond": @(endSecond),
+    }];
+  }
+                                   onError:^(NSString *sessionId, NSString *error) {
+    [self emitOnLiveTranscriptionError:@{@"sessionId": sessionId, @"error": error}];
+  }
+                                   resolve:resolve
+                                    reject:reject];
 }
 
 - (void)stopLiveTranscription:(nonnull NSString *)sessionId

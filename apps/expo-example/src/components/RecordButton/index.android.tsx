@@ -9,11 +9,5 @@ export type RecordButtonProps = Omit<
 >
 
 export function RecordButton(props: RecordButtonProps) {
-  return (
-    <RecordButtonUIBase
-      transcriptionModel={undefined}
-      float32ArrayToWAV={undefined}
-      {...props}
-    />
-  )
+  return <RecordButtonUIBase transcriptionModel={undefined} {...props} />
 }

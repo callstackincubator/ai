@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { transcribe as transcribeAudio, TranscriptionModel } from 'ai'
+import {
+  experimental_streamTranscribe as streamTranscribe,
+  TranscriptionModel,
+} from 'ai'
 import { SymbolView } from 'expo-symbols'
 import { useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from 'react-native'
 import {
-  AudioBuffer,
   AudioContext,
   AudioManager,
   AudioRecorder,
@@ -12,25 +14,26 @@ import {
 } from 'react-native-audio-api'
 
 import { colors } from '../../theme/colors'
-import type { float32ArrayToWAV } from '../../utils/appleAudioUtils'
-import { mergeBuffersToFloat32Array } from '../../utils/audioUtils'
 import { AdaptiveGlass } from '../AdaptiveGlass'
 
 const SAMPLE_RATE = 16000
 const STOP_DELAY_MS = 500
 
 export interface RecordButtonUIBaseProps {
+  // The text heard so far while recording, and an empty string once done
+  onTranscriptionUpdate?: (text: string) => void
   onTranscriptionComplete: (text: string) => void
   disabled?: boolean
   transcriptionModel?: TranscriptionModel
-  float32ArrayToWAV?: typeof float32ArrayToWAV
 }
 
+const join = (...texts: string[]) => texts.filter(Boolean).join(' ')
+
 export function RecordButtonUIBase({
+  onTranscriptionUpdate,
   onTranscriptionComplete,
   disabled = false,
   transcriptionModel,
-  float32ArrayToWAV,
 }: RecordButtonUIBaseProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
@@ -40,7 +43,11 @@ export function RecordButtonUIBase({
   const recorderRef = useRef<AudioRecorder | null>(null)
   const aCtxRef = useRef<AudioContext | null>(null)
   const recorderAdapterRef = useRef<RecorderAdapterNode | null>(null)
-  const audioBuffersRef = useRef<AudioBuffer[]>([])
+  // The recorder's audio, transcribed while it records
+  const audioRef = useRef<ReadableStreamDefaultController<Uint8Array> | null>(
+    null
+  )
+  const transcriptionRef = useRef<Promise<void> | null>(null)
 
   const initializeRecorder = () => {
     AudioManager.setAudioSessionOptions({
@@ -64,22 +71,35 @@ export function RecordButtonUIBase({
     return granted
   }
 
-  const transcribe = async (audioBuffer: ArrayBuffer) => {
-    if (!transcriptionModel) {
-      console.error('transcriptionModel is not provided')
-      return
-    }
-
-    setIsTranscribing(true)
-
+  const transcribe = async (
+    model: TranscriptionModel,
+    audio: ReadableStream<Uint8Array>
+  ) => {
     try {
-      const result = await transcribeAudio({
-        model: transcriptionModel,
-        audio: audioBuffer,
+      const result = streamTranscribe({
+        model,
+        audio,
+        inputAudioFormat: { type: 'audio/pcm', rate: SAMPLE_RATE },
+        // The recorder delivers float samples
+        providerOptions: { apple: { encoding: 'float32' } },
       })
 
-      if (result.text.trim()) {
-        onTranscriptionComplete(result.text.trim())
+      // Final text is settled, partial text is replaced by the next result
+      let finalText = ''
+      for await (const part of result.fullStream) {
+        if (part.type === 'transcript-final') {
+          finalText = join(finalText, part.text.trim())
+          onTranscriptionUpdate?.(finalText)
+        } else if (part.type === 'transcript-partial') {
+          onTranscriptionUpdate?.(join(finalText, part.text.trim()))
+        } else if (part.type === 'error') {
+          throw part.error
+        }
+      }
+
+      const text = (await result.text).trim()
+      if (text) {
+        onTranscriptionComplete(text)
       }
     } catch (error) {
       Alert.alert(
@@ -87,7 +107,7 @@ export function RecordButtonUIBase({
         error instanceof Error ? error.message : 'Failed to transcribe audio'
       )
     } finally {
-      setIsTranscribing(false)
+      onTranscriptionUpdate?.('')
     }
   }
 
@@ -101,6 +121,11 @@ export function RecordButtonUIBase({
       return
     }
 
+    if (!transcriptionModel) {
+      console.error('transcriptionModel is not provided')
+      return
+    }
+
     initializeRecorder()
 
     if (!recorderRef.current) {
@@ -108,17 +133,28 @@ export function RecordButtonUIBase({
       return
     }
 
-    audioBuffersRef.current = []
+    const audio = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        audioRef.current = controller
+      },
+      // A failed transcription cancels the audio, which then takes no more
+      cancel: () => {
+        audioRef.current = null
+      },
+    })
+    transcriptionRef.current = transcribe(transcriptionModel, audio)
 
+    // Small chunks, so the text keeps up with the speech
     recorderRef.current.onAudioReady(
       {
         sampleRate: SAMPLE_RATE,
-        bufferLength: SAMPLE_RATE,
+        bufferLength: SAMPLE_RATE / 10,
         channelCount: 1,
       },
-      (event) => {
-        const { buffer } = event
-        audioBuffersRef.current.push(buffer)
+      ({ buffer }) => {
+        // Copies the samples, as the recorder reuses its buffers
+        const samples = buffer.getChannelData(0).slice()
+        audioRef.current?.enqueue(new Uint8Array(samples.buffer))
       }
     )
 
@@ -127,7 +163,14 @@ export function RecordButtonUIBase({
     recorderAdapterRef.current.connect(aCtxRef.current.destination)
     recorderRef.current.connect(recorderAdapterRef.current)
 
-    await recorderRef.current.start()
+    try {
+      await recorderRef.current.start()
+    } catch (error) {
+      // Ends the transcription, which would otherwise wait for audio
+      audioRef.current?.close()
+      audioRef.current = null
+      throw error
+    }
     setIsRecording(true)
 
     if (aCtxRef.current.state === 'suspended') {
@@ -141,11 +184,6 @@ export function RecordButtonUIBase({
       return
     }
 
-    if (!float32ArrayToWAV) {
-      console.error('float32ArrayToWAV function is not provided')
-      return
-    }
-
     // Immediately update UI to feel snappy
     setIsRecording(false)
     setIsStopping(true)
@@ -156,13 +194,13 @@ export function RecordButtonUIBase({
     await recorderRef.current.stop()
     setIsStopping(false)
 
-    // Merge all recorded PCM data
-    const mergedPCM = mergeBuffersToFloat32Array(audioBuffersRef.current)
-    if (mergedPCM.length > 0) {
-      // Convert to WAV and transcribe
-      const recordedWavBuffer = float32ArrayToWAV(mergedPCM, SAMPLE_RATE)
-      await transcribe(recordedWavBuffer)
-    }
+    // Ending the audio finalizes the transcription
+    audioRef.current?.close()
+    audioRef.current = null
+    setIsTranscribing(true)
+    await transcriptionRef.current
+    transcriptionRef.current = null
+    setIsTranscribing(false)
 
     aCtxRef.current = null
     recorderAdapterRef.current = null

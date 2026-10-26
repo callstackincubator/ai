@@ -37,6 +37,8 @@ export function ChatInputBar({
   imageInputEnabled,
 }: ChatInputBarProps) {
   const [input, setInput] = useState('')
+  // What the record button hears, shown after the input until it is done
+  const [liveTranscript, setLiveTranscript] = useState('')
   const [attachments, setAttachments] = useState<ImageAttachment[]>([])
   // Picked photos are processed after the picker closes, which can take a
   // moment for several full-resolution photos
@@ -96,13 +98,17 @@ export function ChatInputBar({
 
         <View style={styles.textInputContainer}>
           <TextInput
-            value={input}
+            value={
+              liveTranscript
+                ? [input, liveTranscript].filter(Boolean).join(' ')
+                : input
+            }
             onChangeText={setInput}
             placeholder="Message"
             placeholderTextColor={colors.secondaryLabel as any}
             multiline
             style={styles.textInput}
-            editable={!isGenerating}
+            editable={!isGenerating && !liveTranscript}
           />
         </View>
 
@@ -122,6 +128,7 @@ export function ChatInputBar({
           </Pressable>
         ) : (
           <RecordButton
+            onTranscriptionUpdate={setLiveTranscript}
             onTranscriptionComplete={(text) =>
               setInput((prev) => (prev ? `${prev} ${text}` : text))
             }

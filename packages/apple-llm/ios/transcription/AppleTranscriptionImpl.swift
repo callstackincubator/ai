@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 @objc
 public class AppleTranscriptionImpl: NSObject {
   // Live sessions by id. They start on the JS thread and stop from tasks
-  private var liveSessions: [String: AnyObject] = [:]
+  private var liveSessions: [String: TranscriptionSession] = [:]
   private let liveSessionsLock = NSLock()
   
 
@@ -244,40 +244,85 @@ public class AppleTranscriptionImpl: NSObject {
     reject("UNSUPPORTED_OS", "Live transcription needs iOS 27", nil)
   }
 
+  /// Starts a session that transcribes audio the app appends, e.g. from its
+  /// own recorder
+  @objc
+  public func startStreamTranscription(
+    _ sessionId: String,
+    language: String,
+    sampleRate: Double,
+    encoding: String,
+    onResult: @escaping (String, String, Bool, Double, Double) -> Void,
+    onError: @escaping (String, String) -> Void,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+    guard #available(iOS 26, *) else {
+      reject("UNSUPPORTED_OS", "Transcription needs iOS 26", nil)
+      return
+    }
+    Task {
+      do {
+        let session = try await StreamTranscriptionSession.start(
+          sessionId: sessionId,
+          language: language,
+          sampleRate: sampleRate,
+          encoding: encoding,
+          onResult: onResult,
+          onError: onError
+        )
+        self.liveSessionsLock.withLock { self.liveSessions[sessionId] = session }
+        resolve(nil)
+      } catch {
+        reject("AppleTranscription", error.localizedDescription, error)
+      }
+    }
+  }
+
+  /// Called on the JS thread with the next chunk of a stream session's audio
+  @objc
+  public func appendTranscriptionAudio(_ sessionId: String, data: Data) throws {
+    guard #available(iOS 26, *),
+          let session = liveSessionsLock.withLock({ liveSessions[sessionId] }) as? StreamTranscriptionSession else {
+      throw LiveTranscriptionError.noSession
+    }
+    try session.append(data)
+  }
+
   @objc
   public func stopLiveTranscription(
     _ sessionId: String,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-#if compiler(>=6.4)
-    if #available(iOS 27, *) {
-      let session = liveSessionsLock.withLock { liveSessions.removeValue(forKey: sessionId) }
-      guard let session = session as? LiveTranscriptionSession else {
-        resolve(nil)
-        return
-      }
-      Task {
-        do {
-          try await session.stop()
-          resolve(nil)
-        } catch {
-          reject("AppleTranscription", error.localizedDescription, error)
-        }
-      }
+    guard let session = liveSessionsLock.withLock({ liveSessions.removeValue(forKey: sessionId) }) else {
+      resolve(nil)
       return
     }
-#endif
-    resolve(nil)
+    Task {
+      do {
+        try await session.stop()
+        resolve(nil)
+      } catch {
+        reject("AppleTranscription", error.localizedDescription, error)
+      }
+    }
   }
 }
 
-#if compiler(>=6.4)
+/// A live session, recording the microphone or transcribing appended audio
+protocol TranscriptionSession: AnyObject {
+  /// Finalizes what was heard so far and waits for its results
+  func stop() async throws
+}
+
 enum LiveTranscriptionError: LocalizedError {
   case microphoneAccessDenied
   case noMicrophone
   case unsupportedLocale(String)
   case captureFailed
+  case invalidAudioFormat
+  case noSession
 
   var errorDescription: String? {
     switch self {
@@ -289,6 +334,10 @@ enum LiveTranscriptionError: LocalizedError {
       return "Locale not supported: \(language)"
     case .captureFailed:
       return "The microphone could not start recording"
+    case .invalidAudioFormat:
+      return "The audio format is not supported"
+    case .noSession:
+      return "The transcription session is not running"
     }
   }
 }
@@ -307,10 +356,236 @@ final class LiveTranscriptionStopFlag: @unchecked Sendable {
   }
 }
 
+@available(iOS 26, *)
+enum LiveTranscriber {
+  /// Volatile results are quick guesses that later results replace
+  static func create(for locale: Locale) async throws -> SpeechTranscriber {
+    let transcriber = SpeechTranscriber(
+      locale: locale,
+      transcriptionOptions: [],
+      reportingOptions: [.volatileResults],
+      attributeOptions: [.audioTimeRange]
+    )
+    if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+      try await request.downloadAndInstall()
+    }
+    return transcriber
+  }
+
+  /// Reports each result until the results end
+  static func reportResults(
+    of transcriber: SpeechTranscriber,
+    sessionId: String,
+    stopFlag: LiveTranscriptionStopFlag,
+    onResult: @escaping (String, String, Bool, Double, Double) -> Void,
+    onError: @escaping (String, String) -> Void
+  ) -> Task<Void, Never> {
+    Task {
+      do {
+        for try await result in transcriber.results {
+          onResult(
+            sessionId,
+            String(result.text.characters),
+            result.isFinal,
+            CMTimeGetSeconds(result.range.start),
+            CMTimeGetSeconds(CMTimeRangeGetEnd(result.range))
+          )
+        }
+      } catch {
+        // Stopping cancels the analyzer, which ends the results with an error
+        if !stopFlag.isStopped {
+          onError(sessionId, error.localizedDescription)
+        }
+      }
+    }
+  }
+}
+
+/// Transcribes mono PCM audio that is appended in chunks of any size
+@available(iOS 26, *)
+final class StreamTranscriptionSession: TranscriptionSession, @unchecked Sendable {
+  private let analyzer: SpeechAnalyzer
+  private let input: AsyncStream<AnalyzerInput>.Continuation
+  private let inputFormat: AVAudioFormat
+  // Converts to the format the analyzer takes, unless the input already is
+  private let converter: AVAudioConverter?
+  private let results: Task<Void, Never>
+  private let stopFlag: LiveTranscriptionStopFlag
+  // Guards the converter and the bytes of a sample split between two chunks
+  private let lock = NSLock()
+  private var remainder = Data()
+  private var hasAudio = false
+
+  private init(
+    analyzer: SpeechAnalyzer,
+    input: AsyncStream<AnalyzerInput>.Continuation,
+    inputFormat: AVAudioFormat,
+    converter: AVAudioConverter?,
+    results: Task<Void, Never>,
+    stopFlag: LiveTranscriptionStopFlag
+  ) {
+    self.analyzer = analyzer
+    self.input = input
+    self.inputFormat = inputFormat
+    self.converter = converter
+    self.results = results
+    self.stopFlag = stopFlag
+  }
+
+  static func start(
+    sessionId: String,
+    language: String,
+    sampleRate: Double,
+    encoding: String,
+    onResult: @escaping (String, String, Bool, Double, Double) -> Void,
+    onError: @escaping (String, String) -> Void
+  ) async throws -> StreamTranscriptionSession {
+    let commonFormat: AVAudioCommonFormat = encoding == "float32" ? .pcmFormatFloat32 : .pcmFormatInt16
+    guard sampleRate > 0,
+          let inputFormat = AVAudioFormat(commonFormat: commonFormat, sampleRate: sampleRate, channels: 1, interleaved: false) else {
+      throw LiveTranscriptionError.invalidAudioFormat
+    }
+    guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: language)) else {
+      throw LiveTranscriptionError.unsupportedLocale(language)
+    }
+    let transcriber = try await LiveTranscriber.create(for: locale)
+    guard let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+      throw LiveTranscriptionError.invalidAudioFormat
+    }
+    var converter: AVAudioConverter?
+    if inputFormat != analyzerFormat {
+      guard let audioConverter = AVAudioConverter(from: inputFormat, to: analyzerFormat) else {
+        throw LiveTranscriptionError.invalidAudioFormat
+      }
+      converter = audioConverter
+    }
+
+    let (inputSequence, input) = AsyncStream.makeStream(of: AnalyzerInput.self)
+    let analyzer = SpeechAnalyzer(modules: [transcriber])
+    let stopFlag = LiveTranscriptionStopFlag()
+    let results = LiveTranscriber.reportResults(
+      of: transcriber,
+      sessionId: sessionId,
+      stopFlag: stopFlag,
+      onResult: onResult,
+      onError: onError
+    )
+
+    do {
+      try await analyzer.start(inputSequence: inputSequence)
+    } catch {
+      // Ends the results, so their task does not wait forever
+      stopFlag.stop()
+      input.finish()
+      await analyzer.cancelAndFinishNow()
+      await results.value
+      throw error
+    }
+
+    return StreamTranscriptionSession(
+      analyzer: analyzer,
+      input: input,
+      inputFormat: inputFormat,
+      converter: converter,
+      results: results,
+      stopFlag: stopFlag
+    )
+  }
+
+  func append(_ data: Data) throws {
+    try lock.withLock {
+      let bytes = remainder + data
+      let bytesPerFrame = Int(inputFormat.streamDescription.pointee.mBytesPerFrame)
+      let frameCount = bytes.count / bytesPerFrame
+      let byteCount = frameCount * bytesPerFrame
+      remainder = Data(bytes.suffix(from: bytes.startIndex + byteCount))
+      guard frameCount > 0,
+            let buffer = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: AVAudioFrameCount(frameCount)),
+            let destination = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)[0].mData else {
+        return
+      }
+      buffer.frameLength = AVAudioFrameCount(frameCount)
+      bytes.withUnsafeBytes { source in
+        destination.copyMemory(from: source.baseAddress!, byteCount: byteCount)
+      }
+      try yield(buffer)
+    }
+  }
+
+  /// Converts a buffer to the analyzer's format and passes it on. Without a
+  /// buffer, it flushes the frames the converter holds back for resampling
+  private func yield(_ buffer: AVAudioPCMBuffer?) throws {
+    guard let converter else {
+      if let buffer {
+        hasAudio = true
+        input.yield(AnalyzerInput(buffer: buffer))
+      }
+      return
+    }
+    let inputFrames = Double(buffer?.frameLength ?? 0)
+    let ratio = converter.outputFormat.sampleRate / converter.inputFormat.sampleRate
+    // Room for the frames held back from the previous chunk too
+    let capacity = AVAudioFrameCount((inputFrames * ratio).rounded(.up)) + 1024
+    guard let output = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: capacity) else {
+      throw LiveTranscriptionError.invalidAudioFormat
+    }
+    var consumed = false
+    var conversionError: NSError?
+    let status = converter.convert(to: output, error: &conversionError) { _, inputStatus in
+      guard let buffer, !consumed else {
+        inputStatus.pointee = buffer == nil ? .endOfStream : .noDataNow
+        return nil
+      }
+      consumed = true
+      inputStatus.pointee = .haveData
+      return buffer
+    }
+    if status == .error {
+      throw conversionError ?? LiveTranscriptionError.invalidAudioFormat
+    }
+    if output.frameLength > 0 {
+      hasAudio = true
+      input.yield(AnalyzerInput(buffer: output))
+    }
+  }
+
+  func stop() async throws {
+    let hasAudio = lock.withLock {
+      try? yield(nil)
+      remainder = Data()
+      return self.hasAudio
+    }
+    input.finish()
+    // An analyzer that never had audio neither finalizes nor finishes, and
+    // has no results to wait for
+    guard hasAudio else {
+      stopFlag.stop()
+      results.cancel()
+      Task { [analyzer] in await analyzer.cancelAndFinishNow() }
+      return
+    }
+    // Finishing ends the results. A failed finalize still finishes the
+    // analyzer, so the results task does not wait forever
+    var finalizeError: Error?
+    do {
+      try await analyzer.finalizeAndFinishThroughEndOfInput()
+    } catch {
+      finalizeError = error
+      stopFlag.stop()
+      await analyzer.cancelAndFinishNow()
+    }
+    await results.value
+    if let finalizeError {
+      throw finalizeError
+    }
+  }
+}
+
+#if compiler(>=6.4)
 /// Transcribes the microphone as it records, with CaptureInputSequenceProvider
 /// feeding the capture session's audio to a SpeechAnalyzer
 @available(iOS 27, *)
-final class LiveTranscriptionSession: @unchecked Sendable {
+final class LiveTranscriptionSession: TranscriptionSession, @unchecked Sendable {
   private let provider: CaptureInputSequenceProvider
   private let analyzer: SpeechAnalyzer
   private let results: Task<Void, Never>
@@ -346,16 +621,7 @@ final class LiveTranscriptionSession: @unchecked Sendable {
       throw LiveTranscriptionError.noMicrophone
     }
 
-    // Volatile results are quick guesses that later results replace
-    let transcriber = SpeechTranscriber(
-      locale: locale,
-      transcriptionOptions: [],
-      reportingOptions: [.volatileResults],
-      attributeOptions: [.audioTimeRange]
-    )
-    if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-      try await request.downloadAndInstall()
-    }
+    let transcriber = try await LiveTranscriber.create(for: locale)
 
     let provider = try await CaptureInputSequenceProvider.providerWithSession(
       from: device,
@@ -364,24 +630,13 @@ final class LiveTranscriptionSession: @unchecked Sendable {
     let analyzer = SpeechAnalyzer(modules: [transcriber])
 
     let stopFlag = LiveTranscriptionStopFlag()
-    let results = Task {
-      do {
-        for try await result in transcriber.results {
-          onResult(
-            sessionId,
-            String(result.text.characters),
-            result.isFinal,
-            CMTimeGetSeconds(result.range.start),
-            CMTimeGetSeconds(CMTimeRangeGetEnd(result.range))
-          )
-        }
-      } catch {
-        // Stopping cancels the analyzer, which ends the results with an error
-        if !stopFlag.isStopped {
-          onError(sessionId, error.localizedDescription)
-        }
-      }
-    }
+    let results = LiveTranscriber.reportResults(
+      of: transcriber,
+      sessionId: sessionId,
+      stopFlag: stopFlag,
+      onResult: onResult,
+      onError: onError
+    )
 
     do {
       try await analyzer.start(inputSequence: provider.analyzerInputs)

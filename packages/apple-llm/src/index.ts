@@ -39,6 +39,9 @@ export type {
   LiveTranscription,
   LiveTranscriptionOptions,
   LiveTranscriptionResult,
+  StreamTranscription,
+  StreamTranscriptionEncoding,
+  StreamTranscriptionOptions,
 } from './NativeAppleTranscription'
 export { default as AppleTranscription } from './NativeAppleTranscription'
 export { default as AppleUtils } from './NativeAppleUtils'
