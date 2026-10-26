@@ -519,28 +519,57 @@ function isFractionalEnum(schema: unknown) {
 
 // Foundation Models generates properties in order, but native receives objects
 // as dictionaries, which have none, so the order is sent as a list
-function withPropertyOrder(key: string, value: JSONSchema7) {
-  // Like the native parser, objects can leave out their type or be nullable.
-  // The values of a properties map are schemas, but the map itself is not
+// It walks the schema by its structure, since a property can be named like any
+// keyword, including "properties"
+function withPropertyOrder(
+  schema: JSONSchema7Definition
+): JSONSchema7Definition {
+  if (typeof schema !== 'object' || schema === null) {
+    return schema
+  }
+  const { properties, items, anyOf } = schema
+  const { $defs } = schema as { $defs?: Record<string, JSONSchema7Definition> }
+  const definitions = schema.definitions
+  const mapSchemas = (map: Record<string, JSONSchema7Definition>) =>
+    Object.fromEntries(
+      Object.entries(map).map(([name, value]) => [
+        name,
+        withPropertyOrder(value),
+      ])
+    )
+  // Like the native parser, objects can leave out their type or be nullable
   const isObject =
-    value?.type === undefined ||
-    value.type === 'object' ||
-    (Array.isArray(value.type) && value.type.includes('object'))
-  return key !== 'properties' && isObject && value?.properties
-    ? { ...value, 'x-order': Object.keys(value.properties) }
-    : value
+    schema.type === undefined ||
+    schema.type === 'object' ||
+    (Array.isArray(schema.type) && schema.type.includes('object'))
+
+  return {
+    ...schema,
+    ...(properties && { properties: mapSchemas(properties) }),
+    ...(properties && isObject && { 'x-order': Object.keys(properties) }),
+    ...(items && {
+      items: Array.isArray(items)
+        ? items.map(withPropertyOrder)
+        : withPropertyOrder(items),
+    }),
+    ...(anyOf && { anyOf: anyOf.map(withPropertyOrder) }),
+    ...($defs && { $defs: mapSchemas($defs) }),
+    ...(definitions && { definitions: mapSchemas(definitions) }),
+  } as JSONSchema7
 }
 
 function toNativeSchema<T extends JSONSchema7 | undefined>(schema: T): T {
   return (
     schema &&
-    JSON.parse(
-      JSON.stringify(schema, (key, value) =>
-        isFractionalEnum(value)
-          ? { ...value, type: 'string', enum: value.enum!.map(String) }
-          : withPropertyOrder(key, value)
+    (withPropertyOrder(
+      JSON.parse(
+        JSON.stringify(schema, (_, value) =>
+          isFractionalEnum(value)
+            ? { ...value, type: 'string', enum: value.enum!.map(String) }
+            : value
+        )
       )
-    )
+    ) as T)
   )
 }
 
