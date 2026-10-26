@@ -24,6 +24,18 @@ private let supportsVisionTools = true
 #else
 private let supportsVisionTools = false
 #endif
+// SpotlightSearchTool lives in the Core Spotlight + FoundationModels cross-import
+// overlay. The Simulator has it, but not the model assets the tool needs
+#if compiler(>=6.4) && canImport(_CoreSpotlight_FoundationModels)
+import CoreSpotlight
+#if targetEnvironment(simulator)
+private let supportsSpotlightTool = false
+#else
+private let supportsSpotlightTool = true
+#endif
+#else
+private let supportsSpotlightTool = false
+#endif
 
 public typealias ToolInvoker = @Sendable (String, String, @escaping (Any?, Error?) -> Void) -> Void
 
@@ -434,6 +446,7 @@ public class AppleLLMImpl: NSObject {
       "supportsImagePrompts": false,
       "supportsDynamicProfiles": false,
       "supportsVisionTools": false,
+      "supportsSpotlightTool": false,
       "supportsReasoning": false,
     ]
 
@@ -447,6 +460,7 @@ public class AppleLLMImpl: NSObject {
       info["supportsImagePrompts"] = true
       info["supportsDynamicProfiles"] = true
       info["supportsVisionTools"] = supportsVisionTools
+      info["supportsSpotlightTool"] = supportsSpotlightTool
     }
 #endif
 
@@ -477,6 +491,7 @@ public class AppleLLMImpl: NSObject {
       "supportsImagePrompts": true,
       "supportsDynamicProfiles": true,
       "supportsVisionTools": supportsVisionTools,
+      "supportsSpotlightTool": supportsSpotlightTool,
       "supportsReasoning": model.capabilities.contains(.reasoning),
     ]
 
@@ -1111,22 +1126,36 @@ public class AppleLLMImpl: NSObject {
       return []
     }
 
-#if compiler(>=6.4) && canImport(_Vision_FoundationModels)
     if #available(iOS 27, *) {
-      return try toolNames.map { toolName in
-        switch toolName {
-        case "ocr":
-          return OCRTool()
-        case "barcode":
-          return BarcodeReaderTool()
-        default:
-          throw AppleLLMError.invalidMessage("Unsupported built-in tool '\(toolName)'")
-        }
-      }
+      return try toolNames.map(createBuiltInTool)
     }
-#endif
 
     throw AppleLLMError.unsupportedOS
+  }
+
+  @available(iOS 27, *)
+  private func createBuiltInTool(named toolName: String) throws -> any Tool {
+#if compiler(>=6.4) && canImport(_Vision_FoundationModels)
+    switch toolName {
+    case "ocr":
+      return OCRTool()
+    case "barcode":
+      return BarcodeReaderTool()
+    default:
+      break
+    }
+#endif
+#if compiler(>=6.4) && canImport(_CoreSpotlight_FoundationModels)
+    if toolName == "spotlight" {
+      // Searches the app's Core Spotlight index
+      return SpotlightSearchTool()
+    }
+#endif
+    // Known tools whose overlay the SDK does not ship, like Vision in the Simulator
+    if ["ocr", "barcode", "spotlight"].contains(toolName) {
+      throw AppleLLMError.unsupportedOS
+    }
+    throw AppleLLMError.invalidMessage("Unsupported built-in tool '\(toolName)'")
   }
   
   @available(iOS 26, *)

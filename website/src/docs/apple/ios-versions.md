@@ -46,6 +46,7 @@ parts or usage, is left out.
 | Image prompts                                   | ❌     | ❌       | ✅ Final user prompt only     |
 | Private Cloud Compute model                     | ❌     | ❌       | ✅ Physical device only       |
 | Vision OCR and barcode tools                    | ❌     | ❌       | ✅ Physical device only       |
+| Spotlight search tool                           | ❌     | ❌       | ✅ Physical device only       |
 | Token usage and `'length'` finish reason        | ❌     | ❌       | ✅                            |
 | `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅     | ✅       | ✅                            |
 | Guardrail, refusal, language and asset errors   | ✅     | ✅       | ✅                            |
