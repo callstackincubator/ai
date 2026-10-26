@@ -177,6 +177,22 @@ const upscaled = readTensor(outputs.output) // Float32Array of 1 × 3 × 128 × 
 
 `CoreAI.inspectModel(...)` also lists the functions of a `.aimodel` on disk. A shape of `-1` marks a dynamic dimension, which the input's `shape` sets.
 
+Image inputs, with `dataType: 'image'`, take an image file instead of a tensor:
+
+```ts
+// { name: 'image', dataType: 'image', width: 224, height: 224, pixelFormat: '32BGRA' }
+console.log(info.functions[0].inputs[0])
+
+const { outputs } = await CoreAI.runRawFunction(
+  modelHandle,
+  'main',
+  { image: { imageUri: 'file:///path/to/photo.jpg' } },
+  {}
+)
+```
+
+The image is decoded with its EXIF orientation applied and stretched to the input's `width` and `height` (a `-1` keeps the image's own), into a pixel buffer of its `pixelFormat`. `32BGRA`, `32ARGB` and `24RGB` inputs are supported, and other pixel formats are rejected. Alpha is premultiplied.
+
 Ownership and performance:
 
 - Tensors cross the bridge as `{ dataType, shape, data }`, with `data` holding the little-endian elements in row-major order as base64. `createTensor` and `readTensor` convert typed arrays. Every call copies its inputs into new arrays and its outputs out, so JS never holds native memory and nothing outlives the call.
@@ -184,7 +200,7 @@ Ownership and performance:
 - Core AI specializes the model for a compute unit when it loads. Pass `{ computeUnits: 'gpu' }` (or `'cpu'`, `'neural-engine'`) as the `loadModel` options to choose one, for example when the Neural Engine compiler rejects a model.
 - Hermes has no `Float16Array`, so float16 and bfloat16 inputs can be given as float32, and their outputs come back as float32. Pass `{ outputDataType: 'native' }` to get the bits of each element instead (a `Uint16Array` from `readTensor`).
 - Base64 adds a third to the size of each tensor, and every call encodes and decodes it on the JS thread. Use a task wrapper, or keep tensors to a few megabytes, for work that runs every frame.
-- Image inputs (pixel buffers) are not supported yet.
+- Image inputs are decoded into a new pixel buffer on every call. Image outputs are not returned yet.
 
 ### Video Segmentation
 
