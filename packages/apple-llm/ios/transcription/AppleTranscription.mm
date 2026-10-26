@@ -112,6 +112,10 @@ using namespace react;
   return @([_transcription isAvailable:language]);
 }
 
+- (void)getModelInfo:(nonnull NSString *)language resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_transcription getModelInfo:language resolve:resolve reject:reject];
+}
+
 - (void)prepare:(nonnull NSString *)language resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject { 
   [_transcription prepare:language resolve:resolve reject:reject];
 }
