@@ -55,6 +55,18 @@ describe('core ai tensors', () => {
     ).toEqual([2, 3])
   })
 
+  test('rejects a typed array of another element type', () => {
+    expect(() => createTensor('float32', [1], new Int32Array([1]))).toThrow(
+      'takes a Float32Array, got a Int32Array'
+    )
+  })
+
+  test('sends a Float32Array for a half-precision tensor as float32', () => {
+    const tensor = createTensor('bfloat16', [1], new Float32Array([2]))
+
+    expect(tensor.dataType).toBe('float32')
+  })
+
   test('rejects elements that do not fill the shape', () => {
     expect(() => createTensor('float32', [2, 3], [1, 2])).toThrow(
       'has 6 elements, got 2'

@@ -49,7 +49,20 @@ export function createTensor<T extends CoreAITensorDataType>(
   let tensorType: CoreAITensorDataType = dataType
   let array: ArrayBufferView & { length: number }
   if (ArrayBuffer.isView(elements)) {
+    // The bytes are sent as they are, so they have to be elements of dataType.
+    // Half-precision tensors also take float32, which the native side converts
+    const isHalfAsFloat32 =
+      (dataType === 'float16' || dataType === 'bfloat16') &&
+      elements instanceof Float32Array
+    if (!isHalfAsFloat32 && !(elements instanceof typedArrays[dataType])) {
+      throw new Error(
+        `A ${dataType} tensor takes a ${typedArrays[dataType].name}, got a ${elements.constructor.name}.`
+      )
+    }
     array = elements as ArrayBufferView & { length: number }
+    if (isHalfAsFloat32) {
+      tensorType = 'float32'
+    }
   } else if (dataType === 'float16' || dataType === 'bfloat16') {
     // Numbers are not the bits of half-precision elements, so they are sent
     // as float32 for the native side to convert

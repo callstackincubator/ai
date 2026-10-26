@@ -575,6 +575,8 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
       })
     }
 
+    abortSignal?.throwIfAborted()
+
     const streamId = generateId()
     const config = toNativeModelConfig(this.config)
     const modelId = this.modelId
@@ -669,6 +671,9 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
           const result = (await NativeCoreAI.finishTranscriptionStream(
             streamId
           )) as CoreAITranscriptionResult
+          if (abortSignal?.aborted) {
+            throw abortSignal.reason ?? new Error('Transcription was aborted.')
+          }
           controller.enqueue({
             type: 'finish',
             text: result.text,
@@ -681,9 +686,12 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
           controller.close()
         } catch (error) {
           NativeCoreAI.cancelStream(streamId)
+          // Stops a live source, such as a microphone, from capturing on
+          audio.cancel(error).catch(() => {})
           controller.error(error)
         } finally {
           cleanup()
+          audio.releaseLock()
         }
       },
       cancel() {
