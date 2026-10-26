@@ -1192,8 +1192,9 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   /**
-   * Loads the model into memory, so the first generation answers sooner. Call
-   * it shortly before generating, e.g. when the user opens a chat
+   * Starts loading the model into memory, so the first generation answers
+   * sooner. Resolves once loading has started, not when the model is ready, so
+   * call it a little ahead, e.g. when the user opens a chat
    */
   prepare(): Promise<void> {
     return NativeAppleLLM.prewarm({
