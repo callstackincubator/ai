@@ -485,6 +485,12 @@ trim or summarize and retry.
 
 ## Error Handling
 
+When Apple's guardrails flag a prompt or response, or the model refuses, the
+response ends like other providers' content filters instead of throwing:
+`finishReason` is `'content-filter'`, with `GUARDRAIL_VIOLATION` or `REFUSAL`
+as its raw value, and any text streamed before it is kept. The low-level
+`AppleFoundationModels` API rejects with those codes instead.
+
 Use public error codes for app control flow:
 
 ```typescript
