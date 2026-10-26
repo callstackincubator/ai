@@ -216,6 +216,56 @@ describe('apple structured output', () => {
     ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
   })
 
+  it('keeps $defs and definitions apart', async () => {
+    const output = await generateObject('Fill in the fields.', {
+      type: 'object',
+      properties: {
+        modern: { $ref: '#/$defs/fruit' },
+        legacy: { $ref: '#/definitions/fruit' },
+      },
+      required: ['modern', 'legacy'],
+      $defs: {
+        fruit: {
+          type: 'object',
+          properties: { apple: { type: 'string' } },
+          required: ['apple'],
+        },
+      },
+      definitions: {
+        fruit: {
+          type: 'object',
+          properties: { banana: { type: 'string' } },
+          required: ['banana'],
+        },
+      },
+    })
+
+    expect(Object.keys(output.modern)).toEqual(['apple'])
+    expect(Object.keys(output.legacy)).toEqual(['banana'])
+  })
+
+  it('names definitions apart from a root with the same title', async () => {
+    const output = await generateObject('Describe a tree node named "a".', {
+      title: 'node',
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        label: { $ref: '#/$defs/node' },
+      },
+      required: ['name', 'label'],
+      $defs: {
+        node: {
+          type: 'object',
+          properties: { text: { type: 'string' } },
+          required: ['text'],
+        },
+      },
+    })
+
+    expect(typeof output.name).toBe('string')
+    expect(typeof output.label.text).toBe('string')
+  })
+
   it('generates recursive schemas', async () => {
     const output = await generateObject(
       'Describe the folder "src" that contains the folder "lib", which contains no folders.',
