@@ -1160,7 +1160,8 @@ public class AppleLLMImpl: NSObject {
     }
 #endif
 #if compiler(>=6.4) && canImport(_CoreSpotlight_FoundationModels)
-    if toolName == "spotlight" {
+    // The Simulator can create the tool, but not run it
+    if toolName == "spotlight" && supportsSpotlightTool {
       // Searches the app's Core Spotlight index. The default guide is sized for
       // large context windows and overflows the on-device model's, so it gets
       // the focused one Apple recommends
