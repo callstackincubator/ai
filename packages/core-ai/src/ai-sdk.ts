@@ -462,7 +462,10 @@ export class CoreAIVideoModel implements VideoModelV4 {
     options: CoreAIVideoGenerationOptions = {},
     abortSignal?: AbortSignal
   ): Promise<CoreAIVideoGenerationResult> {
-    abortSignal?.throwIfAborted()
+    // React Native's AbortSignal has no throwIfAborted()
+    if (abortSignal?.aborted) {
+      throw toAbortError(abortSignal)
+    }
     const requestId = generateId()
     const onAbort = () => NativeCoreAI.cancelStream(requestId)
     abortSignal?.addEventListener('abort', onAbort)
@@ -575,7 +578,10 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
       })
     }
 
-    abortSignal?.throwIfAborted()
+    // React Native's AbortSignal has no throwIfAborted()
+    if (abortSignal?.aborted) {
+      throw toAbortError(abortSignal)
+    }
 
     const streamId = generateId()
     const config = toNativeModelConfig(this.config)

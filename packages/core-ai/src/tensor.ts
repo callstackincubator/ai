@@ -69,7 +69,16 @@ export function createTensor<T extends CoreAITensorDataType>(
     array = Float32Array.from(elements)
     tensorType = 'float32'
   } else if (dataType === 'int64' || dataType === 'uint64') {
-    const values = Array.from(elements, (value) => BigInt(Math.trunc(value)))
+    // Numbers past 2^53 are already rounded, so they take a BigInt64Array
+    const values = Array.from(elements, (value) => {
+      const integer = Math.trunc(value)
+      if (!Number.isSafeInteger(integer)) {
+        throw new Error(
+          `${value} is not a safe integer. Pass a ${dataType === 'int64' ? 'BigInt64Array' : 'BigUint64Array'} for larger values.`
+        )
+      }
+      return BigInt(integer)
+    })
     array =
       dataType === 'int64'
         ? BigInt64Array.from(values)

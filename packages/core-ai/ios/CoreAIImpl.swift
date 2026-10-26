@@ -572,6 +572,15 @@ public class CoreAIImpl: NSObject {
           try await stream.append(audio)
           resolve(nil)
         } catch {
+          // A failed append cancels the stream, so its ID is free again. An
+          // append rejected while the stream finishes leaves it cancellable
+          let hasEnded = await stream.hasEnded
+          self.locked {
+            guard hasEnded else { return }
+            if self.transcriptionStreams[streamId] as? TranscriptionStream === stream {
+              self.transcriptionStreams.removeValue(forKey: streamId)
+            }
+          }
           reject(errorCode(error), error.localizedDescription, error)
         }
       }
@@ -604,7 +613,11 @@ public class CoreAIImpl: NSObject {
           self.locked { _ = self.transcriptionStreams.removeValue(forKey: streamId) }
           resolve(result)
         } catch {
-          self.locked { _ = self.transcriptionStreams.removeValue(forKey: streamId) }
+          // A second finish is rejected while the first one runs, which
+          // keeps the stream registered and cancellable
+          if await stream.hasEnded {
+            self.locked { _ = self.transcriptionStreams.removeValue(forKey: streamId) }
+          }
           reject(errorCode(error), error.localizedDescription, error)
         }
       }
@@ -1525,6 +1538,10 @@ private actor TranscriptionStream {
   private var sampleCount = 0
   // Called once, when the stream finishes or is cancelled
   private var onEnd: (() -> Void)?
+  private enum State { case running, finishing, ended }
+  private var state = State.running
+
+  var hasEnded: Bool { state == .ended }
 
   init(
     model: SpeechRecognitionModel,
@@ -1582,6 +1599,9 @@ private actor TranscriptionStream {
   }
 
   func append(samples: [Float]) async throws {
+    guard state == .running else {
+      throw CoreAIError.invalidInput("The transcription stream is finishing or has ended, so it takes no more audio.")
+    }
     do {
       let resampled = try resample(samples, isLast: false)
       sampleCount += resampled.count
@@ -1593,6 +1613,11 @@ private actor TranscriptionStream {
   }
 
   func finish() async throws -> [String: Any] {
+    // Only cancel() can run on the session while it finishes
+    guard state == .running else {
+      throw CoreAIError.invalidInput("The transcription stream is already finishing or has ended.")
+    }
+    state = .finishing
     do {
       let tail = try resample([], isLast: true)
       if !tail.isEmpty {
@@ -1614,14 +1639,18 @@ private actor TranscriptionStream {
     ]
   }
 
-  // A session left running would make the model's next startStream throw
+  // A session left running would make the model's next startStream throw.
+  // Once the stream has ended, the model may run a newer session, so this
+  // does nothing
   func cancel() async {
+    guard state != .ended else { return }
     _ = try? await model.finishStream()
     collector.cancel()
     end()
   }
 
   private func end() {
+    state = .ended
     onEnd?()
     onEnd = nil
   }
