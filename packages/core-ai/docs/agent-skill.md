@@ -101,7 +101,7 @@ Download the exported directory into app storage, or bundle it with the app, and
 
 - **Simulator builds fail**: Core AI is device-only. Exclude the package from simulator builds or test on a device.
 - **Structured output**: needs a JSON schema and runs as guided generation. Models whose engine cannot do guided generation reject with `CORE_AI_UNSUPPORTED_CAPABILITY`. Streamed JSON arrives in one piece once it is complete.
-- **Tools**: not supported yet. Tools are not passed to the model, and the call returns a warning.
+- **Tools**: function tools only. A tool call ends the generation, so set `stopWhen` (e.g. `stepCountIs(3)`) for the AI SDK to run the tool and let the model answer. `toolChoice: 'required'` is not enforced.
 - **Wrong package**: Apple Intelligence (Foundation Models system model) is `@react-native-ai/apple`, not Core AI.
 
 ## Related Skills
