@@ -1083,7 +1083,11 @@ class AppleSpeechModel implements SpeechModelV4 {
 
   async doGenerate(options: SpeechModelV4CallOptions) {
     const speechOptions = {
-      language: this.language,
+      // 'auto' asks the provider to detect the language, which speech synthesis cannot
+      language:
+        options.language && options.language !== 'auto'
+          ? options.language
+          : this.language,
       voice: options.voice,
     }
 
@@ -1103,6 +1107,14 @@ class AppleSpeechModel implements SpeechModelV4 {
       ].flatMap((feature) =>
         feature ? [{ type: 'unsupported' as const, feature }] : []
       )
+      // A voice speaks its own language, so only warn when the language was used
+      if (options.language === 'auto' && !options.voice) {
+        warnings.push({
+          type: 'unsupported',
+          feature: 'language',
+          details: `Speech synthesis cannot detect the language, so ${this.language} was used.`,
+        })
+      }
 
       return {
         audio: new Uint8Array(audio),

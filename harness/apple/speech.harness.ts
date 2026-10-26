@@ -51,6 +51,54 @@ describe('apple speech', () => {
     expect(readWav(audio.uint8Array).dataSize).toBeGreaterThan(0)
   })
 
+  it('speaks in the language of the call', async () => {
+    const speak = async (modelLanguage: string, language?: string) => {
+      const { audio } = await generateSpeech({
+        model: apple.speechModel({ language: modelLanguage }),
+        text: 'Bonjour tout le monde.',
+        language,
+      })
+      return readWav(audio.uint8Array).dataSize
+    }
+
+    const english = await speak('en-US')
+    const french = await speak('fr-FR')
+
+    expect(french).not.toBe(english)
+    expect(await speak('en-US', 'fr-FR')).toBe(french)
+  })
+
+  it('warns that it cannot detect the language', async () => {
+    const { warnings } = await generateSpeech({
+      model: apple.speechModel({ language: 'en-US' }),
+      text: 'Hello world.',
+      language: 'auto',
+    })
+
+    expect(warnings).toEqual([
+      {
+        type: 'unsupported',
+        feature: 'language',
+        details:
+          'Speech synthesis cannot detect the language, so en-US was used.',
+      },
+    ])
+  })
+
+  it('does not warn about the language when a voice is set', async () => {
+    const voices = await AppleSpeech.getVoices()
+    const voice = voices.find((v) => v.language === 'en-US') ?? voices[0]
+
+    const { warnings } = await generateSpeech({
+      model: apple.speechModel({ language: 'en-US' }),
+      text: 'Hello world.',
+      language: 'auto',
+      voice: voice.identifier,
+    })
+
+    expect(warnings).toEqual([])
+  })
+
   it('settles for whitespace-only text', async () => {
     const audio = await AppleSpeech.generate('   ', { language: 'en-US' })
 
