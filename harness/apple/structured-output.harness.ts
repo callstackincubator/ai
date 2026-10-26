@@ -37,6 +37,24 @@ describe('apple structured output', () => {
     expect(output.city).toMatch(/paris/i)
   })
 
+  it('orders properties of a property named properties', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      type: 'object',
+      properties: {
+        properties: {
+          type: 'object',
+          properties: Object.fromEntries(
+            orderedKeys.map((key) => [key, { type: 'string' }])
+          ),
+          required: orderedKeys,
+        },
+      },
+      required: ['properties'],
+    })
+
+    expect(Object.keys(output.properties)).toEqual(orderedKeys)
+  })
+
   it('orders properties of objects without a type', async () => {
     const output = await generateObject('Give each field a random word.', {
       properties: Object.fromEntries(
@@ -167,6 +185,33 @@ describe('apple structured output', () => {
         properties: { items: { $ref: '#/$defs/nested' } },
         required: ['items'],
         $defs: { nested: { type: 'array', items: { $ref: '#/$defs/nested' } } },
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
+  })
+
+  it('keeps the description of a property that references a definition', async () => {
+    const output = await generateObject('Fill in the fields.', {
+      type: 'object',
+      properties: {
+        fruit: {
+          $ref: '#/$defs/word',
+          description: 'Always exactly the word KIWI in uppercase.',
+        },
+      },
+      required: ['fruit'],
+      $defs: { word: { type: 'string' } },
+    })
+
+    expect(output.fruit).toMatch(/kiwi/i)
+  })
+
+  it('rejects references outside $defs and definitions', async () => {
+    await expect(
+      generateObject('Fill in the fields.', {
+        type: 'object',
+        properties: { address: { $ref: '#/other/address' } },
+        required: ['address'],
+        $defs: { address: { type: 'string' } },
       })
     ).rejects.toMatchObject({ code: 'INVALID_SCHEMA' })
   })
