@@ -255,12 +255,16 @@ extension RawModel {
   }
 
   private static func draw(_ image: CGImage, into buffer: CVPixelBuffer, name: String) throws {
-    CVPixelBufferLockBaseAddress(buffer, [])
+    guard CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess else {
+      throw CoreAIError.invalidInput("Could not lock the pixel buffer for input \"\(name)\".")
+    }
     defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
     let format = CVPixelBufferGetPixelFormatType(buffer)
     let width = CVPixelBufferGetWidth(buffer)
     let height = CVPixelBufferGetHeight(buffer)
-    let base = CVPixelBufferGetBaseAddress(buffer)!
+    guard let base = CVPixelBufferGetBaseAddress(buffer) else {
+      throw CoreAIError.invalidInput("The pixel buffer for input \"\(name)\" has no memory to draw into.")
+    }
     let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
 
     // Core Graphics draws 32-bit pixels only, so 24RGB is drawn as RGBX and
