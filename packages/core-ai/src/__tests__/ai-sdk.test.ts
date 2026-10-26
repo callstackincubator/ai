@@ -335,6 +335,26 @@ describe('core ai language model', () => {
     ])
   })
 
+  test('keeps the native error code on stream errors', async () => {
+    const { stream } = await createModel().doStream(createCallOptions())
+    const parts = readAll(stream)
+
+    const streamId = await waitForStreamId()
+    onStreamError.emit({
+      streamId,
+      code: 'CORE_AI_UNSUPPORTED_CAPABILITY',
+      error: 'No guided generation.',
+    })
+
+    const error = (await parts).find((part) => part.type === 'error')
+    expect(error).toMatchObject({
+      error: {
+        message: 'No guided generation.',
+        code: 'CORE_AI_UNSUPPORTED_CAPABILITY',
+      },
+    })
+  })
+
   test('cancels the native request when generation is aborted', async () => {
     let rejectGeneration: (error: Error) => void = () => {}
     generateText.mockImplementationOnce(

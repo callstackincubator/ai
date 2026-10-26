@@ -267,7 +267,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
             if (event.streamId === streamId) {
               controller.enqueue({
                 type: 'error',
-                error: new Error(event.error),
+                error: toStreamError(event),
               })
               cleanup()
               controller.close()
@@ -823,7 +823,7 @@ function streamLanguageSession(
         (event: CoreAIStreamErrorEvent) => {
           if (event.streamId === streamId) {
             cleanup()
-            controller.error(new Error(event.error))
+            controller.error(toStreamError(event))
           }
         }
       )
@@ -1013,6 +1013,11 @@ function toUsage(usage: CoreAIUsage | undefined): LanguageModelV4Usage {
       reasoning: usage?.reasoningTokens,
     },
   }
+}
+
+// Keeps the native error code, like errors from rejected native calls
+function toStreamError(event: CoreAIStreamErrorEvent): Error {
+  return Object.assign(new Error(event.error), { code: event.code })
 }
 
 function toAbortError(signal: AbortSignal): Error {
