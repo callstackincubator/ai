@@ -2,7 +2,7 @@
 
 Generate text embeddings on device with Apple's
 [`NLContextualEmbedding`](https://developer.apple.com/documentation/naturallanguage/nlcontextualembedding),
-a BERT-style model that ships with iOS 17 and later. Use them for semantic
+a BERT-style model available on iOS 17 and later. Use them for semantic
 search, similarity, and clustering.
 
 ## Usage
@@ -24,11 +24,12 @@ const { embeddings } = await embedMany({
 
 ## Languages
 
-Apple has one model per writing system: Latin, Cyrillic, and Chinese, Japanese,
-and Korean. Each covers several languages, so texts in different languages of
-the same script can be compared. The model uses the device language by default.
-Pass an [ISO 639-1 code](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes)
-or a language name to pick another:
+Apple groups languages into models by writing system, such as Latin or
+Cyrillic, and adds more scripts in newer iOS versions. Each model covers
+several languages, so texts in different languages of the same script can be
+compared. The model uses the device language by default. Pass an
+[ISO 639-1 code](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes)
+or a locale identifier such as `fr-FR` to pick another:
 
 ```tsx
 const model = apple.embeddingModel({ language: 'fr' })
@@ -37,7 +38,7 @@ await embed({ model, value: 'Bonjour' })
 ```
 
 See [Apple's documentation](https://developer.apple.com/documentation/naturallanguage/nlcontextualembedding#overview)
-for the supported languages.
+for the supported languages and the iOS version that added each.
 
 ## Preparing the Model
 

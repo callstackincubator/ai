@@ -3,8 +3,9 @@ import { PackageManagerTabs } from '@theme'
 # Getting Started
 
 `@react-native-ai/apple` is an AI SDK provider for the AI that ships with iOS.
-There are no models to download or bundle, since it uses the system's models,
-which run on device. The one exception is the opt-in
+There are no models to bundle, since it uses the system's models, which run on
+device. The system downloads some of them, such as embedding and transcription
+assets, on first use. The one exception is the opt-in
 [Private Cloud Compute](./models#private-cloud-compute) model.
 
 | Feature                          | Model                        | Apple API               |
@@ -19,6 +20,7 @@ which run on device. The one exception is the opt-in
 <PackageManagerTabs command="install @react-native-ai/apple ai" />
 
 The provider works with AI SDK v7 and needs its [polyfills](../polyfills.md).
+Examples with schemas also use `zod`.
 
 ## Requirements
 
@@ -44,7 +46,8 @@ if (apple.isAvailable()) {
 
 `isAvailable()` is `false` when the device is not eligible, Apple Intelligence
 is off, or the model is still downloading. [`getModelInfo()`](./models#availability-and-model-info)
-tells you which.
+tells you which. Before iOS 26, `isAvailable()` is `false` and `getModelInfo()`
+rejects with `UNSUPPORTED_OS`.
 
 To test in the iOS Simulator, turn on Apple Intelligence on your Mac first, see
 [Running on Simulator](./running-on-simulator).

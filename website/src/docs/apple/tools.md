@@ -35,7 +35,12 @@ const result = await generateText({
 ```
 
 A tool passed in `tools` but not registered throws. To change the registered
-tools later, call `model.updateTools({ ... })` before generating.
+tools later, keep the model in a variable and update it before generating:
+
+```typescript
+const model = apple()
+model.updateTools({ getWeather, getForecast })
+```
 
 Because Apple runs the whole tool loop natively:
 
@@ -44,9 +49,8 @@ Because Apple runs the whole tool loop natively:
   [`maxToolCalls`](#limiting-tool-calls) to bound the loop.
 - Tool calls and results are reported with Apple's tool call IDs, in
   `generateText` content and as stream parts in `streamText`.
-- When streaming, tool calls are only reported on iOS 27, and each `tool-call`
-  part arrives together with its `tool-result`, once the tool has returned.
-  Before iOS 27 a stream only contains text.
+- When streaming, each `tool-call` part arrives together with its
+  `tool-result`, once the tool has returned.
 
 ## Tool Choice
 
@@ -57,7 +61,8 @@ Because Apple runs the whole tool loop natively:
 | `'required'`                 | The model calls at least one tool before it answers                           | 27  |
 | `{ type: 'tool', toolName }` | Only that tool is offered, without built-in tools, and the model must call it | 27  |
 
-Older versions throw `UNSUPPORTED_OS` for `'required'` and a named tool.
+Before iOS 27, `'required'` is not enforced, so the model may answer without
+calling a tool, and a named tool is the only one offered but is not forced.
 
 ## Limiting Tool Calls
 

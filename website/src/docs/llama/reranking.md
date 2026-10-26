@@ -9,7 +9,7 @@ import { downloadModel, llama } from '@react-native-ai/llama'
 import { rerank } from 'ai'
 
 const modelPath = await downloadModel(
-  'gpustack/jina-reranker-v2-base-multilingual-GGUF/jina-reranker-v2-base-multilingual-Q4_K_M.gguf'
+  'gpustack/bge-reranker-v2-m3-GGUF/bge-reranker-v2-m3-Q4_K_M.gguf'
 )
 const model = llama.rerankingModel(modelPath)
 await model.prepare()

@@ -9,17 +9,20 @@ option.
 
 These run well on recent phones and are used throughout these docs:
 
-| Model ID                                                                                          | Size   | Use                                  |
-| ------------------------------------------------------------------------------------------------- | ------ | ------------------------------------ |
-| `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`                                      | 1.4 GB | Chat, reasoning, tool calling        |
-| `ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q4_0.gguf`                                           | 2.8 GB | Images and audio, with its projector |
-| `nomic-ai/nomic-embed-text-v1.5-GGUF/nomic-embed-text-v1.5.Q8_0.gguf`                             | 146 MB | [Embeddings](./embeddings)           |
-| `gpustack/jina-reranker-v2-base-multilingual-GGUF/jina-reranker-v2-base-multilingual-Q4_K_M.gguf` | 222 MB | [Reranking](./reranking)             |
-| `OuteAI/OuteTTS-0.3-500M-GGUF/OuteTTS-0.3-500M-Q4_K_M.gguf`                                       | 403 MB | [Speech](./speech), with a vocoder   |
+| Model ID                                                              | Size   | Use                                  |
+| --------------------------------------------------------------------- | ------ | ------------------------------------ |
+| `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`          | 1.4 GB | Chat, reasoning, tool calling        |
+| `ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q4_0.gguf`               | 2.8 GB | Images and audio, with its projector |
+| `nomic-ai/nomic-embed-text-v1.5-GGUF/nomic-embed-text-v1.5.Q8_0.gguf` | 146 MB | [Embeddings](./embeddings)           |
+| `gpustack/bge-reranker-v2-m3-GGUF/bge-reranker-v2-m3-Q4_K_M.gguf`     | 438 MB | [Reranking](./reranking)             |
+| `OuteAI/OuteTTS-0.3-500M-GGUF/OuteTTS-0.3-500M-Q4_K_M.gguf`           | 403 MB | [Speech](./speech), with a vocoder   |
 
 The suffix is the quantization. Lower levels such as Q3 are smaller and faster
 but lose quality, and Q4_K_M is a good balance on mobile. The model also needs
 memory for its context on top of the file size.
+
+Licenses differ between models, and some limit commercial use, so check the
+model card before shipping one.
 
 ## Downloading
 
@@ -64,8 +67,10 @@ const models = await getDownloadedModels()
 await removeModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
 ```
 
-`getDownloadedModels` only knows file names, so each `model_id` is the file
-name rather than the full model ID.
+`removeModel` takes the full model ID. `getDownloadedModels` only knows file
+names, so its `model_id` is the file name, which `removeModel` rejects. Keep the
+full IDs of the models your app downloads, and match them to the listed files
+by `filename`.
 
 ## Creating Model Instances
 

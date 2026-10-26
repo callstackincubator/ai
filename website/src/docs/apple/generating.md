@@ -93,12 +93,14 @@ console.log(result.output)
 Guided generation supports:
 
 - Objects, arrays, strings, numbers, integers, booleans, and enums
-- Unions (`anyOf`, e.g. `z.union`) and literals (`z.literal`)
-- Regular expressions (`z.string().regex()`)
+- Unions (`anyOf`, e.g. `z.union`) and string literals (`z.literal('admin')`)
+- Regular expressions (`z.string().regex()`), compiled with Swift's `Regex`, so
+  JavaScript-only syntax fails with `INVALID_SCHEMA`
 - Number bounds (`min`, `max`) and array length (`minItems`, `maxItems`)
 - References to `$defs` or `definitions`, including recursive schemas
 
-String formats such as `z.email()` are ignored, and `multipleOf` fails with
+String formats such as `z.email()` and number and boolean literals are not
+enforced, and `multipleOf` fails with
 `INVALID_SCHEMA`.
 
 `Output.object` also works with `streamText`, but Apple's partial objects are

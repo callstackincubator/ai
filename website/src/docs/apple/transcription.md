@@ -66,8 +66,9 @@ console.log(await result.text)
 ```
 
 Samples are 16-bit integers by default. Recorders built on the Web Audio API,
-such as `react-native-audio-api`, deliver 32-bit floats, which you can pass as
-they are with `providerOptions: { apple: { encoding: 'float32' } }`.
+such as `react-native-audio-api`, deliver 32-bit floats. Enqueue their bytes,
+`new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength)`, and
+set `providerOptions: { apple: { encoding: 'float32' } }`.
 
 Chunks can be any size and any sample rate, and are converted to the format the
 transcriber takes. Closing the audio stream finalizes the transcript, and

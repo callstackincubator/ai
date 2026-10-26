@@ -1,14 +1,16 @@
 # Error Handling
 
-Errors from the Apple provider carry a stable `code` you can use for control
-flow.
+Errors from Foundation Models carry a stable `code` you can use for control
+flow. Other errors, such as a tool that is not registered or a code this
+version of the library does not know, are plain `Error`s without one, so check
+`code` before relying on it.
 
 ## Content Filters
 
 When Apple's guardrails flag a prompt or response, or the model refuses, the
 response ends like other providers' content filters instead of throwing.
 `finishReason` is `'content-filter'`, with `GUARDRAIL_VIOLATION` or `REFUSAL`
-as its raw value, and any text streamed before it is kept. The low-level
+as its raw value, and text already streamed before it is kept. The low-level
 `AppleFoundationModels` API rejects with those codes instead.
 
 ## Catching Errors
@@ -19,7 +21,7 @@ import {
   type AppleLLMError,
   apple,
 } from '@react-native-ai/apple'
-import { generateText } from 'ai'
+import { generateText, streamText } from 'ai'
 
 try {
   await generateText({
@@ -27,9 +29,9 @@ try {
     messages,
   })
 } catch (error) {
-  const appleError = error as AppleLLMError
+  const { code } = error as Partial<AppleLLMError>
 
-  if (appleError.code === AppleLLMErrorCodes.ContextWindowExceeded) {
+  if (code === AppleLLMErrorCodes.ContextWindowExceeded) {
     // Retry with a smaller transcript or a summary.
   }
 
@@ -47,9 +49,9 @@ const result = streamText({
 
 for await (const part of result.stream) {
   if (part.type === 'error') {
-    const error = part.error as AppleLLMError
+    const { code } = part.error as Partial<AppleLLMError>
 
-    if (error.code === AppleLLMErrorCodes.ModelUnavailable) {
+    if (code === AppleLLMErrorCodes.ModelUnavailable) {
       // Show fallback UI.
     }
   }
