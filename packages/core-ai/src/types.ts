@@ -236,6 +236,53 @@ export interface CoreAIRawFunctionResult {
   outputs: Record<string, CoreAITensor>
 }
 
+// Options of `CoreAI.runTask` for `super-resolution`, `classification` and
+// `depth`, which run the `main` function of an .aimodel on the image
+export interface CoreAIVisionTaskOptions {
+  // See `CoreAIRawModelOptions`
+  computeUnits?: CoreAIRawModelOptions['computeUnits']
+  // The function to run, `main` by default
+  functionName?: string
+  // Per-channel RGB normalization for classification and depth, ImageNet's
+  // by default
+  mean?: [number, number, number]
+  std?: [number, number, number]
+  // Super-resolution: the largest tile, 256 px by default
+  tileSize?: number
+  // Super-resolution: the overlap between tiles, 16 px by default
+  tileOverlap?: number
+  // Classification: how many classes to return, 5 by default
+  topK?: number
+  // Classification: class names by logit index. Defaults to a labels.json
+  // array next to the model
+  labels?: string[]
+  // Classification: false when the model returns probabilities already
+  applySoftmax?: boolean
+}
+
+export interface CoreAISuperResolutionOutput {
+  // Base64 PNG
+  image: string
+  width: number
+  height: number
+  scale: number
+}
+
+export interface CoreAIClassificationOutput {
+  classifications: { index: number; label?: string; confidence: number }[]
+}
+
+export interface CoreAIDepthOutput {
+  // Base64 grayscale PNG at the input image size, nearer is brighter
+  image: string
+  // Relative depth at the model resolution, smaller is nearer
+  depth: CoreAITensor & { dataType: 'float32' }
+  width: number
+  height: number
+  min: number
+  max: number
+}
+
 export interface CoreAITaskInput {
   imageUri?: string
   audioUri?: string
