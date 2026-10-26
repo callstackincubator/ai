@@ -30,6 +30,7 @@ const loadModel = mock(async () => ({
   info: { task: 'language', platforms: ['iOS'], functions: [] },
 }))
 const unloadModel = mock(async (_modelHandle: string) => {})
+const removeModel = mock(async (_config: Record<string, unknown>) => {})
 const generateText = mock(
   async (
     _requestId: string,
@@ -116,6 +117,7 @@ mock.module('react-native', () => ({
     getEnforcing: () => ({
       loadModel,
       unloadModel,
+      removeModel,
       generateText,
       streamText,
       cancelStream,
@@ -173,6 +175,7 @@ async function waitForStreamId() {
 beforeEach(() => {
   loadModel.mockClear()
   unloadModel.mockClear()
+  removeModel.mockClear()
   generateText.mockClear()
   streamText.mockClear()
   cancelStream.mockClear()
@@ -222,6 +225,20 @@ describe('core ai language model', () => {
 
     await model.doGenerate(createCallOptions())
     expect(loadModel).toHaveBeenCalledTimes(2)
+  })
+
+  test('unloads the model before removing its files', async () => {
+    const model = createModel()
+    await model.doGenerate(createCallOptions())
+    const modelHandle = generateText.mock.calls[0]![1]
+
+    await model.remove()
+    expect(unloadModel).toHaveBeenCalledWith(modelHandle)
+    expect(removeModel).toHaveBeenCalledTimes(1)
+    expect(unloadModel.mock.invocationCallOrder[0]!).toBeLessThan(
+      removeModel.mock.invocationCallOrder[0]!
+    )
+    expect(model.modelHandle).toBeUndefined()
   })
 
   test('passes session instructions to native', async () => {

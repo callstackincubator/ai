@@ -60,6 +60,12 @@ describe('core-ai super-resolution', () => {
 
     expect(pngSize(output.image)).toEqual({ width: 640, height: 480 })
   })
+
+  it('rejects a tile size of zero', async () => {
+    await expect(
+      run('super-resolution', upscaler, { tileSize: 0 })
+    ).rejects.toThrow('tileSize must be positive')
+  })
 })
 
 describe('core-ai classification', () => {
@@ -89,6 +95,22 @@ describe('core-ai classification', () => {
     expect(confidences.reduce((sum, value) => sum + value, 0)).toBeLessThan(
       1.001
     )
+  })
+
+  it('returns at least one class', async () => {
+    const { classifications } = await run<CoreAIClassificationOutput>(
+      'classification',
+      classifier,
+      { topK: 0 }
+    )
+
+    expect(classifications).toHaveLength(1)
+  })
+
+  it('rejects a mean without one value per channel', async () => {
+    await expect(
+      run('classification', classifier, { mean: [0.5] })
+    ).rejects.toThrow('one non-zero value per RGB channel')
   })
 })
 

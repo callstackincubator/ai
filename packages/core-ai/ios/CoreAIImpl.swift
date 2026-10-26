@@ -1188,7 +1188,8 @@ extension CoreAIImpl {
     let defaults = pipeline.config
     let scheduler = SchedulerType(rawValue: options?["schedulerType"] as? String ?? "") ?? .discreteFlow
     let decodeResolution = DecodeResolution(rawValue: options?["decodeResolution"] as? String ?? "full") ?? .full
-    let seed = UInt32(options?["seed"] as? Double ?? 0)
+    // A random seed unless one is given, wrapped to 32 bits like video generation
+    let seed = UInt32(truncatingIfNeeded: (options?["seed"] as? NSNumber)?.intValue ?? Int.random(in: 0..<Int(UInt32.max)))
     let stepCount = (options?["stepCount"] as? Double).map(Int.init) ?? defaults.defaultSteps ?? 50
     let guidanceScale = (options?["guidanceScale"] as? Double).map(Float.init) ?? defaults.defaultGuidanceScale ?? 7.5
 

@@ -55,9 +55,13 @@ enum VisionTask {
     let fixedHeight = descriptor.shape[2] == -1 ? nil : descriptor.shape[2]
     let fixedWidth = descriptor.shape[3] == -1 ? nil : descriptor.shape[3]
     let maxTile = (options["tileSize"] as? NSNumber)?.intValue ?? 256
+    let requestedOverlap = (options["tileOverlap"] as? NSNumber)?.intValue ?? 16
+    guard maxTile > 0, requestedOverlap >= 0 else {
+      throw CoreAIError.invalidInput("tileSize must be positive and tileOverlap at least 0, got \(maxTile) and \(requestedOverlap).")
+    }
     let tileHeight = fixedHeight ?? min(maxTile, image.height)
     let tileWidth = fixedWidth ?? min(maxTile, image.width)
-    let overlap = min((options["tileOverlap"] as? NSNumber)?.intValue ?? 16, tileWidth / 4, tileHeight / 4)
+    let overlap = min(requestedOverlap, tileWidth / 4, tileHeight / 4)
 
     let source = try rgbPixels(of: image, width: image.width, height: image.height)
     var result: [Float]?
@@ -142,7 +146,7 @@ enum VisionTask {
   ) async throws -> [String: Any] {
     let (inputName, descriptor) = try imageInput(of: function)
     let (height, width) = try imageSize(of: descriptor, default: 224)
-    let pixels = normalized(try rgbPixels(of: image, width: width, height: height), options: options)
+    let pixels = try normalized(try rgbPixels(of: image, width: width, height: height), options: options)
     let input = try makeArray(pixels, shape: [1, 3, height, width], descriptor: descriptor)
     let logits = floats(of: try await runFirstOutput(function, inputs: [inputName: input]))
 
@@ -156,7 +160,7 @@ enum VisionTask {
       scores = logits
     }
 
-    let topK = min((options["topK"] as? NSNumber)?.intValue ?? 5, scores.count)
+    let topK = min(max((options["topK"] as? NSNumber)?.intValue ?? 5, 1), scores.count)
     let top = scores.indices.sorted { scores[$0] > scores[$1] }.prefix(topK)
     return [
       "classifications": top.map { index -> [String: Any] in
@@ -197,7 +201,7 @@ enum VisionTask {
     let (inputName, descriptor) = try imageInput(of: function)
     let (height, width) = try imageSize(of: descriptor, default: 224)
     let views = descriptor.rank == 5 ? max(descriptor.shape[1], 1) : 1
-    let view = normalized(try rgbPixels(of: image, width: width, height: height), options: options)
+    let view = try normalized(try rgbPixels(of: image, width: width, height: height), options: options)
     let shape = descriptor.rank == 5 ? [1, views, 3, height, width] : [1, 3, height, width]
     let input = try makeArray(Array([[Float]](repeating: view, count: views).joined()), shape: shape, descriptor: descriptor)
 
@@ -343,9 +347,12 @@ enum VisionTask {
 
   /// Normalizes channel-major RGB with options.mean and options.std, which
   /// default to ImageNet's unless the task passes its own
-  static func normalized(_ pixels: [Float], options: [String: Any], mean defaultMean: [Float] = VisionTask.imageNetMean, std defaultStd: [Float] = VisionTask.imageNetStd) -> [Float] {
+  static func normalized(_ pixels: [Float], options: [String: Any], mean defaultMean: [Float] = VisionTask.imageNetMean, std defaultStd: [Float] = VisionTask.imageNetStd) throws -> [Float] {
     let mean = (options["mean"] as? [NSNumber])?.map(\.floatValue) ?? defaultMean
     let std = (options["std"] as? [NSNumber])?.map(\.floatValue) ?? defaultStd
+    guard mean.count == 3, std.count == 3, !std.contains(0) else {
+      throw CoreAIError.invalidInput("mean and std need one non-zero value per RGB channel, got \(mean) and \(std).")
+    }
     let planeSize = pixels.count / 3
     return pixels.enumerated().map { index, value in
       let channel = index / planeSize
