@@ -58,6 +58,20 @@ await transcribe({
 > [!NOTE]
 > By default, the transcription model will use device language. Language codes such as `fr` resolve to a supported locale, and `isAvailable()` returns `false` for languages the transcriber does not support.
 
+## Custom Vocabulary
+
+Pass words and phrases the audio likely contains, such as names or jargon, so
+the transcriber recognizes them:
+
+```tsx
+const model = apple.transcriptionModel({
+  language: 'en',
+  contextualStrings: ['Kwabena Oduro', 'Callstack'],
+})
+```
+
+`providerOptions.apple.contextualStrings` sets them for a single call.
+
 ## Preparing the Model
 
 Apple's SpeechAnalyzer requires downloading language-specific assets to the device. While the provider automatically prepares assets when needed, you can call `prepare()` ahead of time for better performance:
