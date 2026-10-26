@@ -85,6 +85,20 @@ describe('apple speech', () => {
     ])
   })
 
+  it('does not warn about the language when a voice is set', async () => {
+    const voices = await AppleSpeech.getVoices()
+    const voice = voices.find((v) => v.language === 'en-US') ?? voices[0]
+
+    const { warnings } = await generateSpeech({
+      model: apple.speechModel({ language: 'en-US' }),
+      text: 'Hello world.',
+      language: 'auto',
+      voice: voice.identifier,
+    })
+
+    expect(warnings).toEqual([])
+  })
+
   it('settles for whitespace-only text', async () => {
     const audio = await AppleSpeech.generate('   ', { language: 'en-US' })
 
