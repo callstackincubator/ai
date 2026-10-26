@@ -273,6 +273,13 @@ and topic detection. Use it with `useCase: 'contentTagging'`, usually with
 structured output:
 
 ```typescript
+import { apple } from '@react-native-ai/apple'
+import { generateText, Output } from 'ai'
+import { z } from 'zod'
+
+const article =
+  'Lionel Messi scored twice as Inter Miami beat Orlando City 3-1 in Florida.'
+
 const result = await generateText({
   model: apple({ useCase: 'contentTagging' }),
   prompt: article,
