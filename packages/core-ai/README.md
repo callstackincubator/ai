@@ -20,8 +20,8 @@ Core AI exposes two layers:
   it, but rejects with an unsupported error until its native runner lands
   ([#237](https://github.com/callstackincubator/ai/issues/237)).
 - Direct native APIs: model loading, persistent language sessions, model
-  inspection, segmentation, and object detection. `specializeModel` returns
-  metadata only. Depth, super-resolution, and raw `.aimodel` function calls
+  inspection, segmentation, object detection, and raw `.aimodel` function
+  calls. `specializeModel` returns metadata only. Depth and super-resolution
   reject with an unsupported error.
 
 Reranking, speech generation, and video generation have no adapters, because

@@ -94,12 +94,29 @@ public class CoreAIImpl: NSObject {
       let exists = FileManager.default.fileExists(atPath: sourceURL.path, isDirectory: &isDirectory)
       let attributes = try? FileManager.default.attributesOfItem(atPath: sourceURL.path)
       let size = attributes?[.size] as? NSNumber
-
-      resolve(modelInfo(config: config, metadata: [
+      var info = modelInfo(config: config, metadata: [
         "exists": exists,
         "isDirectory": isDirectory.boolValue,
         "path": sourceURL.path
-      ], size: size))
+      ], size: size)
+
+#if canImport(CoreAI)
+      // A single .aimodel asset describes its functions. Bundles of several
+      // assets, such as diffusion pipelines, are described by their task
+      if #available(iOS 27, macOS 27, *), AIModelAsset.isValid(at: sourceURL) {
+        Task {
+          do {
+            let model = try await AIModel(contentsOf: sourceURL)
+            info["functions"] = Self.describeFunctions(of: model)
+            resolve(info)
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+        return
+      }
+#endif
+      resolve(info)
     } catch {
       reject(errorCode(error), error.localizedDescription, error)
     }
@@ -126,6 +143,9 @@ public class CoreAIImpl: NSObject {
       return
     case "object-detection":
       loadObjectDetectionModel(config, options: options, resolve: resolve, reject: reject)
+      return
+    case "raw":
+      loadRawModel(config, options: options, resolve: resolve, reject: reject)
       return
     default:
       break
@@ -593,7 +613,67 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    rejectCoreAI(.unsupportedTask("raw"), reject: reject)
+#if canImport(CoreAI)
+    if #available(iOS 27, macOS 27, *) {
+      guard let model = locked({ loadedModels[modelHandle] }) as? RawModel else {
+        rejectCoreAI(.modelNotLoaded(modelHandle), reject: reject)
+        return
+      }
+      Task {
+        do {
+          let outputs = try await model.run(
+            functionName,
+            inputs: inputs,
+            keepsHalfPrecision: options?["outputDataType"] as? String == "native"
+          )
+          resolve(["outputs": outputs])
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
+  }
+
+  private func loadRawModel(
+    _ config: [String: Any],
+    options: [String: Any]?,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAI)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        guard AIModelAsset.isValid(at: sourceURL) else {
+          throw CoreAIError.invalidInput("\(sourceURL.lastPathComponent) is not a valid .aimodel asset.")
+        }
+        let specialization = try RawModel.specializationOptions(options)
+        Task {
+          do {
+            let model = try await AIModel(contentsOf: sourceURL, options: specialization)
+            let handle = self.makeHandle("model")
+            self.locked { self.loadedModels[handle] = RawModel(model: model) }
+            var info = self.modelInfo(config: config)
+            info["functions"] = Self.describeFunctions(of: model)
+            resolve(["modelHandle": handle, "info": info])
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
   }
 
   private func loadLanguageModel(

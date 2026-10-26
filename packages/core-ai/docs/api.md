@@ -77,7 +77,41 @@ Native-only API status:
 | Object detection     | `CoreAI.runTask('object-detection', ...)` | Supported                               | AI SDK has no detection primitive.                                         |
 | Depth estimation     | `CoreAI.runTask('depth', ...)`            | Throws unsupported error                | AI SDK has no depth primitive.                                             |
 | Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Throws unsupported error                | AI SDK has no image-to-image upscaling primitive.                          |
-| Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Throws unsupported error                | Raw tensor APIs need Core AI-specific ownership and performance rules.     |
+| Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Supported                               | AI SDK has no tensor primitive.                                            |
+
+### Raw Function Calls
+
+Any exported `.aimodel` runs through its functions, for models that have no task wrapper. Load it with the `raw` task, which needs no `coreai-models` product, and call a function by name with tensors:
+
+```ts
+import { CoreAI, createTensor, readTensor } from '@react-native-ai/core-ai'
+
+const { modelHandle, info } = await CoreAI.loadModel(
+  { id: 'edsr-x2', source: { type: 'file', uri }, task: 'raw' },
+  {}
+)
+// [{ name: 'main', inputs: [{ name: 'x', dataType: 'float16', shape: [-1, 3, -1, -1] }], outputs: [...] }]
+console.log(info.functions)
+
+const { outputs } = await CoreAI.runRawFunction(
+  modelHandle,
+  'main',
+  { x: createTensor('float32', [1, 3, 64, 64], pixels) },
+  {}
+)
+const upscaled = readTensor(outputs.output) // Float32Array of 1 × 3 × 128 × 128
+```
+
+`CoreAI.inspectModel(...)` also lists the functions of a `.aimodel` on disk. A shape of `-1` marks a dynamic dimension, which the input's `shape` sets.
+
+Ownership and performance:
+
+- Tensors cross the bridge as `{ dataType, shape, data }`, with `data` holding the little-endian elements in row-major order as base64. `createTensor` and `readTensor` convert typed arrays. Every call copies its inputs into new arrays and its outputs out, so JS never holds native memory and nothing outlives the call.
+- Functions load their weights on their first call and stay loaded until `CoreAI.unloadModel(modelHandle)`.
+- Core AI specializes the model for a compute unit when it loads. Pass `{ computeUnits: 'gpu' }` (or `'cpu'`, `'neural-engine'`) as the `loadModel` options to choose one, for example when the Neural Engine compiler rejects a model.
+- Hermes has no `Float16Array`, so float16 and bfloat16 inputs can be given as float32, and their outputs come back as float32. Pass `{ outputDataType: 'native' }` to get the bits of each element instead (a `Uint16Array` from `readTensor`).
+- Base64 adds a third to the size of each tensor, and every call encodes and decodes it on the JS thread. Use a task wrapper, or keep tensors to a few megabytes, for work that runs every frame.
+- Image inputs (pixel buffers) are not supported yet.
 
 When the AI SDK owns message history, every request sends the whole chat. To
 keep it inside the context window, see
