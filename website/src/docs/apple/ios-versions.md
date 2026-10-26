@@ -99,8 +99,8 @@ if (info.supportsImagePrompts) {
 
 Use `supportsReasoning` before setting `reasoning`, and `availability` with
 `{ model: 'private-cloud-compute' }` before using Private Cloud Compute. Other
-features without a flag throw `UNSUPPORTED_OS` when the device or SDK does not
-have them.
+options that need a missing feature throw `UNSUPPORTED_OS`, while missing output
+is left out.
 
 ## Image Generation
 
