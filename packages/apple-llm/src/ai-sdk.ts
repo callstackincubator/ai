@@ -1084,7 +1084,8 @@ class AppleSpeechModel implements SpeechModelV4 {
       ].flatMap((feature) =>
         feature ? [{ type: 'unsupported' as const, feature }] : []
       )
-      if (options.language === 'auto') {
+      // A voice speaks its own language, so only warn when the language was used
+      if (options.language === 'auto' && !options.voice) {
         warnings.push({
           type: 'unsupported',
           feature: 'language',
