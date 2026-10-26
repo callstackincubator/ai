@@ -1257,7 +1257,13 @@ public class AppleLLMImpl: NSObject {
         if !pendingText.isEmpty {
           flush()
         }
-        let arguments = try GeneratedContent(json: input)
+        // Malformed input is a problem with the prompt, not a decoding failure of the model
+        let arguments: GeneratedContent
+        do {
+          arguments = try GeneratedContent(json: input)
+        } catch {
+          throw AppleLLMError.invalidMessage("Tool call input of '\(toolName)' is not valid JSON")
+        }
         pendingToolCalls.append(Transcript.ToolCall(id: toolCallId, toolName: toolName, arguments: arguments))
       case "tool-result":
         guard let toolCallId = part["toolCallId"] as? String,
@@ -1631,25 +1637,54 @@ public class AppleLLMImpl: NSObject {
       return try GenerationSchema(root: dynamicSchemas, dependencies: dependencies)
     }
 
-    // Objects and unions have a name that references can point to, so they can be recursive
+    // Objects and unions have a name that references can point to, so they can be
+    // recursive. Nullable schemas count as their non-null schema, which the parser
+    // turns them into
     static func isNamedSchema(_ schema: [String: Any]) -> Bool {
-      schema["type"] as? String == "object" || schema["properties"] != nil || schema["anyOf"] != nil
+      if let anyOf = schema["anyOf"] as? [[String: Any]] {
+        let nonNullSchemas = anyOf.filter { $0["type"] as? String != "null" }
+        return nonNullSchemas.count == 1 ? isNamedSchema(nonNullSchemas[0]) : !nonNullSchemas.isEmpty
+      }
+      if let types = schema["type"] as? [String] {
+        let nonNullTypes = types.filter { $0 != "null" }
+        return nonNullTypes.count > 1 || nonNullTypes == ["object"]
+      }
+      return schema["type"] as? String == "object" || schema["properties"] != nil
     }
 
     /// Turns JSON schema references into the name of the schema they point to. "#"
     /// points to the root. Definitions that are not objects or unions have no name,
     /// so references to them are replaced with the definition
-    static func resolveReferences(in value: Any, definitions: [String: Any], rootName: String) throws -> Any {
+    ///
+    /// - Parameter inlining: Definitions being inlined, to reject references that cycle
+    ///   through them instead of recursing forever
+    static func resolveReferences(
+      in value: Any,
+      definitions: [String: Any],
+      rootName: String,
+      inlining: Set<String> = []
+    ) throws -> Any {
+      let resolve = { (child: Any) in
+        try resolveReferences(in: child, definitions: definitions, rootName: rootName, inlining: inlining)
+      }
       if let array = value as? [Any] {
-        return try array.map { try resolveReferences(in: $0, definitions: definitions, rootName: rootName) }
+        return try array.map(resolve)
       }
       guard let schema = value as? [String: Any] else {
         return value
       }
       guard let reference = schema["$ref"] as? String else {
-        return try schema
-          .filter { $0.key != "$defs" && $0.key != "definitions" }
-          .mapValues { try resolveReferences(in: $0, definitions: definitions, rootName: rootName) }
+        var resolvedSchema: [String: Any] = [:]
+        for (key, child) in schema where key != "$defs" && key != "definitions" {
+          // Property names can be anything, including "definitions", so only
+          // their schemas are resolved
+          if key == "properties", let properties = child as? [String: Any] {
+            resolvedSchema[key] = try properties.mapValues(resolve)
+          } else {
+            resolvedSchema[key] = try resolve(child)
+          }
+        }
+        return resolvedSchema
       }
       if reference == "#" {
         return ["$ref": rootName]
@@ -1661,7 +1696,15 @@ public class AppleLLMImpl: NSObject {
       if isNamedSchema(definition) {
         return ["$ref": definitionName]
       }
-      return try resolveReferences(in: definition, definitions: definitions, rootName: rootName)
+      guard !inlining.contains(definitionName) else {
+        throw AppleLLMError.invalidSchema("Reference cycle through '\(definitionName)', which is not an object or union")
+      }
+      return try resolveReferences(
+        in: definition,
+        definitions: definitions,
+        rootName: rootName,
+        inlining: inlining.union([definitionName])
+      )
     }
 
     static func parseDynamicSchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {

@@ -180,7 +180,7 @@ describe('apple generate', () => {
         prompt: prompt(
           'Write one sentence about a fantasy creature you invent.'
         ),
-        temperature: 1.5,
+        temperature: 1,
         seed,
       })
       expect(result.warnings).toEqual([])
@@ -199,6 +199,28 @@ describe('apple generate', () => {
     })
 
     expect(warnedFeatures(result.warnings)).toEqual(['seed'])
+  })
+
+  it('rejects tool call history with input that is not JSON', async () => {
+    await expect(
+      apple().doGenerate({
+        prompt: [
+          { role: 'user', content: [{ type: 'text', text: 'Weather?' }] },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'call-1',
+                toolName: 'getWeather',
+                input: '{not json',
+              },
+            ],
+          },
+          { role: 'user', content: [{ type: 'text', text: 'Thanks.' }] },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_MESSAGE' })
   })
 
   it('rejects sampling with both topP and topK', async () => {
