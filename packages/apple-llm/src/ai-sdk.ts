@@ -2,6 +2,9 @@ import type {
   EmbeddingModelV4,
   EmbeddingModelV4CallOptions,
   EmbeddingModelV4Result,
+  Experimental_TranscriptionModelV4StreamOptions,
+  Experimental_TranscriptionModelV4StreamPart,
+  Experimental_TranscriptionModelV4StreamResult,
   ImageModelV4,
   ImageModelV4CallOptions,
   JSONSchema7,
@@ -37,7 +40,11 @@ import NativeAppleLLM, {
   type AppleUsage,
 } from './NativeAppleLLM'
 import NativeAppleSpeech from './NativeAppleSpeech'
-import NativeAppleTranscription from './NativeAppleTranscription'
+import NativeAppleTranscription, {
+  type StreamTranscription,
+  type StreamTranscriptionEncoding,
+  type TranscriptionSegment,
+} from './NativeAppleTranscription'
 import NativeAppleUtils from './NativeAppleUtils'
 
 type Tool = LanguageModelV4FunctionTool | LanguageModelV4ProviderTool
@@ -1114,6 +1121,139 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
       throw new Error(
         `Apple transcription failed: ${error instanceof Error ? error.message : String(error)}`
       )
+    }
+  }
+
+  /**
+   * Transcribes raw mono PCM audio as it arrives, e.g. from a recorder. Takes
+   * audio/pcm with a rate, as int16 unless providerOptions.apple.encoding is
+   * float32
+   */
+  async doStream(
+    options: Experimental_TranscriptionModelV4StreamOptions
+  ): Promise<Experimental_TranscriptionModelV4StreamResult> {
+    const { audio, inputAudioFormat, abortSignal } = options
+    const encoding = (options.providerOptions?.apple?.encoding ??
+      'int16') as StreamTranscriptionEncoding
+    if (inputAudioFormat.type !== 'audio/pcm' || !inputAudioFormat.rate) {
+      throw new Error(
+        `Apple transcription streams audio/pcm with a rate, not ${inputAudioFormat.type} at ${inputAudioFormat.rate ?? 'no'} Hz`
+      )
+    }
+    if (encoding !== 'int16' && encoding !== 'float32') {
+      throw new Error(
+        `Apple transcription streams int16 or float32 samples, not ${encoding}`
+      )
+    }
+    if (typeof ReadableStream === 'undefined') {
+      throw new Error(
+        `ReadableStream is not available in this environment. Please load a polyfill, such as web-streams-polyfill.`
+      )
+    }
+
+    const sampleRate = inputAudioFormat.rate
+    const language = this.language
+    const bytesPerSecond = sampleRate * (encoding === 'float32' ? 4 : 2)
+    const reader = audio.getReader()
+    let closed = false
+
+    const stream =
+      new ReadableStream<Experimental_TranscriptionModelV4StreamPart>({
+        start: (controller) => {
+          const enqueue = (
+            part: Experimental_TranscriptionModelV4StreamPart
+          ) => {
+            if (!closed) {
+              controller.enqueue(part)
+            }
+          }
+          const segments: TranscriptionSegment[] = []
+          let byteCount = 0
+
+          const run = async () => {
+            let session: StreamTranscription | undefined
+            try {
+              enqueue({ type: 'stream-start', warnings: [] })
+              const starting = NativeAppleTranscription.transcribeStream({
+                language,
+                sampleRate,
+                encoding,
+                onResult: ({ text, isFinal, startSecond, endSecond }) => {
+                  if (isFinal) {
+                    segments.push({ text, startSecond, endSecond })
+                    enqueue({
+                      type: 'transcript-final',
+                      text,
+                      startSecond,
+                      endSecond,
+                    })
+                  } else {
+                    enqueue({
+                      type: 'transcript-partial',
+                      text,
+                      startSecond,
+                      durationInSeconds: endSecond - startSecond,
+                    })
+                  }
+                },
+                onError: (error) => enqueue({ type: 'error', error }),
+              })
+              // A session that starts after an abort is stopped right away
+              session = await abortable(starting, abortSignal, () => {
+                starting.then((started) => started.stop()).catch(() => {})
+              })
+              while (true) {
+                const { done, value } = await abortable(
+                  reader.read(),
+                  abortSignal,
+                  () => {}
+                )
+                if (done) {
+                  break
+                }
+                const chunk =
+                  typeof value === 'string'
+                    ? this.base64ToArrayBuffer(value)
+                    : value
+                byteCount += chunk.byteLength
+                session.append(chunk)
+              }
+              // Resolves once the last results were enqueued
+              await session.stop()
+              enqueue({
+                type: 'finish',
+                text: segments.map((segment) => segment.text).join(' '),
+                segments,
+                // The AI SDK reports ISO-639-1 codes, while the locale can be en_US
+                language: language.split(/[-_]/)[0],
+                durationInSeconds: byteCount / bytesPerSecond,
+              })
+              if (!closed) {
+                closed = true
+                controller.close()
+              }
+            } catch (error) {
+              // Ends the session and the audio when aborted or failed
+              await session?.stop().catch(() => {})
+              reader.cancel(error).catch(() => {})
+              if (!closed) {
+                closed = true
+                controller.error(error)
+              }
+            }
+          }
+          void run()
+        },
+        // Ends the audio, which stops the session
+        cancel: (reason) => {
+          closed = true
+          return reader.cancel(reason)
+        },
+      })
+
+    return {
+      stream,
+      response: { timestamp: new Date(), modelId: this.modelId },
     }
   }
 
