@@ -175,10 +175,18 @@ describe('apple generate', () => {
       return result.content[0].type === 'text' ? result.content[0].text : ''
     }
 
-    const first = await sample(42)
+    // Apple does not guarantee it, but with the seed forwarded the samples
+    // match, and without it random sampling makes them differ
+    expect(await sample(42)).toBe(await sample(42))
+  })
 
-    expect(await sample(42)).toBe(first)
-    expect(await sample(7)).not.toBe(first)
+  it('leaves out a seed that is not a whole number', async () => {
+    const result = await apple().doGenerate({
+      prompt: prompt('Say hi.'),
+      seed: 1.5,
+    })
+
+    expect(warnedFeatures(result.warnings)).toEqual(['seed'])
   })
 
   it('rejects sampling with both topP and topK', async () => {

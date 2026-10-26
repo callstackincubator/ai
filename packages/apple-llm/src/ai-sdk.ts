@@ -349,9 +349,22 @@ function getUnsupportedSettingWarnings(
     options.presencePenalty !== undefined ? 'presencePenalty' : undefined,
     options.frequencyPenalty !== undefined ? 'frequencyPenalty' : undefined,
   ]
-  return unsupported.flatMap((feature) =>
+  const warnings: SharedV4Warning[] = unsupported.flatMap((feature) =>
     feature ? [{ type: 'unsupported' as const, feature }] : []
   )
+  if (options.seed !== undefined && !isNativeSeed(options.seed)) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'seed',
+      details: 'Foundation Models seeds are whole numbers, so it was left out.',
+    })
+  }
+  return warnings
+}
+
+// Native seeds are UInt64, so other numbers would be changed instead of used
+function isNativeSeed(seed: number | undefined): seed is number {
+  return Number.isSafeInteger(seed) && seed! >= 0
 }
 
 /**
@@ -1280,7 +1293,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           temperature: options.temperature,
           topP: options.topP,
           topK: options.topK,
-          seed: options.seed,
+          seed: isNativeSeed(options.seed) ? options.seed : undefined,
           tools,
           toolCallingMode,
           providerOptions: { ...appleOptions, requestId } as Record<
@@ -1459,7 +1472,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             temperature: options.temperature,
             topP: options.topP,
             topK: options.topK,
-            seed: options.seed,
+            seed: isNativeSeed(options.seed) ? options.seed : undefined,
             tools,
             toolCallingMode,
             providerOptions: appleOptions as unknown as Record<string, unknown>,
