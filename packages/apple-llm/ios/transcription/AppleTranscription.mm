@@ -67,32 +67,20 @@ using namespace react;
         auto languageStr = args[1].asString(rt).utf8(rt);
         NSString *language = [NSString stringWithUTF8String:languageStr.c_str()];
         
-        // Words and phrases the transcriber should expect, such as names
-        NSMutableArray<NSString *> *contextualStrings = [NSMutableArray new];
-        if (count > 2 && args[2].isObject() && args[2].asObject(rt).isArray(rt)) {
-          auto strings = args[2].asObject(rt).asArray(rt);
-          for (size_t i = 0; i < strings.size(rt); i++) {
-            auto value = strings.getValueAtIndex(rt, i);
-            if (value.isString()) {
-              [contextualStrings addObject:[NSString stringWithUTF8String:value.asString(rt).utf8(rt).c_str()]];
-            }
-          }
-        }
-        
         auto Promise = rt.global().getPropertyAsFunction(rt, "Promise");
         
         return Promise.callAsConstructor(rt, jsi::Function::createFromHostFunction(
           rt,
           jsi::PropNameID::forAscii(rt, "executor"),
           2,
-          [transcriptionModule, audioData, language, contextualStrings, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
+          [transcriptionModule, audioData, language, jsInvoker](jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) -> jsi::Value {
             using ResolveCallback = facebook::react::AsyncCallback<>;
             using RejectCallback = facebook::react::AsyncCallback<NSString*, NSString*, NSError*>;
             
             auto resolve = ResolveCallback(rt, args[0].asObject(rt).asFunction(rt), jsInvoker);
             auto reject = RejectCallback(rt, args[1].asObject(rt).asFunction(rt), jsInvoker);
             
-            [transcriptionModule transcribe:audioData language:language contextualStrings:contextualStrings resolve:^(id result) {
+            [transcriptionModule transcribe:audioData language:language resolve:^(id result) {
               resolve.call([result](jsi::Runtime& rt, jsi::Function& resolveFunc) {
                 auto jsResult = react::TurboModuleConvertUtils::convertObjCObjectToJSIValue(rt, result);
                 resolveFunc.call(rt, jsResult);
@@ -122,6 +110,10 @@ using namespace react;
 
 - (nonnull NSNumber *)isAvailable:(nonnull NSString *)language { 
   return @([_transcription isAvailable:language]);
+}
+
+- (void)getModelInfo:(nonnull NSString *)language resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_transcription getModelInfo:language resolve:resolve reject:reject];
 }
 
 - (void)prepare:(nonnull NSString *)language resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject { 

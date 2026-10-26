@@ -1038,8 +1038,6 @@ class AppleImageModel implements ImageModelV4 {
 
 export interface AppleTranscriptionOptions {
   language?: string
-  // Words and phrases the audio likely contains, such as names or jargon
-  contextualStrings?: string[]
 }
 
 class AppleTranscriptionModel implements TranscriptionModelV4 {
@@ -1050,15 +1048,19 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
 
   private prepared = false
   private language: string
-  private contextualStrings?: string[]
 
   constructor(options: AppleTranscriptionOptions = {}) {
     this.language = options.language ?? NativeAppleUtils.getCurrentLocale()
-    this.contextualStrings = options.contextualStrings
   }
 
+  /** Whether the device can transcribe. See getModelInfo for locale support */
   isAvailable(): boolean {
     return NativeAppleTranscription.isAvailable(this.language)
+  }
+
+  /** Locale support and asset status for the model's language */
+  getModelInfo() {
+    return NativeAppleTranscription.getModelInfo(this.language)
   }
 
   async prepare(): Promise<void> {
@@ -1086,12 +1088,7 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
           audio.byteOffset,
           audio.byteOffset + audio.byteLength
         ),
-        this.language,
-        (
-          options.providerOptions?.apple as
-            | AppleTranscriptionOptions
-            | undefined
-        )?.contextualStrings ?? this.contextualStrings
+        this.language
       )
 
       const transcriptionText = transcriptionResult.segments
