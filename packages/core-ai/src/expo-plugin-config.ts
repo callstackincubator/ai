@@ -39,6 +39,9 @@ export function setCoreAIEntitlements(
 ) {
   if (options.increasedMemoryLimit) {
     entitlements[INCREASED_MEMORY_LIMIT_ENTITLEMENT] = true
+  } else if (options.increasedMemoryLimit === false) {
+    // Prebuild without --clean keeps the entitlements file
+    delete entitlements[INCREASED_MEMORY_LIMIT_ENTITLEMENT]
   }
   return entitlements
 }

@@ -86,6 +86,18 @@ describe('setCoreAIEntitlements', () => {
     })
   })
 
+  test('removes the entitlement when turned off', () => {
+    expect(
+      setCoreAIEntitlements(
+        {
+          'aps-environment': 'development',
+          [INCREASED_MEMORY_LIMIT_ENTITLEMENT]: true,
+        },
+        { increasedMemoryLimit: false }
+      )
+    ).toEqual({ 'aps-environment': 'development' })
+  })
+
   test('adds no entitlements by default', () => {
     expect(setCoreAIEntitlements({})).toEqual({})
     expect(setCoreAIEntitlements({}, { increasedMemoryLimit: false })).toEqual(

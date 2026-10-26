@@ -2,8 +2,8 @@
 // it is opt-in: CORE_AI=1 npx expo prebuild --clean (see react-native.config.js)
 //
 // Video generation needs more memory than iOS gives an app by default.
-// CORE_AI_MEMORY=1 adds the increased memory limit entitlement, which the
-// signing team's App ID must have
+// CORE_AI=1 CORE_AI_MEMORY=1 adds the increased memory limit entitlement,
+// which the signing team's App ID must have
 //
 // Private Cloud Compute needs Apple's managed entitlement on the signing team,
 // and the app crashes without it, so it is opt-in too: PCC=1 npx expo prebuild
@@ -26,7 +26,7 @@ module.exports = ({ config }) => ({
                 'video-segmentation',
                 'video-diffusion',
               ],
-              increasedMemoryLimit: !!process.env.CORE_AI_MEMORY,
+              increasedMemoryLimit: process.env.CORE_AI_MEMORY === '1',
             },
           ],
         ]
