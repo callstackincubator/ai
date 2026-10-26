@@ -1,31 +1,27 @@
 # Transcription
 
-Convert speech to text using Apple's on-device `SpeechAnalyzer` and `SpeechTranscriber`.
+Convert speech to text on device with Apple's
+[`SpeechAnalyzer`](https://developer.apple.com/documentation/speech/speechanalyzer)
+and [`SpeechTranscriber`](https://developer.apple.com/documentation/speech/speechtranscriber),
+available from iOS 26.
 
-## Overview
+There are three ways to transcribe, depending on where the audio comes from:
 
-This provider uses Apple's [`SpeechAnalyzer`](https://developer.apple.com/documentation/speech/speechanalyzer) and [`SpeechTranscriber`](https://developer.apple.com/documentation/speech/speechtranscriber) to perform speech-to-text transcription entirely on-device. This is Apple's new advanced speech recognition model and is available in iOS 26 and onwards.
+| Audio                            | API                                                         | iOS |
+| -------------------------------- | ----------------------------------------------------------- | --- |
+| A complete recording             | [`transcribe`](#transcribing-a-recording)                   | 26  |
+| Chunks from your own recorder    | [`experimental_streamTranscribe`](#streaming-transcription) | 26  |
+| The microphone, recorded for you | [`AppleTranscription.transcribeLive`](#live-transcription)  | 27  |
 
-## Requirements
-
-- **iOS 26+** - SpeechAnalyzer requires iOS 26
-
-## Usage
-
-### Basic Transcription
+## Transcribing a Recording
 
 ```tsx
 import { apple } from '@react-native-ai/apple'
 import { transcribe } from 'ai'
 
-const file = await fetch(
-  'https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_0010_8k.wav'
-)
-const audio = await file.arrayBuffer()
-
 const response = await transcribe({
   model: apple.transcriptionModel(),
-  audio,
+  audio, // ArrayBuffer or base64 string
 })
 
 console.log(response.text)
@@ -33,18 +29,18 @@ console.log(response.segments)
 console.log(response.durationInSeconds)
 ```
 
-The `audio` parameter accepts either an `ArrayBuffer` or a base64-encoded string.
-
-Each word also comes with its own timing in `providerMetadata.apple.words`:
+Each word also comes with its own timing:
 
 ```tsx
 const words = response.providerMetadata.apple.words
 // [{ text: 'The', startSecond: 0.12, endSecond: 0.24 }, ...]
 ```
 
-### Streaming Transcription
+## Streaming Transcription
 
-`experimental_streamTranscribe` transcribes audio as it arrives, e.g. from a recorder, and reports text while the speech goes on. Pass raw mono PCM chunks in a `ReadableStream`:
+`experimental_streamTranscribe` transcribes audio as it arrives, for example
+from a recorder, and reports text while the speech goes on. Pass raw mono PCM
+chunks in a `ReadableStream`:
 
 ```tsx
 import { apple } from '@react-native-ai/apple'
@@ -69,25 +65,23 @@ for await (const part of result.fullStream) {
 console.log(await result.text)
 ```
 
-Samples are 16-bit integers by default. Recorders built on the Web Audio API, such as `react-native-audio-api`, deliver 32-bit floats, which you can pass as they are:
+Samples are 16-bit integers by default. Recorders built on the Web Audio API,
+such as `react-native-audio-api`, deliver 32-bit floats, which you can pass as
+they are with `providerOptions: { apple: { encoding: 'float32' } }`.
 
-```tsx
-const result = streamTranscribe({
-  model: apple.transcriptionModel(),
-  audio,
-  inputAudioFormat: { type: 'audio/pcm', rate: 16000 },
-  providerOptions: { apple: { encoding: 'float32' } },
-})
-```
+Chunks can be any size and any sample rate, and are converted to the format the
+transcriber takes. Closing the audio stream finalizes the transcript, and
+`abortSignal` stops it early.
 
-Chunks can be any size and any sample rate. They are converted to the format the transcriber takes. Closing the audio stream finalizes the transcript, and `abortSignal` stops it early. Recording is up to your app, so this works from iOS 26 and with any recorder.
+:::note
+Streaming transcription is experimental in the AI SDK, so its API may change in
+a patch release.
+:::
 
-> [!NOTE]
-> Streaming transcription is experimental in the AI SDK, so its API may change in a patch release.
+## Live Transcription
 
-### Live Transcription
-
-On iOS 27 and newer, `AppleTranscription.transcribeLive` records the microphone itself and transcribes it, for when your app has no recorder of its own:
+On iOS 27, `AppleTranscription.transcribeLive` records the microphone itself,
+for apps without a recorder of their own:
 
 ```tsx
 import { AppleTranscription } from '@react-native-ai/apple'
@@ -102,35 +96,29 @@ const live = await AppleTranscription.transcribeLive({
   onError: (error) => console.error(error),
 })
 
-// Later, stops recording and waits for the last results
+// Stops recording and waits for the last results
 await live.stop()
 ```
 
-It asks for microphone access, so add `NSMicrophoneUsageDescription` to your app's Info.plist. It throws `UNSUPPORTED_OS` before iOS 27. It does not run in the iOS Simulator.
+Add `NSMicrophoneUsageDescription` to your app's Info.plist, since it asks for
+microphone access. It does not run in the iOS Simulator, and throws
+`UNSUPPORTED_OS` before iOS 27.
 
-## Language Support
+## Languages
 
-The transcription model supports multiple languages, but does not detect the language of the audio. Set the language when creating the model:
+The model does not detect the language of the audio. It uses the device
+language by default, so set it when the audio is in another language. Codes
+such as `fr` resolve to a supported locale:
 
 ```tsx
 const model = apple.transcriptionModel({ language: 'fr' })
-
-await transcribe({
-  model,
-  audio: audioArrayBuffer,
-})
 ```
 
-> [!NOTE]
-> By default, the transcription model will use device language. Language codes such as `fr` resolve to a supported locale.
-
-## Availability
-
-`isAvailable()` is a quick, synchronous check that the device can transcribe at all. Whether it supports a language is only known asynchronously, so `getModelInfo()` reports it, along with the locale the language resolves to and whether its assets are on the device:
+`isAvailable()` is a quick synchronous check that the device can transcribe at
+all. `getModelInfo()` reports whether it supports the language, which locale it
+resolves to, and whether its assets are on the device:
 
 ```tsx
-const model = apple.transcriptionModel({ language: 'fr' })
-
 if (model.isAvailable()) {
   const info = await model.getModelInfo()
   // { isAvailable: true, supportsLocale: true, locale: 'fr-FR',
@@ -139,58 +127,44 @@ if (model.isAvailable()) {
 }
 ```
 
-`assets` is `supported` when the locale can be used once `prepare()` downloads it.
+`assets` is `supported` when the locale can be used once `prepare()` downloads
+it.
 
 ## Preparing the Model
 
-Apple's SpeechAnalyzer requires downloading language-specific assets to the device. While the provider automatically prepares assets when needed, you can call `prepare()` ahead of time for better performance:
+Each language's assets are downloaded once by the system, into a catalog shared
+by all apps, so they add nothing to your app's size and may already be on the
+device. Call `prepare()` ahead of time so the first transcription does not wait
+for the download:
 
 ```tsx
 const model = apple.transcriptionModel({ language: 'en' })
-
-// Call prepare() ahead of time to optimize first inference latency
 await model.prepare()
-
-// Now transcription will be faster on first use
-const response = await transcribe({ model, audio })
 ```
 
-> [!TIP]
-> Calling `prepare()` ahead of time is recommended to avoid delays on first use. If not called, the model will auto-prepare when first used, but a warning will be logged.
-
-When you call `prepare()`, the system first checks if the required assets are already present on the device. If they are, the method resolves immediately without any network activity.
-
-> [!NOTE]
-> All language models and assets are stored in Apple's system-wide assets catalog, separate from your app bundle. This means zero impact on your app's size. Assets may already be available if the user has previously used other apps, or if system features have requested them.
+`prepare()` resolves right away when the assets are already there. Without it,
+the first request prepares the model itself and logs a warning.
 
 ## Direct API Access
 
-For advanced use cases, you can access the speech transcription API directly:
-
-### AppleTranscription
+`AppleTranscription` is the native module behind the model:
 
 ```tsx
 import { AppleTranscription } from '@react-native-ai/apple'
 
 const language = 'fr'
 
-// Check whether the device can transcribe
-const isAvailable: boolean = AppleTranscription.isAvailable(language)
-
-// Locale support and asset status for a language
+const isAvailable = AppleTranscription.isAvailable(language)
 const info = await AppleTranscription.getModelInfo(language)
-
-// Prepare language assets
 await AppleTranscription.prepare(language)
 
-// Transcribe audio with timing information
+// A complete recording, with timing information
 const { segments, duration } = await AppleTranscription.transcribe(
   arrayBuffer,
   language
 )
 
-// Transcribe audio as you append it, with the options of transcribeLive and
-// the format of the samples
+// Audio you append as it arrives
 const stream = await AppleTranscription.transcribeStream({
   language,
   sampleRate: 16000,
@@ -200,12 +174,3 @@ const stream = await AppleTranscription.transcribeStream({
 stream.append(chunk) // ArrayBuffer or typed array
 await stream.stop() // waits for the last results
 ```
-
-## Benchmarks
-
-Performance comparison showing transcription speed for a 34-minute audio file ([source](https://www.macrumors.com/2025/06/18/apple-transcription-api-faster-than-whisper/)):
-
-| System                    | Processing Time     | Performance |
-| ------------------------- | ------------------- | ----------- |
-| Apple SpeechAnalyzer      | 45 seconds          | Baseline    |
-| MacWhisper Large V3 Turbo | 1 minute 41 seconds | 2.2× slower |

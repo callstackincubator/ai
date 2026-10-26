@@ -54,21 +54,14 @@ parts or usage, is left out.
 
 Notes:
 
-- **Tool choice.** Apple runs tools itself, inside the session. Its required
-  mode applies to every model request in that tool loop, so on its own the
-  model would keep calling tools and never answer. On iOS 27 the provider
-  requires a tool call only until the model has made one, then lets it answer.
-  - `'none'` leaves the tools out. On iOS 27 it also sets Apple's disallowed
-    mode, which turns off built-in tools.
-  - `'required'` makes the model call at least one tool before it answers.
-  - A named tool is the only tool offered, without built-in tools, and the
-    model must call it.
+- **Tool choice.** Apple's required mode applies to every request in its tool
+  loop, so the model would never answer. On iOS 27 the provider requires a
+  tool call only until the model has made one. See [Tools](./tools#tool-choice).
 - **Guardrails** apply to the `system` model only. Private Cloud Compute
   ignores them.
-- **Streaming tool calls.** Before iOS 27 Apple does not expose tool activity
-  while a response streams, so a stream only contains text. On iOS 27, the
-  `tool-call` and `tool-result` parts are sent together once the tool returns,
-  because native runs the tool before the provider sees the call.
+- **Streaming tool calls.** Before iOS 27 a stream only contains text. On iOS
+  27, `tool-call` and `tool-result` parts are sent together once the tool
+  returns, because native runs the tool before the provider sees the call.
 - **Reasoning.** Transcripts before iOS 27 have no reasoning entries, so
   reasoning parts in the message history are dropped. On iOS 27 they are
   replayed in later turns.
@@ -92,6 +85,7 @@ check at runtime instead of comparing iOS versions:
 | `supportsTokenCounting` | `false` | `true`   | `true` for `system` only    |
 | `supportsImagePrompts`  | `false` | `false`  | `true`                      |
 | `supportsVisionTools`   | `false` | `false`  | `true` on a physical device |
+| `supportsSpotlightTool` | `false` | `false`  | `true` on a physical device |
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
@@ -103,9 +97,10 @@ if (info.supportsImagePrompts) {
 }
 ```
 
-Features without a flag, such as reasoning levels and Private Cloud Compute,
-throw `AppleLLMErrorCodes.UnsupportedOS` when the device or SDK does not have
-them.
+Use `supportsReasoning` before setting `reasoning`, and `availability` with
+`{ model: 'private-cloud-compute' }` before using Private Cloud Compute. Other
+features without a flag throw `UNSUPPORTED_OS` when the device or SDK does not
+have them.
 
 ## Image Generation
 

@@ -1,58 +1,30 @@
 # Speech
 
-Convert text to speech using Apple's on-device speech synthesis capabilities.
-
-## Overview
-
-This provider uses Apple's [`AVSpeechSynthesizer`](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizer) to perform text-to-speech entirely on-device. Audio is synthesized locally and returned to your app as a WAV byte stream.
-
-## Requirements
-
-- **iOS 13+** – Required for programmatic audio rendering with `AVSpeechSynthesizer.write(...)`.
-- **iOS 17+** – Required to use Personal Voice if available on device.
+Convert text to speech on device with Apple's
+[`AVSpeechSynthesizer`](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizer).
+The audio is returned as WAV. Personal Voice needs iOS 17.
 
 ## Usage
-
-### Basic Speech
 
 ```tsx
 import { apple } from '@react-native-ai/apple'
 import { generateSpeech } from 'ai'
 
-const response = await generateSpeech({
+const { audio } = await generateSpeech({
   model: apple.speechModel(),
   text: 'Hello from Apple on-device speech!',
 })
 
-// Access the buffer in a preferred way
-console.log(response.audio.uint8Array)
-console.log(response.audio.base64)
+console.log(audio.uint8Array)
+console.log(audio.base64)
 ```
 
-> [!NOTE]
-> Sample rate and bit depth are determined by the system voice (commonly 44.1 kHz, 16‑bit PCM; some devices may return 32‑bit float which is encoded accordingly in the WAV header).
+The sample rate and bit depth depend on the voice, commonly 44.1 kHz 16-bit
+PCM. Some voices return 32-bit float, which the WAV header reflects.
 
-### Language and Voice Selection
+## Voice and Language
 
-You can control the output language or select a specific voice by identifier. To see what voices are available on the device:
-
-```tsx
-import { AppleSpeech } from '@react-native-ai/apple'
-
-const voices = await AppleSpeech.getVoices()
-```
-
-Use a specific voice by passing its `identifier`:
-
-```tsx
-await generateSpeech({
-  model: apple.speechModel(),
-  text: 'Custom voice synthesis',
-  voice: 'com.apple.voice.super-compact.en-US.Samantha',
-})
-```
-
-Or specify only `language` to use the system’s default voice for that locale:
+Pass `language` to use the system's default voice for that locale:
 
 ```tsx
 await generateSpeech({
@@ -62,12 +34,36 @@ await generateSpeech({
 })
 ```
 
-> [!NOTE]
-> If both `voice` and `language` are provided, `voice` takes priority.
+Or pick a specific voice by its `identifier`, which takes priority over
+`language`:
 
-### Speed
+```tsx
+import { AppleSpeech } from '@react-native-ai/apple'
 
-`speed` multiplies the voice's default speaking rate, so `2` speaks twice as fast and `0.5` half as fast. Apple caps the rate, so very high or low values are clamped:
+const voices = await AppleSpeech.getVoices()
+
+await generateSpeech({
+  model: apple.speechModel(),
+  text: 'Custom voice synthesis',
+  voice: 'com.apple.voice.super-compact.en-US.Samantha',
+})
+```
+
+Each voice has:
+
+- `identifier` and `name`
+- `language`, a BCP 47 code such as `en-US`
+- `quality`: `default`, `enhanced`, or `premium`
+- `isPersonalVoice` and `isNoveltyVoice` (iOS 17+)
+
+The system manages voices. Enhanced and premium voices may need a one-time
+download, which users start in Settings → Accessibility → Read & Speak →
+Voices.
+
+## Speed
+
+`speed` multiplies the voice's default rate, so `2` speaks twice as fast and
+`0.5` half as fast. Apple caps the rate, so extreme values are clamped:
 
 ```tsx
 await generateSpeech({
@@ -77,45 +73,11 @@ await generateSpeech({
 })
 ```
 
-## Voices and Asset Management
+## Personal Voice
 
-The system provides a catalog of built‑in voices, including enhanced and premium variants, which may require a one‑time system download. If the user created a Personal Voice (iOS 17+), it appears in the list, flagged with `isPersonalVoice`, once they allow your app to use it with [`requestPersonalVoiceAuthorization()`](#personal-voice).
-
-> [!NOTE]
-> Voice assets are managed by the operating system. To add or manage voices, use iOS Settings → Accessibility → Read & Speak → Voices. This provider does not bundle or manage voice downloads.
-
-## Direct API Access
-
-For advanced use cases, you can access the speech API directly:
-
-### AppleSpeech
-
-```tsx
-import { AppleSpeech } from '@react-native-ai/apple'
-
-// List available voices (identifier, name, language, quality, traits)
-const voices = await AppleSpeech.getVoices()
-
-// Generate audio as an ArrayBuffer-like WAV payload
-const buffer = await AppleSpeech.generate('Hello world', {
-  language: 'en-US',
-})
-
-// Convert to Uint8Array if needed
-```
-
-Returned voice objects include:
-
-- `identifier`: string
-- `name`: string
-- `language`: BCP‑47 code, e.g. `en-US`
-- `quality`: `default` | `enhanced` | `premium`
-- `isPersonalVoice`: boolean (iOS 17+)
-- `isNoveltyVoice`: boolean (iOS 17+)
-
-### Personal Voice
-
-On iOS 17+, a Personal Voice the user created is only listed once they let your app use it. Ask when your app needs it, for example when it opens a voice picker. iOS shows the prompt once, and later calls return the saved answer:
+On iOS 17+, a Personal Voice the user created is only listed once they let your
+app use it. Ask when your app needs it, for example when it opens a voice
+picker. iOS shows the prompt once, and later calls return the saved answer:
 
 ```tsx
 const status = await AppleSpeech.requestPersonalVoiceAuthorization()
@@ -128,5 +90,21 @@ if (status === 'authorized') {
 }
 ```
 
-Right after the user allows access, iOS can take a moment to add the Personal Voice to the voice list, so if it is missing, call `getVoices()` again shortly after, for example when your voice picker next appears.
+Right after the user allows access, iOS can take a moment to add the Personal
+Voice to the list. If it is missing, call `getVoices()` again shortly after,
+for example when your voice picker next appears.
 
+## Direct API Access
+
+`AppleSpeech` is the native module behind the model:
+
+```tsx
+import { AppleSpeech } from '@react-native-ai/apple'
+
+const voices = await AppleSpeech.getVoices()
+
+// WAV bytes as an ArrayBuffer
+const buffer = await AppleSpeech.generate('Hello world', {
+  language: 'en-US',
+})
+```
