@@ -30,6 +30,7 @@ import type { CodegenTypes } from 'react-native'
 
 import NativeCoreAI from './NativeCoreAI'
 import type {
+  CoreAIEmbeddingOptions,
   CoreAIEmbeddingResult,
   CoreAIGenerationOptions,
   CoreAIGenerationPart,
@@ -343,13 +344,34 @@ export class CoreAITextEmbeddingModel implements EmbeddingModelV4 {
     ) as Promise<CoreAIEmbeddingResult>
   }
 
+  // Embeds images into the same space as text, with the model's
+  // `encode_image` function. The AI SDK has no image embedding call
+  async embedImages(
+    imageUris: string[],
+    options: CoreAIEmbeddingOptions = {}
+  ): Promise<CoreAIEmbeddingResult> {
+    const result = (await NativeCoreAI.runTask(
+      'embedding',
+      toNativeModelConfig(this.config),
+      { data: { imageUris } },
+      options
+    )) as { output: CoreAIEmbeddingResult }
+    return result.output
+  }
+
   async doEmbed(
     options: EmbeddingModelV4CallOptions
   ): Promise<EmbeddingModelV4Result> {
-    const result = await this.embed(options.values)
+    const result = await this.embed(
+      options.values,
+      options.providerOptions?.['core-ai'] ?? {}
+    )
     return {
       embeddings: result.embeddings,
       warnings: [],
+      providerMetadata: result.metadata
+        ? ({ 'core-ai': result.metadata } as any)
+        : undefined,
     }
   }
 }

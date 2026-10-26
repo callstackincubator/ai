@@ -50,6 +50,21 @@ const streamText = mock(
   ) => {}
 )
 const cancelStream = mock((_streamId: string) => {})
+const embed = mock(
+  async (
+    _config: Record<string, unknown>,
+    _values: string[],
+    _options: Record<string, unknown>
+  ) => ({ embeddings: [[0.6, 0.8]], metadata: { dimensions: 2 } })
+)
+const runTask = mock(
+  async (
+    _task: string,
+    _config: Record<string, unknown>,
+    _input: Record<string, unknown>,
+    _options: Record<string, unknown>
+  ) => ({ task: 'embedding', output: { embeddings: [[1, 0]] } })
+)
 const createLanguageSession = mock(
   async (_modelHandle: string, _options: Record<string, unknown>) => 'session'
 )
@@ -87,6 +102,8 @@ mock.module('react-native', () => ({
       generateText,
       streamText,
       cancelStream,
+      embed,
+      runTask,
       createLanguageSession,
       onStreamUpdate,
       onStreamComplete,
@@ -611,5 +628,35 @@ describe('core ai streaming transcription', () => {
         inputAudioFormat: { type: 'audio/pcmu', rate: 8000 },
       })
     ).rejects.toThrow('audio/pcm')
+  })
+})
+
+describe('core ai embeddings', () => {
+  const embeddingModel = () =>
+    coreAI.embeddingModel({
+      id: 'clip',
+      source: { type: 'file', uri: '/clip' },
+    })
+
+  test('passes core-ai provider options and returns the metadata', async () => {
+    const result = await embeddingModel().doEmbed({
+      values: ['a cat'],
+      providerOptions: { 'core-ai': { batchSize: 4 } },
+    })
+
+    expect(embed.mock.calls.at(-1)![1]).toEqual(['a cat'])
+    expect(embed.mock.calls.at(-1)![2]).toEqual({ batchSize: 4 })
+    expect(result.embeddings).toEqual([[0.6, 0.8]])
+    expect(result.providerMetadata).toEqual({ 'core-ai': { dimensions: 2 } })
+  })
+
+  test('embeds images as a batch through the embedding task', async () => {
+    const result = await embeddingModel().embedImages(['file:///a.jpg'])
+
+    const [task, config, input] = runTask.mock.calls.at(-1)!
+    expect(task).toBe('embedding')
+    expect(config).toMatchObject({ sourceUri: '/clip', task: 'embedding' })
+    expect(input).toEqual({ data: { imageUris: ['file:///a.jpg'] } })
+    expect(result.embeddings).toEqual([[1, 0]])
   })
 })

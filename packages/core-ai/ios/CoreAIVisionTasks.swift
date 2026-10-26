@@ -10,8 +10,8 @@ import CoreAI
 /// tensors made from the image, so any export with the same inputs works
 @available(iOS 27, macOS 27, *)
 enum VisionTask {
-  private static let imageNetMean: [Float] = [0.485, 0.456, 0.406]
-  private static let imageNetStd: [Float] = [0.229, 0.224, 0.225]
+  static let imageNetMean: [Float] = [0.485, 0.456, 0.406]
+  static let imageNetStd: [Float] = [0.229, 0.224, 0.225]
 
   static func run(
     _ task: String,
@@ -265,7 +265,7 @@ enum VisionTask {
   }
 
   /// A float16, bfloat16 or float32 array from float elements in row-major order
-  private static func makeArray(_ values: [Float], shape: [Int], descriptor: NDArrayDescriptor) throws -> NDArray {
+  static func makeArray(_ values: [Float], shape: [Int], descriptor: NDArrayDescriptor) throws -> NDArray {
     var data = values.withUnsafeBytes { Data($0) }
     let type = descriptor.scalarType
     switch type {
@@ -289,7 +289,7 @@ enum VisionTask {
   }
 
   /// The elements of a floating point array in row-major order
-  private static func floats(of array: NDArray) -> [Float] {
+  static func floats(of array: NDArray) -> [Float] {
     let elementSize = (try? RawModel.size(of: array.scalarType)) ?? 4
     var data = Data(count: array.shape.reduce(1, *) * elementSize)
     data.withUnsafeMutableBytes { destination in
@@ -308,7 +308,7 @@ enum VisionTask {
   // MARK: - Images
 
   /// RGB in 0...1, channel-major ([3, height, width]), resized to the size
-  private static func rgbPixels(of image: CGImage, width: Int, height: Int) throws -> [Float] {
+  static func rgbPixels(of image: CGImage, width: Int, height: Int, crops: Bool = false) throws -> [Float] {
     var rgba = [UInt8](repeating: 0, count: width * height * 4)
     guard let context = CGContext(
       data: &rgba,
@@ -322,7 +322,14 @@ enum VisionTask {
       throw CoreAIError.invalidInput("Could not read the image pixels.")
     }
     context.interpolationQuality = .high
-    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    var rect = CGRect(x: 0, y: 0, width: width, height: height)
+    if crops {
+      // Scales the shorter side to fit and crops the center of the longer one
+      let scale = max(CGFloat(width) / CGFloat(image.width), CGFloat(height) / CGFloat(image.height))
+      let size = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
+      rect = CGRect(x: (CGFloat(width) - size.width) / 2, y: (CGFloat(height) - size.height) / 2, width: size.width, height: size.height)
+    }
+    context.draw(image, in: rect)
 
     var pixels = [Float](repeating: 0, count: 3 * width * height)
     let planeSize = width * height
@@ -335,10 +342,10 @@ enum VisionTask {
   }
 
   /// Normalizes channel-major RGB with options.mean and options.std, which
-  /// default to ImageNet's
-  private static func normalized(_ pixels: [Float], options: [String: Any]) -> [Float] {
-    let mean = (options["mean"] as? [NSNumber])?.map(\.floatValue) ?? imageNetMean
-    let std = (options["std"] as? [NSNumber])?.map(\.floatValue) ?? imageNetStd
+  /// default to ImageNet's unless the task passes its own
+  static func normalized(_ pixels: [Float], options: [String: Any], mean defaultMean: [Float] = VisionTask.imageNetMean, std defaultStd: [Float] = VisionTask.imageNetStd) -> [Float] {
+    let mean = (options["mean"] as? [NSNumber])?.map(\.floatValue) ?? defaultMean
+    let std = (options["std"] as? [NSNumber])?.map(\.floatValue) ?? defaultStd
     let planeSize = pixels.count / 3
     return pixels.enumerated().map { index, value in
       let channel = index / planeSize
@@ -404,7 +411,7 @@ enum VisionTask {
   // MARK: - Model files
 
   /// The .aimodel at the URL, or the only one in a directory with its labels
-  private static func modelAsset(at url: URL) throws -> URL {
+  static func modelAsset(at url: URL) throws -> URL {
     if AIModelAsset.isValid(at: url) {
       return url
     }
@@ -418,7 +425,7 @@ enum VisionTask {
     throw CoreAIError.invalidInput("No .aimodel asset at \(url.path).")
   }
 
-  private static func isDirectoryOfAssets(_ url: URL) -> Bool {
+  static func isDirectoryOfAssets(_ url: URL) -> Bool {
     var isDirectory: ObjCBool = false
     return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
       && isDirectory.boolValue
@@ -430,7 +437,7 @@ enum VisionTask {
 /// loading one specializes it and loads its weights. Switching models
 /// releases the last one, and concurrent calls share one load
 @available(iOS 27, macOS 27, *)
-private final class ModelCache: @unchecked Sendable {
+final class ModelCache: @unchecked Sendable {
   static let shared = ModelCache()
 
   private let lock = NSLock()
