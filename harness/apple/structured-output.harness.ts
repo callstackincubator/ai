@@ -37,6 +37,17 @@ describe('apple structured output', () => {
     expect(output.city).toMatch(/paris/i)
   })
 
+  it('orders properties of objects without a type', async () => {
+    const output = await generateObject('Give each field a random word.', {
+      properties: Object.fromEntries(
+        orderedKeys.map((key) => [key, { type: 'string' }])
+      ),
+      required: orderedKeys,
+    })
+
+    expect(Object.keys(output)).toEqual(orderedKeys)
+  })
+
   it('returns properties in the order the schema declares them', async () => {
     const output = await generateObject('Give each field a random word.', {
       type: 'object',
@@ -87,16 +98,15 @@ describe('apple structured output', () => {
       )
     })
 
-    const generated = snapshots.reduce<string[]>(
-      (keys, snapshot) => [
-        ...keys,
-        ...Object.keys(JSON.parse(snapshot)).filter(
-          (key) => !keys.includes(key)
-        ),
-      ],
-      []
+    // Properties that first appear in the same snapshot can be in any order,
+    // since the snapshot JSON does not keep key order
+    const firstSnapshot = orderedKeys.map((key) =>
+      snapshots.findIndex((snapshot) => key in JSON.parse(snapshot))
     )
-    expect(generated).toEqual(orderedKeys)
+    expect(firstSnapshot.every((index) => index >= 0)).toBe(true)
+    expect(firstSnapshot).toEqual([...firstSnapshot].sort((a, b) => a - b))
+    // Arbitrary order would almost never keep every snapshot index in order
+    expect(new Set(firstSnapshot).size).toBeGreaterThan(1)
   })
 
   it('resolves references to definitions', async () => {
