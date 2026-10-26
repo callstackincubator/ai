@@ -1,13 +1,12 @@
 import type { LanguageModelV4 } from '@ai-sdk/provider'
-import { coreAI } from '@react-native-ai/core-ai'
-import { Directory } from 'expo-file-system'
-import RNBlobUtil from 'react-native-blob-util'
+import {
+  coreAI,
+  downloadModel,
+  getModelSource,
+  isModelDownloaded,
+} from '@react-native-ai/core-ai'
 
 import type { SetupAdapter } from '../../config/providers.common'
-import {
-  CORE_AI_STORAGE_PATH,
-  downloadHubFolder,
-} from '../../utils/coreAIStorageUtils'
 
 export const createCoreAILanguageSetupAdapter = ({
   id,
@@ -19,14 +18,11 @@ export const createCoreAILanguageSetupAdapter = ({
   repo: string
   folder: string
 }): SetupAdapter<LanguageModelV4> => {
-  const modelPath = `${CORE_AI_STORAGE_PATH}/${id}`
   const model = coreAI.languageModel({
     id,
-    source: { type: 'file', uri: modelPath },
+    source: getModelSource(id),
     variant: 'iOS',
   })
-  // expo-file-system requires that this URI starts with the file:// protocol
-  const directory = new Directory(`file://${modelPath}`)
   return {
     model,
     modelId: model.modelId,
@@ -37,14 +33,20 @@ export const createCoreAILanguageSetupAdapter = ({
     },
     builtIn: false,
     isAvailable() {
-      return directory.exists ? 'yes' : 'availableForDownload'
+      return isModelDownloaded(id) ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {
-      await downloadHubFolder(repo, folder, modelPath, onProgress)
+      await downloadModel({
+        id,
+        repo,
+        folder,
+        onProgress: ({ percentage }) => onProgress(percentage),
+      })
+      // Specializing now keeps the first load from doing it
+      await model.specialize()
     },
     async delete() {
-      await model.unload()
-      await RNBlobUtil.fs.unlink(modelPath)
+      await model.remove()
     },
     async unload() {
       await model.unload()

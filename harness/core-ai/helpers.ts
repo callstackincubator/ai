@@ -1,12 +1,21 @@
-import { coreAI, type CoreAILanguageModel } from '@react-native-ai/core-ai'
+import {
+  coreAI,
+  type CoreAILanguageModel,
+  downloadModel,
+  getModelSource,
+} from '@react-native-ai/core-ai'
 import RNBlobUtil from 'react-native-blob-util'
 import { afterAll, beforeAll } from 'react-native-harness'
 
-import {
-  CORE_AI_STORAGE_PATH,
-  downloadHubFolder,
-} from '../../apps/expo-example/src/utils/coreAIStorageUtils'
 import { cats, catsVideo } from '../fixtures'
+
+// Downloads a hosted model before the tests of a file, on the first run only
+function downloadBeforeAll(id: string, repo: string, folder: string) {
+  beforeAll(async () => {
+    await downloadModel({ id, repo, folder })
+  })
+  return getModelSource(id)
+}
 
 // Qwen3 0.6B exported for iOS with the coreai-models recipe, as in the example
 // app. The model is downloaded on the first run
@@ -21,13 +30,9 @@ export function setupLanguageModel() {
   let model: CoreAILanguageModel | undefined
 
   beforeAll(async () => {
-    const path = `${CORE_AI_STORAGE_PATH}/${LANGUAGE_MODEL.id}`
-    if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(LANGUAGE_MODEL.repo, LANGUAGE_MODEL.folder, path)
-    }
     model = coreAI.languageModel({
       id: LANGUAGE_MODEL.id,
-      source: { type: 'file', uri: path },
+      source: await downloadModel(LANGUAGE_MODEL),
       variant: 'iOS',
     })
     await model.prepare()
@@ -52,18 +57,12 @@ const VISION_MODELS = {
 }
 
 export function setupVisionModel(name: keyof typeof VISION_MODELS) {
-  const path = `${CORE_AI_STORAGE_PATH}/${name}`
-
-  beforeAll(async () => {
-    if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(VISION_MODELS[name], name, path)
-    }
-  })
+  const source = downloadBeforeAll(name, VISION_MODELS[name], name)
 
   return {
     id: name,
     sourceType: 'file',
-    sourceUri: path,
+    sourceUri: source.uri,
   }
 }
 
@@ -76,17 +75,15 @@ const IMAGE_MODEL = {
 }
 
 export function setupImageModel() {
-  const path = `${CORE_AI_STORAGE_PATH}/${IMAGE_MODEL.id}`
-
-  beforeAll(async () => {
-    if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(IMAGE_MODEL.repo, IMAGE_MODEL.folder, path)
-    }
-  })
+  const source = downloadBeforeAll(
+    IMAGE_MODEL.id,
+    IMAGE_MODEL.repo,
+    IMAGE_MODEL.folder
+  )
 
   return coreAI.imageModel({
     id: IMAGE_MODEL.id,
-    source: { type: 'file', uri: path },
+    source,
   })
 }
 
@@ -99,17 +96,15 @@ const SPEECH_MODEL = {
 }
 
 export function setupSpeechModel() {
-  const path = `${CORE_AI_STORAGE_PATH}/${SPEECH_MODEL.id}`
-
-  beforeAll(async () => {
-    if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(SPEECH_MODEL.repo, SPEECH_MODEL.folder, path)
-    }
-  })
+  const source = downloadBeforeAll(
+    SPEECH_MODEL.id,
+    SPEECH_MODEL.repo,
+    SPEECH_MODEL.folder
+  )
 
   return coreAI.transcriptionModel({
     id: SPEECH_MODEL.id,
-    source: { type: 'file', uri: path },
+    source,
   })
 }
 
@@ -121,21 +116,15 @@ const EMBEDDING_MODEL = {
 }
 
 export function setupEmbeddingModel() {
-  const path = `${CORE_AI_STORAGE_PATH}/${EMBEDDING_MODEL.id}`
-
-  beforeAll(async () => {
-    if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(
-        EMBEDDING_MODEL.repo,
-        EMBEDDING_MODEL.folder,
-        path
-      )
-    }
-  })
+  const source = downloadBeforeAll(
+    EMBEDDING_MODEL.id,
+    EMBEDDING_MODEL.repo,
+    EMBEDDING_MODEL.folder
+  )
 
   return coreAI.embeddingModel({
     id: EMBEDDING_MODEL.id,
-    source: { type: 'file', uri: path },
+    source,
   })
 }
 
@@ -148,17 +137,15 @@ const VIDEO_MODEL = {
 }
 
 export function setupVideoModel() {
-  const path = `${CORE_AI_STORAGE_PATH}/${VIDEO_MODEL.id}`
-
-  beforeAll(async () => {
-    if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(VIDEO_MODEL.repo, VIDEO_MODEL.folder, path)
-    }
-  })
+  const source = downloadBeforeAll(
+    VIDEO_MODEL.id,
+    VIDEO_MODEL.repo,
+    VIDEO_MODEL.folder
+  )
 
   return coreAI.videoModel({
     id: VIDEO_MODEL.id,
-    source: { type: 'file', uri: path },
+    source,
   })
 }
 
@@ -185,21 +172,15 @@ const VIDEO_SEGMENTATION_MODEL = {
 }
 
 export function setupVideoSegmentationModel() {
-  const path = `${CORE_AI_STORAGE_PATH}/${VIDEO_SEGMENTATION_MODEL.id}`
-
-  beforeAll(async () => {
-    if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(
-        VIDEO_SEGMENTATION_MODEL.repo,
-        VIDEO_SEGMENTATION_MODEL.folder,
-        path
-      )
-    }
-  })
+  const source = downloadBeforeAll(
+    VIDEO_SEGMENTATION_MODEL.id,
+    VIDEO_SEGMENTATION_MODEL.repo,
+    VIDEO_SEGMENTATION_MODEL.folder
+  )
 
   return {
     id: VIDEO_SEGMENTATION_MODEL.id,
     sourceType: 'file',
-    sourceUri: path,
+    sourceUri: source.uri,
   }
 }
