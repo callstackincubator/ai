@@ -4,7 +4,7 @@ This guide covers the complete lifecycle of Llama models - from discovery and do
 
 ## Finding Models
 
-Unlike MLC which has a prebuilt set of models, the Llama provider can run any GGUF model from HuggingFace. You can browse available models at [HuggingFace GGUF Models](https://huggingface.co/models?library=gguf).
+The Llama provider can run any GGUF model from HuggingFace. You can browse available models at [HuggingFace GGUF Models](https://huggingface.co/models?library=gguf).
 
 ### Recommended Models
 

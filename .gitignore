@@ -83,6 +83,3 @@ lib/
 
 # other
 dist/
-
-# ignore prebuilt (MLC)
-prebuilt/

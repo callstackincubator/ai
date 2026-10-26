@@ -90,4 +90,3 @@ const result = await generateText({
 
 - [quick-start](quick-start.md)
 - [llama-provider](llama-provider.md)
-- [mlc-provider](mlc-provider.md)

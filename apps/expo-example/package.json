@@ -23,7 +23,6 @@
     "@react-native-ai/dev-tools": "workspace:*",
     "@react-native-ai/json-ui": "workspace:*",
     "@react-native-ai/llama": "workspace:*",
-    "@react-native-ai/mlc": "workspace:*",
     "@react-native-ai/utils": "workspace:*",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-picker/picker": "2.11.4",

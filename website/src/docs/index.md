@@ -59,16 +59,6 @@ Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-nat
 
 Works on iOS and Android.
 
-#### MLC Engine (Work in Progress)
-
-Run any open-source LLM locally using MLC's optimized runtime through `@react-native-ai/mlc`:
-
-- Support for popular models like Llama, Mistral, and Phi
-- Cross-platform compatibility (iOS and Android)
-
-> [!NOTE]
-> MLC support is experimental and not recommended for production use yet.
-
 ## JSON UI
 
 Build UIs from tool-calling models with `@react-native-ai/json-ui`:

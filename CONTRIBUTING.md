@@ -11,7 +11,6 @@ Thank you for your interest in contributing to React Native AI! This guide will 
 
 This is a monorepo with the following packages:
 
-- **`packages/mlc/`** - MLC-LLM integration for React Native
 - **`packages/apple-llm/`** - Apple Intelligence turbo module for iOS
 - **`apps/expo-example/`** - example Expo app
 
@@ -88,7 +87,7 @@ bun run --filter='@react-native-ai/*' prepare
 Work on specific package
 
 ```bash
-cd packages/mlc
+cd packages/llama
 bun run typecheck
 ```
 
@@ -96,7 +95,6 @@ bun run typecheck
 
 ```bash
 cd apps/expo-example
-bun run prestart    # Setup MLC dependencies
 bun run start
 bun run android
 ```
@@ -104,17 +102,9 @@ bun run android
 ### Native Development
 
 - **Android**: Open `apps/expo-example/android` in Android Studio
-- **iOS MLC**: Open `apps/expo-example/ios/AiExample.xcworkspace` in Xcode
-
 - **RN example app**: Open `apps/expo-example/ios/example.xcworkspace` in Xcode
   - The Apple Intelligence package is a Turbo Module - work directly from the integrated Xcode project
   - Native code is in `packages/apple-llm/ios/` but best developed through the example app
-
-## Required Native Builds
-
-The demos require the MLC package to have built the MLC-LLM engine libraries for Android and iOS. We publish the package with prebuilt binaries and this monorepo contains a postinstall script that fetches them on initial setup so you don't need to go through the prerequisites for the MLC package yourself. Set `SKIP_MLC_PREBUILT_FETCH=1` to opt out, or run
-`bun run fetch-prebuilt` in `packages/mlc` package to fetch manually. Rebuild from source with
-`build:runtime:ios` / `build:runtime:android` when needed.
 
 ## Need Help?
 

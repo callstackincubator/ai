@@ -45,7 +45,6 @@
         "@react-native-ai/dev-tools": "workspace:*",
         "@react-native-ai/json-ui": "workspace:*",
         "@react-native-ai/llama": "workspace:*",
-        "@react-native-ai/mlc": "workspace:*",
         "@react-native-ai/utils": "workspace:*",
         "@react-native-async-storage/async-storage": "^2.2.0",
         "@react-native-picker/picker": "2.11.4",
@@ -200,25 +199,6 @@
         "llama.rn": ">=0.13.0-rc.8",
         "react-native": ">=0.76.0",
       },
-    },
-    "packages/mlc": {
-      "name": "@react-native-ai/mlc",
-      "version": "0.12.0",
-      "dependencies": {
-        "@ai-sdk/provider": "^4.0.33",
-        "@ai-sdk/provider-utils": "^5.0.67",
-        "zod": "^4.2.1",
-      },
-      "devDependencies": {
-        "react-native": "0.88.0",
-      },
-      "peerDependencies": {
-        "expo": "*",
-        "react-native": ">=0.76.0",
-      },
-      "optionalPeers": [
-        "expo",
-      ],
     },
     "packages/utils": {
       "name": "@react-native-ai/utils",
@@ -945,8 +925,6 @@
     "@react-native-ai/json-ui": ["@react-native-ai/json-ui@workspace:packages/json-ui"],
 
     "@react-native-ai/llama": ["@react-native-ai/llama@workspace:packages/llama"],
-
-    "@react-native-ai/mlc": ["@react-native-ai/mlc@workspace:packages/mlc"],
 
     "@react-native-ai/utils": ["@react-native-ai/utils@workspace:packages/utils"],
 

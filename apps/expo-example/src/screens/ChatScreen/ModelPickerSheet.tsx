@@ -22,7 +22,7 @@ type ModelPickerSheetProps = {
   ref: RefObject<TrueSheet | null>
 }
 
-const PROVIDER_ORDER = ['adk', 'apple', 'llama', 'mlc']
+const PROVIDER_ORDER = ['adk', 'apple', 'llama']
 
 export function ModelPickerSheet({ ref }: ModelPickerSheetProps) {
   const { chatSettings, updateChatSettings } = useChatStore()
