@@ -348,8 +348,15 @@ enum VisionTask {
   /// Normalizes channel-major RGB with options.mean and options.std, which
   /// default to ImageNet's unless the task passes its own
   static func normalized(_ pixels: [Float], options: [String: Any], mean defaultMean: [Float] = VisionTask.imageNetMean, std defaultStd: [Float] = VisionTask.imageNetStd) throws -> [Float] {
-    let mean = (options["mean"] as? [NSNumber])?.map(\.floatValue) ?? defaultMean
-    let std = (options["std"] as? [NSNumber])?.map(\.floatValue) ?? defaultStd
+    func values(_ key: String, default defaultValues: [Float]) throws -> [Float] {
+      guard let option = options[key], !(option is NSNull) else { return defaultValues }
+      guard let numbers = option as? [NSNumber] else {
+        throw CoreAIError.invalidInput("\(key) must be an array of 3 numbers, got \(option).")
+      }
+      return numbers.map(\.floatValue)
+    }
+    let mean = try values("mean", default: defaultMean)
+    let std = try values("std", default: defaultStd)
     guard mean.count == 3, std.count == 3, !std.contains(0) else {
       throw CoreAIError.invalidInput("mean and std need one non-zero value per RGB channel, got \(mean) and \(std).")
     }

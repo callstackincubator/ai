@@ -55,6 +55,12 @@ describe('core ai tensors', () => {
     ).toEqual([2, 3])
   })
 
+  test('rejects numbers past the safe integers for 64-bit tensors', () => {
+    expect(() => createTensor('int64', [1], [2 ** 63])).toThrow(
+      'Pass a BigInt64Array'
+    )
+  })
+
   test('rejects a typed array of another element type', () => {
     expect(() => createTensor('float32', [1], new Int32Array([1]))).toThrow(
       'takes a Float32Array, got a Int32Array'
