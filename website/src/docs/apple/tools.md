@@ -61,8 +61,7 @@ Because Apple runs the whole tool loop natively:
 | `'required'`                 | The model calls at least one tool before it answers                           | 27  |
 | `{ type: 'tool', toolName }` | Only that tool is offered, without built-in tools, and the model must call it | 27  |
 
-Before iOS 27, `'required'` is not enforced, so the model may answer without
-calling a tool, and a named tool is the only one offered but is not forced.
+Older versions throw `UNSUPPORTED_OS` for `'required'` and a named tool.
 
 ## Limiting Tool Calls
 

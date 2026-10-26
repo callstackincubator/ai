@@ -23,7 +23,8 @@ Two things decide whether a feature is available:
 
 Features of `apple()` and `apple('private-cloud-compute')`. Options that ask
 for a missing feature (`reasoning`, image parts, the Private Cloud Compute
-model, Vision tools, `maxToolCalls`) throw `UNSUPPORTED_OS`. Missing output, such as reasoning
+model, Vision tools, a required or named tool choice, `maxToolCalls`) throw
+`UNSUPPORTED_OS`. Missing output, such as reasoning
 parts or usage, is left out.
 
 | Feature                                         | iOS 26                        | iOS 26.4                      | iOS 27                        |
@@ -35,8 +36,8 @@ parts or usage, is left out.
 | Tool calls and results in `generateText`        | ✅                            | ✅                            | ✅                            |
 | Tool calls and results while streaming          | ✅ Sent once the tool returns | ✅ Sent once the tool returns | ✅ Sent once the tool returns |
 | `toolChoice: 'auto'` and `'none'`               | ✅                            | ✅                            | ✅                            |
-| `toolChoice: 'required'`                        | Not enforced                  | Not enforced                  | ✅                            |
-| `toolChoice` with a named tool                  | Only that tool, not enforced  | Only that tool, not enforced  | ✅                            |
+| `toolChoice: 'required'`                        | ❌                            | ❌                            | ✅                            |
+| `toolChoice` with a named tool                  | ❌                            | ❌                            | ✅                            |
 | `maxToolCalls` provider option                  | ❌                            | ❌                            | ✅                            |
 | Guardrails (`permissiveContentTransformations`) | ✅                            | ✅                            | ✅                            |
 | `countTokens` and `contextSize`                 | ❌                            | ✅                            | ✅                            |
