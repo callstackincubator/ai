@@ -14,7 +14,6 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4Content,
   LanguageModelV4FinishReason,
-  LanguageModelV4Prompt,
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
   SharedV4Warning,
@@ -100,7 +99,10 @@ export interface CoreAILanguageSession {
 
 export class CoreAILanguageModel implements LanguageModelV4 {
   readonly specificationVersion = 'v4'
-  readonly supportedUrls = {}
+  // Local images are read natively, so the AI SDK passes their URLs through
+  readonly supportedUrls = {
+    'image/*': [/^file:\/\//, /^data:image\//],
+  }
   readonly provider = 'core-ai'
   readonly modelId: string
   readonly config: CoreAIModelConfig
@@ -899,31 +901,11 @@ function prepareCall(options: LanguageModelV4CallOptions): {
   messages: CoreAIMessage[]
   warnings: SharedV4Warning[]
 } {
-  const warnings = getCallWarnings(options)
-
-  // Core AI language models have no vision input yet
-  let hasFiles = false
-  const prompt = options.prompt.map((message) => {
-    if (message.role !== 'user') {
-      return message
-    }
-    const content = message.content.filter((part) => part.type !== 'file')
-    hasFiles ||= content.length !== message.content.length
-    return { ...message, content }
-  }) as LanguageModelV4Prompt
-
-  if (hasFiles) {
-    warnings.push({
-      type: 'unsupported',
-      feature: 'file parts',
-      details:
-        'Core AI language models do not accept files yet, so they were left out of the prompt.',
-    })
-  }
-
+  // Image parts of the last user message become transcript attachments, read
+  // by vision language model bundles
   return {
-    messages: prepareAppleMessages(prompt) as CoreAIMessage[],
-    warnings,
+    messages: prepareAppleMessages(options.prompt) as CoreAIMessage[],
+    warnings: getCallWarnings(options),
   }
 }
 

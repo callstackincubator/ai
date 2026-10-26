@@ -16,17 +16,26 @@ const LANGUAGE_MODEL = {
   folder: 'ios',
 }
 
+// Qwen3-VL 2B exported with the coreai-models VLM recipe, 4-bit text decoder:
+// the decoder, token embedding and 448x448 vision encoder. It loads only in an
+// app with the increased memory limit entitlement
+export const VISION_LANGUAGE_MODEL = {
+  id: 'qwen3-vl-2b',
+  repo: 'grabbou/Qwen3-VL-2B-Instruct-CoreAI',
+  folder: 'qwen3_vl_2b',
+}
+
 // Loads the language model before the tests of a file and unloads it after
-export function setupLanguageModel() {
+export function setupLanguageModel(config = LANGUAGE_MODEL) {
   let model: CoreAILanguageModel | undefined
 
   beforeAll(async () => {
-    const path = `${CORE_AI_STORAGE_PATH}/${LANGUAGE_MODEL.id}`
+    const path = `${CORE_AI_STORAGE_PATH}/${config.id}`
     if (!(await RNBlobUtil.fs.exists(path))) {
-      await downloadHubFolder(LANGUAGE_MODEL.repo, LANGUAGE_MODEL.folder, path)
+      await downloadHubFolder(config.repo, config.folder, path)
     }
     model = coreAI.languageModel({
-      id: LANGUAGE_MODEL.id,
+      id: config.id,
       source: path,
     })
     await model.prepare()
