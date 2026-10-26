@@ -67,7 +67,7 @@ enum Embeddings {
     for batch in batches(of: images, fixedSize: descriptor.shape[0], options: options) {
       // CLIP resizes the shorter side and crops the center
       let pixels = try batch.flatMap { image in
-        VisionTask.normalized(
+        try VisionTask.normalized(
           try VisionTask.rgbPixels(of: image, width: width, height: height, crops: true),
           options: options, mean: clipMean, std: clipStd
         )

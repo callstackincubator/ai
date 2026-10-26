@@ -41,6 +41,22 @@ describe('core-ai image generation', () => {
     expect(other.image.base64).not.toBe(first.image.base64)
   })
 
+  it('takes seeds past 32 bits and picks a random one without a seed', async () => {
+    const large = await generate(2 ** 40, 1)
+    const [first, second] = await Promise.all(
+      [0, 1].map(() =>
+        generateImage({
+          model,
+          prompt,
+          providerOptions: { 'core-ai': { stepCount: 1 } },
+        })
+      )
+    )
+
+    expect(pngSize(large.image.uint8Array)).toEqual({ width: 512, height: 512 })
+    expect(second.image.base64).not.toBe(first.image.base64)
+  })
+
   it('runs the requested number of steps', async () => {
     const twoSteps = await generate(7)
     const oneStep = await generate(7, 1)

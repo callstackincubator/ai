@@ -150,10 +150,10 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     await NativeCoreAI.unloadModel((await loading).modelHandle)
   }
 
+  // Unloads the model before deleting its files
   async remove(): Promise<void> {
+    await this.unload().catch(() => {})
     await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
-    this.loading = undefined
-    this.loadedModel = undefined
   }
 
   async createSession(
