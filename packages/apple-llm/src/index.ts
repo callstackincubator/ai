@@ -10,6 +10,7 @@ export type {
   AppleModelAvailability,
   AppleModelInfo,
   AppleProviderOptions,
+  AppleQuotaInfo,
   AppleReasoningLevel,
   AppleToolDefinitionSet,
   AppleUseCase,
