@@ -5,6 +5,8 @@ import {
 } from '@react-native-harness/platform-apple'
 
 const deviceName = process.env.HARNESS_IOS_DEVICE
+// Builds signed with entitlements the default App ID lacks use another one
+const bundleId = process.env.HARNESS_IOS_BUNDLE_ID ?? 'com.callstack.ai.example'
 
 // Tests run in a debug build of the app. The ios runner uses the physical
 // device named with HARNESS_IOS_DEVICE (as `xcrun devicectl list devices`
@@ -18,7 +20,7 @@ export default {
           applePlatform({
             name: 'ios',
             device: applePhysicalDevice(deviceName),
-            bundleId: 'com.callstack.ai.example',
+            bundleId,
           }),
         ]
       : []),
