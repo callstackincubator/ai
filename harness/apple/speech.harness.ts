@@ -68,6 +68,23 @@ describe('apple speech', () => {
     expect(await speak('en-US', 'fr-FR')).toBe(french)
   })
 
+  it('warns that it cannot detect the language', async () => {
+    const { warnings } = await generateSpeech({
+      model: apple.speechModel({ language: 'en-US' }),
+      text: 'Hello world.',
+      language: 'auto',
+    })
+
+    expect(warnings).toEqual([
+      {
+        type: 'unsupported',
+        feature: 'language',
+        details:
+          'Speech synthesis cannot detect the language, so en-US was used.',
+      },
+    ])
+  })
+
   it('settles for whitespace-only text', async () => {
     const audio = await AppleSpeech.generate('   ', { language: 'en-US' })
 

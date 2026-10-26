@@ -1072,6 +1072,13 @@ class AppleSpeechModel implements SpeechModelV4 {
       ].flatMap((feature) =>
         feature ? [{ type: 'unsupported' as const, feature }] : []
       )
+      if (options.language === 'auto') {
+        warnings.push({
+          type: 'unsupported',
+          feature: 'language',
+          details: `Speech synthesis cannot detect the language, so ${this.language} was used.`,
+        })
+      }
 
       return {
         audio: new Uint8Array(audio),
