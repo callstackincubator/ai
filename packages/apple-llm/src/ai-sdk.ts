@@ -356,9 +356,22 @@ function getUnsupportedSettingWarnings(
     options.presencePenalty !== undefined ? 'presencePenalty' : undefined,
     options.frequencyPenalty !== undefined ? 'frequencyPenalty' : undefined,
   ]
-  return unsupported.flatMap((feature) =>
+  const warnings: SharedV4Warning[] = unsupported.flatMap((feature) =>
     feature ? [{ type: 'unsupported' as const, feature }] : []
   )
+  if (options.seed !== undefined && !isNativeSeed(options.seed)) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'seed',
+      details: 'Foundation Models seeds are whole numbers, so it was left out.',
+    })
+  }
+  return warnings
+}
+
+// Native seeds are UInt64, so other numbers would be changed instead of used
+function isNativeSeed(seed: number | undefined): seed is number {
+  return Number.isSafeInteger(seed) && seed! >= 0
 }
 
 /**
@@ -706,9 +719,13 @@ export function createSnapshotStreamHandler(
         id,
       })
     },
-    end() {
+    /**
+     * @param flushHeldText Whether to send the held back structured output. A
+     * filtered response leaves it out, like doGenerate does
+     */
+    end({ flushHeldText = true }: { flushHeldText?: boolean } = {}) {
       endReasoning()
-      if (schema && previousRawContent) {
+      if (schema && previousRawContent && flushHeldText) {
         controller.enqueue({ type: 'text-start', id })
         controller.enqueue({
           type: 'text-delta',
@@ -1092,7 +1109,8 @@ class AppleSpeechModel implements SpeechModelV4 {
       ].flatMap((feature) =>
         feature ? [{ type: 'unsupported' as const, feature }] : []
       )
-      if (options.language === 'auto') {
+      // A voice speaks its own language, so only warn when the language was used
+      if (options.language === 'auto' && !options.voice) {
         warnings.push({
           type: 'unsupported',
           feature: 'language',
@@ -1183,8 +1201,9 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
   }
 
   /**
-   * Loads the model into memory, so the first generation answers sooner. Call
-   * it shortly before generating, e.g. when the user opens a chat
+   * Starts loading the model into memory, so the first generation answers
+   * sooner. Resolves once loading has started, not when the model is ready, so
+   * call it a little ahead, e.g. when the user opens a chat
    */
   prepare(): Promise<void> {
     return NativeAppleLLM.prewarm({
@@ -1294,7 +1313,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
           temperature: options.temperature,
           topP: options.topP,
           topK: options.topK,
-          seed: options.seed,
+          seed: isNativeSeed(options.seed) ? options.seed : undefined,
           tools,
           toolCallingMode,
           providerOptions: { ...appleOptions, requestId } as Record<
@@ -1446,7 +1465,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
           const errorListener = NativeAppleLLM.onStreamError((data) => {
             if (data.streamId === streamId && isContentFilterError(data.code)) {
-              snapshots.end()
+              snapshots.end({ flushHeldText: false })
               controller.enqueue({
                 type: 'finish',
                 finishReason: toContentFilterFinishReason(data.code!),
@@ -1473,7 +1492,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
             temperature: options.temperature,
             topP: options.topP,
             topK: options.topK,
-            seed: options.seed,
+            seed: isNativeSeed(options.seed) ? options.seed : undefined,
             tools,
             toolCallingMode,
             providerOptions: appleOptions as unknown as Record<string, unknown>,
