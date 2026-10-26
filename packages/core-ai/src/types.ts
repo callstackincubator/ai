@@ -51,6 +51,7 @@ export interface NativeCoreAIModelConfig {
 export interface CoreAITensorDescriptor {
   name?: string
   dataType?: string
+  // -1 marks a dynamic dimension
   shape?: number[]
 }
 
@@ -192,6 +193,47 @@ export interface CoreAIImageGenerationResult {
     width: number
     height: number
   }
+}
+
+export type CoreAITensorDataType =
+  | 'float32'
+  | 'float16'
+  | 'bfloat16'
+  | 'float64'
+  | 'int8'
+  | 'int16'
+  | 'int32'
+  | 'int64'
+  | 'uint8'
+  | 'uint16'
+  | 'uint32'
+  | 'uint64'
+  | 'bool'
+
+// A tensor passed to or returned by `CoreAI.runRawFunction`. `data` holds the
+// little-endian elements in row-major order as base64, which `createTensor`
+// and `readTensor` convert from and to typed arrays
+export interface CoreAITensor {
+  dataType: CoreAITensorDataType
+  shape: number[]
+  data: string
+}
+
+// Options of `CoreAI.loadModel` for a model with the `raw` task
+export interface CoreAIRawModelOptions {
+  // The compute unit Core AI specializes the model for. `default` lets Core AI
+  // pick, which is usually the Neural Engine
+  computeUnits?: 'default' | 'cpu' | 'gpu' | 'neural-engine'
+}
+
+export interface CoreAIRawFunctionOptions {
+  // `float32` (default) converts float16 and bfloat16 outputs to float32.
+  // `native` returns them as they are, as the bits of each element
+  outputDataType?: 'float32' | 'native'
+}
+
+export interface CoreAIRawFunctionResult {
+  outputs: Record<string, CoreAITensor>
 }
 
 export interface CoreAITaskInput {

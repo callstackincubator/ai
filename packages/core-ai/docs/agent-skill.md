@@ -91,12 +91,13 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 - Image generation: `coreAI.imageModel(config)` with `generateImage`
 - Transcription: `coreAI.transcriptionModel(config)` with `transcribe`, on a Parakeet TDT bundle
 - Segmentation and object detection: `CoreAI.runTask('segmentation' | 'object-detection', ...)`
-- Model metadata: `CoreAI.inspectModel(...)`
+- Any other `.aimodel`: `CoreAI.loadModel({ ...config, task: 'raw' }, {})`, then `CoreAI.runRawFunction(modelHandle, functionName, inputs, {})` with tensors from `createTensor`, read back with `readTensor`
+- Model metadata and function signatures: `CoreAI.inspectModel(...)`
 
 ## Common Pitfalls
 
 - **Simulator builds fail**: Core AI is device-only. Exclude the package from simulator builds or test on a device.
-- **Unsupported adapters**: `coreAI.embeddingModel(...)` exists but rejects with an unsupported error. Depth, super-resolution and raw `.aimodel` calls also reject.
+- **Unsupported adapters**: `coreAI.embeddingModel(...)` exists but rejects with an unsupported error. Depth and super-resolution also reject.
 - **Structured output**: needs a JSON schema and runs as guided generation. Models whose engine cannot do guided generation reject with `CORE_AI_UNSUPPORTED_CAPABILITY`. Streamed JSON arrives in one piece once it is complete.
 - **Tools**: not supported yet. Tools are not passed to the model, and the call returns a warning.
 - **Wrong package**: Apple Intelligence (Foundation Models system model) is `@react-native-ai/apple`, not Core AI.

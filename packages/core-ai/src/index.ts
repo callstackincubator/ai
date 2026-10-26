@@ -8,6 +8,7 @@ export {
   createCoreAIProvider,
 } from './ai-sdk'
 export { default as CoreAI } from './NativeCoreAI'
+export { createTensor, readTensor } from './tensor'
 export type {
   CoreAICapabilities,
   CoreAIEmbeddingResult,
@@ -23,9 +24,15 @@ export type {
   CoreAIModelTask,
   CoreAIPlatform,
   CoreAIProviderOptions,
+  CoreAIRawFunctionOptions,
+  CoreAIRawFunctionResult,
+  CoreAIRawModelOptions,
   CoreAIReasoningLevel,
   CoreAITaskInput,
   CoreAITaskResult,
+  CoreAITensor,
+  CoreAITensorDataType,
+  CoreAITensorDescriptor,
   CoreAITranscriptionResult,
 } from './types'
 export { toNativeModelConfig } from './types'
