@@ -137,6 +137,10 @@ export function RecordButtonUIBase({
       start: (controller) => {
         audioRef.current = controller
       },
+      // A failed transcription cancels the audio, which then takes no more
+      cancel: () => {
+        audioRef.current = null
+      },
     })
     transcriptionRef.current = transcribe(transcriptionModel, audio)
 
@@ -159,7 +163,14 @@ export function RecordButtonUIBase({
     recorderAdapterRef.current.connect(aCtxRef.current.destination)
     recorderRef.current.connect(recorderAdapterRef.current)
 
-    await recorderRef.current.start()
+    try {
+      await recorderRef.current.start()
+    } catch (error) {
+      // Ends the transcription, which would otherwise wait for audio
+      audioRef.current?.close()
+      audioRef.current = null
+      throw error
+    }
     setIsRecording(true)
 
     if (aCtxRef.current.state === 'suspended') {
