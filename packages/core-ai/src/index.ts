@@ -38,6 +38,8 @@ export type {
   CoreAITensorDataType,
   CoreAITensorDescriptor,
   CoreAITranscriptionResult,
+  CoreAIVideoSegmentationOptions,
+  CoreAIVideoSegmentationOutput,
   CoreAIVisionTaskOptions,
 } from './types'
 export { toNativeModelConfig } from './types'

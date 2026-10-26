@@ -8,6 +8,7 @@ export type CoreAIModelTask =
   | 'asr'
   | 'diffusion'
   | 'segmentation'
+  | 'video-segmentation'
   | 'object-detection'
   | 'depth'
   | 'super-resolution'
@@ -299,8 +300,43 @@ export interface CoreAIDepthOutput {
   max: number
 }
 
+// Options of `CoreAI.runTask('video-segmentation', ...)`
+export interface CoreAIVideoSegmentationOptions {
+  // Stops after this many frames
+  maxFrames?: number
+  // Also returns each object's mask as a base64 PNG, which is large
+  includeMasks?: boolean
+  // Also writes a copy of the video with the masks and boxes drawn on
+  outputVideo?: boolean
+  // Detection score an object needs to be tracked, 0.5 by default
+  scoreThreshold?: number
+  // Score a new detection needs to start a track, 0.7 by default
+  newObjectThreshold?: number
+  maxObjects?: number
+}
+
+export interface CoreAIVideoSegmentationOutput {
+  frames: {
+    frameIndex: number
+    objects: {
+      // Stays the same for an object across frames
+      id: number
+      prompt: string
+      score: number
+      box: { x: number; y: number; width: number; height: number }
+      // With includeMasks: white where the object is, transparent elsewhere
+      mask?: string
+      maskWidth?: number
+      maskHeight?: number
+    }[]
+  }[]
+  // With outputVideo: file:// URL of the annotated MP4
+  video?: string
+}
+
 export interface CoreAITaskInput {
   imageUri?: string
+  videoUri?: string
   audioUri?: string
   text?: string
   values?: string[]
@@ -320,6 +356,8 @@ export interface CoreAICapabilities {
   isCoreAISegmentationAvailable: boolean
   isCoreAIObjectDetectionAvailable: boolean
   isCoreAISpeechAvailable: boolean
+
+  isCoreAIVideoSegmentationAvailable: boolean
   supportedPlatform: boolean
   missingProducts: string[]
 }
