@@ -700,9 +700,13 @@ export function createSnapshotStreamHandler(
         id,
       })
     },
-    end() {
+    /**
+     * @param flushHeldText Whether to send the held back structured output. A
+     * filtered response leaves it out, like doGenerate does
+     */
+    end({ flushHeldText = true }: { flushHeldText?: boolean } = {}) {
       endReasoning()
-      if (schema && previousRawContent) {
+      if (schema && previousRawContent && flushHeldText) {
         controller.enqueue({ type: 'text-start', id })
         controller.enqueue({
           type: 'text-delta',
@@ -1428,7 +1432,7 @@ class AppleLLMChatLanguageModel implements AppleLanguageModel {
 
           const errorListener = NativeAppleLLM.onStreamError((data) => {
             if (data.streamId === streamId && isContentFilterError(data.code)) {
-              snapshots.end()
+              snapshots.end({ flushHeldText: false })
               controller.enqueue({
                 type: 'finish',
                 finishReason: toContentFilterFinishReason(data.code!),
