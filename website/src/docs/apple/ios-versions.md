@@ -22,10 +22,11 @@ Two things decide whether a feature is available:
 ## Language Model
 
 Features of `apple()` and `apple('private-cloud-compute')`. Options that ask
-for a missing feature (`reasoning`, image parts, the Private Cloud Compute
-model, Vision tools, a required or named tool choice, `maxToolCalls`) throw
-`UNSUPPORTED_OS`. Missing output, such as reasoning
-parts or usage, is left out.
+for a missing feature (image parts, the Private Cloud Compute model, Vision
+tools, a required or named tool choice, `maxToolCalls`) throw `UNSUPPORTED_OS`.
+A `reasoning` level the model cannot use, which includes every model before
+iOS 27, is dropped with an `unsupported` warning. Missing output, such as
+reasoning parts or usage, is left out.
 
 | Feature                                         | iOS 26                        | iOS 26.4                      | iOS 27                        |
 | ----------------------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
@@ -41,7 +42,7 @@ parts or usage, is left out.
 | `maxToolCalls` provider option                  | ❌                            | ❌                            | ✅                            |
 | Guardrails (`permissiveContentTransformations`) | ✅                            | ✅                            | ✅                            |
 | `countTokens` and `contextSize`                 | ❌                            | ✅                            | ✅                            |
-| Reasoning level (`reasoning` option)            | ❌                            | ❌                            | ✅                            |
+| Reasoning level (`reasoning` option)            | Ignored, with a warning       | Ignored, with a warning       | ✅                            |
 | Reasoning parts in results and streams          | ❌                            | ❌                            | ✅                            |
 | Image prompts                                   | ❌                            | ❌                            | ✅ Final user prompt only     |
 | Private Cloud Compute model                     | ❌                            | ❌                            | ✅ Physical device only       |

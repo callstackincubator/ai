@@ -162,9 +162,9 @@ Apple has three levels. `minimal` and `low` map to `light`, `medium` to
 Apple's default.
 
 Private Cloud Compute supports reasoning. Models that cannot reason, such as
-the on-device model on current hardware, ignore the option and return an
-`unsupported` warning, so check `supportsReasoning` from `getModelInfo` first.
-Older versions throw `UNSUPPORTED_OS`.
+the on-device model on current hardware and every model before iOS 27, ignore
+the option and return an `unsupported` warning, so check `supportsReasoning`
+from `getModelInfo` first.
 
 Reasoning is returned as `reasoning` content, and streamed as reasoning parts.
 It is replayed in later turns, while reasoning from other providers is left out
