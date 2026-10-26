@@ -368,8 +368,8 @@ const base64Png = result.images[0].base64
 
 The provider uses `ImageCreator` and returns PNG images. Supported styles are
 `animation`, `illustration`, and `sketch`. `any`, `emoji`, and
-`externalProvider` need iOS 27, which has no `ImageCreator`, so they fall back
-to `illustration`. Apple supports at most one source image
+`externalProvider` fall back to `illustration`, since Apple only added them in
+iOS 27, where the model rejects with `UNSUPPORTED_OS`. Apple supports at most one source image
 concept for generation, so pass no more than one file. Personalization is
 applied when the app is built with an SDK that exposes `ImagePlaygroundOptions`.
 
