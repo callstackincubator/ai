@@ -32,6 +32,13 @@ console.log(response.durationInSeconds)
 
 The `audio` parameter accepts either an `ArrayBuffer` or a base64-encoded string.
 
+Each word also comes with its own timing in `providerMetadata.apple.words`:
+
+```tsx
+const words = response.providerMetadata.apple.words
+// [{ text: 'The', startSecond: 0.12, endSecond: 0.24 }, ...]
+```
+
 > [!NOTE]
 > The API currently does not support streaming or live transcription. It is relatively easy to include, please let us know on Github if you need support for this.
 

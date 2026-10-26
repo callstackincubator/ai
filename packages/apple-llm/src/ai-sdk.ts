@@ -1083,6 +1083,9 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
         // The AI SDK reports ISO-639-1 codes, while the locale can be en_US
         language: this.language.split(/[-_]/)[0],
         durationInSeconds: transcriptionResult.duration,
+        providerMetadata: {
+          apple: { words: transcriptionResult.words },
+        },
         warnings: [],
         response: {
           timestamp: new Date(),

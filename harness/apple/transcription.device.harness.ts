@@ -69,6 +69,32 @@ describe('apple transcription', () => {
     expect(result.durationInSeconds).toBeGreaterThan(0)
   })
 
+  it('times each word', async () => {
+    const model = apple.transcriptionModel({ language: 'en-US' })
+
+    const result = await transcribe({ model, audio: speech })
+    const words = result.providerMetadata.apple.words as {
+      text: string
+      startSecond: number
+      endSecond: number
+    }[]
+
+    const texts = words.map((word) => word.text.toLowerCase())
+    const quick = texts.indexOf('quick')
+    expect(quick).toBeGreaterThanOrEqual(0)
+    expect(texts.indexOf('brown')).toBeGreaterThan(quick)
+    expect(texts.indexOf('fox')).toBeGreaterThan(texts.indexOf('brown'))
+    for (const [index, word] of words.entries()) {
+      expect(word.startSecond).toBeGreaterThanOrEqual(0)
+      expect(word.endSecond).toBeGreaterThanOrEqual(word.startSecond)
+      if (index > 0) {
+        expect(word.startSecond).toBeGreaterThanOrEqual(
+          words[index - 1].startSecond
+        )
+      }
+    }
+  })
+
   it('transcribes only the bytes of a typed array view', async () => {
     const model = apple.transcriptionModel({ language: 'en-US' })
     const padded = new Uint8Array(speech.length + 8)

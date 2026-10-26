@@ -24,6 +24,26 @@ public class AppleTranscriptionImpl: NSObject {
       attributeOptions: preset.attributeOptions
     )
   }
+  /// The transcriber times each run of the text, which is a word or a few
+  /// characters of punctuation
+  @available(iOS 26, *)
+  private static func timedWords(in text: AttributedString) -> [[String: Any]] {
+    text.runs.compactMap { run in
+      guard let timeRange = run[AttributeScopes.SpeechAttributes.TimeRangeAttribute.self] else {
+        return nil
+      }
+      let word = String(text[run.range].characters).trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !word.isEmpty else {
+        return nil
+      }
+      return [
+        "text": word,
+        "startSecond": CMTimeGetSeconds(timeRange.start),
+        "endSecond": CMTimeGetSeconds(CMTimeRangeGetEnd(timeRange))
+      ]
+    }
+  }
+
   /// Whether the device can transcribe. Locale support is only known
   /// asynchronously, so getModelInfo reports it
   @objc
@@ -142,6 +162,7 @@ public class AppleTranscriptionImpl: NSObject {
             // so segments that arrive while finalizing are not dropped
             let resultsTask = Task {
               var segments: [[String: Any]] = []
+              var words: [[String: Any]] = []
               for try await result in transcriber.results {
                 if result.isFinal {
                   let segment: [String: Any] = [
@@ -150,9 +171,10 @@ public class AppleTranscriptionImpl: NSObject {
                     "endSecond": CMTimeGetSeconds(CMTimeRangeGetEnd(result.range))
                   ]
                   segments.append(segment)
+                  words.append(contentsOf: Self.timedWords(in: result.text))
                 }
               }
-              return segments
+              return (segments, words)
             }
             
             let lastSampleTime = try await analyzer.analyzeSequence(from: audioFile)
@@ -163,11 +185,12 @@ public class AppleTranscriptionImpl: NSObject {
               await analyzer.cancelAndFinishNow()
             }
             
-            let segments = try await resultsTask.value
+            let (segments, words) = try await resultsTask.value
             let totalDuration = if let lastSampleTime { CMTimeGetSeconds(lastSampleTime) } else { 0.0 }
             
             let result: [String: Any] = [
               "segments": segments,
+              "words": words,
               "duration": totalDuration
             ]
             
