@@ -131,3 +131,5 @@ if (status === 'authorized') {
 }
 ```
 
+Right after the user allows access, iOS can take a moment to add the Personal Voice to the voice list, so if it is missing, call `getVoices()` again shortly after, for example when your voice picker next appears.
+
