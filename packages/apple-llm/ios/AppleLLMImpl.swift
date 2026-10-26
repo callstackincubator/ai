@@ -1594,25 +1594,37 @@ public class AppleLLMImpl: NSObject {
         }
         return resolvedSchema
       }
+      // The description of the property that references a schema is kept, and
+      // wins over the description of an inlined definition
+      let referenceDescription = schema["description"].map { ["description": $0] } ?? [:]
       if reference == "#" {
-        return ["$ref": rootName]
+        return referenceDescription.merging(["$ref": rootName]) { _, new in new }
       }
-      let definitionName = String(reference.split(separator: "/").last ?? "")
-      guard reference.hasPrefix("#/"), let definition = definitions[definitionName] as? [String: Any] else {
+      // Only definitions directly under $defs or definitions can be referenced
+      let definitionName: String
+      if reference.hasPrefix("#/$defs/") {
+        definitionName = String(reference.dropFirst("#/$defs/".count))
+      } else if reference.hasPrefix("#/definitions/") {
+        definitionName = String(reference.dropFirst("#/definitions/".count))
+      } else {
+        throw AppleLLMError.invalidSchema("Unresolved reference '\(reference)'")
+      }
+      guard !definitionName.contains("/"), let definition = definitions[definitionName] as? [String: Any] else {
         throw AppleLLMError.invalidSchema("Unresolved reference '\(reference)'")
       }
       if isNamedSchema(definition) {
-        return ["$ref": definitionName]
+        return referenceDescription.merging(["$ref": definitionName]) { _, new in new }
       }
       guard !inlining.contains(definitionName) else {
         throw AppleLLMError.invalidSchema("Reference cycle through '\(definitionName)', which is not an object or union")
       }
-      return try resolveReferences(
+      let inlined = try resolveReferences(
         in: definition,
         definitions: definitions,
         rootName: rootName,
         inlining: inlining.union([definitionName])
       )
+      return (inlined as? [String: Any])?.merging(referenceDescription) { _, new in new } ?? inlined
     }
 
     static func parseDynamicSchema(from schemaDict: [String: Any], path: String) throws -> DynamicGenerationSchema {
