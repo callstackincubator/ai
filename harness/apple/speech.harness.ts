@@ -102,6 +102,18 @@ describe('apple speech', () => {
     expect(await speak(0.5)).toBeGreaterThan(normal)
   })
 
+  it('speaks at the default rate when the speed is not a number', async () => {
+    const normal = await AppleSpeech.generate('Hello world.', {
+      language: 'en-US',
+    })
+    const notANumber = await AppleSpeech.generate('Hello world.', {
+      language: 'en-US',
+      speed: NaN,
+    })
+
+    expect(notANumber.byteLength).toBe(normal.byteLength)
+  })
+
   it('does not warn about the language when a voice is set', async () => {
     const voices = await AppleSpeech.getVoices()
     const voice = voices.find((v) => v.language === 'en-US') ?? voices[0]
