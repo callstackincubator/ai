@@ -60,7 +60,7 @@ const live = await AppleTranscription.transcribeLive({
 await live.stop()
 ```
 
-It asks for microphone access, so add `NSMicrophoneUsageDescription` to your app's Info.plist. It also accepts `contextualStrings`, and throws `UNSUPPORTED_OS` before iOS 27. It does not run in the iOS Simulator.
+It asks for microphone access, so add `NSMicrophoneUsageDescription` to your app's Info.plist. It throws `UNSUPPORTED_OS` before iOS 27. It does not run in the iOS Simulator.
 
 ## Language Support
 

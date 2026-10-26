@@ -47,11 +47,7 @@ export interface Spec extends TurboModule {
   isAvailable(language: string): boolean
   getModelInfo(language: string): Promise<CodegenTypes.UnsafeObject>
   prepare(language: string): Promise<void>
-  startLiveTranscription(
-    sessionId: string,
-    language: string,
-    contextualStrings: string[]
-  ): Promise<void>
+  startLiveTranscription(sessionId: string, language: string): Promise<void>
   stopLiveTranscription(sessionId: string): Promise<void>
 
   onLiveTranscriptionResult: CodegenTypes.EventEmitter<LiveTranscriptionResultEvent>
@@ -65,8 +61,6 @@ export type LiveTranscriptionResult = Omit<
 
 export interface LiveTranscriptionOptions {
   language: string
-  // Words and phrases the audio likely contains, such as names or jargon
-  contextualStrings?: string[]
   onResult: (result: LiveTranscriptionResult) => void
   onError?: (error: Error) => void
 }
@@ -97,7 +91,6 @@ export default {
    */
   transcribeLive: async ({
     language,
-    contextualStrings = [],
     onResult,
     onError,
   }: LiveTranscriptionOptions): Promise<LiveTranscription> => {
@@ -120,11 +113,7 @@ export default {
       listeners.forEach((listener) => listener.remove())
 
     try {
-      await NativeAppleTranscription.startLiveTranscription(
-        sessionId,
-        language,
-        contextualStrings
-      )
+      await NativeAppleTranscription.startLiveTranscription(sessionId, language)
     } catch (error) {
       removeListeners()
       throw error

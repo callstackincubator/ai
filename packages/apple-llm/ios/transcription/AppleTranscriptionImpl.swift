@@ -217,7 +217,6 @@ public class AppleTranscriptionImpl: NSObject {
   public func startLiveTranscription(
     _ sessionId: String,
     language: String,
-    contextualStrings: [String],
     onResult: @escaping (String, String, Bool, Double, Double) -> Void,
     onError: @escaping (String, String) -> Void,
     resolve: @escaping (Any?) -> Void,
@@ -230,7 +229,6 @@ public class AppleTranscriptionImpl: NSObject {
           let session = try await LiveTranscriptionSession.start(
             sessionId: sessionId,
             language: language,
-            contextualStrings: contextualStrings,
             onResult: onResult,
             onError: onError
           )
@@ -335,7 +333,6 @@ final class LiveTranscriptionSession: @unchecked Sendable {
   static func start(
     sessionId: String,
     language: String,
-    contextualStrings: [String],
     onResult: @escaping (String, String, Bool, Double, Double) -> Void,
     onError: @escaping (String, String) -> Void
   ) async throws -> LiveTranscriptionSession {
@@ -365,11 +362,6 @@ final class LiveTranscriptionSession: @unchecked Sendable {
       compatibleWith: [transcriber]
     )
     let analyzer = SpeechAnalyzer(modules: [transcriber])
-    if !contextualStrings.isEmpty {
-      let context = AnalysisContext()
-      context.contextualStrings[.general] = contextualStrings
-      try await analyzer.setContext(context)
-    }
 
     let stopFlag = LiveTranscriptionStopFlag()
     let results = Task {
