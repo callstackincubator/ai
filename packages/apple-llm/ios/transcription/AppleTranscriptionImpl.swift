@@ -27,7 +27,19 @@ public class AppleTranscriptionImpl: NSObject {
   @objc
   public func isAvailable(_ language: String) -> Bool {
     if #available(iOS 26, *) {
-      return SpeechTranscriber.isAvailable
+      guard SpeechTranscriber.isAvailable else {
+        return false
+      }
+      // isAvailable is synchronous in JS, and the supported locales are only
+      // available asynchronously. The lookup is local, so waiting is short
+      let semaphore = DispatchSemaphore(value: 0)
+      var isSupported = false
+      Task.detached {
+        isSupported = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: language)) != nil
+        semaphore.signal()
+      }
+      semaphore.wait()
+      return isSupported
     } else {
       return false
     }
@@ -90,7 +102,13 @@ public class AppleTranscriptionImpl: NSObject {
         
         Task {
           do {
-            let transcriber = createTranscriber(for: Locale(identifier: language))
+            // Resolves the locale like prepare() does, so "en" and "en_US" work too
+            guard let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: language)) else {
+              try? FileManager.default.removeItem(at: fileURL)
+              reject("AppleTranscription", "Locale not supported: \(language)", nil)
+              return
+            }
+            let transcriber = createTranscriber(for: supportedLocale)
             
             let analyzer = SpeechAnalyzer(modules: [transcriber])
             

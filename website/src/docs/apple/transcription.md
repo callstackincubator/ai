@@ -37,7 +37,7 @@ The `audio` parameter accepts either an `ArrayBuffer` or a base64-encoded string
 
 ## Language Support
 
-The transcription model supports multiple languages with automatic language detection. You can configure a custom language when creating the model:
+The transcription model supports multiple languages, but does not detect the language of the audio. Set the language when creating the model:
 
 ```tsx
 const model = apple.transcriptionModel({ language: 'fr' })
@@ -49,7 +49,7 @@ await transcribe({
 ```
 
 > [!NOTE]
-> By default, the transcription model will use device language.
+> By default, the transcription model will use device language. Language codes such as `fr` resolve to a supported locale, and `isAvailable()` returns `false` for languages the transcriber does not support.
 
 ## Preparing the Model
 

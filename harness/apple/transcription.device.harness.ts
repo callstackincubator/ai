@@ -21,6 +21,21 @@ describe('apple transcription', () => {
     )
   })
 
+  it('is unavailable for a language it does not support', () => {
+    expect(apple.transcriptionModel({ language: 'tlh' }).isAvailable()).toBe(
+      false
+    )
+  })
+
+  it('transcribes with a language code without a region', async () => {
+    const model = apple.transcriptionModel({ language: 'en' })
+    await model.prepare()
+
+    const result = await transcribe({ model, audio: speech })
+
+    expect(result.text).toMatch(/quick brown fox/i)
+  })
+
   it('transcribes speech with timed segments', async () => {
     const model = apple.transcriptionModel({ language: 'en-US' })
     await model.prepare()
