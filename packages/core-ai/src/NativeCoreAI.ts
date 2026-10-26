@@ -56,6 +56,16 @@ export type CoreAIStreamErrorEvent = {
   error: string
 }
 
+export type CoreAITranscriptionUpdateEvent = {
+  streamId: string
+  // Partial text of a segment grows append-only until the final update
+  type: string
+  segmentIndex: number
+  text: string
+  startSecond: number
+  endSecond: number
+}
+
 export interface Spec extends TurboModule {
   getCapabilities(): Promise<CodegenTypes.UnsafeObject>
 
@@ -116,6 +126,17 @@ export interface Spec extends TurboModule {
     mediaType: string,
     options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
+  // Live transcription on a streaming speech bundle. Audio is base64 16-bit
+  // little-endian mono PCM at options.sampleRate (16 kHz by default)
+  startTranscriptionStream(
+    streamId: string,
+    config: NativeCoreAIModelConfig,
+    options: CodegenTypes.UnsafeObject
+  ): Promise<void>
+  appendTranscriptionAudio(streamId: string, pcmBase64: string): Promise<void>
+  finishTranscriptionStream(
+    streamId: string
+  ): Promise<CodegenTypes.UnsafeObject>
   generateImage(
     config: NativeCoreAIModelConfig,
     prompt: string,
@@ -138,6 +159,7 @@ export interface Spec extends TurboModule {
   onStreamUpdate: CodegenTypes.EventEmitter<CoreAIStreamUpdateEvent>
   onStreamComplete: CodegenTypes.EventEmitter<CoreAIStreamCompleteEvent>
   onStreamError: CodegenTypes.EventEmitter<CoreAIStreamErrorEvent>
+  onTranscriptionUpdate: CodegenTypes.EventEmitter<CoreAITranscriptionUpdateEvent>
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeCoreAI')

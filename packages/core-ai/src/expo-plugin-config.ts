@@ -3,25 +3,22 @@
 
 import type { CoreAIModelTask } from './types'
 
-/**
- * Tasks the native module implements. Each one links the coreai-models
- * product that runs it (see ReactNativeAICoreAI.podspec)
- */
+// Tasks the native module implements. Each one links the coreai-models
+// product that runs it (see ReactNativeAICoreAI.podspec)
 export const CORE_AI_LINKABLE_TASKS = [
   'language',
   'diffusion',
   'segmentation',
   'object-detection',
+  'asr',
 ] as const satisfies readonly CoreAIModelTask[]
 
 export type CoreAILinkableTask = (typeof CORE_AI_LINKABLE_TASKS)[number]
 
 export type CoreAIPluginOptions = {
-  /**
-   * Tasks to link native support for, with the same names as a model's
-   * `task`. Defaults to all of them. Tasks that are not linked reject at
-   * runtime with CORE_AI_MISSING_SPM_PRODUCT
-   */
+  // Tasks to link native support for, with the same names as a model's
+  // `task`. Defaults to all of them. Tasks that are not linked reject at
+  // runtime with CORE_AI_MISSING_SPM_PRODUCT
   tasks?: CoreAILinkableTask[]
 }
 
@@ -41,10 +38,8 @@ function compareVersions(a: string, b: string) {
   return 0
 }
 
-/**
- * Raises a deployment target below the iOS 27 that Core AI needs, and keeps a
- * higher one
- */
+// Raises a deployment target below the iOS 27 that Core AI needs, and keeps a
+// higher one
 export function raiseDeploymentTarget(current: string | undefined) {
   const version = current?.replace(/"/g, '')
   return version && compareVersions(version, CORE_AI_DEPLOYMENT_TARGET) >= 0

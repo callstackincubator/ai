@@ -86,6 +86,29 @@ export function setupImageModel() {
   })
 }
 
+// Parakeet TDT 0.6B v3 exported for streaming with the coreai-models recipe,
+// so it transcribes audio of any length
+const SPEECH_MODEL = {
+  id: 'parakeet-tdt-0.6b-v3',
+  repo: 'grabbou/parakeet-tdt-0.6b-v3-CoreAI',
+  folder: 'streaming',
+}
+
+export function setupSpeechModel() {
+  const path = `${CORE_AI_STORAGE_PATH}/${SPEECH_MODEL.id}`
+
+  beforeAll(async () => {
+    if (!(await RNBlobUtil.fs.exists(path))) {
+      await downloadHubFolder(SPEECH_MODEL.repo, SPEECH_MODEL.folder, path)
+    }
+  })
+
+  return coreAI.transcriptionModel({
+    id: SPEECH_MODEL.id,
+    source: { type: 'file', uri: path },
+  })
+}
+
 // Native tasks read images from files, so the fixture is written to one
 export async function writeCatsImage() {
   const path = `${RNBlobUtil.fs.dirs.CacheDir}/harness-cats.jpg`
