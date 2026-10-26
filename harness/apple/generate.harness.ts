@@ -125,13 +125,15 @@ describe('apple generate', () => {
   })
 
   it('samples with only a temperature set', async () => {
+    // Random samples can repeat, so sample until two differ. Greedy sampling
+    // would give the same answer every time
     const answers = new Set<string>()
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6 && answers.size < 2; i++) {
       const result = await apple().doGenerate({
         prompt: prompt(
           'Invent a name for a new fantasy creature. Reply with the name only.'
         ),
-        temperature: 1.5,
+        temperature: 1,
       })
       answers.add(
         result.content[0].type === 'text' ? result.content[0].text : ''

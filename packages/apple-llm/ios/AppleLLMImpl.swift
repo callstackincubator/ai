@@ -948,6 +948,19 @@ public class AppleLLMImpl: NSObject {
         }
       }
 
+      // iOS 27 moves these GenerationError cases to their own types
+      if let systemModelError = error as? SystemLanguageModel.Error,
+         case .assetsUnavailable = systemModelError {
+        return .assetsUnavailable(systemModelError.localizedDescription)
+      }
+      if let sessionError = error as? LanguageModelSession.Error,
+         case .concurrentRequests = sessionError {
+        return .concurrentRequests(sessionError.localizedDescription)
+      }
+      if let parsingError = error as? GeneratedContent.ParsingError {
+        return .decodingFailure(parsingError.localizedDescription)
+      }
+
       if let privateCloudComputeError = error as? PrivateCloudComputeLanguageModel.Error {
         let message = privateCloudComputeError.localizedDescription
         switch privateCloudComputeError {
