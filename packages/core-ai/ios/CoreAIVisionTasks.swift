@@ -356,7 +356,9 @@ enum VisionTask {
   static func normalized(_ pixels: [Float], options: [String: Any], mean defaultMean: [Float] = VisionTask.imageNetMean, std defaultStd: [Float] = VisionTask.imageNetStd) throws -> [Float] {
     func values(_ key: String, default defaultValues: [Float]) throws -> [Float] {
       guard let option = options[key], !(option is NSNull) else { return defaultValues }
-      guard let numbers = option as? [NSNumber] else {
+      // NSNumber also holds booleans, which aren't channel values
+      guard let numbers = option as? [NSNumber],
+            !numbers.contains(where: { CFGetTypeID($0) == CFBooleanGetTypeID() }) else {
         throw CoreAIError.invalidInput("\(key) must be an array of 3 numbers, got \(option).")
       }
       return numbers.map(\.floatValue)

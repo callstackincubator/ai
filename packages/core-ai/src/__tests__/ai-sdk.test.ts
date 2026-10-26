@@ -241,6 +241,33 @@ describe('core ai language model', () => {
     expect(model.modelHandle).toBeUndefined()
   })
 
+  test('waits for a removal before loading again', async () => {
+    const model = createModel()
+    await model.prepare()
+    let finishRemoval: () => void = () => {}
+    removeModel.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRemoval = resolve
+        })
+    )
+
+    const removal = model.remove()
+    const loading = model.prepare()
+    while (removeModel.mock.calls.length === 0) {
+      await Promise.resolve()
+    }
+    expect(loadModel).toHaveBeenCalledTimes(1)
+
+    finishRemoval()
+    await removal
+    await loading
+    expect(loadModel).toHaveBeenCalledTimes(2)
+    expect(removeModel.mock.invocationCallOrder[0]!).toBeLessThan(
+      loadModel.mock.invocationCallOrder[1]!
+    )
+  })
+
   test('passes session instructions to native', async () => {
     await createModel().createSession({ instructions: 'Be brief.' })
 
