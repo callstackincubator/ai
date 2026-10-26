@@ -65,6 +65,18 @@ await speech({
 > [!NOTE]
 > If both `voice` and `language` are provided, `voice` takes priority.
 
+### Speed
+
+`speed` multiplies the voice's default speaking rate, so `2` speaks twice as fast and `0.5` half as fast. Apple caps the rate, so very high or low values are clamped:
+
+```tsx
+await speech({
+  model: apple.speechModel(),
+  text: 'Speaking a little faster.',
+  speed: 1.25,
+})
+```
+
 > [!NOTE]
 > If only `language` is provided, the default system voice for that locale is used.
 

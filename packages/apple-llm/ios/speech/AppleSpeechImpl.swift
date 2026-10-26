@@ -48,6 +48,14 @@ public class AppleSpeechImpl: NSObject {
       nil
     }
     
+    // Speed multiplies the default rate, within the rates AVSpeechUtterance allows
+    if let speed = options["speed"] as? Double {
+      utterance.rate = min(
+        max(AVSpeechUtteranceDefaultSpeechRate * Float(speed), AVSpeechUtteranceMinimumSpeechRate),
+        AVSpeechUtteranceMaximumSpeechRate
+      )
+    }
+    
     var collectedBuffers: [AVAudioPCMBuffer] = []
    
     speechSynthesizer.write(utterance) { buffer in

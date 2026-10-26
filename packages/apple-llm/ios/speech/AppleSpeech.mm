@@ -16,6 +16,7 @@
 #import <ReactCommon/RCTTurboModule.h>
 #import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
 
+#import <cmath>
 #import <jsi/jsi.h>
 #import <react/bridging/Function.h>
 
@@ -72,6 +73,14 @@ using namespace react;
             if (langProp.isString()) {
               auto langStr = langProp.asString(rt).utf8(rt);
               options[@"language"] = [NSString stringWithUTF8String:langStr.c_str()];
+            }
+          }
+          
+          if (opts.hasProperty(rt, "speed")) {
+            auto speedProp = opts.getProperty(rt, "speed");
+            // NaN would pass through the clamp of the speaking rate
+            if (speedProp.isNumber() && std::isfinite(speedProp.asNumber())) {
+              options[@"speed"] = @(speedProp.asNumber());
             }
           }
           

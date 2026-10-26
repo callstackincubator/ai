@@ -85,6 +85,35 @@ describe('apple speech', () => {
     ])
   })
 
+  it('speaks faster with a higher speed', async () => {
+    const speak = async (speed?: number) => {
+      const { audio, warnings } = await generateSpeech({
+        model: apple.speechModel({ language: 'en-US' }),
+        text: 'The quick brown fox jumps over the lazy dog.',
+        speed,
+      })
+      expect(warnings).toEqual([])
+      return readWav(audio.uint8Array).dataSize
+    }
+
+    const normal = await speak()
+
+    expect(await speak(2)).toBeLessThan(normal)
+    expect(await speak(0.5)).toBeGreaterThan(normal)
+  })
+
+  it('speaks at the default rate when the speed is not a number', async () => {
+    const normal = await AppleSpeech.generate('Hello world.', {
+      language: 'en-US',
+    })
+    const notANumber = await AppleSpeech.generate('Hello world.', {
+      language: 'en-US',
+      speed: NaN,
+    })
+
+    expect(notANumber.byteLength).toBe(normal.byteLength)
+  })
+
   it('does not warn about the language when a voice is set', async () => {
     const voices = await AppleSpeech.getVoices()
     const voice = voices.find((v) => v.language === 'en-US') ?? voices[0]
@@ -110,14 +139,9 @@ describe('apple speech', () => {
       model: apple.speechModel({ language: 'en-US' }),
       text: 'Hello world.',
       outputFormat: 'mp3',
-      speed: 1.5,
       instructions: 'Speak cheerfully.',
     })
 
-    expect(warnedFeatures(warnings)).toEqual([
-      'outputFormat',
-      'speed',
-      'instructions',
-    ])
+    expect(warnedFeatures(warnings)).toEqual(['outputFormat', 'instructions'])
   })
 })
