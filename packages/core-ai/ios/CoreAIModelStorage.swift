@@ -53,9 +53,19 @@ enum ModelStorage {
     }
     defer { _ = lock.withLock { activeDownloads.remove(id) } }
 
-    let files = try await listFiles(repo: repo, folder: folder, revision: revision)
+    // Files download from the commit the revision points to, so a resumed file
+    // never mixes two versions of it. A partial download of another commit
+    // starts over
+    let commit = try await resolveCommit(repo: repo, revision: revision)
+    let files = try await listFiles(repo: repo, folder: folder, revision: commit)
     let totalBytes = files.reduce(0) { $0 + $1.size }
     let partial = modelsDirectory.appendingPathComponent("\(id).partial", isDirectory: true)
+    let commitMarker = modelsDirectory.appendingPathComponent("\(id).partial-commit")
+    if (try? String(contentsOf: commitMarker, encoding: .utf8)) != commit {
+      try? FileManager.default.removeItem(at: partial)
+      try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+      try commit.write(to: commitMarker, atomically: true, encoding: .utf8)
+    }
     let reporter = ProgressReporter(totalBytes: totalBytes, onProgress: onProgress)
 
     var completedBytes: Int64 = 0
@@ -65,7 +75,7 @@ enum ModelStorage {
       let target = partial.appendingPathComponent(relativePath)
       try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
       let encodedPath = file.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file.path
-      let url = URL(string: "https://huggingface.co/\(repo)/resolve/\(revision)/\(encodedPath)?download=true")!
+      let url = URL(string: "https://huggingface.co/\(repo)/resolve/\(commit)/\(encodedPath)?download=true")!
       let offset = completedBytes
       try await FileDownload.run(url: url, to: target, expectedSize: file.size) { written in
         reporter.report(offset + written)
@@ -75,12 +85,30 @@ enum ModelStorage {
     reporter.report(totalBytes, force: true)
 
     try FileManager.default.moveItem(at: partial, to: destination)
+    try? FileManager.default.removeItem(at: commitMarker)
     // Models are large and can be downloaded again, so they stay out of backups
     var resourceValues = URLResourceValues()
     resourceValues.isExcludedFromBackup = true
     var excluded = destination
     try? excluded.setResourceValues(resourceValues)
     return destination
+  }
+
+  private struct HubRevision: Decodable {
+    let sha: String
+  }
+
+  private static func resolveCommit(repo: String, revision: String) async throws -> String {
+    let encodedRevision = revision.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? revision
+    guard let url = URL(string: "https://huggingface.co/api/models/\(repo)/revision/\(encodedRevision)") else {
+      throw CoreAIError.invalidInput("Invalid Hugging Face repo \"\(repo)\".")
+    }
+    let (data, response) = try await URLSession.shared.data(from: url)
+    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    guard status == 200 else {
+      throw CoreAIError.downloadFailed("Failed to resolve \(repo)@\(revision): HTTP \(status).")
+    }
+    return try JSONDecoder().decode(HubRevision.self, from: data).sha
   }
 
   private static func listFiles(repo: String, folder: String, revision: String) async throws -> [HubFile] {
@@ -148,10 +176,11 @@ private final class FileDownload: NSObject, URLSessionDataDelegate, @unchecked S
       onProgress(existing)
       return
     }
-    if existing == nil || existing! > expectedSize {
+    var written = existing ?? 0
+    if existing == nil || written > expectedSize {
       FileManager.default.createFile(atPath: target.path, contents: nil)
+      written = 0
     }
-    let written = min(existing ?? 0, expectedSize)
     let download = FileDownload(target: target, expectedSize: expectedSize, written: written, onProgress: onProgress)
 
     var request = URLRequest(url: url)
@@ -360,6 +389,8 @@ enum Specialization {
       return "neural-engine"
     case nil:
       return options.allowedComputeUnitKinds == [.cpu] ? "cpu" : "default"
+    default:
+      return "default"
     }
   }
 

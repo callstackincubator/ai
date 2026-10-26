@@ -858,15 +858,17 @@ describe('core ai model storage', () => {
 
   test('cancels the native download on abort', async () => {
     const controller = new AbortController()
-    downloadModel.mockImplementationOnce(async (downloadId) => {
+    let downloadId: string | undefined
+    downloadModel.mockImplementationOnce(async (id) => {
+      downloadId = id
       controller.abort()
-      expect(cancelStream).toHaveBeenCalledWith(downloadId)
       throw new Error('cancelled')
     })
 
     await expect(
       download({ id: 'qwen3', repo: 'r', signal: controller.signal })
     ).rejects.toThrow('aborted')
+    expect(cancelStream).toHaveBeenCalledWith(downloadId!)
   })
 
   test('specializes and removes language models by their task', async () => {
