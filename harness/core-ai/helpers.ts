@@ -46,6 +46,9 @@ const VISION_MODELS = {
   'yolos-tiny.aimodel': 'grabbou/yolos-tiny-CoreAI',
   'efficient-sam': 'grabbou/EfficientSAM-Ti-CoreAI',
   'edsr-x2.aimodel': 'grabbou/edsr-x2-CoreAI',
+  // pvt-v2-b0.aimodel and labels.json
+  'pvt-v2-b0': 'grabbou/pvt-v2-b0-CoreAI',
+  'da3-small.aimodel': 'grabbou/depth-anything-3-small-CoreAI',
 }
 
 export function setupVisionModel(name: keyof typeof VISION_MODELS) {
