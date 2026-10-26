@@ -172,6 +172,12 @@ static NSString *AppleLLMToolRejectionMessage(jsi::Runtime &rt, const jsi::Value
   [_llm getModelInfo:locale model:model resolve:resolve reject:reject];
 }
 
+- (void)prewarm:(nonnull NSDictionary *)options
+        resolve:(nonnull RCTPromiseResolveBlock)resolve
+         reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_llm prewarm:options resolve:resolve reject:reject];
+}
+
 - (void)generateImages:(nonnull NSDictionary *)options
                resolve:(nonnull RCTPromiseResolveBlock)resolve
                 reject:(nonnull RCTPromiseRejectBlock)reject {
