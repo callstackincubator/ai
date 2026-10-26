@@ -51,6 +51,23 @@ describe('apple speech', () => {
     expect(readWav(audio.uint8Array).dataSize).toBeGreaterThan(0)
   })
 
+  it('speaks in the language of the call', async () => {
+    const speak = async (modelLanguage: string, language?: string) => {
+      const { audio } = await generateSpeech({
+        model: apple.speechModel({ language: modelLanguage }),
+        text: 'Bonjour tout le monde.',
+        language,
+      })
+      return readWav(audio.uint8Array).dataSize
+    }
+
+    const english = await speak('en-US')
+    const french = await speak('fr-FR')
+
+    expect(french).not.toBe(english)
+    expect(await speak('en-US', 'fr-FR')).toBe(french)
+  })
+
   it('settles for whitespace-only text', async () => {
     const audio = await AppleSpeech.generate('   ', { language: 'en-US' })
 

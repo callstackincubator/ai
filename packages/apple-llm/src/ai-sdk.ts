@@ -1048,7 +1048,11 @@ class AppleSpeechModel implements SpeechModelV4 {
 
   async doGenerate(options: SpeechModelV4CallOptions) {
     const speechOptions = {
-      language: this.language,
+      // 'auto' asks the provider to detect the language, which speech synthesis cannot
+      language:
+        options.language && options.language !== 'auto'
+          ? options.language
+          : this.language,
       voice: options.voice,
     }
 
