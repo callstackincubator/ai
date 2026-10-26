@@ -13,6 +13,8 @@ describe('core-ai availability', () => {
     expect(capabilities.isCoreAISegmentationAvailable).toBe(true)
     expect(capabilities.isCoreAIDiffusionAvailable).toBe(true)
     expect(capabilities.isCoreAISpeechAvailable).toBe(true)
+
+    expect(capabilities.isCoreAIVideoSegmentationAvailable).toBe(true)
     expect(capabilities.missingProducts).toEqual([])
   })
 

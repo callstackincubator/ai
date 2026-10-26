@@ -18,6 +18,8 @@ module.exports = ({ config }) => ({
                 'object-detection',
                 'segmentation',
                 'asr',
+
+                'video-segmentation',
               ],
             },
           ],

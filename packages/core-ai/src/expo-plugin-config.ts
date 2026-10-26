@@ -11,6 +11,8 @@ export const CORE_AI_LINKABLE_TASKS = [
   'segmentation',
   'object-detection',
   'asr',
+
+  'video-segmentation',
 ] as const satisfies readonly CoreAIModelTask[]
 
 export type CoreAILinkableTask = (typeof CORE_AI_LINKABLE_TASKS)[number]
