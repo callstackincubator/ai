@@ -1224,7 +1224,13 @@ public class AppleLLMImpl: NSObject {
         if !pendingText.isEmpty {
           flush()
         }
-        let arguments = try GeneratedContent(json: input)
+        // Malformed input is a problem with the prompt, not a decoding failure of the model
+        let arguments: GeneratedContent
+        do {
+          arguments = try GeneratedContent(json: input)
+        } catch {
+          throw AppleLLMError.invalidMessage("Tool call input of '\(toolName)' is not valid JSON")
+        }
         pendingToolCalls.append(Transcript.ToolCall(id: toolCallId, toolName: toolName, arguments: arguments))
       case "tool-result":
         guard let toolCallId = part["toolCallId"] as? String,
