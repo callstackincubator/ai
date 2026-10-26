@@ -1622,14 +1622,21 @@ public class AppleLLMImpl: NSObject {
     // otherwise share an empty name and nested objects would resolve to the root
     static func createGenerationSchema(from schemaDict: [String: Any], name: String = "Root") throws -> GenerationSchema {
       let rootName = schemaDict["title"] as? String ?? name
-      let definitions = (schemaDict["definitions"] as? [String: Any] ?? [:])
-        .merging(schemaDict["$defs"] as? [String: Any] ?? [:]) { _, new in new }
+      // $defs and definitions are separate namespaces, and a definition can share
+      // its key with the root's title, so definitions are named after both their
+      // namespace and key
+      var definitions: [String: Any] = [:]
+      for namespace in ["$defs", "definitions"] {
+        for (key, definition) in schemaDict[namespace] as? [String: Any] ?? [:] {
+          definitions[definitionName(namespace: namespace, key: key)] = definition
+        }
+      }
       let resolve = { (schema: [String: Any]) in
         try resolveReferences(in: schema, definitions: definitions, rootName: rootName) as! [String: Any]
       }
 
       let dynamicSchemas = try parseDynamicSchema(from: resolve(schemaDict), path: name)
-      // Referenced definitions are named after their key, so references resolve to them
+      // Referenced definitions are named like their references, so they resolve to them
       let dependencies = try definitions.keys.sorted().compactMap { definitionName -> DynamicGenerationSchema? in
         guard let definition = definitions[definitionName] as? [String: Any], isNamedSchema(definition) else {
           return nil
@@ -1639,6 +1646,10 @@ public class AppleLLMImpl: NSObject {
         return try parseDynamicSchema(from: namedDefinition, path: definitionName)
       }
       return try GenerationSchema(root: dynamicSchemas, dependencies: dependencies)
+    }
+
+    static func definitionName(namespace: String, key: String) -> String {
+      "\(namespace).\(key)"
     }
 
     // Objects and unions have a name that references can point to, so they can be
@@ -1697,15 +1708,13 @@ public class AppleLLMImpl: NSObject {
         return referenceDescription.merging(["$ref": rootName]) { _, new in new }
       }
       // Only definitions directly under $defs or definitions can be referenced
-      let definitionName: String
-      if reference.hasPrefix("#/$defs/") {
-        definitionName = String(reference.dropFirst("#/$defs/".count))
-      } else if reference.hasPrefix("#/definitions/") {
-        definitionName = String(reference.dropFirst("#/definitions/".count))
-      } else {
+      let namespace = ["$defs", "definitions"].first { reference.hasPrefix("#/\($0)/") }
+      guard let namespace else {
         throw AppleLLMError.invalidSchema("Unresolved reference '\(reference)'")
       }
-      guard !definitionName.contains("/"), let definition = definitions[definitionName] as? [String: Any] else {
+      let key = String(reference.dropFirst("#/\(namespace)/".count))
+      let definitionName = definitionName(namespace: namespace, key: key)
+      guard !key.contains("/"), let definition = definitions[definitionName] as? [String: Any] else {
         throw AppleLLMError.invalidSchema("Unresolved reference '\(reference)'")
       }
       if isNamedSchema(definition) {
