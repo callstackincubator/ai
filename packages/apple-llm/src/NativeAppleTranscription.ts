@@ -1,7 +1,8 @@
 import type { TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
 
-export interface TranscriptionSegment {
+// A type rather than an interface, so it fits JSON provider metadata
+export type TranscriptionSegment = {
   text: string
   startSecond: number
   endSecond: number
@@ -9,6 +10,8 @@ export interface TranscriptionSegment {
 
 export interface TranscriptionResult {
   segments: TranscriptionSegment[]
+  // Each word with its own timing
+  words: TranscriptionSegment[]
   duration: number
 }
 
