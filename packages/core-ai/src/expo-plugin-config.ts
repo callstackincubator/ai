@@ -23,6 +23,24 @@ export type CoreAIPluginOptions = {
   // `task`. Defaults to all of them. Tasks that are not linked reject at
   // runtime with CORE_AI_MISSING_SPM_PRODUCT
   tasks?: CoreAILinkableTask[]
+  // Adds the increased memory limit entitlement, which raises the memory an
+  // app may use before iOS stops it. Video generation needs it. The App ID
+  // must have the Increased Memory Limit capability, which free and
+  // wildcard provisioning profiles cannot carry
+  increasedMemoryLimit?: boolean
+}
+
+export const INCREASED_MEMORY_LIMIT_ENTITLEMENT =
+  'com.apple.developer.kernel.increased-memory-limit'
+
+export function setCoreAIEntitlements(
+  entitlements: Record<string, unknown>,
+  options: CoreAIPluginOptions = {}
+) {
+  if (options.increasedMemoryLimit) {
+    entitlements[INCREASED_MEMORY_LIMIT_ENTITLEMENT] = true
+  }
+  return entitlements
 }
 
 // apple/coreai-models declares iOS 27 as its minimum platform
