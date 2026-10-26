@@ -99,8 +99,8 @@ For advanced use cases, you can access the embeddings API directly:
 ```tsx
 import { AppleEmbeddings } from '@react-native-ai/apple'
 
-// Get embedding model information
-const modelInfo: EmbeddingInfo = await AppleEmbeddings.getInfo(language: string)
+// Get embedding model information (getInfo is a deprecated alias)
+const modelInfo: AppleEmbeddingModelInfo = await AppleEmbeddings.getModelInfo(language: string)
 
 // Prepare language assets
 await AppleEmbeddings.prepare(language: string)
@@ -111,7 +111,7 @@ const embeddings = await AppleEmbeddings.generateEmbeddings(
   language: string
 ): Promise<number[][]>
 
-export interface EmbeddingInfo {
+export interface AppleEmbeddingModelInfo {
   hasAvailableAssets: boolean
   dimension: number
   languages: string[]

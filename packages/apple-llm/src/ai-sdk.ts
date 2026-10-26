@@ -1220,6 +1220,11 @@ class AppleTextEmbeddingModel implements EmbeddingModelV4 {
     this.prepared = true
   }
 
+  /** Assets, dimension and languages of the model for its language */
+  getModelInfo() {
+    return NativeAppleEmbeddings.getModelInfo(this.language)
+  }
+
   async doEmbed(
     options: EmbeddingModelV4CallOptions
   ): Promise<EmbeddingModelV4Result> {

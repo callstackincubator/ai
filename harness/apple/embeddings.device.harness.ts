@@ -17,6 +17,16 @@ function cosine(a: number[], b: number[]) {
 }
 
 describe('apple embeddings', () => {
+  it('describes the model for its language', async () => {
+    const model = apple.embeddingModel({ language: 'en' })
+    await model.prepare()
+
+    const info = await model.getModelInfo()
+    expect(info).toMatchObject({ hasAvailableAssets: true })
+    expect(info.dimension).toBeGreaterThan(0)
+    expect(info.languages).toContain('en')
+  })
+
   it('embeds text so that similar texts are closer', async () => {
     const model = apple.embeddingModel({ language: 'en' })
     await model.prepare()

@@ -26,6 +26,10 @@ export {
 } from './ai-sdk'
 export type { AppleLLMError, AppleLLMErrorCode } from './errors'
 export { AppleLLMErrorCodes } from './errors'
+export type {
+  AppleEmbeddingModelInfo,
+  EmbeddingInfo,
+} from './NativeAppleEmbeddings'
 export { default as AppleEmbeddings } from './NativeAppleEmbeddings'
 export { default as AppleFoundationModels } from './NativeAppleLLM'
 export type {
