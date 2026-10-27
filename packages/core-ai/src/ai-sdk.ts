@@ -100,7 +100,10 @@ export interface CoreAILanguageSession {
 
 export class CoreAILanguageModel implements LanguageModelV4 {
   readonly specificationVersion = 'v4'
-  readonly supportedUrls = {}
+  // Local images are read natively, so the AI SDK passes their URLs through
+  readonly supportedUrls = {
+    'image/*': [/^file:\/\//, /^data:image\//],
+  }
   readonly provider = 'core-ai'
   readonly modelId: string
   readonly config: CoreAIModelConfig
@@ -901,23 +904,30 @@ function prepareCall(options: LanguageModelV4CallOptions): {
 } {
   const warnings = getCallWarnings(options)
 
-  // Core AI language models have no vision input yet
-  let hasFiles = false
-  const prompt = options.prompt.map((message) => {
+  // Image parts of the last user message become transcript attachments, read
+  // by vision language model bundles. Other files, and images of earlier
+  // turns, are left out
+  let hasOmittedFiles = false
+  const prompt = options.prompt.map((message, index) => {
     if (message.role !== 'user') {
       return message
     }
-    const content = message.content.filter((part) => part.type !== 'file')
-    hasFiles ||= content.length !== message.content.length
+    const isFinalPrompt = index === options.prompt.length - 1
+    const content = message.content.filter(
+      (part) =>
+        part.type !== 'file' ||
+        (isFinalPrompt && part.mediaType.toLowerCase().startsWith('image'))
+    )
+    hasOmittedFiles ||= content.length !== message.content.length
     return { ...message, content }
   }) as LanguageModelV4Prompt
 
-  if (hasFiles) {
+  if (hasOmittedFiles) {
     warnings.push({
       type: 'unsupported',
       feature: 'file parts',
       details:
-        'Core AI language models do not accept files yet, so they were left out of the prompt.',
+        'Core AI language models accept images in the last user message only, so other files were left out of the prompt.',
     })
   }
 

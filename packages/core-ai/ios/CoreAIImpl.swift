@@ -245,8 +245,16 @@ public class CoreAIImpl: NSObject {
   ) {
 #if canImport(FoundationModels) && canImport(CoreAILanguageModels)
     if #available(iOS 27, macOS 27, *) {
-      guard let model = locked({ loadedModels[modelHandle] }) as? CoreAILanguageModel else {
+      guard let model = locked({ loadedModels[modelHandle] }) as? any LanguageModel else {
         rejectCoreAI(.modelNotLoaded(modelHandle), reject: reject)
+        return
+      }
+      // Session prompts are text, which the VLM engine rejects without an image
+      if model is CoreAIVisionLanguageModel {
+        rejectCoreAI(
+          .invalidInput("Vision language models answer image prompts through generateText and streamText, not sessions."),
+          reject: reject
+        )
         return
       }
 
@@ -356,7 +364,7 @@ public class CoreAIImpl: NSObject {
   ) {
 #if canImport(FoundationModels) && canImport(CoreAILanguageModels)
     if #available(iOS 27, macOS 27, *) {
-      guard let model = locked({ loadedModels[modelHandle] }) as? CoreAILanguageModel else {
+      guard let model = locked({ loadedModels[modelHandle] }) as? any LanguageModel else {
         rejectCoreAI(.modelNotLoaded(modelHandle), reject: reject)
         return
       }
@@ -387,7 +395,7 @@ public class CoreAIImpl: NSObject {
   ) {
 #if canImport(FoundationModels) && canImport(CoreAILanguageModels)
     if #available(iOS 27, macOS 27, *) {
-      guard let model = locked({ loadedModels[modelHandle] }) as? CoreAILanguageModel else {
+      guard let model = locked({ loadedModels[modelHandle] }) as? any LanguageModel else {
         emitError(.modelNotLoaded(modelHandle), streamId: streamId, onError: onError)
         return
       }
@@ -878,7 +886,11 @@ public class CoreAIImpl: NSObject {
         let sourceURL = try resolveSourceURL(config)
         Task {
           do {
-            let model = try await CoreAILanguageModel(resourcesAt: sourceURL)
+            // Vision language bundles run on their own engine, which reads
+            // the image attachment of the prompt
+            let model: any LanguageModel = Self.bundleKind(at: sourceURL) == "vlm"
+              ? try await CoreAIVisionLanguageModel(resourcesAt: sourceURL)
+              : try await CoreAILanguageModel(resourcesAt: sourceURL)
             let handle = self.makeHandle("model")
             self.locked { self.loadedModels[handle] = model }
             resolve([
@@ -1113,6 +1125,17 @@ public class CoreAIImpl: NSObject {
       return URL(string: source) ?? URL(fileURLWithPath: source.replacingOccurrences(of: "file://", with: ""))
     }
     return URL(fileURLWithPath: source)
+  }
+
+  /// The `kind` of a resource bundle's metadata.json, such as `llm` or `vlm`
+  private static func bundleKind(at url: URL) -> String? {
+    guard
+      let data = try? Data(contentsOf: url.appendingPathComponent("metadata.json")),
+      let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return nil
+    }
+    return metadata["kind"] as? String
   }
 
   private func modelInfo(
@@ -1907,12 +1930,14 @@ extension CoreAIImpl {
 private struct LanguageModelRequest {
   let session: LanguageModelSession
   let prompt: String
+  let attachments: [Attachment<ImageAttachmentContent>]
+  let temporaryFileURLs: [URL]
   let generationOptions: GenerationOptions
   let contextOptions: ContextOptions
   let schema: GenerationSchema?
   let toolCalls: ToolCallRecorder
 
-  init(model: CoreAILanguageModel, messages: [[String: Any]], options: [String: Any]) throws {
+  init(model: any LanguageModel, messages: [[String: Any]], options: [String: Any]) throws {
     let toolCalls = ToolCallRecorder()
     let tools = try (options["tools"] as? [[String: Any]] ?? []).map {
       try DeferredTool($0, toolCalls: toolCalls)
@@ -1924,12 +1949,18 @@ private struct LanguageModelRequest {
     if messages.last?["role"] as? String != "user" {
       messages.append(["role": "user", "content": ""])
     }
-    let (transcript, prompt, attachments) = try AppleLLMImpl.createTranscriptAndPrompt(from: messages, tools: tools)
-    guard attachments.isEmpty else {
-      throw CoreAIError.invalidInput("Core AI language models do not accept image prompts yet.")
+    let (transcript, prompt, promptAttachments) = try AppleLLMImpl.createTranscriptAndPrompt(from: messages, tools: tools)
+    if !promptAttachments.isEmpty, !model.capabilities.contains(.vision) {
+      throw CoreAIError.invalidInput("This Core AI language model does not accept image prompts. Load a vision language model bundle (kind \"vlm\").")
     }
 
     let schema = try AppleLLMImpl.createGenerationSchema(from: options)
+    // The VLM engine has no guided generation
+    if schema != nil, model is CoreAIVisionLanguageModel {
+      throw CoreAIError.unsupportedCapability(
+        "Vision language models do not support structured output (responseFormat with a schema)."
+      )
+    }
     self.session = LanguageModelSession(model: model, tools: tools, transcript: transcript)
     self.toolCalls = toolCalls
     self.prompt = prompt
@@ -1949,10 +1980,14 @@ private struct LanguageModelRequest {
     }
     self.contextOptions = contextOptions
     self.schema = schema
+    // Base64 images are written to temporary files, removed once the request finishes
+    (self.attachments, self.temporaryFileURLs) = try AppleLLMImpl.createImageAttachments(from: promptAttachments)
   }
 
   func respond() async throws -> [String: Any] {
     let prompt = self.prompt
+    let attachments = self.attachments
+    defer { AppleLLMImpl.removeTemporaryFiles(temporaryFileURLs) }
     let replayedEntryCount = session.transcript.count
 
     do {
@@ -1963,6 +1998,9 @@ private struct LanguageModelRequest {
           contextOptions: contextOptions
         ) {
           prompt
+          for attachment in attachments {
+            attachment
+          }
         }
         // The JSON comes from the generated content rather than the response entry
         let content = AppleLLMTranscriptSerializer.serialize(response.transcriptEntries, includeResponses: false)
@@ -1972,6 +2010,9 @@ private struct LanguageModelRequest {
 
       let response = try await session.respond(options: generationOptions, contextOptions: contextOptions) {
         prompt
+        for attachment in attachments {
+          attachment
+        }
       }
       return ["content": response.toModelMessages(), "usage": CoreAIImpl.serializeUsage(response.usage)]
     } catch where !toolCalls.parts.isEmpty && !Task.isCancelled {
@@ -1992,6 +2033,8 @@ private struct LanguageModelRequest {
   /// change, and returns the usage of the response
   func stream(onUpdate: @escaping (String, [[String: Any]]?) -> Void) async throws -> [String: Any]? {
     let prompt = self.prompt
+    let attachments = self.attachments
+    defer { AppleLLMImpl.removeTemporaryFiles(temporaryFileURLs) }
     let replayedEntryCount = session.transcript.count
     var previousContent = ""
     var previousEntries: NSArray = []
@@ -2013,6 +2056,9 @@ private struct LanguageModelRequest {
           contextOptions: contextOptions
         ) {
           prompt
+          for attachment in attachments {
+            attachment
+          }
         }
         var json = ""
         for try await chunk in responseStream {
@@ -2026,6 +2072,9 @@ private struct LanguageModelRequest {
       } else {
         let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
           prompt
+          for attachment in attachments {
+            attachment
+          }
         }
         for try await chunk in responseStream {
           try Task.checkCancellation()

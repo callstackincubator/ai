@@ -478,7 +478,7 @@ describe('core ai language model warnings', () => {
     })
   })
 
-  test('leaves files out of the prompt with a warning', async () => {
+  test('passes images of the prompt as attachments', async () => {
     const result = await createModel().doGenerate(
       createCallOptions({
         prompt: [
@@ -491,6 +491,12 @@ describe('core ai language model warnings', () => {
                 mediaType: 'image/png',
                 data: { type: 'data', data: 'iVBORw0KGgo=' },
               },
+              {
+                type: 'file',
+                mediaType: 'image/jpeg',
+                filename: 'cats.jpg',
+                data: { type: 'url', url: new URL('file:///tmp/cats.jpg') },
+              },
             ],
           },
         ],
@@ -498,14 +504,103 @@ describe('core ai language model warnings', () => {
     )
 
     expect(generateText.mock.calls[0]![2]).toEqual([
-      { role: 'user', content: 'What is this?', attachments: [] },
+      {
+        role: 'user',
+        content: 'What is this?',
+        attachments: [
+          {
+            type: 'image',
+            mediaType: 'image/png',
+            data: 'iVBORw0KGgo=',
+            label: 'image-1',
+          },
+          {
+            type: 'image',
+            mediaType: 'image/jpeg',
+            url: 'file:///tmp/cats.jpg',
+            label: 'cats.jpg',
+          },
+        ],
+      },
     ])
+    expect(result.warnings).toEqual([])
+  })
+
+  test('leaves out files that are not images of the last message', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({
+        prompt: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Earlier' },
+              {
+                type: 'file',
+                mediaType: 'image/png',
+                data: { type: 'data', data: 'iVBORw0KGgo=' },
+              },
+            ],
+          },
+          { role: 'assistant', content: [{ type: 'text', text: 'Ok' }] },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Summarize' },
+              {
+                type: 'file',
+                mediaType: 'application/pdf',
+                data: { type: 'data', data: 'JVBERi0=' },
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    expect(generateText.mock.calls[0]![2][0]).toEqual({
+      role: 'user',
+      content: 'Earlier',
+      attachments: [],
+    })
+    expect(generateText.mock.calls[0]![2][2]).toEqual({
+      role: 'user',
+      content: 'Summarize',
+      attachments: [],
+    })
     expect(result.warnings).toEqual([
       {
         type: 'unsupported',
         feature: 'file parts',
         details:
-          'Core AI language models do not accept files yet, so they were left out of the prompt.',
+          'Core AI language models accept images in the last user message only, so other files were left out of the prompt.',
+      },
+    ])
+  })
+
+  test('keeps base64 that starts with a slash as data', async () => {
+    await createModel().doGenerate(
+      createCallOptions({
+        prompt: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'file',
+                mediaType: 'image/jpeg',
+                data: { type: 'data', data: '/9j/4AAQSkZJRg==' },
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    expect(generateText.mock.calls[0]![2][0].attachments).toEqual([
+      {
+        type: 'image',
+        mediaType: 'image/jpeg',
+        data: '/9j/4AAQSkZJRg==',
+        label: 'image-1',
       },
     ])
   })

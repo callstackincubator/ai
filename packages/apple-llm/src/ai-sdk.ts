@@ -239,14 +239,19 @@ function prepareImageAttachment(
     )
   }
 
-  const source = normalizeAppleImageSource(
-    part.data.type === 'data'
-      ? part.data.data
-      : part.data.type === 'url'
-        ? part.data.url
-        : undefined,
-    'Apple Foundation Models'
-  )
+  // The AI SDK turns data URLs into base64 strings, and JPEG base64 starts
+  // with "/9j/", so a string here is data, never a file path
+  const source =
+    part.data.type === 'data' && typeof part.data.data === 'string'
+      ? { type: 'data' as const, value: part.data.data }
+      : normalizeAppleImageSource(
+          part.data.type === 'data'
+            ? part.data.data
+            : part.data.type === 'url'
+              ? part.data.url
+              : undefined,
+          'Apple Foundation Models'
+        )
 
   // The label is how the model and Vision tools name the image, so images
   // without a filename still need one
