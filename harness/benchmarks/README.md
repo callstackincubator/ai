@@ -5,9 +5,12 @@ with, on one iPhone:
 
 | File | Runtime |
 | --- | --- |
-| `core-ai.device.benchmark.harness.ts` | `@react-native-ai/core-ai` (Apple Core AI) |
+| `core-ai.device.benchmark.harness.ts` | `@react-native-ai/core-ai`, iOS export (Neural Engine) |
+| `core-ai-gpu.device.benchmark.harness.ts` | `@react-native-ai/core-ai`, macOS export (GPU) |
+| `core-ai-cold-start.device.benchmark.harness.ts` | Core AI's first launch, both exports |
 | `llama.device.benchmark.harness.ts` | `@react-native-ai/llama` (llama.rn) |
-| `executorch.device.benchmark.harness.ts` | `react-native-executorch`, MLX and XNNPACK backends |
+| `executorch-mlx.device.benchmark.harness.ts` | `react-native-executorch`, MLX backend |
+| `executorch-xnnpack.device.benchmark.harness.ts` | `react-native-executorch`, XNNPACK backend |
 | `mlx/` | mlx-swift-lm in a minimal Swift app |
 
 Results are in [RESULTS.md](RESULTS.md).
@@ -19,19 +22,27 @@ with Qwen3's tokenizer), greedy decoding (temperature 0), thinking off and at
 most 256 output tokens. Both prompts ask for more than 256 tokens, so every run
 decodes all 256.
 
-- **Load**: the first load in the process (cold), and the median of 3 loads
-  after it (warm). For Core AI, cold means its specialization cache was
-  cleared, so the load includes specializing the model for the device. It also
-  times `specialize()` on its own, and the first load after it.
-- **Generation**: one warmup run, then the median of 3 runs. Time to first
+- **Load**: the first load in the process, the median of 3 loads after it,
+  and the time to the first token after a load.
+- **Core AI cold start**: with its specialization cache cleared, the load and
+  the first token, which is when Core AI compiles the model for the Neural
+  Engine. Then the same after `specialize()`. It runs last, since the compile
+  heats the device.
+- **Generation**: one warmup run (reported as `first`), then the median of 3
+  runs. Time to first
   token (TTFT) is from the call to the first token, including the chat template
   and tokenization. Prefill is prompt tokens over TTFT. Decode is the tokens
   after the first over the time between the first and the last.
 - **Memory**: the process footprint (`phys_footprint`, what jetsam limits),
   sampled every 10 ms. It counts Metal and Neural Engine buffers the process
-  owns. Peak is over the 3 measured runs. The React Native runtimes report it
+  owns. Peak is over all runs of a prompt. The React Native runtimes report it
   through the `device-stats` module in `apps/expo-example/modules`, and the
   MLX app reads it the same way.
+
+- **Thermal state**: each stage waits up to 5 minutes for the device to cool
+  down to `nominal`, and results record the thermal state and Low Power Mode
+  before and after the runs. Back-to-back runs throttle an iPhone by 2 to 3
+  times.
 
 The React Native runtimes run in the harness, with the AI SDK's `streamText`
 where the provider has one (Core AI, llama.rn). ExecuTorch's runner is called
@@ -59,11 +70,12 @@ xcrun devicectl device install app --device "$DEVICE" \
   ios/build/Build/Products/Debug-iphoneos/reactnativeaiexample.app
 ```
 
-Then each runtime, one at a time, so they don't share a process:
+Then the configurations, one at a time, so they don't share a process. The
+results go to `benchmarks.jsonl` in the app's documents, and `run.sh` copies
+them to `harness/benchmarks/benchmarks.jsonl`:
 
 ```bash
-HARNESS_IOS_DEVICE="<device name>" HARNESS_BENCHMARK=true \
-  npx react-native-harness --harnessRunner ios harness/benchmarks/core-ai | tee core-ai.log
+DEVICE=<udid> HARNESS_IOS_DEVICE="<device name>" harness/benchmarks/run.sh
 ```
 
 The MLX app builds with XcodeGen (`brew install xcodegen`) and Xcode:
@@ -75,5 +87,5 @@ DEVICE=<udid> TEAM=<team id> harness/benchmarks/mlx/run.sh | tee mlx.log
 `collect.ts` turns the logs into the tables in RESULTS.md:
 
 ```bash
-bun harness/benchmarks/collect.ts *.log
+bun harness/benchmarks/collect.ts harness/benchmarks/benchmarks.jsonl mlx.log
 ```
