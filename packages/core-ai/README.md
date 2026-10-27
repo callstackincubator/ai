@@ -1,30 +1,39 @@
 # @react-native-ai/core-ai
 
-Apple Core AI provider for React Native AI.
+Run your own models on iPhone with Apple's Core AI framework. Bring a model
+bundle exported with [`apple/coreai-models`](https://github.com/apple/coreai-models),
+such as Qwen3 or FLUX.2, and run it on-device from React Native. The package
+comes with a [Vercel AI SDK](https://ai-sdk.dev) provider, so the same models
+work with `generateText`, `streamText`, `generateImage` and the other AI SDK
+functions.
 
 > [!WARNING]
 > Work in progress. This package is not published to npm yet.
 > Its docs live in [`docs/`](./docs) until it is released.
 
-This package is for app-provided Core AI model bundles exported from
-[`apple/coreai-models`](https://github.com/apple/coreai-models). It is separate
-from `@react-native-ai/apple`, which wraps Apple system capabilities such as
-Foundation Models, NLContextualEmbedding, SpeechAnalyzer, and AVSpeechSynthesizer.
+Use it when you want to choose and ship the model yourself. For the models
+built into iOS (Apple Intelligence, system speech and embeddings), use
+[`@react-native-ai/apple`](../apple-llm) instead.
 
-## API Layers
+## Features
 
-Core AI exposes two layers:
+As a Vercel AI SDK provider:
 
-- AI SDK adapters: language models, image generation, transcription and
-  text embeddings (CLIP).
-- Direct native APIs: model loading, persistent language sessions, model
-  inspection, segmentation, video segmentation, object detection,
-  super-resolution, classification, depth estimation, and raw `.aimodel`
-  function calls. `specializeModel` returns metadata only.
+- Text generation and streaming with language models
+- Image generation
+- Video generation with `experimental_generateVideo`
+- Transcription
+- Text embeddings (CLIP)
 
-Video generation runs through `coreAI.videoModel(...)` and AI SDK
-`experimental_generateVideo`. Reranking and speech generation have no adapters, because
-`coreai-models` has no runtime for them yet.
+As native APIs:
+
+- Model loading, inspection and persistent language sessions
+- Image and video segmentation, object detection, super-resolution,
+  classification and depth estimation
+- Raw `.aimodel` function calls with tensors
+
+`specializeModel` returns metadata only. Reranking and speech generation are
+not available, because `coreai-models` has no runtime for them yet.
 
 ## Installation
 
@@ -69,15 +78,15 @@ Set `platform :ios, '27.0'` in `ios/Podfile` and the deployment target of the ap
 
 By default the pod links native support for every task the module implements. Each task links one `coreai-models` product:
 
-| Task               | Used by                                   | Linked product          |
-| ------------------ | ----------------------------------------- | ----------------------- |
-| `language`         | `coreAI.languageModel(...)` and sessions  | `CoreAILM`              |
-| `diffusion`        | `coreAI.imageModel(...)`                  | `CoreAIDiffusion`       |
-| `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
-| `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
-| `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
+| Task                 | Used by                                     | Linked product            |
+| -------------------- | ------------------------------------------- | ------------------------- |
+| `language`           | `coreAI.languageModel(...)` and sessions    | `CoreAILM`                |
+| `diffusion`          | `coreAI.imageModel(...)`                    | `CoreAIDiffusion`         |
+| `segmentation`       | `CoreAI.runTask('segmentation', ...)`       | `CoreAISegmentation`      |
+| `object-detection`   | `CoreAI.runTask('object-detection', ...)`   | `CoreAIObjectDetection`   |
+| `asr`                | `coreAI.transcriptionModel(...)`            | `CoreAISpeech`            |
 | `video-segmentation` | `CoreAI.runTask('video-segmentation', ...)` | `CoreAIVideoSegmentation` |
-| `video-diffusion`  | `coreAI.videoModel(...)`                  | `CoreAIVideoDiffusion`  |
+| `video-diffusion`    | `coreAI.videoModel(...)`                    | `CoreAIVideoDiffusion`    |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 
@@ -155,7 +164,9 @@ await CoreAI.inspectModel(modelConfig)
 Core AI loads models from local `.aimodel` / `.aimodelc` files and model folders. `source` is a path or `file://` URL in app storage, or `bundle://` and a path in the app bundle for a model shipped with the app:
 
 ```ts
-const downloaded = coreAI.languageModel({ source: `${modelsDirectory}/qwen3-0.6b` })
+const downloaded = coreAI.languageModel({
+  source: `${modelsDirectory}/qwen3-0.6b`,
+})
 const bundled = coreAI.languageModel({ source: 'bundle://models/qwen3-0.6b' })
 ```
 
