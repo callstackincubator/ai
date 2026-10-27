@@ -75,9 +75,33 @@ Native-only API status:
 | Persistent sessions  | `model.createSession(...)`                | Supported for language models           | AI SDK owns message history; Core AI sessions own native transcript state. |
 | Segmentation         | `CoreAI.runTask('segmentation', ...)`     | Supported                               | AI SDK image APIs do not model segmentation masks.                         |
 | Object detection     | `CoreAI.runTask('object-detection', ...)` | Supported                               | AI SDK has no detection primitive.                                         |
-| Depth estimation     | `CoreAI.runTask('depth', ...)`            | Throws unsupported error                | AI SDK has no depth primitive.                                             |
-| Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Throws unsupported error                | AI SDK has no image-to-image upscaling primitive.                          |
+| Depth estimation     | `CoreAI.runTask('depth', ...)`            | Supported                               | AI SDK has no depth primitive.                                             |
+| Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Supported                               | AI SDK has no image-to-image upscaling primitive.                          |
+| Classification       | `CoreAI.runTask('classification', ...)`   | Supported                               | AI SDK has no image classification primitive.                              |
 | Raw `.aimodel` calls | `CoreAI.runRawFunction(...)`              | Supported                               | AI SDK has no tensor primitive.                                            |
+
+### Super-resolution, Classification and Depth
+
+`coreai-models` has export recipes for these tasks but no Swift runtime, so the package runs the `main` function of the exported `.aimodel` itself. They need no `coreai-models` product, and any export with the same input works:
+
+| Task               | Model input                                                              | Starter model                                                                                  | Output                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `super-resolution` | `[batch, 3, height, width]` RGB in 0...1                                 | [EDSR x2](https://huggingface.co/grabbou/edsr-x2-CoreAI)                                       | `image` (base64 PNG), `width`, `height`, `scale`. Images larger than `tileSize` (256 px) are upscaled in tiles that overlap by `tileOverlap` (16 px)              |
+| `classification`   | `[1, 3, height, width]` normalized RGB, returns logits                   | [PVT v2 b0](https://huggingface.co/grabbou/pvt-v2-b0-CoreAI) (ImageNet-1k, with `labels.json`) | `classifications`: the `topK` (5) classes with `index`, `label` and softmax `confidence`                                                                          |
+| `depth`            | `[1, 3, height, width]` or `[1, views, 3, height, width]` normalized RGB | [Depth Anything 3 small](https://huggingface.co/grabbou/depth-anything-3-small-CoreAI)         | `depth` (float32 tensor at model resolution, relative, smaller is nearer), `min`, `max`, and `image` (base64 grayscale PNG at the input size, nearer is brighter) |
+
+```ts
+const { output } = await CoreAI.runTask(
+  'classification',
+  { id: 'pvt-v2-b0', sourceType: 'file', sourceUri: folder },
+  { imageUri },
+  { topK: 3 }
+)
+```
+
+- Classification and depth normalize RGB with the ImageNet mean and std unless you pass `mean` and `std`. Classification reads class names from `options.labels`, or from a `labels.json` array next to the model, and `sourceUri` can be the folder holding both.
+- Models that take several views, like Depth Anything 3, get the image as every view, and the output is the depth of the first.
+- Models stay loaded after the first call, by path and `computeUnits`.
 
 ### Raw Function Calls
 

@@ -599,6 +599,28 @@ public class CoreAIImpl: NSObject {
       runSegmentationTask(config: config, input: input, options: options, resolve: resolve, reject: reject)
     case "object-detection":
       runObjectDetectionTask(config: config, input: input, options: options, resolve: resolve, reject: reject)
+    case "super-resolution", "classification", "depth":
+#if canImport(CoreAI)
+      if #available(iOS 27, macOS 27, *) {
+        do {
+          let sourceURL = try resolveSourceURL(config)
+          let image = try Self.loadCGImage(from: input)
+          Task {
+            do {
+              resolve(try await VisionTask.run(task, sourceURL: sourceURL, image: image, options: options ?? [:]))
+            } catch {
+              reject(errorCode(error), error.localizedDescription, error)
+            }
+          }
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      } else {
+        rejectCoreAI(.unsupportedOS, reject: reject)
+      }
+#else
+      rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
     default:
       rejectCoreAI(.unsupportedTask(task), reject: reject)
     }
@@ -1484,7 +1506,7 @@ extension CoreAIImpl {
 #endif
 
 extension CoreAIImpl {
-  private static func loadCGImage(from input: [String: Any]) throws -> CGImage {
+  static func loadCGImage(from input: [String: Any]) throws -> CGImage {
     guard let imageUri = input["imageUri"] as? String else {
       throw CoreAIError.invalidInput("Expected input.imageUri for this Core AI task.")
     }
@@ -1515,7 +1537,7 @@ extension CoreAIImpl {
     return image
   }
 
-  private static func pngBase64(_ image: CGImage) throws -> String {
+  static func pngBase64(_ image: CGImage) throws -> String {
     let data = NSMutableData()
     guard let destination = CGImageDestinationCreateWithData(
       data,

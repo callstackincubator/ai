@@ -54,7 +54,7 @@ final class RawModel: @unchecked Sendable {
     return result
   }
 
-  private func loadFunction(_ name: String) throws -> InferenceFunction {
+  func loadFunction(_ name: String) throws -> InferenceFunction {
     lock.lock()
     defer { lock.unlock() }
     if let function = functions[name] {
@@ -109,7 +109,7 @@ extension RawModel {
     return dataTypes.first { $0.type == type }?.name ?? String(describing: type)
   }
 
-  private static func size(of type: NDArray.ScalarType) throws -> Int {
+  static func size(of type: NDArray.ScalarType) throws -> Int {
     guard let size = dataTypes.first(where: { $0.type == type })?.size else {
       throw CoreAIError.invalidInput("Raw function calls do not support \(type) tensors yet.")
     }
@@ -196,7 +196,7 @@ extension RawModel {
 
   /// Calls body with the row-major index of each element and its offset in
   /// elements, following strides that may pad rows for the hardware
-  private static func forEachElement(
+  static func forEachElement(
     shape: Span<Int>,
     strides: Span<Int>,
     _ body: (_ index: Int, _ offset: Int) -> Void
@@ -235,7 +235,7 @@ extension RawModel {
     }
   }
 
-  private static func halfPrecision(fromFloat32 data: Data, as type: NDArray.ScalarType) -> Data {
+  static func halfPrecision(fromFloat32 data: Data, as type: NDArray.ScalarType) -> Data {
     let floats = data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
     var bits = [UInt16](repeating: 0, count: floats.count)
     for (index, value) in floats.enumerated() {
@@ -250,7 +250,7 @@ extension RawModel {
     return bits.withUnsafeBytes { Data($0) }
   }
 
-  private static func float32(fromHalfPrecision data: Data, as type: NDArray.ScalarType) -> Data {
+  static func float32(fromHalfPrecision data: Data, as type: NDArray.ScalarType) -> Data {
     let bits = data.withUnsafeBytes { Array($0.bindMemory(to: UInt16.self)) }
     let floats = bits.map { value in
       type == .bfloat16 ? Float(bitPattern: UInt32(value) << 16) : Float(Float16(bitPattern: value))

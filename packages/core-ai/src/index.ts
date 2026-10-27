@@ -11,6 +11,8 @@ export { default as CoreAI } from './NativeCoreAI'
 export { createTensor, readTensor } from './tensor'
 export type {
   CoreAICapabilities,
+  CoreAIClassificationOutput,
+  CoreAIDepthOutput,
   CoreAIEmbeddingResult,
   CoreAIGenerationOptions,
   CoreAIGenerationPart,
@@ -28,11 +30,13 @@ export type {
   CoreAIRawFunctionResult,
   CoreAIRawModelOptions,
   CoreAIReasoningLevel,
+  CoreAISuperResolutionOutput,
   CoreAITaskInput,
   CoreAITaskResult,
   CoreAITensor,
   CoreAITensorDataType,
   CoreAITensorDescriptor,
   CoreAITranscriptionResult,
+  CoreAIVisionTaskOptions,
 } from './types'
 export { toNativeModelConfig } from './types'
