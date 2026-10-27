@@ -1,0 +1,108 @@
+import { generateId, type ModelMessage, streamText } from 'ai'
+import * as Haptics from 'expo-haptics'
+import { useRef, useState } from 'react'
+
+import { type Message, useChats, useSetStreamingReply } from '../store/chats'
+import { useModels } from '../store/models'
+import {
+  getAttachmentUri,
+  type ImageAttachment,
+} from '../utils/imageAttachments'
+
+const SYSTEM_PROMPT =
+  "You are a helpful assistant running entirely on the user's iPhone. Be concise and use Markdown when it helps."
+
+// Images go to the model as file URLs
+function toModelMessage({ role, content, attachments }: Message): ModelMessage {
+  if (role !== 'user' || !attachments?.length) {
+    return { role, content }
+  }
+  return {
+    role,
+    content: [
+      ...(content ? [{ type: 'text' as const, text: content }] : []),
+      ...attachments.map((attachment) => ({
+        type: 'image' as const,
+        image: new URL(getAttachmentUri(attachment)),
+        mediaType: attachment.mediaType,
+      })),
+    ],
+  }
+}
+
+export function useChatGeneration() {
+  const { currentChat, selectChat, addMessage, truncateAfter } = useChats()
+  const { selectedModel } = useModels()
+  const setStreamingReply = useSetStreamingReply()
+  const [isGenerating, setIsGenerating] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const generate = async (chatId: string, history: Message[]) => {
+    if (!selectedModel) return
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    const reply = { chatId, id: generateId(), content: '' }
+    setStreamingReply(reply)
+    setIsGenerating(true)
+
+    try {
+      const result = streamText({
+        model: selectedModel.model,
+        system: SYSTEM_PROMPT,
+        messages: history.map(toModelMessage),
+        abortSignal: controller.signal,
+      })
+      for await (const chunk of result.textStream) {
+        reply.content += chunk
+        setStreamingReply({ ...reply })
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    } catch (error) {
+      if (!controller.signal.aborted && !reply.content) {
+        reply.content = `Something went wrong: ${error instanceof Error ? error.message : String(error)}`
+      }
+    } finally {
+      // The finished reply is saved once
+      if (reply.content) {
+        addMessage(chatId, {
+          id: reply.id,
+          role: 'assistant',
+          content: reply.content,
+        })
+      }
+      setStreamingReply(null)
+      setIsGenerating(false)
+    }
+  }
+
+  const send = (content: string, attachments: ImageAttachment[]) => {
+    if (isGenerating) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    const message: Message = {
+      id: generateId(),
+      role: 'user',
+      content,
+      attachments,
+    }
+    const history = [...(currentChat?.messages ?? []), message]
+    const chatId = addMessage(currentChat?.id ?? null, message)
+    selectChat(chatId)
+    generate(chatId, history)
+    return message.id
+  }
+
+  // Answers the user message before the given reply again
+  const regenerate = (replyId: string) => {
+    if (isGenerating || !currentChat) return
+    const index = currentChat.messages.findIndex((m) => m.id === replyId)
+    const question = currentChat.messages[index - 1]
+    if (!question) return
+    truncateAfter(currentChat.id, question.id)
+    generate(currentChat.id, currentChat.messages.slice(0, index))
+  }
+
+  const stop = () => abortControllerRef.current?.abort()
+
+  return { isGenerating, send, regenerate, stop }
+}
