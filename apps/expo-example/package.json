@@ -51,6 +51,8 @@
     "react": "19.3.0",
     "react-native": "0.88.0",
     "react-native-audio-api": "^0.13.6",
+    "react-native-device-info": "^15.0.2",
+    "react-native-executorch": "0.10.7",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-keyboard-controller": "1.22.7",
     "react-native-reanimated": "4.7.1",
@@ -67,5 +69,12 @@
     "@types/react": "~19.3.0",
     "react-native-harness": "1.6.0"
   },
-  "private": true
+  "private": true,
+  "react-native-executorch": {
+    "backends": [
+      "xnnpack",
+      "mlx"
+    ],
+    "libs": []
+  }
 }
