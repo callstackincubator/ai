@@ -2,8 +2,8 @@
 
 Use the AI built into iOS from React Native. Apple Intelligence (Foundation
 Models), text embeddings, speech-to-text and text-to-speech run on-device with
-the models that ship with the system, so there is nothing to download or
-bundle. The package comes with a [Vercel AI SDK](https://ai-sdk.dev) provider,
+the models that ship with the system, so your app has no model to bundle or
+download. The OS may still download model assets the first time they are used. The package comes with a [Vercel AI SDK](https://ai-sdk.dev) provider,
 so you can call these models with `generateText`, `streamText`, `embed`,
 `transcribe` and `generateSpeech`.
 
@@ -39,13 +39,23 @@ transcription on iOS 27 and voice listing.
 npm install @react-native-ai/apple ai
 ```
 
-The package is autolinked, so there is no native setup.
+The package is autolinked, so there is no native setup. The one exception is
+live microphone transcription (`AppleTranscription.transcribeLive`), which
+needs a microphone usage description in `Info.plist`:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>Transcribe what you say.</string>
+```
 
 ## Usage
 
 ```ts
 import { apple } from '@react-native-ai/apple'
 import { embed, generateSpeech, generateText, transcribe } from 'ai'
+
+// Recorded audio, for example a WAV file read into a Uint8Array
+declare const audioBuffer: Uint8Array
 
 const { text } = await generateText({
   model: apple(),
@@ -70,7 +80,8 @@ const { audio } = await generateSpeech({
 
 Check `await apple.isAvailable()` before generating text, since Apple
 Intelligence can be off or still downloading. For long chats on the small
-on-device context window, wrap the model with `@react-native-ai/utils`.
+on-device context window, wrap the model with
+[`@react-native-ai/utils`](../utils) (not published to npm yet).
 
 ## iOS 26 and iOS 27
 

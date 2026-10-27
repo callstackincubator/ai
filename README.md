@@ -15,19 +15,19 @@ work with cloud ones.
 
 ## Providers
 
-| Provider                           | Package                                          | Platforms    | Models                                     | Download needed |
-| ---------------------------------- | ------------------------------------------------ | ------------ | ------------------------------------------ | --------------- |
-| [Apple](#apple)                    | [`@react-native-ai/apple`](./packages/apple-llm) | iOS          | Apple Intelligence and system models       | No              |
-| [Google ADK](#google-adk)          | [`@react-native-ai/adk`](./packages/adk)         | Android      | Gemini Nano, optional cloud Gemini         | No              |
-| [Llama](#llama)                    | [`@react-native-ai/llama`](./packages/llama)     | iOS, Android | Any GGUF model, via llama.rn               | Yes             |
-| [Core AI](#core-ai) (not released) | [`@react-native-ai/core-ai`](./packages/core-ai) | iOS 27+      | Core AI bundles from `apple/coreai-models` | Yes             |
+| Provider                           | Package                                          | Platforms    | Models                                     | App downloads the model |
+| ---------------------------------- | ------------------------------------------------ | ------------ | ------------------------------------------ | ----------------------- |
+| [Apple](#apple)                    | [`@react-native-ai/apple`](./packages/apple-llm) | iOS          | Apple Intelligence and system models       | No                      |
+| [Google ADK](#google-adk)          | [`@react-native-ai/adk`](./packages/adk)         | Android      | Gemini Nano, optional cloud Gemini         | No                      |
+| [Llama](#llama)                    | [`@react-native-ai/llama`](./packages/llama)     | iOS, Android | llama.cpp-compatible GGUF models           | Yes                     |
+| [Core AI](#core-ai) (not released) | [`@react-native-ai/core-ai`](./packages/core-ai) | iOS 27+      | Core AI bundles from `apple/coreai-models` | Yes                     |
 
 ### Apple
 
 Use the AI built into iOS: Apple Intelligence for text generation,
 NLContextualEmbedding for embeddings, SpeechAnalyzer for transcription and
-AVSpeechSynthesizer for speech. Nothing to download, the models ship with the
-system.
+AVSpeechSynthesizer for speech. Your app has nothing to bundle or download, the
+models ship with the system.
 
 ```bash
 npm install @react-native-ai/apple
@@ -86,7 +86,7 @@ const { text } = await generateText({
 
 ### Llama
 
-Run any GGUF model from Hugging Face on iOS and Android with
+Run llama.cpp-compatible GGUF models from Hugging Face on iOS and Android with
 [llama.rn](https://github.com/mybigday/llama.rn). Supports text generation,
 embeddings, reranking and speech.
 
@@ -155,10 +155,12 @@ The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
 requests and surfaces them in Rozenite DevTools.
 
 ```bash
-npm install @react-native-ai/dev-tools
+npm install @react-native-ai/dev-tools @ai-sdk/otel
 ```
 
-Rozenite must be installed and enabled in your app. See the
+Register the profiler's tracer with `registerTelemetry` at app startup, see the
+[package README](./packages/dev-tools) for the setup. Rozenite must be
+installed and enabled in your app. See the
 [Rozenite getting started guide](https://www.rozenite.dev/docs/getting-started).
 
 The Expo demo app in [apps/expo-example](./apps/expo-example)
