@@ -28,13 +28,15 @@ AI SDK adapter status:
 | Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Not supported yet (warns)     |
 | Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Supported                     |
 | Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Throws unsupported error      |
-| Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Throws unsupported error      |
+| Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Supported, Parakeet TDT       |
 
 Structured output needs a JSON schema and runs as guided generation, so the output always matches it. Models whose inference engine cannot do guided generation reject with a `CORE_AI_UNSUPPORTED_CAPABILITY` error. When streaming, the JSON arrives in one piece once it is complete.
 
 The `reasoning` call option sets the model's thinking effort (`minimal`/`low` → `light`, `medium` → `moderate`, `high` and above → `deep`), and `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence. Reasoning comes back as reasoning parts. Core AI ignores `topP`, `topK`, `seed`, stop sequences and penalties, and returns a warning when they are set.
 
-`coreAI.embeddingModel(...)` and `coreAI.transcriptionModel(...)` exist so the API is in place, but they throw until the package has native runners for CLIP/CLAP and wav2vec2/Whisper models ([#237](https://github.com/callstackincubator/ai/issues/237)).
+`coreAI.transcriptionModel(...)` runs `CoreAISpeech` bundles. Export Parakeet TDT with `--streaming` so the model transcribes audio of any length and returns segments with timestamps, closed at pauses. Other bundles transcribe only as much audio as their traced window holds (5 seconds by default) and return one segment. Audio can be any format AVFoundation decodes (WAV, MP3, M4A, FLAC, CAF, AIFF), picked by `mediaType`. The model stays loaded after the first call. Parakeet does not detect the language, so `language` is not set.
+
+`coreAI.embeddingModel(...)` exists so the API is in place, but it throws until the package has native runners for CLIP models ([#237](https://github.com/callstackincubator/ai/issues/237)).
 
 There are no adapters for reranking, speech generation, or video generation, because `coreai-models` has no models for them. Use `@react-native-ai/apple` for system speech synthesis.
 

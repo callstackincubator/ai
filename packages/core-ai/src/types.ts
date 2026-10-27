@@ -94,15 +94,11 @@ export interface CoreAIGenerationOptions {
   providerOptions?: { reasoningLevel?: CoreAIReasoningLevel }
 }
 
-/**
- * Foundation Models reasoning level. Core AI maps it to the chat template's
- * thinking effort, and `none` turns thinking off
- */
+// Foundation Models reasoning level. Core AI maps it to the chat template's
+// thinking effort, and `none` turns thinking off
 export type CoreAIReasoningLevel = 'none' | 'light' | 'moderate' | 'deep'
 
-/**
- * Options under `providerOptions['core-ai']` of AI SDK calls
- */
+// Options under `providerOptions['core-ai']` of AI SDK calls
 export interface CoreAIProviderOptions {
   reasoningLevel?: CoreAIReasoningLevel
 }
@@ -218,6 +214,7 @@ export interface CoreAICapabilities {
   isCoreAIDiffusionAvailable: boolean
   isCoreAISegmentationAvailable: boolean
   isCoreAIObjectDetectionAvailable: boolean
+  isCoreAISpeechAvailable: boolean
   supportedPlatform: boolean
   missingProducts: string[]
 }

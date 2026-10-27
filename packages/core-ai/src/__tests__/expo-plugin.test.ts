@@ -51,8 +51,8 @@ describe('setCoreAIPodfileProperties', () => {
 
   test('rejects unknown and empty task lists', () => {
     expect(() =>
-      setCoreAIPodfileProperties({}, { tasks: ['asr' as never] })
-    ).toThrow('unknown task "asr"')
+      setCoreAIPodfileProperties({}, { tasks: ['raw' as never] })
+    ).toThrow('unknown task "raw"')
     expect(() => setCoreAIPodfileProperties({}, { tasks: [] })).toThrow(
       'must list at least one'
     )

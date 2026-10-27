@@ -2,6 +2,9 @@ import type {
   EmbeddingModelV4,
   EmbeddingModelV4CallOptions,
   EmbeddingModelV4Result,
+  Experimental_TranscriptionModelV4StreamOptions as TranscriptionModelV4StreamOptions,
+  Experimental_TranscriptionModelV4StreamPart as TranscriptionModelV4StreamPart,
+  Experimental_TranscriptionModelV4StreamResult as TranscriptionModelV4StreamResult,
   ImageModelV4,
   ImageModelV4CallOptions,
   LanguageModelV4,
@@ -15,6 +18,7 @@ import type {
   TranscriptionModelV4,
   TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
+import { UnsupportedFunctionalityError } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import {
   type AppleStreamEntry,
@@ -109,10 +113,8 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     ) as Promise<CoreAIModelInfo>
   }
 
-  /**
-   * Loads the model once. Later calls, including generateText and streamText,
-   * reuse it until unload()
-   */
+  // Loads the model once. Later calls, including generateText and streamText,
+  // reuse it until unload()
   async prepare(
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAIModelInfo> {
@@ -128,9 +130,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     ) as Promise<CoreAIModelInfo>
   }
 
-  /**
-   * Releases the native model and the sessions created from it
-   */
+  // Releases the native model and the sessions created from it
   async unload(): Promise<void> {
     const loading = this.loading
     if (!loading) {
@@ -430,6 +430,139 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
     ) as Promise<CoreAITranscriptionResult>
   }
 
+  // Transcribes live 16-bit PCM audio on a streaming Parakeet TDT bundle.
+  // Segments close at pauses, and their text only ever grows until then
+  async doStream(
+    options: TranscriptionModelV4StreamOptions
+  ): Promise<TranscriptionModelV4StreamResult> {
+    const { inputAudioFormat, abortSignal } = options
+    if (inputAudioFormat.type !== 'audio/pcm') {
+      throw new UnsupportedFunctionalityError({
+        functionality: `streaming transcription of ${inputAudioFormat.type}`,
+        message: `Core AI streams 16-bit PCM audio (audio/pcm), not ${inputAudioFormat.type}.`,
+      })
+    }
+
+    const streamId = generateId()
+    const config = toNativeModelConfig(this.config)
+    const modelId = this.modelId
+    const audio = options.audio.getReader()
+    let listener: { remove(): void } | undefined
+    const cleanup = () => {
+      listener?.remove()
+      abortSignal?.removeEventListener('abort', onAbort)
+    }
+    function onAbort() {
+      NativeCoreAI.cancelStream(streamId)
+      audio.cancel().catch(() => {})
+    }
+
+    const stream = new ReadableStream<TranscriptionModelV4StreamPart>({
+      async start(controller) {
+        controller.enqueue({ type: 'stream-start', warnings: [] })
+        controller.enqueue({
+          type: 'response-metadata',
+          timestamp: new Date(),
+          modelId,
+        })
+
+        // Text sent so far of each segment, to send what the next update adds
+        const sentText = new Map<number, string>()
+        listener = NativeCoreAI.onTranscriptionUpdate((update) => {
+          if (update.streamId !== streamId) {
+            return
+          }
+          const id = `segment-${update.segmentIndex}`
+          const sent = sentText.get(update.segmentIndex) ?? ''
+          const text = update.text.trim()
+          if (text.startsWith(sent) && text.length > sent.length) {
+            // Segments after the first start with a space
+            const separator = sent === '' && update.segmentIndex > 0 ? ' ' : ''
+            controller.enqueue({
+              type: 'transcript-delta',
+              id,
+              delta: separator + text.slice(sent.length),
+            })
+            sentText.set(update.segmentIndex, text)
+          }
+          if (update.type === 'final' && text) {
+            controller.enqueue({
+              type: 'transcript-final',
+              id,
+              text,
+              startSecond: update.startSecond,
+              endSecond: update.endSecond,
+            })
+          }
+        })
+        abortSignal?.addEventListener('abort', onAbort)
+
+        try {
+          await NativeCoreAI.startTranscriptionStream(streamId, config, {
+            sampleRate: inputAudioFormat.rate ?? 16000,
+          })
+          // A sample can be split across chunks
+          let carry: number | undefined
+          while (true) {
+            const { done, value } = await audio.read()
+            if (done || abortSignal?.aborted) {
+              break
+            }
+            const bytes =
+              typeof value === 'string'
+                ? Uint8Array.from(atob(value), (char) => char.charCodeAt(0))
+                : value
+            let chunk = bytes
+            if (carry !== undefined) {
+              chunk = new Uint8Array(bytes.length + 1)
+              chunk[0] = carry
+              chunk.set(bytes, 1)
+              carry = undefined
+            }
+            if (chunk.length % 2 === 1) {
+              carry = chunk[chunk.length - 1]
+              chunk = chunk.subarray(0, chunk.length - 1)
+            }
+            if (chunk.length > 0) {
+              await NativeCoreAI.appendTranscriptionAudio(
+                streamId,
+                toBase64(chunk)
+              )
+            }
+          }
+          if (abortSignal?.aborted) {
+            throw abortSignal.reason ?? new Error('Transcription was aborted.')
+          }
+
+          const result = (await NativeCoreAI.finishTranscriptionStream(
+            streamId
+          )) as CoreAITranscriptionResult
+          controller.enqueue({
+            type: 'finish',
+            text: result.text,
+            segments: result.segments,
+            durationInSeconds: result.durationInSeconds,
+            providerMetadata: result.metadata
+              ? ({ 'core-ai': result.metadata } as any)
+              : undefined,
+          })
+          controller.close()
+        } catch (error) {
+          NativeCoreAI.cancelStream(streamId)
+          controller.error(error)
+        } finally {
+          cleanup()
+        }
+      },
+      cancel() {
+        onAbort()
+        cleanup()
+      },
+    })
+
+    return { stream, response: { timestamp: new Date(), modelId } }
+  }
+
   async doGenerate(options: TranscriptionModelV4CallOptions) {
     const result = await this.transcribe(options.audio, options.mediaType, {
       ...(options.providerOptions?.['core-ai'] ?? {}),
@@ -574,10 +707,8 @@ const UNSUPPORTED_SETTINGS = [
   'frequencyPenalty',
 ] as const
 
-/**
- * Converts the prompt into messages replayed natively as the session
- * transcript, and warns about the options Core AI ignores
- */
+// Converts the prompt into messages replayed natively as the session
+// transcript, and warns about the options Core AI ignores
 function prepareCall(options: LanguageModelV4CallOptions): {
   messages: CoreAIMessage[]
   warnings: SharedV4Warning[]

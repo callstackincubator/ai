@@ -219,6 +219,34 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
   [_coreAI transcribe:CoreAIConfigToDictionary(config) audioBase64:audioBase64 mediaType:mediaType options:options resolve:resolve reject:reject];
 }
 
+- (void)startTranscriptionStream:(nonnull NSString *)streamId
+                          config:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+                         options:(nonnull NSDictionary *)options
+                         resolve:(nonnull RCTPromiseResolveBlock)resolve
+                          reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI startTranscriptionStream:streamId
+                             config:CoreAIConfigToDictionary(config)
+                            options:options
+                           onUpdate:^(NSDictionary *update) {
+    [self emitOnTranscriptionUpdate:update];
+  }
+                            resolve:resolve
+                             reject:reject];
+}
+
+- (void)appendTranscriptionAudio:(nonnull NSString *)streamId
+                       pcmBase64:(nonnull NSString *)pcmBase64
+                         resolve:(nonnull RCTPromiseResolveBlock)resolve
+                          reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI appendTranscriptionAudio:streamId pcmBase64:pcmBase64 resolve:resolve reject:reject];
+}
+
+- (void)finishTranscriptionStream:(nonnull NSString *)streamId
+                          resolve:(nonnull RCTPromiseResolveBlock)resolve
+                           reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI finishTranscriptionStream:streamId resolve:resolve reject:reject];
+}
+
 - (void)generateImage:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
                prompt:(nonnull NSString *)prompt
               options:(nonnull NSDictionary *)options

@@ -17,6 +17,7 @@ module.exports = ({ config }) => ({
                 'diffusion',
                 'object-detection',
                 'segmentation',
+                'asr',
               ],
             },
           ],

@@ -30,12 +30,22 @@ import CoreAILanguageModels
 import CoreAIObjectDetector
 #endif
 
+#if canImport(CoreAISpeech)
+import AVFoundation
+import CoreAISpeech
+#endif
+
 @objc
 public class CoreAIImpl: NSObject {
   private let lock = NSLock()
   private var loadedModels: [String: Any] = [:]
   private var languageSessions: [String: LanguageSessionEntry] = [:]
   private var tasks: [String: Task<Void, Never>] = [:]
+  // The speech model last used, by bundle path, since loading one compiles
+  // and warms its graphs. One stays loaded, so switching models releases the
+  // last one
+  private var loadedSpeechModel: (path: String, load: Any)?
+  private var transcriptionStreams: [String: Any] = [:]
 
   @objc
   public func getCapabilities(
@@ -56,6 +66,9 @@ public class CoreAIImpl: NSObject {
 #if !canImport(CoreAIObjectDetector)
     missingProducts.append("CoreAIObjectDetection")
 #endif
+#if !canImport(CoreAISpeech)
+    missingProducts.append("CoreAISpeech")
+#endif
 
     resolve([
       "isCoreAIRuntimeAvailable": Self.isCoreAIRuntimeAvailable(),
@@ -63,6 +76,7 @@ public class CoreAIImpl: NSObject {
       "isCoreAIDiffusionAvailable": Self.isCoreAIDiffusionAvailable(),
       "isCoreAISegmentationAvailable": Self.isCoreAISegmentationAvailable(),
       "isCoreAIObjectDetectionAvailable": Self.isCoreAIObjectDetectionAvailable(),
+      "isCoreAISpeechAvailable": Self.isCoreAISpeechAvailable(),
       "supportedPlatform": Self.isSupportedPlatform(),
       "missingProducts": missingProducts
     ])
@@ -353,6 +367,12 @@ public class CoreAIImpl: NSObject {
   public func cancelStream(_ streamId: String) {
     let task = locked { tasks.removeValue(forKey: streamId) }
     task?.cancel()
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *),
+       let stream = locked({ transcriptionStreams.removeValue(forKey: streamId) }) as? TranscriptionStream {
+      Task { await stream.cancel() }
+    }
+#endif
   }
 
   @objc
@@ -375,7 +395,132 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    rejectCoreAI(.unsupportedTask("asr"), reject: reject)
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        guard let audio = Data(base64Encoded: audioBase64) else {
+          throw CoreAIError.invalidInput("Expected base64 encoded audio.")
+        }
+        Task {
+          do {
+            let model = try await self.speechModel(at: sourceURL)
+            let sampleRate = await model.sampleRate
+            let pcm = try Self.loadPCM(audio, mediaType: mediaType, sampleRate: sampleRate)
+            resolve(try await Self.transcribe(pcm, with: model))
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  /// Starts transcribing live audio, pushed with appendTranscriptionAudio as
+  /// 16-bit PCM at options.sampleRate. Needs a streaming Parakeet TDT bundle
+  @objc
+  public func startTranscriptionStream(
+    _ streamId: String,
+    config: [String: Any],
+    options: [String: Any]?,
+    onUpdate: @escaping ([String: Any]) -> Void,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        let inputSampleRate = options?["sampleRate"] as? Double ?? 16_000
+        Task {
+          do {
+            let model = try await self.speechModel(at: sourceURL)
+            let stream = try await TranscriptionStream(model: model, inputSampleRate: inputSampleRate) { update in
+              onUpdate(update.merging(["streamId": streamId]) { current, _ in current })
+            }
+            self.locked { self.transcriptionStreams[streamId] = stream }
+            resolve(nil)
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  @objc
+  public func appendTranscriptionAudio(
+    _ streamId: String,
+    pcmBase64: String,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      guard let stream = locked({ transcriptionStreams[streamId] }) as? TranscriptionStream else {
+        rejectCoreAI(.invalidInput("Core AI transcription stream was not found: \(streamId)."), reject: reject)
+        return
+      }
+      guard let audio = Data(base64Encoded: pcmBase64) else {
+        rejectCoreAI(.invalidInput("Expected base64 encoded 16-bit PCM."), reject: reject)
+        return
+      }
+      Task {
+        do {
+          try await stream.append(audio)
+          resolve(nil)
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  /// Transcribes the audio still buffered and resolves with the transcript
+  @objc
+  public func finishTranscriptionStream(
+    _ streamId: String,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      guard let stream = locked({ transcriptionStreams.removeValue(forKey: streamId) }) as? TranscriptionStream else {
+        rejectCoreAI(.invalidInput("Core AI transcription stream was not found: \(streamId)."), reject: reject)
+        return
+      }
+      Task {
+        do {
+          resolve(try await stream.finish())
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
   }
 
   @objc
@@ -781,6 +926,14 @@ public class CoreAIImpl: NSObject {
     return false
 #endif
   }
+
+  private static func isCoreAISpeechAvailable() -> Bool {
+#if canImport(CoreAISpeech)
+    return isSupportedPlatform()
+#else
+    return false
+#endif
+  }
 }
 
 #if canImport(CoreAIDiffusionPipeline)
@@ -935,6 +1088,287 @@ extension CoreAIImpl {
       throw CoreAIError.invalidInput("Could not create a segmentation mask image.")
     }
     return image
+  }
+}
+#endif
+
+#if canImport(CoreAISpeech)
+@available(iOS 27, macOS 27, *)
+extension CoreAIImpl {
+  // Concurrent calls for the same bundle share one load
+  private func speechModel(at sourceURL: URL) async throws -> SpeechRecognitionModel {
+    let load = locked { () -> Task<SpeechRecognitionModel, Error> in
+      if let cached = loadedSpeechModel, cached.path == sourceURL.path,
+         let load = cached.load as? Task<SpeechRecognitionModel, Error> {
+        return load
+      }
+      let load = Task { try await SpeechRecognitionModel(resourcesAt: sourceURL) }
+      loadedSpeechModel = (sourceURL.path, load)
+      return load
+    }
+    do {
+      return try await load.value
+    } catch {
+      // A failed load is retried on the next call
+      locked {
+        if loadedSpeechModel?.load as? Task<SpeechRecognitionModel, Error> == load {
+          loadedSpeechModel = nil
+        }
+      }
+      throw error
+    }
+  }
+
+  /// Streaming bundles slide their window over audio of any length and close
+  /// segments at pauses. Other bundles transcribe only as much audio as their
+  /// traced window holds, in one segment
+  private static func transcribe(_ pcm: [Float], with model: SpeechRecognitionModel) async throws -> [String: Any] {
+    let sampleRate = await model.sampleRate
+    let stream: TranscriptionStream
+    do {
+      stream = try await TranscriptionStream(model: model, inputSampleRate: sampleRate, onUpdate: nil)
+    } catch SpeechError.incompatibleResources, SpeechError.invalidStreamingConfig {
+      let durationInSeconds = Double(pcm.count) / sampleRate
+      let (text, _) = try await model.transcribe(pcm: pcm)
+      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      return [
+        "text": trimmed,
+        "segments": trimmed.isEmpty ? [] : [["text": trimmed, "startSecond": 0, "endSecond": durationInSeconds]],
+        "durationInSeconds": durationInSeconds,
+        "metadata": ["architecture": await model.architecture, "streaming": false]
+      ]
+    }
+
+    // One second at a time, as a microphone would push it
+    let chunkSize = Int(sampleRate)
+    for start in stride(from: 0, to: pcm.count, by: chunkSize) {
+      try await stream.append(samples: Array(pcm[start..<min(start + chunkSize, pcm.count)]))
+    }
+    return try await stream.finish()
+  }
+
+  /// Decodes audio to mono float PCM at the model's sample rate
+  private static func loadPCM(_ audio: Data, mediaType: String, sampleRate: Double) throws -> [Float] {
+    // AVAudioFile reads from files and picks the decoder by extension
+    let fileURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("core-ai-audio-\(UUID().uuidString)")
+      .appendingPathExtension(audioExtension(for: mediaType))
+    try audio.write(to: fileURL)
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+
+    let file: AVAudioFile
+    do {
+      file = try AVAudioFile(forReading: fileURL)
+    } catch {
+      throw CoreAIError.invalidInput("Could not decode \(mediaType) audio: \(error.localizedDescription)")
+    }
+    guard let outputFormat = AVAudioFormat(
+      commonFormat: .pcmFormatFloat32,
+      sampleRate: sampleRate,
+      channels: 1,
+      interleaved: false
+    ),
+      let converter = AVAudioConverter(from: file.processingFormat, to: outputFormat),
+      let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
+    else {
+      throw CoreAIError.invalidInput("Could not convert \(mediaType) audio to \(Int(sampleRate)) Hz mono.")
+    }
+    try file.read(into: input)
+
+    let capacity = AVAudioFrameCount(Double(input.frameLength) * sampleRate / file.processingFormat.sampleRate) + 1024
+    guard let output = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else {
+      throw CoreAIError.invalidInput("Could not allocate the audio buffer.")
+    }
+    var consumed = false
+    var conversionError: NSError?
+    converter.convert(to: output, error: &conversionError) { _, status in
+      if consumed {
+        status.pointee = .endOfStream
+        return nil
+      }
+      consumed = true
+      status.pointee = .haveData
+      return input
+    }
+    if let conversionError {
+      throw CoreAIError.invalidInput("Could not convert \(mediaType) audio: \(conversionError.localizedDescription)")
+    }
+    guard let samples = output.floatChannelData?[0] else {
+      return []
+    }
+    return Array(UnsafeBufferPointer(start: samples, count: Int(output.frameLength)))
+  }
+
+  fileprivate static func serializeSegment(_ segment: TranscriptSegment, type: String) -> [String: Any] {
+    return [
+      "type": type,
+      "segmentIndex": segment.segmentIndex,
+      "text": segment.text,
+      "startSecond": segment.startTime,
+      "endSecond": segment.endTime
+    ]
+  }
+
+  private static func audioExtension(for mediaType: String) -> String {
+    switch mediaType.lowercased() {
+    case "audio/mpeg", "audio/mp3":
+      return "mp3"
+    case "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/aac":
+      return "m4a"
+    case "audio/flac", "audio/x-flac":
+      return "flac"
+    case "audio/x-caf", "audio/caf":
+      return "caf"
+    case "audio/aiff", "audio/x-aiff":
+      return "aiff"
+    default:
+      return "wav"
+    }
+  }
+}
+
+/// One streaming session on a speech model. Partial updates are append-only
+/// and segments close at pauses. A model runs one session at a time
+@available(iOS 27, macOS 27, *)
+private actor TranscriptionStream {
+  private let model: SpeechRecognitionModel
+  private let sampleRate: Double
+  private let architecture: String
+  // Resamples pushed audio to the model's rate, keeping filter state across chunks
+  private let converter: AVAudioConverter?
+  private let collector: Task<[[String: Any]], Error>
+  private var sampleCount = 0
+
+  init(
+    model: SpeechRecognitionModel,
+    inputSampleRate: Double,
+    onUpdate: (([String: Any]) -> Void)?
+  ) async throws {
+    self.model = model
+    self.sampleRate = await model.sampleRate
+    self.architecture = await model.architecture
+
+    if inputSampleRate != sampleRate {
+      guard let inputFormat = AVAudioFormat(
+        commonFormat: .pcmFormatFloat32, sampleRate: inputSampleRate, channels: 1, interleaved: false),
+        let outputFormat = AVAudioFormat(
+          commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false),
+        let converter = AVAudioConverter(from: inputFormat, to: outputFormat)
+      else {
+        throw CoreAIError.invalidInput("Could not resample \(Int(inputSampleRate)) Hz audio to \(Int(sampleRate)) Hz.")
+      }
+      self.converter = converter
+    } else {
+      self.converter = nil
+    }
+
+    let updates = try await model.startStream()
+    self.collector = Task {
+      var segments: [[String: Any]] = []
+      for try await update in updates {
+        switch update {
+        case .partial(let segment):
+          onUpdate?(CoreAIImpl.serializeSegment(segment, type: "partial"))
+        case .finalized(let segment):
+          onUpdate?(CoreAIImpl.serializeSegment(segment, type: "final"))
+          let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+          if !text.isEmpty {
+            segments.append(["text": text, "startSecond": segment.startTime, "endSecond": segment.endTime])
+          }
+        }
+      }
+      return segments
+    }
+  }
+
+  /// Appends 16-bit little-endian mono PCM
+  func append(_ pcm16: Data) async throws {
+    guard pcm16.count % 2 == 0 else {
+      throw CoreAIError.invalidInput("Expected 16-bit PCM, got an odd number of bytes.")
+    }
+    let samples = pcm16.withUnsafeBytes { bytes in
+      bytes.bindMemory(to: Int16.self).map { Float(Int16(littleEndian: $0)) / 32_768 }
+    }
+    try await append(samples: samples)
+  }
+
+  func append(samples: [Float]) async throws {
+    do {
+      let resampled = try resample(samples, isLast: false)
+      sampleCount += resampled.count
+      try await model.append(pcm: resampled)
+    } catch {
+      await cancel()
+      throw error
+    }
+  }
+
+  func finish() async throws -> [String: Any] {
+    do {
+      let tail = try resample([], isLast: true)
+      if !tail.isEmpty {
+        sampleCount += tail.count
+        try await model.append(pcm: tail)
+      }
+      try await model.finishStream()
+    } catch {
+      await cancel()
+      throw error
+    }
+    let segments = try await collector.value
+    return [
+      "text": segments.compactMap { $0["text"] as? String }.joined(separator: " "),
+      "segments": segments,
+      "durationInSeconds": Double(sampleCount) / sampleRate,
+      "metadata": ["architecture": architecture, "streaming": true]
+    ]
+  }
+
+  // A session left running would make the model's next startStream throw
+  func cancel() async {
+    _ = try? await model.finishStream()
+    collector.cancel()
+  }
+
+  private func resample(_ samples: [Float], isLast: Bool) throws -> [Float] {
+    guard let converter else {
+      return samples
+    }
+    let input = AVAudioPCMBuffer(pcmFormat: converter.inputFormat, frameCapacity: AVAudioFrameCount(max(samples.count, 1)))
+    let ratio = converter.outputFormat.sampleRate / converter.inputFormat.sampleRate
+    let output = AVAudioPCMBuffer(
+      pcmFormat: converter.outputFormat,
+      frameCapacity: AVAudioFrameCount(Double(samples.count) * ratio) + 1024
+    )
+    guard let input, let output else {
+      throw CoreAIError.invalidInput("Could not allocate the audio buffer.")
+    }
+    samples.withUnsafeBufferPointer { pointer in
+      if let baseAddress = pointer.baseAddress {
+        input.floatChannelData?[0].update(from: baseAddress, count: samples.count)
+      }
+    }
+    input.frameLength = AVAudioFrameCount(samples.count)
+
+    var consumed = samples.isEmpty
+    var conversionError: NSError?
+    converter.convert(to: output, error: &conversionError) { _, status in
+      if consumed {
+        // More audio follows unless this is the last call, which flushes the filter
+        status.pointee = isLast ? .endOfStream : .noDataNow
+        return nil
+      }
+      consumed = true
+      status.pointee = .haveData
+      return input
+    }
+    if let conversionError {
+      throw CoreAIError.invalidInput("Could not resample audio: \(conversionError.localizedDescription)")
+    }
+    guard let channel = output.floatChannelData?[0] else {
+      return []
+    }
+    return Array(UnsafeBufferPointer(start: channel, count: Int(output.frameLength)))
   }
 }
 #endif

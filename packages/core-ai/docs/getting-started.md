@@ -58,6 +58,7 @@ By default the pod links native support for every task the module implements. Ea
 | `diffusion`        | `coreAI.imageModel(...)`                  | `CoreAIDiffusion`       |
 | `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
 | `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
+| `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 

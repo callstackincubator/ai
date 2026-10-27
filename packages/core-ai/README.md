@@ -15,9 +15,9 @@ Foundation Models, NLContextualEmbedding, SpeechAnalyzer, and AVSpeechSynthesize
 
 Core AI exposes two layers:
 
-- AI SDK adapters: language models and image generation. Text embedding and
-  transcription adapters exist, because Apple has starter export recipes for
-  them, but they reject with an unsupported error until native runners land
+- AI SDK adapters: language models, image generation and transcription. The
+  text embedding adapter exists, because Apple has starter export recipes for
+  it, but rejects with an unsupported error until its native runner lands
   ([#237](https://github.com/callstackincubator/ai/issues/237)).
 - Direct native APIs: model loading, persistent language sessions, model
   inspection, segmentation, and object detection. `specializeModel` returns
@@ -76,6 +76,7 @@ By default the pod links native support for every task the module implements. Ea
 | `diffusion`        | `coreAI.imageModel(...)`                  | `CoreAIDiffusion`       |
 | `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
 | `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
+| `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 

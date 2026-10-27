@@ -56,6 +56,28 @@ const createLanguageSession = mock(
 const onStreamUpdate = createEmitter()
 const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
+const onTranscriptionUpdate = createEmitter()
+
+const transcriptionResult = {
+  text: 'hello world',
+  segments: [{ text: 'hello world', startSecond: 0, endSecond: 1 }],
+  durationInSeconds: 1,
+  metadata: { architecture: 'Parakeet TDT', streaming: true },
+}
+const startTranscriptionStream = mock(
+  async (
+    _streamId: string,
+    _config: Record<string, unknown>,
+    _options: Record<string, unknown>
+  ) => {}
+)
+const appendTranscriptionAudio = mock(
+  async (_streamId: string, _pcmBase64: string) => {}
+)
+const finishTranscriptionStream = mock(
+  async (_streamId: string): Promise<Record<string, unknown>> =>
+    transcriptionResult
+)
 
 mock.module('react-native', () => ({
   TurboModuleRegistry: {
@@ -69,6 +91,10 @@ mock.module('react-native', () => ({
       onStreamUpdate,
       onStreamComplete,
       onStreamError,
+      startTranscriptionStream,
+      appendTranscriptionAudio,
+      finishTranscriptionStream,
+      onTranscriptionUpdate,
     }),
   },
 }))
@@ -87,8 +113,10 @@ function createCallOptions(
   }
 }
 
-async function readAll(stream: ReadableStream<LanguageModelV4StreamPart>) {
-  const parts: LanguageModelV4StreamPart[] = []
+async function readAll<Part = LanguageModelV4StreamPart>(
+  stream: ReadableStream<Part>
+) {
+  const parts: Part[] = []
   const reader = stream.getReader()
   while (true) {
     const { done, value } = await reader.read()
@@ -464,5 +492,124 @@ describe('core ai reasoning', () => {
 
     expect(lastReasoningLevel()).toBeUndefined()
     expect(result.warnings).toEqual([])
+  })
+})
+
+describe('core ai streaming transcription', () => {
+  const createTranscriptionModel = () =>
+    coreAI.transcriptionModel({
+      id: 'parakeet',
+      source: { type: 'file', uri: '/parakeet' },
+    })
+
+  const audioStream = (chunks: (Uint8Array | string)[]) =>
+    new ReadableStream<Uint8Array | string>({
+      start(controller) {
+        chunks.forEach((chunk) => controller.enqueue(chunk))
+        controller.close()
+      },
+    })
+
+  const update = (
+    streamId: string,
+    type: string,
+    segmentIndex: number,
+    text: string
+  ) =>
+    onTranscriptionUpdate.emit({
+      streamId,
+      type,
+      segmentIndex,
+      text,
+      startSecond: segmentIndex,
+      endSecond: segmentIndex + 0.5,
+    })
+
+  beforeEach(() => {
+    startTranscriptionStream.mockClear()
+    appendTranscriptionAudio.mockClear()
+    finishTranscriptionStream.mockClear()
+  })
+
+  test('sends whole 16-bit samples at the input rate', async () => {
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([1, 2, 3]), btoa('\x04')]),
+      inputAudioFormat: { type: 'audio/pcm', rate: 24000 },
+    })
+    await readAll(stream)
+
+    expect(startTranscriptionStream.mock.calls[0][2]).toEqual({
+      sampleRate: 24000,
+    })
+    // The odd byte of the first chunk is carried into the second
+    expect(appendTranscriptionAudio.mock.calls.map(([, pcm]) => pcm)).toEqual([
+      btoa('\x01\x02'),
+      btoa('\x03\x04'),
+    ])
+  })
+
+  test('streams what each update adds and closes segments', async () => {
+    appendTranscriptionAudio.mockImplementationOnce(async (streamId) => {
+      update(streamId, 'partial', 0, 'Hello')
+      update(streamId, 'partial', 0, 'Hello world')
+      update(streamId, 'final', 0, 'Hello world.')
+      update(streamId, 'partial', 1, ' How')
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([0, 0])]),
+      inputAudioFormat: { type: 'audio/pcm' },
+    })
+    const parts = await readAll(stream)
+
+    expect(startTranscriptionStream.mock.calls[0][2]).toEqual({
+      sampleRate: 16000,
+    })
+    expect(parts.filter(({ type }) => type === 'transcript-delta')).toEqual([
+      { type: 'transcript-delta', id: 'segment-0', delta: 'Hello' },
+      { type: 'transcript-delta', id: 'segment-0', delta: ' world' },
+      { type: 'transcript-delta', id: 'segment-0', delta: '.' },
+      { type: 'transcript-delta', id: 'segment-1', delta: ' How' },
+    ])
+    expect(parts.filter(({ type }) => type === 'transcript-final')).toEqual([
+      {
+        type: 'transcript-final',
+        id: 'segment-0',
+        text: 'Hello world.',
+        startSecond: 0,
+        endSecond: 0.5,
+      },
+    ])
+    expect(parts.at(-1)).toEqual({
+      type: 'finish',
+      text: 'hello world',
+      segments: transcriptionResult.segments,
+      durationInSeconds: 1,
+      providerMetadata: { 'core-ai': transcriptionResult.metadata },
+    })
+  })
+
+  test('cancels the native stream when the audio fails', async () => {
+    appendTranscriptionAudio.mockImplementationOnce(async () => {
+      throw new Error('model busy')
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([0, 0])]),
+      inputAudioFormat: { type: 'audio/pcm' },
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('model busy')
+    expect(cancelStream).toHaveBeenCalled()
+    expect(finishTranscriptionStream).not.toHaveBeenCalled()
+  })
+
+  test('rejects audio that is not pcm', async () => {
+    await expect(
+      createTranscriptionModel().doStream({
+        audio: audioStream([]),
+        inputAudioFormat: { type: 'audio/pcmu', rate: 8000 },
+      })
+    ).rejects.toThrow('audio/pcm')
   })
 })
