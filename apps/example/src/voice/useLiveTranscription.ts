@@ -51,9 +51,10 @@ export function useLiveTranscription(model: TranscriptionModel) {
   useEffect(
     () => () => {
       if (simulationRef.current) clearInterval(simulationRef.current.timer)
-      recorderRef.current?.stop()
+      // stop() may be closing the same resources, so failures are ignored
+      recorderRef.current?.stop().catch(() => {})
       audioRef.current?.close()
-      audioContextRef.current?.close()
+      audioContextRef.current?.close().catch(() => {})
     },
     []
   )
@@ -193,20 +194,23 @@ export function useLiveTranscription(model: TranscriptionModel) {
 
     setStatus('finishing')
     level.value = withTiming(0)
-    // Captures the end of the last word
-    await new Promise((resolve) => setTimeout(resolve, STOP_DELAY_MS))
-    await recorder.stop()
-
-    // Ending the audio finalizes the transcription
-    audioRef.current?.close()
-    audioRef.current = null
+    // Releases everything even when stopping the recorder fails
     try {
+      // Captures the end of the last word
+      await new Promise((resolve) => setTimeout(resolve, STOP_DELAY_MS))
+      await recorder.stop()
+
+      // Ending the audio finalizes the transcription
+      audioRef.current?.close()
+      audioRef.current = null
       return (await transcriptionRef.current) ?? ''
     } finally {
+      audioRef.current?.close()
+      audioRef.current = null
       transcriptionRef.current = null
       recorderRef.current = null
       recorderAdapterRef.current = null
-      audioContextRef.current?.close()
+      audioContextRef.current?.close().catch(() => {})
       audioContextRef.current = null
       setStatus('idle')
     }

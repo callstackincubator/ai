@@ -116,12 +116,13 @@ export default function ChatScreen() {
   const handleSend = (content: string, attachments: ImageAttachment[]) => {
     const isFirstMessage = messages.length === 0
     const messageId = send(content, attachments)
-    if (!messageId) return
+    if (!messageId) return false
     setSentMessageId(messageId)
     // Read back from the store on the next render
     setTimeout(() => {
       scrollMessageToEnd({ animated: !isFirstMessage, closeKeyboard: false })
     })
+    return true
   }
 
   return (
@@ -145,6 +146,8 @@ export default function ChatScreen() {
             <Stack.Toolbar.MenuAction
               key={adapter.modelId}
               isOn={adapter.modelId === selectedModel?.modelId}
+              // Switching unloads the model, which would cut the reply short
+              disabled={isGenerating}
               onPress={() => selectModel(adapter.modelId)}
             >
               {adapter.label}

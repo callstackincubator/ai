@@ -57,6 +57,11 @@ const selectedModelIdAtom = atomWithPersistence<string | null>(
   null
 )
 
+// Model switches run one at a time, each unloading the previous model before
+// the next one is selected and prepared
+let modelTransition = Promise.resolve()
+let activeModel: SetupAdapter<LanguageModelV4> | undefined
+
 export function useModels() {
   const availability = useAtomValue(availabilityAtom)
   const refreshAvailability = useSetAtom(availabilityAtom)
@@ -103,10 +108,15 @@ export function useModels() {
     selectedModel,
     // Frees the previous model, as each open model holds gigabytes of memory
     selectModel: (modelId: string) => {
-      if (selectedModel && selectedModel.modelId !== modelId) {
-        selectedModel.unload()
-      }
-      setSelectedModelId(modelId)
+      const initial = selectedModel
+      modelTransition = modelTransition.then(async () => {
+        const previous = activeModel ?? initial
+        if (previous && previous.modelId !== modelId) {
+          await previous.unload().catch(() => {})
+        }
+        activeModel = chatModels.find((model) => model.modelId === modelId)
+        setSelectedModelId(modelId)
+      })
     },
     downloadModel,
     deleteModel,

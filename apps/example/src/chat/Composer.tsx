@@ -27,7 +27,8 @@ import { AttachmentMenu } from './AttachmentMenu'
 import { AttachmentThumbnails } from './AttachmentThumbnails'
 
 type ComposerProps = {
-  onSend: (message: string, attachments: ImageAttachment[]) => void
+  // Returns whether the message was sent
+  onSend: (message: string, attachments: ImageAttachment[]) => boolean
   onStop: () => void
   isGenerating: boolean
   imageInputEnabled: boolean
@@ -69,7 +70,8 @@ export function Composer({
 
   const handleSend = () => {
     if (!canSend || isGenerating) return
-    onSend(input.trim(), attachments)
+    // The draft stays when the message isn't sent
+    if (!onSend(input.trim(), attachments)) return
     setInput('')
     setAttachments([])
   }

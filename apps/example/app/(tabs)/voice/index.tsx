@@ -51,10 +51,8 @@ export default function VoiceScreen() {
     transform: [{ scale: withSpring(1 + level.value * 0.35) }],
   }))
 
-  const answer = async (question: string) => {
+  const answer = async (question: string, controller: AbortController) => {
     if (!selectedModel) return
-    const controller = new AbortController()
-    abortControllerRef.current = controller
     setPhase('thinking')
     try {
       const result = streamText({
@@ -107,12 +105,15 @@ export default function VoiceScreen() {
         )
       }
     } else if (phase === 'listening') {
-      // Leaves listening right away, so a second tap can't stop twice
+      // Leaves listening right away, so a second tap can't stop twice. The
+      // controller exists already, so a tap or leaving cancels the answer
       setPhase('thinking')
+      const controller = new AbortController()
+      abortControllerRef.current = controller
       try {
         const question = await stop()
-        if (question) {
-          answer(question)
+        if (question && !controller.signal.aborted) {
+          answer(question, controller)
         } else {
           setPhase('idle')
         }

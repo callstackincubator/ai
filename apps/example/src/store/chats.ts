@@ -83,8 +83,21 @@ export function useChats() {
     )
   }
 
+  // Photos are copied into the app, so they go with their chats
+  const deleteAttachments = (removed: Chat[]) => {
+    removed
+      .flatMap((chat) => chat.messages)
+      .flatMap((message) => message.attachments ?? [])
+      .forEach(deleteAttachment)
+  }
+
   // Drops the messages after the given one, to regenerate its reply
   const truncateAfter = (chatId: string, messageId: string) => {
+    const chat = chats.find((item) => item.id === chatId)
+    if (chat) {
+      const index = chat.messages.findIndex((m) => m.id === messageId)
+      deleteAttachments([{ ...chat, messages: chat.messages.slice(index + 1) }])
+    }
     setChats((prev) =>
       prev.map((chat) => {
         if (chat.id !== chatId) return chat
@@ -92,14 +105,6 @@ export function useChats() {
         return { ...chat, messages: chat.messages.slice(0, index + 1) }
       })
     )
-  }
-
-  // Photos are copied into the app, so they go with their chats
-  const deleteAttachments = (removed: Chat[]) => {
-    removed
-      .flatMap((chat) => chat.messages)
-      .flatMap((message) => message.attachments ?? [])
-      .forEach(deleteAttachment)
   }
 
   const deleteChat = (chatId: string) => {

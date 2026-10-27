@@ -65,6 +65,7 @@ export function useSemanticSearch(query: string) {
   // are not shown while a newer one is embedded
   const [results, setResults] = useState<{
     query: string
+    notes: Note[]
     items: SearchResult[]
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -124,6 +125,7 @@ export function useSemanticSearch(query: string) {
         if (cancelled) return
         setResults({
           query: text,
+          notes: userNotes,
           items: [...userNotes, ...sampleNotes]
             .filter((note) => vectors[note.id])
             .map((note) => ({
@@ -154,8 +156,12 @@ export function useSemanticSearch(query: string) {
 
   return {
     notes,
-    // Results only apply to the current query
-    results: results && results.query === query.trim() ? results.items : null,
+    // Results only apply to the current query and notes, so a deleted note
+    // isn't shown or sent to Chat
+    results:
+      results && results.query === query.trim() && results.notes === userNotes
+        ? results.items
+        : null,
     isIndexing: vectors === null && error === null,
     error,
     addNote,
