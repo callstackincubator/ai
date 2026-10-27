@@ -1,5 +1,12 @@
 # React Native AI - Example App
 
+<p>
+  <img src="screenshots/chat.png" width="24%" alt="Chat streaming a Markdown answer from Apple Intelligence" />
+  <img src="screenshots/voice.png" width="24%" alt="Voice answering a spoken question" />
+  <img src="screenshots/search.png" width="24%" alt="Search ranking notes by meaning" />
+  <img src="screenshots/setup.png" width="24%" alt="Setup listing Apple Intelligence and open models" />
+</p>
+
 An iOS app that shows what runs on an iPhone with React Native AI:
 
 - **Chat** with Apple Intelligence, or with open models (Qwen3.5 2B, Gemma 4 E2B) that run with llama.cpp after a download. Replies stream as Markdown, reasoning models show their thinking, and photos can be attached to models that see them.
