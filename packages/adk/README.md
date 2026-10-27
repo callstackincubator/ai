@@ -1,12 +1,13 @@
 # @react-native-ai/adk
 
-Use Gemini on Android from React Native, through Google's
-[Agent Development Kit (ADK)](https://developer.android.com/ai/adk). Gemini
-Nano runs on-device and is provided by the system through AICore, so your app
-has no model to bundle and needs no API key. AICore downloads Nano when
-`prepareNano()` is first called, if the device doesn't have it yet. Cloud Gemini is available when
-you need a larger model. The package comes with a
-[Vercel AI SDK](https://ai-sdk.dev) provider, so you can call both with
+**Gemini on Android, as a Vercel AI SDK provider for React Native.**
+
+Gemini Nano runs on-device through Google's
+[Agent Development Kit (ADK)](https://developer.android.com/ai/adk) and
+AICore. Your app has no model to bundle and needs no API key. AICore downloads
+Nano the first time `prepareNano()` runs, if the device doesn't have it yet.
+
+Cloud Gemini is available when you need a larger model. Both work with
 `generateText` and `streamText`, including tool calling and image input.
 
 To run models you choose and ship yourself on Android, see

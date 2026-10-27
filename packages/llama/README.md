@@ -1,11 +1,13 @@
 # @react-native-ai/llama
 
-Run open-weight GGUF models on iOS and Android with
-[llama.rn](https://github.com/mybigday/llama.rn). Download a model such as
-Qwen, Llama or Gemma from Hugging Face, load it into memory and run it fully
-on-device. The package comes with a [Vercel AI SDK](https://ai-sdk.dev)
-provider for text generation, embeddings, reranking and speech, each with a
-model trained for that task.
+**Open-weight GGUF models on iOS and Android, as a Vercel AI SDK provider for React Native.**
+
+Download a model such as Qwen, Llama or Gemma from Hugging Face, load it into
+memory and run it fully on-device with
+[llama.rn](https://github.com/mybigday/llama.rn).
+
+The provider covers text generation, embeddings, reranking and speech, each
+with a model trained for that task.
 
 Use it when you need the same models on both platforms, or a model the system
 doesn't provide. For models built into the OS, see
