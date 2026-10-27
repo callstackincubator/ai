@@ -8,6 +8,8 @@ export type Message = {
   id: string
   role: 'user' | 'assistant'
   content: string
+  // What a reasoning model thought before answering
+  reasoning?: string
   attachments?: ImageAttachment[]
 }
 
@@ -24,6 +26,7 @@ export type StreamingReply = {
   chatId: string
   id: string
   content: string
+  reasoning: string
 }
 
 const chatsAtom = atomWithPersistence<Chat[]>('chats', [])

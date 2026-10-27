@@ -45,7 +45,7 @@ export function useChatGeneration() {
 
     const controller = new AbortController()
     abortController = controller
-    const reply = { chatId, id: generateId(), content: '' }
+    const reply = { chatId, id: generateId(), content: '', reasoning: '' }
     setStreamingReply(reply)
     setIsGenerating(true)
 
@@ -54,11 +54,29 @@ export function useChatGeneration() {
         model: selectedModel.model,
         system: SYSTEM_PROMPT,
         messages: history.map(toModelMessage),
+        // A short think keeps small models from spending the reply on it
+        reasoning: selectedModel.capabilities.includes('reasoning')
+          ? 'low'
+          : undefined,
         abortSignal: controller.signal,
       })
-      for await (const chunk of result.textStream) {
-        reply.content += chunk
+      // Reasoning models think out loud before the answer
+      for await (const part of result.fullStream) {
+        if (part.type === 'text-delta') {
+          reply.content += part.text
+        } else if (part.type === 'reasoning-delta') {
+          reply.reasoning += part.text
+        } else if (part.type === 'error') {
+          throw part.error
+        } else {
+          continue
+        }
         setStreamingReply({ ...reply })
+      }
+      if (!reply.content.trim()) {
+        reply.content = reply.reasoning
+          ? 'I ran out of room before answering. Try a shorter question.'
+          : 'No answer this time. Try again.'
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } catch (error) {
@@ -72,6 +90,7 @@ export function useChatGeneration() {
           id: reply.id,
           role: 'assistant',
           content: reply.content,
+          reasoning: reply.reasoning || undefined,
         })
       }
       setStreamingReply(null)

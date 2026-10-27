@@ -1,5 +1,5 @@
 import { apple } from '@react-native-ai/apple'
-import { experimental_generateSpeech as generateSpeech } from 'ai'
+import { generateSpeech } from 'ai'
 import { AudioContext, AudioManager } from 'react-native-audio-api'
 
 // Speaks the text with Apple's on-device voice and resolves when it is done

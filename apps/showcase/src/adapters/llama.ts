@@ -7,6 +7,7 @@ import {
 } from '@react-native-ai/llama'
 import { File } from 'expo-file-system'
 
+import { isSimulator } from '../simulator'
 import type { Availability, SetupAdapter } from './types'
 
 function isDownloaded(modelId: string): boolean {
@@ -37,10 +38,12 @@ export function createLlamaLanguageSetupAdapter({
 }): SetupAdapter<LanguageModelV4> {
   const model = llama.languageModel(getModelPath(modelId), {
     projectorPath: projectorId ? getModelPath(projectorId) : undefined,
+    // The Simulator's Metal driver crashes on llama.cpp, so it runs on CPU
+    projectorUseGpu: !isSimulator,
     contextParams: {
       // Images take hundreds of tokens each
       n_ctx: projectorId ? 4096 : 2048,
-      n_gpu_layers: 99,
+      n_gpu_layers: isSimulator ? 0 : 99,
     },
   })
   const files = projectorId ? [modelId, projectorId] : [modelId]

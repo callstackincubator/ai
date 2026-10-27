@@ -106,6 +106,7 @@ export default function ChatScreen() {
       kind: 'streaming',
       id: streamingReply.id,
       content: streamingReply.content,
+      reasoning: streamingReply.reasoning,
     })
   }
   const anchorIndex = items.findIndex(

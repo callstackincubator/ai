@@ -10,7 +10,7 @@ import {
   Text,
   Toggle,
 } from '@expo/ui/swift-ui'
-import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers'
+import { pickerStyle, tag, tint } from '@expo/ui/swift-ui/modifiers'
 import Constants from 'expo-constants'
 import React from 'react'
 import { Alert, StyleSheet } from 'react-native'
@@ -30,6 +30,7 @@ import {
   useDownloadProgress,
   useModels,
 } from '../src/store/models'
+import { accent } from '../src/theme/brand'
 
 function confirm(title: string, message: string, onConfirm: () => void) {
   Alert.alert(title, message, [
@@ -109,7 +110,7 @@ export default function Settings() {
 
   return (
     <Host style={styles.host}>
-      <Form>
+      <Form modifiers={[tint(accent)]}>
         <Section title="Features">
           {features.map((feature) => (
             <Toggle

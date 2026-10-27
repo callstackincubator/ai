@@ -58,6 +58,10 @@ export default function VoiceScreen() {
         model: selectedModel.model,
         system: SYSTEM_PROMPT,
         prompt: question,
+        // Spoken answers should come quickly, without thinking first
+        reasoning: selectedModel.capabilities.includes('reasoning')
+          ? 'none'
+          : undefined,
         abortSignal: controller.signal,
       })
       let text = ''
