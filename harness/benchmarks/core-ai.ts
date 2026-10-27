@@ -122,13 +122,14 @@ export function benchmarkCoreAI(
   describe(`${runtime} benchmark`, () => {
     it('loads', async () => {
       await benchmark.download()
+      // Taken first, since Core AI keeps some memory after an unload
+      const baselineMB = footprintMB()
       // Specialized and compiled before the measured loads
       await benchmark.create().prepare()
       await benchmark.firstTokenMs()
       await benchmark.model.unload()
 
       await waitForCooldown()
-      const baselineMB = footprintMB()
       const { value: coldLoadMs, peakMemoryMB: loadPeakMemoryMB } =
         await withPeakMemory(() => timeMs(() => benchmark.create().prepare()))
       const loadedMB = footprintMB()
