@@ -2,39 +2,52 @@ import { PackageManagerTabs } from '@theme'
 
 # Getting Started
 
-The Apple provider enables you to use Apple's on-device AI capabilities with the Vercel AI SDK in React Native applications. This includes language models, text embeddings, and other Apple-provided AI features that run entirely on-device for privacy and performance.
+`@react-native-ai/apple` is an AI SDK provider for the AI that ships with iOS.
+There are no models to bundle, since it uses the system's models, which run on
+device. The system downloads some of them, such as embedding and transcription
+assets, on first use. The one exception is the opt-in
+[Private Cloud Compute](./models#private-cloud-compute) model.
+
+| Feature                          | Model                        | Apple API               |
+| -------------------------------- | ---------------------------- | ----------------------- |
+| [Text generation](./generating)  | `apple()`                    | Foundation Models       |
+| [Embeddings](./embeddings)       | `apple.embeddingModel()`     | `NLContextualEmbedding` |
+| [Transcription](./transcription) | `apple.transcriptionModel()` | `SpeechAnalyzer`        |
+| [Speech](./speech)               | `apple.speechModel()`        | `AVSpeechSynthesizer`   |
 
 ## Installation
 
-Install the Apple provider:
+<PackageManagerTabs command="install @react-native-ai/apple ai" />
 
-<PackageManagerTabs command="install @react-native-ai/apple" />
-
-You can use the Apple provider standalone, but we recommend the Vercel AI SDK for its unified APIs and streaming. To use it with the AI SDK, you'll need v7+ and [required polyfills](../polyfills.md):
-
-<PackageManagerTabs command="install ai" />
+The provider works with AI SDK v7 and needs its [polyfills](../polyfills.md).
+Examples with schemas also use `zod`.
 
 ## Requirements
 
-- **React Native New Architecture** - Required for native module functionality
+- React Native New Architecture
+- iOS 26 for text generation and transcription, on a device with Apple
+  Intelligence turned on. Embeddings and speech work on older versions.
+- Xcode 27 to build with the iOS 27 features. Older SDKs leave them out, see
+  [iOS Versions](./ios-versions).
 
-> [!NOTE]
-> Different Apple AI features have varying iOS version requirements. See [iOS Versions](./ios-versions) for what works on iOS 26 and iOS 27.
-
-## Running on Simulator
-
-To use Apple Intelligence with the iOS Simulator, you need to enable it on your macOS system first. See the [Running on Simulator](./running-on-simulator) guide for detailed setup instructions.
-
-## Basic Usage
-
-Import the Apple provider and use it with the AI SDK:
+## Usage
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
 import { generateText } from 'ai'
 
-const result = await generateText({
-  model: apple(),
-  prompt: 'Explain quantum computing in simple terms',
-})
+if (apple.isAvailable()) {
+  const { text } = await generateText({
+    model: apple(),
+    prompt: 'Explain quantum computing in simple terms.',
+  })
+}
 ```
+
+`isAvailable()` is `false` when the device is not eligible, Apple Intelligence
+is off, or the model is still downloading. [`getModelInfo()`](./models#availability-and-model-info)
+tells you which. Before iOS 26, `isAvailable()` is `false` and `getModelInfo()`
+rejects with `UNSUPPORTED_OS`.
+
+To test in the iOS Simulator, turn on Apple Intelligence on your Mac first, see
+[Running on Simulator](./running-on-simulator).

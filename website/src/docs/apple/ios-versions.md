@@ -22,62 +22,57 @@ Two things decide whether a feature is available:
 ## Language Model
 
 Features of `apple()` and `apple('private-cloud-compute')`. Options that ask
-for a missing feature (`reasoning`, image parts, the Private Cloud Compute
-model, Vision tools, a required tool choice, `maxToolCalls`) throw
-`UNSUPPORTED_OS`. Missing output, such as reasoning
-parts or usage, is left out.
+for a missing feature (image parts, the Private Cloud Compute model, Vision
+tools, a required or named tool choice, `maxToolCalls`) throw `UNSUPPORTED_OS`.
+A `reasoning` level the model cannot use, which includes every model before
+iOS 27, is dropped with an `unsupported` warning. Missing output, such as
+reasoning parts, is left out, and missing usage has undefined token counts.
 
-| Feature                                         | iOS 26 | iOS 26.4 | iOS 27                        |
-| ----------------------------------------------- | ------ | -------- | ----------------------------- |
-| Text generation and streaming                   | ✅     | ✅       | ✅                            |
-| Structured output (`generateObject`)            | ✅     | ✅       | ✅                            |
-| Streaming structured output                     | ❌     | ❌       | ❌                            |
-| JavaScript tools                                | ✅     | ✅       | ✅                            |
-| Tool calls and results in `generateText`        | ✅     | ✅       | ✅                            |
-| Tool calls and results while streaming          | ❌     | ❌       | ✅ Sent once the tool returns |
-| `toolChoice: 'auto'` and `'none'`               | ✅     | ✅       | ✅                            |
-| `toolChoice: 'required'`                        | ❌     | ❌       | ✅                            |
-| `toolChoice` with a named tool                  | ❌     | ❌       | ✅                            |
-| `maxToolCalls` provider option                  | ❌     | ❌       | ✅                            |
-| Guardrails (`permissiveContentTransformations`) | ✅     | ✅       | ✅                            |
-| `countTokens` and `contextSize`                 | ❌     | ✅       | ✅                            |
-| Reasoning level (`reasoning` option)            | ❌     | ❌       | ✅                            |
-| Reasoning parts in results and streams          | ❌     | ❌       | ✅                            |
-| Image prompts                                   | ❌     | ❌       | ✅ Final user prompt only     |
-| Private Cloud Compute model                     | ❌     | ❌       | ✅ Physical device only       |
-| Vision OCR and barcode tools                    | ❌     | ❌       | ✅ Physical device only       |
-| Spotlight search tool                           | ❌     | ❌       | ✅ Physical device only       |
-| Token usage and `'length'` finish reason        | ❌     | ❌       | ✅                            |
-| `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅     | ✅       | ✅                            |
-| Guardrail, refusal, language and asset errors   | ✅     | ✅       | ✅                            |
-| Timeout and network errors                      | ❌     | ❌       | ✅                            |
+| Feature                                         | iOS 26                        | iOS 26.4                      | iOS 27                        |
+| ----------------------------------------------- | ----------------------------- | ----------------------------- | ----------------------------- |
+| Text generation and streaming                   | ✅                            | ✅                            | ✅                            |
+| Structured output (`Output.object`)             | ✅                            | ✅                            | ✅                            |
+| Structured output with `streamText`             | ✅ Sent whole at the end      | ✅ Sent whole at the end      | ✅ Sent whole at the end      |
+| JavaScript tools                                | ✅                            | ✅                            | ✅                            |
+| Tool calls and results in `generateText`        | ✅                            | ✅                            | ✅                            |
+| Tool calls and results while streaming          | ✅ Sent once the tool returns | ✅ Sent once the tool returns | ✅ Sent once the tool returns |
+| `toolChoice: 'auto'` and `'none'`               | ✅                            | ✅                            | ✅                            |
+| `toolChoice: 'required'`                        | ❌                            | ❌                            | ✅                            |
+| `toolChoice` with a named tool                  | ❌                            | ❌                            | ✅                            |
+| `maxToolCalls` provider option                  | ❌                            | ❌                            | ✅                            |
+| Guardrails (`permissiveContentTransformations`) | ✅                            | ✅                            | ✅                            |
+| `countTokens` and `contextSize`                 | ❌                            | ✅                            | ✅                            |
+| Reasoning level (`reasoning` option)            | Ignored, with a warning       | Ignored, with a warning       | ✅                            |
+| Reasoning parts in results and streams          | ❌                            | ❌                            | ✅                            |
+| Image prompts                                   | ❌                            | ❌                            | ✅ Final user prompt only     |
+| Private Cloud Compute model                     | ❌                            | ❌                            | ✅ Physical device only       |
+| Vision OCR and barcode tools                    | ❌                            | ❌                            | ✅ Physical device only       |
+| Spotlight search tool                           | ❌                            | ❌                            | ✅ Physical device only       |
+| Token usage and `'length'` finish reason        | ❌                            | ✅ Counted with the tokenizer | ✅                            |
+| `CONTEXT_WINDOW_EXCEEDED` and `RATE_LIMITED`    | ✅                            | ✅                            | ✅                            |
+| Guardrail, refusal, language and asset errors   | ✅                            | ✅                            | ✅                            |
+| Timeout and network errors                      | ❌                            | ❌                            | ✅                            |
 
 Notes:
 
-- **Tool choice.** Apple runs tools itself, inside the session. Its required
-  mode applies to every model request in that tool loop, so on its own the
-  model would keep calling tools and never answer. On iOS 27 the provider
-  requires a tool call only until the model has made one, then lets it answer.
-  - `'none'` leaves the tools out. On iOS 27 it also sets Apple's disallowed
-    mode, which turns off built-in tools.
-  - `'required'` makes the model call at least one tool before it answers.
-  - A named tool is the only tool offered, without built-in tools, and the
-    model must call it.
+- **Tool choice.** Apple's required mode applies to every request in its tool
+  loop, so the model would never answer. On iOS 27 the provider requires a
+  tool call only until the model has made one. See [Tools](./tools#tool-choice).
 - **Guardrails** apply to the `system` model only. Private Cloud Compute
   ignores them.
-- **Streaming tool calls.** Before iOS 27 Apple does not expose tool activity
-  while a response streams, so a stream only contains text. On iOS 27, the
-  `tool-call` and `tool-result` parts are sent together once the tool returns,
-  because native runs the tool before the provider sees the call.
+- **Streaming tool calls.** `tool-call` and `tool-result` parts are sent
+  together once the tool returns, because native runs the tool before the
+  provider sees the call.
 - **Reasoning.** Transcripts before iOS 27 have no reasoning entries, so
   reasoning parts in the message history are dropped. On iOS 27 they are
   replayed in later turns.
 - **Images in history.** Apple only reads images on the prompt being answered.
   Images in earlier user turns are left out on every version.
-- **Usage and finish reason.** Before iOS 27 usage is `undefined` and the
-  finish reason is always `'stop'`. Apple does not report when a response
-  stops at `maxOutputTokens`, so on iOS 27 the finish reason is `'length'` when
-  the response used every allowed token.
+- **Usage and finish reason.** iOS 27 reports the usage Foundation Models
+  measured, and iOS 26.4 counts it with the on-device tokenizer. On iOS 26,
+  `usage` has undefined token counts and the finish reason is always `'stop'`.
+  Apple does not report when a response stops at `maxOutputTokens`, so the
+  finish reason is `'length'` when the response used every allowed token.
 - **Simulator.** Private Cloud Compute does not run in the iOS Simulator, and
   the simulator SDK does not include the Vision tools.
 
@@ -92,6 +87,7 @@ check at runtime instead of comparing iOS versions:
 | `supportsTokenCounting` | `false` | `true`   | `true` for `system` only    |
 | `supportsImagePrompts`  | `false` | `false`  | `true`                      |
 | `supportsVisionTools`   | `false` | `false`  | `true` on a physical device |
+| `supportsSpotlightTool` | `false` | `false`  | `true` on a physical device |
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
@@ -103,9 +99,10 @@ if (info.supportsImagePrompts) {
 }
 ```
 
-Features without a flag, such as reasoning levels and Private Cloud Compute,
-throw `AppleLLMErrorCodes.UnsupportedOS` when the device or SDK does not have
-them.
+Use `supportsReasoning` before setting `reasoning`, and `availability` with
+`{ model: 'private-cloud-compute' }` before using Private Cloud Compute. Other
+options that need a missing feature throw `UNSUPPORTED_OS`, while missing output
+is left out.
 
 ## Image Generation
 

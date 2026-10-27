@@ -39,7 +39,7 @@ const { text } = await generateText({
 
 ## Documentation
 
-For complete installation instructions and API documentation, visit our [documentation site](https://react-native-ai.com/docs/llama).
+For complete installation instructions and API documentation, visit our [documentation site](https://react-native-ai.dev/docs/llama/getting-started).
 
 ## License
 

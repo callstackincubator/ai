@@ -1,12 +1,7 @@
 # Running on Simulator
 
-This guide helps you configure Apple Intelligence to work with the iOS Simulator in your React Native applications.
-
-Apple Intelligence must be enabled on your macOS system before it can be used in the iOS Simulator. Follow these steps to ensure proper configuration.
-
-## Prerequisites
-
-Before running Apple Intelligence on the simulator, verify your macOS settings are correctly configured.
+The iOS Simulator uses your Mac's Apple Intelligence, so turn it on in macOS
+first. Your Mac needs Apple Silicon.
 
 ## Step 1: Check Language Settings
 
@@ -24,10 +19,8 @@ Apple Intelligence is only available in certain regions. To enable it:
 2. Set your **Region** to **United States** or another Apple Intelligence-supported region
 3. Restart your Mac if prompted
 
-After changing your region to a supported location, the Apple Intelligence toggle should appear in your system settings.
-
-> [!NOTE]
-> United States is one of the supported regions, but Apple Intelligence may be available in other regions as well. Check Apple's official documentation for the complete list of supported regions.
+Once the region is supported, the Apple Intelligence toggle appears in System
+Settings.
 
 ## Step 3: Enable Apple Intelligence
 
@@ -38,8 +31,7 @@ Once your language and region are configured:
 3. macOS will begin downloading the required models
 4. Wait for the download to complete before testing in the simulator
 
-> [!NOTE]
-> The model download may take several minutes depending on your internet connection. Ensure you have sufficient disk space available.
+The download can take several minutes, and needs free disk space.
 
 ## Step 4: Verify Simulator Access
 
@@ -66,9 +58,5 @@ If Apple Intelligence is enabled but models aren't working:
 
 - Ensure the model download completed successfully on macOS
 - Restart the iOS Simulator
-- Verify that `apple.isAvailable()` returns `true` in your code (see [Availability Check](./generating#availability-check))
+- Check what [`apple.getModelInfo()`](./models#availability-and-model-info) reports in `availability`
 - Check that your app is running on iOS 26+ in the simulator
-
-## API Availability
-
-Always check if Apple Intelligence is available before using it in your application. See the [Availability Check](./generating#availability-check) section in the Generating guide for details on how to implement this check.
