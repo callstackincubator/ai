@@ -118,7 +118,7 @@ const rt = home.runtimes;
           runtimes.map((r) => (
             <a class="cell cell--link runtime" href={r.href}>
               <span class="label runtime-owner" data-owner={r.owner}>
-                {r.owner === 'native' ? 'Native module · ours' : 'Community binding'}
+                {r.owner === 'native' ? 'Native · by Callstack' : 'Third-party binding'}
               </span>
               <h3 class="h3">{r.name}</h3>
               <dl class="runtime-facts">

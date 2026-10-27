@@ -19,18 +19,18 @@ export const site = {
    * What it is, in a few words. The home page title is "Name: subtitle" (src/site/meta.ts),
    * 60 characters at most in all.
    */
-  subtitle: 'The AI SDK, running on device',
+  subtitle: 'On-device AI for React Native apps',
   /** The motto, in two beats. Used by the hero, the social card and the banner. */
-  headline: ['Your AI SDK code.', 'Running on the phone.'],
+  headline: ['On-device AI for your mobile app.', 'Every platform’s models, one API.'],
   /** The hero lede: one or two sentences, naming who it is for. */
-  lede: 'Vercel AI SDK providers for React Native that run models on your users’ devices. Keep the calls you already write; the answer comes from Apple Intelligence, Gemini Nano or a model you ship, with no server and no API key.',
+  lede: 'Run the models each platform provides, or your own, right on your users’ devices. Drop-in Vercel AI SDK providers for React Native: swap the model per platform and keep the rest of your code. No server, no API key.',
   /** The meta description: 160 characters at most. */
-  description: 'Run Vercel AI SDK code on device in React Native: Apple Foundation Models, Core AI, Gemini Nano and llama.rn. No server, no API key, works offline.',
+  description: 'On-device AI for React Native apps: Apple Foundation Models, Core AI, Gemini Nano and llama.rn as drop-in Vercel AI SDK providers. No server, no API key.',
   install: 'npm install @react-native-ai/apple ai',
   /** The agent skill install, in the short owner/repo form. Remove it if there is no skill. */
-  skill: 'npx skills add callstackincubator/ai' as string | undefined,
+  skill: undefined as string | undefined,
   /** Alt text for the social card (public/og-image.jpg): the lockup, the motto, the picture. */
-  ogAlt: 'React Native AI by Callstack. Your AI SDK code. Running on the phone. A streamText call next to a phone streaming its reply offline.',
+  ogAlt: 'React Native AI by Callstack. On-device AI for your mobile app. Every platform’s models, one API. A streamText call next to a phone streaming its reply offline.',
   /** Who holds the copyright in the footer: "© YEAR PRODUCT BY CALLSTACK". */
   owner: 'Callstack',
   callstack: 'https://callstack.com/?utm_source=react-native-ai.dev&utm_medium=referral',
@@ -252,7 +252,7 @@ export const runtimes = [
     pkg: '@react-native-ai/llama',
     models: 'Any GGUF from Hugging Face',
     owner: 'community' as const,
-    body: 'The portable option: an AI SDK provider over the community llama.rn binding, for any GGUF model on both platforms.',
+    body: 'The portable option: an AI SDK provider over the third-party llama.rn binding, for any GGUF model on both platforms.',
     href: docs.llama,
     file: 'llama.ts',
     code: code.llama,
@@ -264,7 +264,7 @@ export const home = {
   /** The `zsh` window beside the hero copy (hidden below 64rem): setup in a few lines. */
   setup: [
     { cmd: site.install },
-    { comment: 'for you: the Apple provider and the AI SDK' },
+    { comment: 'the Apple provider and the AI SDK' },
     ...(site.skill ? [{ cmd: site.skill }, { comment: 'for your agent: the skill' }] : []),
   ] as ({ cmd: string } | { comment: string })[],
 
@@ -279,9 +279,9 @@ export const home = {
     label: 'How it works',
     headline: ['Swap the model.', 'Keep the code.'],
     steps: [
-      { title: 'Install a provider', body: 'Pick the runtime for your platform and add it next to the AI SDK.', cmd: site.install },
-      { title: 'Add the polyfills', body: 'React Native needs streams and `structuredClone` for the AI SDK. One file, loaded first.', cmd: 'npm install @ungap/structured-clone @stardazed/streams-text-encoding' },
-      { title: 'Call the AI SDK', body: 'Pass the provider’s model to `generateText`, `streamText`, `embed` or any other AI SDK function.', cmd: 'npx expo run:ios --device' },
+      { title: 'Install the providers', body: 'Add the provider for each platform you ship to, next to the AI SDK.', cmd: site.install },
+      { title: 'Pick a model per platform', body: 'Use `apple()` on iOS and `adk()` on Android, or a model you ship with Core AI or Llama.', cmd: 'npm install @react-native-ai/adk' },
+      { title: 'Call the AI SDK', body: 'Pass the model to `generateText`, `streamText`, `embed` or any other AI SDK function. The rest of your code stays the same.', cmd: 'npx expo run:ios' },
     ],
     /** One tab per runtime, each with its real setup snippet. */
     tabs: runtimes.map((r) => ({
@@ -291,7 +291,7 @@ export const home = {
       lang: 'ts',
       code: r.code,
       pkg: r.pkg,
-      note: r.owner === 'native' ? `${r.runtime}, through a native module we build.` : `${r.runtime}, through the community binding.`,
+      note: r.owner === 'native' ? `${r.runtime}, provided by the platform: native and fast.` : `${r.runtime}, through the third-party llama.rn binding.`,
       href: r.href,
     })),
   },
@@ -299,7 +299,7 @@ export const home = {
   runtimes: {
     label: 'Runtimes',
     headline: ['The fastest runtime on each platform.', 'One API over all of them.'],
-    lede: 'Apple, Core AI and ADK are native modules we build against each platform’s own AI stack, so they get its system models and hardware acceleration. Llama is a provider over the community llama.rn binding, for when you need the same GGUF model on iOS and Android.',
+    lede: 'Apple, Core AI and ADK run on the AI stack the platform provides: native, hardware-accelerated and with its system models. Llama runs any GGUF model on iOS and Android through llama.rn, a third-party binding.',
   },
 
   feature: {
