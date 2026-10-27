@@ -13,6 +13,7 @@ export type {
   CoreAICapabilities,
   CoreAIClassificationOutput,
   CoreAIDepthOutput,
+  CoreAIEmbeddingOptions,
   CoreAIEmbeddingResult,
   CoreAIGenerationOptions,
   CoreAIGenerationPart,

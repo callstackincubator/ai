@@ -113,6 +113,32 @@ export function setupSpeechModel() {
   })
 }
 
+// CLIP ViT-B/32 with separate text and image encoders, and its tokenizer
+const EMBEDDING_MODEL = {
+  id: 'clip-vit-base-patch32',
+  repo: 'grabbou/clip-vit-base-patch32-CoreAI',
+  folder: 'clip-vit-base-patch32',
+}
+
+export function setupEmbeddingModel() {
+  const path = `${CORE_AI_STORAGE_PATH}/${EMBEDDING_MODEL.id}`
+
+  beforeAll(async () => {
+    if (!(await RNBlobUtil.fs.exists(path))) {
+      await downloadHubFolder(
+        EMBEDDING_MODEL.repo,
+        EMBEDDING_MODEL.folder,
+        path
+      )
+    }
+  })
+
+  return coreAI.embeddingModel({
+    id: EMBEDDING_MODEL.id,
+    source: { type: 'file', uri: path },
+  })
+}
+
 // Native tasks read images from files, so the fixture is written to one
 export async function writeCatsImage() {
   const path = `${RNBlobUtil.fs.dirs.CacheDir}/harness-cats.jpg`

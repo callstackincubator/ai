@@ -18,6 +18,10 @@ final class RawModel: @unchecked Sendable {
     self.model = model
   }
 
+  var functionNames: [String] {
+    return model.functionNames
+  }
+
   func run(
     _ functionName: String,
     inputs: [String: Any],
