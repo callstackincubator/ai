@@ -12,8 +12,7 @@ import { generateText } from 'ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 const { text } = await generateText({ model, prompt: 'Hello' })
 ```
@@ -83,7 +82,7 @@ Download a hosted export folder from Hugging Face into app storage (the [models 
 uv run coreai.llm.export qwen3-0.6b --platform iOS
 ```
 
-Pass the folder as `source: { type: 'file', uri }`.
+Pass the folder's path as `source`, or `bundle://` and its path in the app bundle for a model shipped with the app. `id` is optional and defaults to the folder name.
 
 ### 4. Use It
 
@@ -93,7 +92,7 @@ Pass the folder as `source: { type: 'file', uri }`.
 - Video generation: `coreAI.videoModel(config)` with `experimental_generateVideo` (Wan 2.1). The hosted export runs on macOS: on an iPhone 17 Pro the app is killed while the VAE decoder loads, even with the increased memory limit entitlement, so don't recommend it for iPhone yet
 - Transcription: `coreAI.transcriptionModel(config)` with `transcribe`, and live 16-bit PCM with `experimental_streamTranscribe` (Parakeet TDT)
 - Embeddings: `coreAI.embeddingModel(config)` with `embed` / `embedMany`, and `model.embedImages(imageUris)` (CLIP)
-- Vision: `CoreAI.runTask('object-detection' | 'segmentation' | 'video-segmentation' | 'super-resolution' | 'classification' | 'depth', config, input, options)`. `CoreAI.*` native calls take the flat config, `{ id, sourceType: 'file', sourceUri }`: convert a provider config with `toNativeModelConfig(config)`
+- Vision: `CoreAI.runTask('object-detection' | 'segmentation' | 'video-segmentation' | 'super-resolution' | 'classification' | 'depth', config, input, options)`. `CoreAI.*` native calls take the same config as the providers (`{ id?, source }`)
 - Any `.aimodel`: `CoreAI.loadModel({ ...config, task: 'raw' }, {})`, then `CoreAI.runRawFunction(modelHandle, functionName, inputs, {})` with tensors from `createTensor`, read back with `readTensor`
 - Function signatures: `CoreAI.inspectModel(...)`
 

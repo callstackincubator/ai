@@ -163,12 +163,13 @@ See the [ADK documentation](https://react-native-ai.dev/docs/adk/getting-started
 
 Run models exported with Apple's [`coreai-models`](https://github.com/apple/coreai-models) on Apple's Core AI runtime, on iOS 27 devices. Your app downloads or bundles the models, and every task has a [hosted export](https://react-native-ai.dev/docs/core-ai/models) to start from, except raw function calls, which run your own `.aimodel`.
 
-- **Text Generation** - Qwen3 and other LLM exports, with structured output and reasoning
+- **Text Generation** - Qwen3 and other LLM exports, with structured output, tool calling and reasoning
+- **Image Prompts** - Qwen3-VL answers questions about an image
 - **Image and Video Generation** - FLUX.2 diffusion pipelines, and Wan 2.1 video on macOS (it does not fit in iPhone memory yet)
 - **Transcription** - Parakeet TDT, for files and live audio
 - **Embeddings** - CLIP text and image embeddings in one space
 - **Vision** - Object detection, segmentation, video tracking, super-resolution, classification and depth
-- **Any `.aimodel`** - Raw function calls with tensors
+- **Any `.aimodel`** - Raw function calls with tensors and images
 
 #### Installation
 
@@ -189,8 +190,7 @@ import { generateImage, streamText, transcribe } from 'ai'
 const result = streamText({
   model: coreAI.languageModel({
     id: 'qwen3-0.6b',
-    source: { type: 'file', uri: qwen3 },
-    variant: 'iOS',
+    source: qwen3,
   }),
   prompt: 'Explain Core AI in one sentence.',
 })
@@ -203,7 +203,7 @@ for await (const delta of result.textStream) {
 const { image } = await generateImage({
   model: coreAI.imageModel({
     id: 'flux2-klein-4b',
-    source: { type: 'file', uri: flux },
+    source: flux,
   }),
   prompt: 'a red apple on a wooden table',
 })
@@ -212,7 +212,7 @@ const { image } = await generateImage({
 const { text } = await transcribe({
   model: coreAI.transcriptionModel({
     id: 'parakeet',
-    source: { type: 'file', uri: parakeet },
+    source: parakeet,
   }),
   audio: recording,
 })

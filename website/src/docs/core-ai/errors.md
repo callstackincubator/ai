@@ -25,7 +25,7 @@ With `streamText`, errors arrive as `error` parts in `fullStream`, with the same
 | Code                             | When                                                                                                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `CORE_AI_UNSUPPORTED_OS`         | The device runs an iOS older than 27                                                                                                                   |
-| `CORE_AI_MISSING_SOURCE`         | The config has no `uri`, or no bundled resource with its `name`                                                                                        |
+| `CORE_AI_MISSING_SOURCE`         | The config has no `source`, or its `bundle://` path is not in the app bundle                                                                           |
 | `CORE_AI_MISSING_SPM_PRODUCT`    | The call needs a `coreai-models` product that isn't linked. The message names the task to add (see [Choosing Tasks](./getting-started#choosing-tasks)) |
 | `CORE_AI_MODEL_NOT_LOADED`       | A model handle was unloaded, or never loaded                                                                                                           |
 | `CORE_AI_SESSION_NOT_FOUND`      | A native session was closed, or its model unloaded                                                                                                     |

@@ -10,7 +10,7 @@ import { transcribe } from 'ai'
 
 const model = coreAI.transcriptionModel({
   id: 'parakeet-tdt-0.6b-v3',
-  source: { type: 'file', uri: parakeetDirectory },
+  source: parakeetDirectory,
 })
 
 const { text, segments, durationInSeconds } = await transcribe({

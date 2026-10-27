@@ -8,7 +8,7 @@ import { cosineSimilarity, embed, embedMany } from 'ai'
 
 const model = coreAI.embeddingModel({
   id: 'clip-vit-base-patch32',
-  source: { type: 'file', uri: clipDirectory },
+  source: clipDirectory,
 })
 
 const { embedding } = await embed({ model, value: 'a photo of a cat' })

@@ -6,7 +6,7 @@ Any exported `.aimodel` runs through its functions, for models no task covers. L
 import { CoreAI, createTensor, readTensor } from '@react-native-ai/core-ai'
 
 const { modelHandle, info } = await CoreAI.loadModel(
-  { id: 'edsr-x2', sourceType: 'file', sourceUri: edsrModel, task: 'raw' },
+  { id: 'edsr-x2', source: edsrModel, task: 'raw' },
   {}
 )
 
@@ -39,9 +39,28 @@ Hermes has no `Float16Array`, so float16 and bfloat16 inputs can be given as flo
 
 Shapes, data types and input names are checked against the function, with errors that say what it takes.
 
+## Image Inputs
+
+Inputs with `dataType: 'image'` take an image file instead of a tensor:
+
+```typescript
+// { name: 'image', dataType: 'image', width: 224, height: 224, pixelFormat: '32BGRA' }
+console.log(info.functions[0].inputs[0])
+
+const { outputs } = await CoreAI.runRawFunction(
+  modelHandle,
+  'main',
+  { image: { imageUri: 'file:///path/to/photo.jpg' } },
+  {}
+)
+```
+
+The image is decoded with its EXIF orientation applied, and stretched to the input's `width` and `height` (a `-1` keeps the image's own) into a pixel buffer of its `pixelFormat`. `32BGRA`, `32ARGB` and `24RGB` inputs are supported, and other pixel formats are rejected. Alpha is premultiplied. Image outputs are not returned yet.
+
 ## Ownership and Performance
 
 - Every call copies its inputs into new native arrays and copies its outputs out, so JavaScript never holds native memory and nothing outlives the call
 - Functions load their weights on their first call and stay loaded until `CoreAI.unloadModel(modelHandle)`
 - Core AI specializes the model for a compute unit when it loads. Pass `{ computeUnits: 'gpu' }` (or `'cpu'`, `'neural-engine'`) as the `loadModel` options to choose one, for example when the Neural Engine compiler rejects a model
 - Base64 adds a third to the size of each tensor, and encoding runs on the JavaScript thread. For work that runs every frame, prefer a task, or keep tensors to a few megabytes
+- Image inputs are decoded into a new pixel buffer on every call

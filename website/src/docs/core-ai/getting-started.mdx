@@ -7,6 +7,7 @@ The Core AI provider runs model bundles exported with Apple's [`coreai-models`](
 | Task               | API                                                                            | Hosted model                                                    |
 | ------------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | Text generation    | `generateText`, `streamText` with `coreAI.languageModel`                       | [Qwen3 0.6B](./models#hosted-exports)                           |
+| Image prompts      | Image parts in `generateText`, `streamText` with `coreAI.languageModel`        | [Qwen3-VL 2B](./models#hosted-exports)                          |
 | Image generation   | `generateImage` with `coreAI.imageModel`                                       | [FLUX.2 klein 4B](./models#hosted-exports)                      |
 | Video generation   | `experimental_generateVideo` with `coreAI.videoModel`                          | [Wan 2.1 T2V 1.3B](./models#hosted-exports), macOS only for now |
 | Transcription      | `transcribe`, `experimental_streamTranscribe` with `coreAI.transcriptionModel` | [Parakeet TDT 0.6B v3](./models#hosted-exports)                 |
@@ -91,6 +92,22 @@ CORE_AI_TASKS=language npx pod-install
 
 Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`, and `CoreAI.getCapabilities()` reports which products are linked.
 
+### Memory Limit
+
+iOS stops an app that uses more memory than its limit, about 3.4 GB on an iPhone 17 Pro. Larger models, such as the [Qwen3-VL 2B](./models#hosted-exports) vision language model, need the [increased memory limit](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.kernel.increased-memory-limit) entitlement, which raises it to about 6 GB. With Expo, the plugin adds it:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "increasedMemoryLimit": true }]]
+  }
+}
+```
+
+The App ID needs the Increased Memory Limit capability, so sign with an explicit App ID: a wildcard profile can't carry it. In a bare app, add the capability to the app target in Xcode.
+
+Wan 2.1 doesn't finish on an iPhone even with it, because its VAE decoder needs more GPU memory than the raised limit ([#306](https://github.com/callstackincubator/ai/issues/306)).
+
 ## Loading Models
 
 Core AI loads models from local files. Download a model folder into app storage, or bundle it with the app, and pass its path as `source`:
@@ -100,15 +117,11 @@ import { coreAI } from '@react-native-ai/core-ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: {
-    type: 'file',
-    uri: `${documentDirectory}/coreai-models/qwen3-0.6b`,
-  },
-  variant: 'iOS',
+  source: `${documentDirectory}/coreai-models/qwen3-0.6b`,
 })
 ```
 
-Bundled models use `source: { type: 'bundle', name, extension, subdirectory }`. The [Models](./models) page lists exports hosted on Hugging Face for every task, and how to export your own.
+For a model shipped with the app, use `bundle://` and its path in the app bundle, such as `source: 'bundle://models/qwen3-0.6b'`. `id` is optional: it names the model in AI SDK results and telemetry, and defaults to the folder or `.aimodel` name. The [Models](./models) page lists exports hosted on Hugging Face for every task, and how to export your own.
 
 ## Basic Usage
 
@@ -127,7 +140,7 @@ for await (const delta of result.textStream) {
 
 ## Next Steps
 
-- [Generating](./generating): text, structured output, reasoning and native sessions
+- [Generating](./generating): text, structured output, tool calling, image prompts, reasoning and native sessions
 - [Images and Video](./images-and-video): image and video generation
 - [Transcription](./transcription): files and live audio
 - [Embeddings](./embeddings): text and image embeddings
