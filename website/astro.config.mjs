@@ -97,6 +97,7 @@ export default defineConfig({
         group('ADK', 'adk', [
           ['getting-started', 'Getting started'],
           ['generating', 'Generating'],
+          ['models', 'Models and availability'],
         ]),
         group('Core AI', 'core-ai', [
           ['getting-started', 'Getting started'],

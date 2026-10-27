@@ -65,12 +65,6 @@ const result = await generateText({
 })
 ```
 
-`apple({ model: 'private-cloud-compute' })` is equivalent, and
-`createAppleProvider({ model: 'private-cloud-compute' })` makes it the default.
-Check `apple.getModelInfo({ model: 'private-cloud-compute' })` before offering
-it. While it is unavailable, `contextSize` is omitted, `supportsLocale` is
-`false`, and `supportedLanguages` is empty.
-
 ### Enabling It
 
 Private Cloud Compute needs the managed
@@ -102,6 +96,18 @@ to check for it. Until the Info.plist key is set, the model reports
 `missingEntitlement` and generation fails with `MODEL_UNAVAILABLE`, so only set
 it in builds signed with the entitlement.
 :::
+
+### Checking Availability
+
+Check `apple.getModelInfo({ model: 'private-cloud-compute' })` before offering
+it. While it is unavailable, `contextSize` is omitted, `supportsLocale` is
+`false`, and `supportedLanguages` is empty.
+
+### Making It the Default
+
+`apple({ model: 'private-cloud-compute' })` is the same as
+`apple('private-cloud-compute')`. To use it for every call, create the provider
+with `createAppleProvider({ model: 'private-cloud-compute' })`.
 
 ### Quota
 

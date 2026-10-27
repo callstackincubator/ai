@@ -6,9 +6,9 @@ You can generate responses using ADK with the Vercel AI SDK's `generateText` or 
 
 ## Requirements
 
-- **Physical Android device with AICore** - Required for Gemini Nano; the device must be capable of running Gemini Nano. Please consult the [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device). We provide runtime checks for this capability - please refer to [Getting Started - On-device Gemini Nano](/docs/adk/getting-started#on-device-gemini-nano).
+- **Physical Android device with AICore** - Required for Gemini Nano; the device must be capable of running Gemini Nano. Please consult the [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device). We provide runtime checks for this capability - please refer to [Models & Availability](/docs/adk/models#on-device-gemini-nano).
 - **Polyfills** - Streaming requires `ReadableStream`; see [Polyfills](/docs/polyfills)
-- **Prepare Nano** - Call `prepareNano()` or `model.prepare()` before first on-device use (see [Getting Started - On-device Gemini Nano](/docs/adk/getting-started#on-device-gemini-nano))
+- **Prepare Nano** - Call `prepareNano()` or `model.prepare()` before first on-device use (see [Models & Availability](/docs/adk/models#on-device-gemini-nano))
 
 ## Text Generation
 
