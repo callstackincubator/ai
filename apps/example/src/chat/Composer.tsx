@@ -70,6 +70,14 @@ export function Composer({
 
   const handleSend = () => {
     if (!canSend || isGenerating) return
+    // Photos stay in the draft, so they can go to a model that sees them
+    if (attachments.length > 0 && !imageInputEnabled) {
+      Alert.alert(
+        'This model can’t see photos',
+        'Remove the photos or pick a model that sees them.'
+      )
+      return
+    }
     // The draft stays when the message isn't sent
     if (!onSend(input.trim(), attachments)) return
     setInput('')

@@ -47,13 +47,26 @@ export function useLiveTranscription(model: TranscriptionModel) {
     text: string
   } | null>(null)
 
+  const unmountedRef = useRef(false)
+
+  // Ends the audio stream once. Cleanup and stop() can overlap, and closing a
+  // stream twice throws
+  const closeAudio = () => {
+    const controller = audioRef.current
+    audioRef.current = null
+    try {
+      controller?.close()
+    } catch {}
+  }
+
   // Stops the microphone and timers when the screen goes away mid-recording
   useEffect(
     () => () => {
+      unmountedRef.current = true
       if (simulationRef.current) clearInterval(simulationRef.current.timer)
       // stop() may be closing the same resources, so failures are ignored
       recorderRef.current?.stop().catch(() => {})
-      audioRef.current?.close()
+      closeAudio()
       audioContextRef.current?.close().catch(() => {})
     },
     []
@@ -106,7 +119,8 @@ export function useLiveTranscription(model: TranscriptionModel) {
       return startSimulation()
     }
     const permission = await AudioManager.requestRecordingPermissions()
-    if (permission !== 'Granted') {
+    // The screen can go away while the permission prompt is up
+    if (permission !== 'Granted' || unmountedRef.current) {
       return false
     }
 
@@ -161,8 +175,7 @@ export function useLiveTranscription(model: TranscriptionModel) {
       await recorder.start()
     } catch (error) {
       // Ends the transcription, which would otherwise wait for audio
-      audioRef.current?.close()
-      audioRef.current = null
+      closeAudio()
       transcription.catch(() => {})
       audioContext.close()
       transcriptionRef.current = null
@@ -201,12 +214,10 @@ export function useLiveTranscription(model: TranscriptionModel) {
       await recorder.stop()
 
       // Ending the audio finalizes the transcription
-      audioRef.current?.close()
-      audioRef.current = null
+      closeAudio()
       return (await transcriptionRef.current) ?? ''
     } finally {
-      audioRef.current?.close()
-      audioRef.current = null
+      closeAudio()
       transcriptionRef.current = null
       recorderRef.current = null
       recorderAdapterRef.current = null
