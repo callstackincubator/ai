@@ -2,7 +2,7 @@
 title: "Generating"
 ---
 
-`coreAI.languageModel(config)` runs language models exported with the `coreai-models` LLM recipes, such as [Qwen3 0.6B](/docs/core-ai/models#hosted-exports), with `generateText` and `streamText`.
+Run open language models that you ship with your app, such as Qwen3, with the AI SDK's `generateText` and `streamText`. Create the model with `coreAI.languageModel(config)`, pointing at a bundle exported with the `coreai-models` LLM recipes, such as [Qwen3 0.6B](/docs/core-ai/models#hosted-exports).
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
@@ -31,7 +31,7 @@ Every call replays the whole message history into a new native session, so the A
 
 ## Structured Output
 
-Pass a schema, and the model runs guided generation, so its output always matches it:
+Get a typed object back instead of free text. Pass a schema, and the model runs guided generation, so its output always matches it:
 
 ```typescript
 import { generateText, Output } from 'ai'
@@ -50,7 +50,7 @@ When streaming, the JSON arrives in one piece once it is complete. Models whose 
 
 ## Tool Calling
 
-Function tools are passed to the model. A tool call ends the generation and comes back as a `tool-call` part, so the AI SDK runs the tool and replays its result on the next call. Set `stopWhen` to let the model answer with the result:
+Let the model call your JavaScript functions, for example to look something up in your app. Function tools are passed to the model. A tool call ends the generation and comes back as a `tool-call` part, so the AI SDK runs the tool and replays its result on the next call. Set `stopWhen` to let the model answer with the result:
 
 ```typescript
 import { generateText, stepCountIs, tool } from 'ai'
@@ -74,7 +74,7 @@ Core AI models decide themselves whether to call a tool, so a `required` or name
 
 ## Image Prompts
 
-Vision language model bundles (`kind: "vlm"` in their `metadata.json`), such as [Qwen3-VL 2B](/docs/core-ai/models#hosted-exports), answer prompts about an image. Pass the image as a file part of the last user message, from a `file://` URL or as base64:
+Ask questions about a photo. Vision language model bundles (`kind: "vlm"` in their `metadata.json`), such as [Qwen3-VL 2B](/docs/core-ai/models#hosted-exports), read an image alongside the prompt. Pass the image as a file part of the last user message, from a `file://` URL or as base64:
 
 ```typescript
 const vision = coreAI.languageModel({
@@ -107,7 +107,7 @@ const { text } = await generateText({
 
 ## Reasoning
 
-The `reasoning` call option sets the model's thinking effort: `minimal` and `low` map to `light`, `medium` to `moderate`, and `high` and above to `deep`. `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence:
+Let the model think before it answers, for harder questions. The `reasoning` call option sets the thinking effort: `minimal` and `low` map to `light`, `medium` to `moderate`, and `high` and above to `deep`. `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence:
 
 ```typescript
 const result = await generateText({

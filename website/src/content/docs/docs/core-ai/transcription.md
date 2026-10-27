@@ -2,9 +2,11 @@
 title: "Transcription"
 ---
 
-`coreAI.transcriptionModel(config)` runs `coreai-models` speech bundles (Parakeet TDT and Whisper) with the AI SDK. The [hosted Parakeet TDT 0.6B v3 export](/docs/core-ai/models#hosted-exports) transcribes 25 European languages.
+Turn speech into text with a model you ship, from a recording or live from the microphone, through the AI SDK's `transcribe` and `experimental_streamTranscribe`. Create the model with `coreAI.transcriptionModel(config)`, pointing at a Parakeet TDT or Whisper bundle exported with `coreai-models`. The [hosted Parakeet TDT 0.6B v3 export](/docs/core-ai/models#hosted-exports) transcribes 25 European languages. For the transcriber built into iOS, see [Apple transcription](/docs/apple/transcription).
 
 ## Files
+
+Transcribe a recorded file with `transcribe`:
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
@@ -29,7 +31,7 @@ const { text, segments, durationInSeconds } = await transcribe({
 
 ## Live Audio
 
-`experimental_streamTranscribe` takes a stream of 16-bit little-endian mono PCM at any rate, for example from a microphone, and streams the transcript as it grows:
+Transcribe while the user speaks. `experimental_streamTranscribe` takes a stream of 16-bit little-endian mono PCM at any rate, for example from a microphone, and streams the transcript as it grows:
 
 ```typescript
 import { experimental_streamTranscribe as streamTranscribe } from 'ai'

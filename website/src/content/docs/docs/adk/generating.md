@@ -2,7 +2,7 @@
 title: "Generating"
 ---
 
-You can generate responses using ADK with the Vercel AI SDK's `generateText` or `streamText` functions. ADK orchestrates the agent loop natively on Android while the provider bridges tool execution and streaming back to JavaScript. Import the default provider, call `adk()` to construct a language model, and pass it to the AI SDK — the default export targets on-device Gemini Nano.
+Generate text on Android with Gemini Nano on the device, or with cloud Gemini, through the AI SDK's `generateText` and `streamText`. Pass `adk()` as the model; by default it targets on-device Gemini Nano. ADK runs the agent loop natively on Android, and the provider bridges tool calls and streaming back to JavaScript.
 
 ## Requirements
 

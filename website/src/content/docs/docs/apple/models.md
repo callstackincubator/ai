@@ -2,9 +2,11 @@
 title: "Models & Availability"
 ---
 
-`apple()` uses the on-device model, `SystemLanguageModel.default`. On iOS 27
-you can also use Apple's Private Cloud Compute model, and tune the on-device
-model with guardrail and use-case options.
+Check that Apple Intelligence can run before you offer it, and pick which
+Apple model answers. `apple()` uses the on-device model,
+`SystemLanguageModel.default`. On iOS 27 you can also use Apple's Private Cloud
+Compute model, and tune the on-device model with guardrail and use-case
+options.
 
 ## Availability And Model Info
 

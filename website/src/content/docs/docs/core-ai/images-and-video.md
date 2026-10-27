@@ -2,9 +2,11 @@
 title: "Images and Video"
 ---
 
+Generate images and short videos from a text prompt, entirely on the device. Both use the AI SDK's own calls, so the code reads the same as it would with a cloud model.
+
 ## Image Generation
 
-`coreAI.imageModel(config)` runs `coreai-models` diffusion bundles (FLUX.2 and Sana Sprint pipelines) with `generateImage`. The [hosted FLUX.2 klein 4B export](/docs/core-ai/models#hosted-exports) generates 512x512 images on an iPhone 17 Pro in about 13 seconds with 2 steps:
+Turn a prompt into an image with the AI SDK's `generateImage`. Create the model with `coreAI.imageModel(config)`, pointing at a FLUX.2 or Sana Sprint diffusion bundle exported with `coreai-models`. The [hosted FLUX.2 klein 4B export](/docs/core-ai/models#hosted-exports) makes a 512x512 image in about 13 seconds on an iPhone 17 Pro, with 2 steps:
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
@@ -33,7 +35,7 @@ const { image } = await generateImage({
 
 ## Video Generation
 
-`coreAI.videoModel(config)` runs `coreai-models` video diffusion bundles (Wan 2.1) with `experimental_generateVideo`, and returns an MP4:
+Turn a prompt into a short MP4 clip with the AI SDK's `experimental_generateVideo`. Create the model with `coreAI.videoModel(config)`, pointing at a Wan 2.1 video diffusion bundle. Video is much heavier than images: the hosted export runs on macOS for now, not on iPhone (see below).
 
 ```typescript
 import { experimental_generateVideo as generateVideo } from 'ai'

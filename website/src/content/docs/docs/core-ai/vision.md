@@ -2,7 +2,7 @@
 title: "Vision"
 ---
 
-Vision tasks run through `CoreAI.runTask(task, config, input, options)`, since the AI SDK has no API for them. Images are file URIs, and are decoded with their EXIF orientation applied, so coordinates match the image as it is displayed. Super-resolution, classification, depth and video segmentation keep the model last used loaded, while object detection and segmentation load theirs on each call.
+Find objects in photos, cut them out, track them through a video, upscale, label, or estimate depth, all on the device. The AI SDK has no API for these tasks, so they run through `CoreAI.runTask(task, config, input, options)`. Images are file URIs, and are decoded with their EXIF orientation applied, so coordinates match the image as it is displayed. Super-resolution, classification, depth and video segmentation keep the model last used loaded, while object detection and segmentation load theirs on each call.
 
 These calls take the same config as the providers, with `source` and an optional `id`.
 
@@ -21,14 +21,14 @@ const { output, metadata } = await CoreAI.runTask(
 
 ## Object Detection
 
-Runs DETR-style detectors (the [hosted YOLOS-tiny export](/docs/core-ai/models#hosted-exports), COCO classes):
+Find the objects in a photo, each with a label and a box. Runs DETR-style detectors (the [hosted YOLOS-tiny export](/docs/core-ai/models#hosted-exports), COCO classes):
 
 - **Output**: `output.detections`, each with `label`, `labelIndex`, `confidence` and `box` (`x`, `y`, `width`, `height` in image pixels)
 - **Options**: `threshold`, `maxDetections`, `inputWidth`, `inputHeight`
 
 ## Segmentation
 
-Runs `coreai-models` segmenters (the [hosted EfficientSAM-Ti export](/docs/core-ai/models#hosted-exports), or the [SAM 3 community export](/docs/core-ai/models#community-exports) for text prompts). Describe what to segment with a box, points or text:
+Cut an object out of a photo as a mask. Runs `coreai-models` segmenters (the [hosted EfficientSAM-Ti export](/docs/core-ai/models#hosted-exports), or the [SAM 3 community export](/docs/core-ai/models#community-exports) for text prompts). Describe what to segment with a box, points or text:
 
 ```typescript
 const efficientSAM = {
@@ -77,7 +77,7 @@ const { output } = await CoreAI.runTask(
 
 ## Super-resolution
 
-Upscales an image with an EDSR-style model that takes `[batch, 3, height, width]` RGB in 0...1 (the [hosted EDSR x2 export](/docs/core-ai/models#hosted-exports)):
+Make a photo sharper at a larger size. Upscales an image with an EDSR-style model that takes `[batch, 3, height, width]` RGB in 0...1 (the [hosted EDSR x2 export](/docs/core-ai/models#hosted-exports)):
 
 ```typescript
 const { output } = await CoreAI.runTask('super-resolution', edsr, { imageUri })
@@ -88,7 +88,7 @@ Images larger than `tileSize` (256 px) are upscaled in tiles that overlap by `ti
 
 ## Classification
 
-Classifies an image with a model that takes `[1, 3, height, width]` normalized RGB and returns logits (the [hosted PVT v2 b0 export](/docs/core-ai/models#hosted-exports), ImageNet-1k):
+Say what a photo shows. Classifies an image with a model that takes `[1, 3, height, width]` normalized RGB and returns logits (the [hosted PVT v2 b0 export](/docs/core-ai/models#hosted-exports), ImageNet-1k):
 
 ```typescript
 const { output } = await CoreAI.runTask(
@@ -105,7 +105,7 @@ const { output } = await CoreAI.runTask(
 
 ## Depth Estimation
 
-Estimates relative depth with a Depth Anything-style model (the [hosted Depth Anything 3 small export](/docs/core-ai/models#hosted-exports)):
+Tell which parts of a photo are near and which are far. Estimates relative depth with a Depth Anything-style model (the [hosted Depth Anything 3 small export](/docs/core-ai/models#hosted-exports)):
 
 ```typescript
 const { output } = await CoreAI.runTask('depth', depthAnything, { imageUri })

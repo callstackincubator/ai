@@ -2,7 +2,7 @@
 title: "Embeddings"
 ---
 
-`coreAI.embeddingModel(config)` runs CLIP-style exports with `embed` and `embedMany`, and embeds images into the same space, for search across text and photos.
+Search across text and photos by meaning, on the device. `coreAI.embeddingModel(config)` runs CLIP-style exports with the AI SDK's `embed` and `embedMany`, and embeds images into the same space, so a text query such as "a dog on a beach" finds the matching photos.
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
