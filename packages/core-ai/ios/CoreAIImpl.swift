@@ -54,6 +54,11 @@ public class CoreAIImpl: NSObject {
   // last one
   private var loadedSpeechModel: (path: String, load: Any)?
   private var transcriptionStreams: [String: Any] = [:]
+  // Streams whose speech model is still loading, until they start or cancel
+  private var pendingTranscriptionStreams: Set<String> = []
+  // Paths of speech models with a transcription running, since a model runs
+  // one at a time
+  private var busySpeechModels: Set<String> = []
 
   @objc
   public func getCapabilities(
@@ -124,10 +129,14 @@ public class CoreAIImpl: NSObject {
           do {
             let model = try await AIModel(contentsOf: sourceURL)
             info["functions"] = Self.describeFunctions(of: model)
-            resolve(info)
           } catch {
-            reject(errorCode(error), error.localizedDescription, error)
+            // The file metadata still describes the model, so the load error
+            // goes with it
+            var metadata = info["metadata"] as? [String: Any] ?? [:]
+            metadata["functionsError"] = error.localizedDescription
+            info["metadata"] = metadata
           }
+          resolve(info)
         }
         return
       }
@@ -404,9 +413,15 @@ public class CoreAIImpl: NSObject {
     let task = locked { tasks.removeValue(forKey: streamId) }
     task?.cancel()
 #if canImport(CoreAISpeech)
-    if #available(iOS 27, macOS 27, *),
-       let stream = locked({ transcriptionStreams.removeValue(forKey: streamId) }) as? TranscriptionStream {
-      Task { await stream.cancel() }
+    if #available(iOS 27, macOS 27, *) {
+      // A stream still starting is torn down once it starts
+      let stream = locked { () -> Any? in
+        pendingTranscriptionStreams.remove(streamId)
+        return transcriptionStreams.removeValue(forKey: streamId)
+      } as? TranscriptionStream
+      if let stream {
+        Task { await stream.cancel() }
+      }
     }
 #endif
   }
@@ -457,7 +472,9 @@ public class CoreAIImpl: NSObject {
         guard let audio = Data(base64Encoded: audioBase64) else {
           throw CoreAIError.invalidInput("Expected base64 encoded audio.")
         }
+        try claimSpeechModel(at: sourceURL)
         Task {
+          defer { self.releaseSpeechModel(at: sourceURL) }
           do {
             let model = try await self.speechModel(at: sourceURL)
             let sampleRate = await model.sampleRate
@@ -494,15 +511,35 @@ public class CoreAIImpl: NSObject {
       do {
         let sourceURL = try resolveSourceURL(config)
         let inputSampleRate = options?["sampleRate"] as? Double ?? 16_000
+        try claimSpeechModel(at: sourceURL)
+        locked { _ = pendingTranscriptionStreams.insert(streamId) }
         Task {
+          var stream: TranscriptionStream?
           do {
             let model = try await self.speechModel(at: sourceURL)
-            let stream = try await TranscriptionStream(model: model, inputSampleRate: inputSampleRate) { update in
+            let started = try await TranscriptionStream(model: model, inputSampleRate: inputSampleRate) { update in
               onUpdate(update.merging(["streamId": streamId]) { current, _ in current })
+            } onEnd: {
+              self.releaseSpeechModel(at: sourceURL)
             }
-            self.locked { self.transcriptionStreams[streamId] = stream }
+            stream = started
+            // cancelStream during startup removes the pending stream
+            let isCancelled = self.locked { () -> Bool in
+              guard self.pendingTranscriptionStreams.remove(streamId) != nil else { return true }
+              self.transcriptionStreams[streamId] = started
+              return false
+            }
+            if isCancelled {
+              await started.cancel()
+              throw CoreAIError.cancelled
+            }
             resolve(nil)
           } catch {
+            self.locked { _ = self.pendingTranscriptionStreams.remove(streamId) }
+            if stream == nil {
+              // A stream that started releases the model when it ends
+              self.releaseSpeechModel(at: sourceURL)
+            }
             reject(errorCode(error), error.localizedDescription, error)
           }
         }
@@ -539,6 +576,15 @@ public class CoreAIImpl: NSObject {
           try await stream.append(audio)
           resolve(nil)
         } catch {
+          // A failed append cancels the stream, so its ID is free again. An
+          // append rejected while the stream finishes leaves it cancellable
+          let hasEnded = await stream.hasEnded
+          self.locked {
+            guard hasEnded else { return }
+            if self.transcriptionStreams[streamId] as? TranscriptionStream === stream {
+              self.transcriptionStreams.removeValue(forKey: streamId)
+            }
+          }
           reject(errorCode(error), error.localizedDescription, error)
         }
       }
@@ -559,14 +605,23 @@ public class CoreAIImpl: NSObject {
   ) {
 #if canImport(CoreAISpeech)
     if #available(iOS 27, macOS 27, *) {
-      guard let stream = locked({ transcriptionStreams.removeValue(forKey: streamId) }) as? TranscriptionStream else {
+      // The stream stays registered while it decodes the buffered tail, so
+      // cancelStream can still stop it
+      guard let stream = locked({ transcriptionStreams[streamId] }) as? TranscriptionStream else {
         rejectCoreAI(.invalidInput("Core AI transcription stream was not found: \(streamId)."), reject: reject)
         return
       }
       Task {
         do {
-          resolve(try await stream.finish())
+          let result = try await stream.finish()
+          self.locked { _ = self.transcriptionStreams.removeValue(forKey: streamId) }
+          resolve(result)
         } catch {
+          // A second finish is rejected while the first one runs, which
+          // keeps the stream registered and cancellable
+          if await stream.hasEnded {
+            self.locked { _ = self.transcriptionStreams.removeValue(forKey: streamId) }
+          }
           reject(errorCode(error), error.localizedDescription, error)
         }
       }
@@ -696,10 +751,9 @@ public class CoreAIImpl: NSObject {
           guard !uris.isEmpty else {
             throw CoreAIError.invalidInput("Expected input.imageUri or input.data.imageUris for image embeddings.")
           }
-          let images = try uris.map { try Self.loadCGImage(from: ["imageUri": $0]) }
           Task {
             do {
-              let output = try await Embeddings.embed(images: images, sourceURL: sourceURL, options: options ?? [:])
+              let output = try await Embeddings.embed(imageUris: uris, sourceURL: sourceURL, options: options ?? [:])
               resolve(["task": "embedding", "output": output])
             } catch {
               reject(errorCode(error), error.localizedDescription, error)
@@ -1188,7 +1242,7 @@ extension CoreAIImpl {
     let defaults = pipeline.config
     let scheduler = SchedulerType(rawValue: options?["schedulerType"] as? String ?? "") ?? .discreteFlow
     let decodeResolution = DecodeResolution(rawValue: options?["decodeResolution"] as? String ?? "full") ?? .full
-    let seed = UInt32(options?["seed"] as? Double ?? 0)
+    let seed = try Self.seed(from: options?["seed"])
     let stepCount = (options?["stepCount"] as? Double).map(Int.init) ?? defaults.defaultSteps ?? 50
     let guidanceScale = (options?["guidanceScale"] as? Double).map(Float.init) ?? defaults.defaultGuidanceScale ?? 7.5
 
@@ -1328,6 +1382,19 @@ extension CoreAIImpl {
 #if canImport(CoreAISpeech)
 @available(iOS 27, macOS 27, *)
 extension CoreAIImpl {
+  /// Marks the speech model as transcribing. A second transcription on it
+  /// would fail to start its stream and fall back to a single window
+  private func claimSpeechModel(at sourceURL: URL) throws {
+    let claimed = locked { busySpeechModels.insert(sourceURL.path).inserted }
+    guard claimed else {
+      throw CoreAIError.invalidInput("This speech model is already transcribing. Wait for that transcription to finish, or cancel it.")
+    }
+  }
+
+  private func releaseSpeechModel(at sourceURL: URL) {
+    locked { _ = busySpeechModels.remove(sourceURL.path) }
+  }
+
   // Concurrent calls for the same bundle share one load
   private func speechModel(at sourceURL: URL) async throws -> SpeechRecognitionModel {
     let load = locked { () -> Task<SpeechRecognitionModel, Error> in
@@ -1471,13 +1538,21 @@ private actor TranscriptionStream {
   private let converter: AVAudioConverter?
   private let collector: Task<[[String: Any]], Error>
   private var sampleCount = 0
+  // Called once, when the stream finishes or is cancelled
+  private var onEnd: (() -> Void)?
+  private enum State { case running, finishing, ended }
+  private var state = State.running
+
+  var hasEnded: Bool { state == .ended }
 
   init(
     model: SpeechRecognitionModel,
     inputSampleRate: Double,
-    onUpdate: (([String: Any]) -> Void)?
+    onUpdate: (([String: Any]) -> Void)?,
+    onEnd: (() -> Void)? = nil
   ) async throws {
     self.model = model
+    self.onEnd = onEnd
     self.sampleRate = await model.sampleRate
     self.architecture = await model.architecture
 
@@ -1526,6 +1601,9 @@ private actor TranscriptionStream {
   }
 
   func append(samples: [Float]) async throws {
+    guard state == .running else {
+      throw CoreAIError.invalidInput("The transcription stream is finishing or has ended, so it takes no more audio.")
+    }
     do {
       let resampled = try resample(samples, isLast: false)
       sampleCount += resampled.count
@@ -1537,17 +1615,34 @@ private actor TranscriptionStream {
   }
 
   func finish() async throws -> [String: Any] {
+    // Only cancel() can run on the session while it finishes
+    guard state == .running else {
+      throw CoreAIError.invalidInput("The transcription stream is already finishing or has ended.")
+    }
+    state = .finishing
     do {
       let tail = try resample([], isLast: true)
       if !tail.isEmpty {
         sampleCount += tail.count
         try await model.append(pcm: tail)
       }
-      try await model.finishStream()
     } catch {
-      await cancel()
+      // The tail failed before the finalizer ran, so it runs once here
+      _ = try? await model.finishStream()
+      collector.cancel()
+      end()
       throw error
     }
+    do {
+      try await model.finishStream()
+    } catch {
+      // The finalizer already ran and isn't repeated. If it left the session
+      // open, the model's next startStream reports that
+      collector.cancel()
+      end()
+      throw error
+    }
+    defer { end() }
     let segments = try await collector.value
     return [
       "text": segments.compactMap { $0["text"] as? String }.joined(separator: " "),
@@ -1557,10 +1652,28 @@ private actor TranscriptionStream {
     ]
   }
 
-  // A session left running would make the model's next startStream throw
+  // A session left running would make the model's next startStream throw.
+  // Once the stream has ended, the model may run a newer session, so this
+  // does nothing
   func cancel() async {
-    _ = try? await model.finishStream()
-    collector.cancel()
+    switch state {
+    case .ended:
+      return
+    case .finishing:
+      // finish() is already finalizing the session, and ends the stream once
+      // that returns, so this only stops collecting its transcript
+      collector.cancel()
+    case .running:
+      _ = try? await model.finishStream()
+      collector.cancel()
+      end()
+    }
+  }
+
+  private func end() {
+    state = .ended
+    onEnd?()
+    onEnd = nil
   }
 
   private func resample(_ samples: [Float], isLast: Bool) throws -> [Float] {
@@ -1666,6 +1779,20 @@ extension CoreAIImpl {
       throw CoreAIError.invalidInput("Could not load image at \(url.path).")
     }
     return image
+  }
+
+  /// A 32-bit diffusion seed: the given number truncated and wrapped to 32
+  /// bits, or a random one when none is given
+  static func seed(from option: Any?) throws -> UInt32 {
+    guard let value = (option as? NSNumber)?.doubleValue else {
+      return UInt32.random(in: 0...UInt32.max)
+    }
+    guard value.isFinite else {
+      throw CoreAIError.invalidInput("seed must be a finite number, got \(value).")
+    }
+    // The remainder is below 2^32 in magnitude, so it fits in an Int64
+    let wrapped = value.rounded(.towardZero).truncatingRemainder(dividingBy: 4_294_967_296)
+    return UInt32(truncatingIfNeeded: Int64(wrapped))
   }
 
   static func pngBase64(_ image: CGImage) throws -> String {

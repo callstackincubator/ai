@@ -52,7 +52,12 @@ final class RawModel: @unchecked Sendable {
     var outputs = try await function.run(inputs: arrays)
     var result: [String: Any] = [:]
     for name in descriptor.outputNames {
-      guard let array = outputs.remove(name)?.ndArray else { continue }
+      guard let value = outputs.remove(name) else {
+        throw CoreAIError.invalidInput("\(functionName) returned no output \"\(name)\".")
+      }
+      guard let array = value.ndArray else {
+        throw CoreAIError.invalidInput("Output \"\(name)\" is an image, which raw function calls do not support yet.")
+      }
       result[name] = try Self.serialize(array, keepsHalfPrecision: keepsHalfPrecision)
     }
     return result
@@ -160,10 +165,18 @@ extension RawModel {
     }
 
     let elementSize = try size(of: tensorType)
-    let count = shape.reduce(1, *)
-    guard data.count == count * elementSize else {
+    // Checked, since JS sets the dimensions of dynamic shapes
+    var byteCount = elementSize
+    for dimension in shape {
+      let (product, overflow) = byteCount.multipliedReportingOverflow(by: dimension)
+      guard !overflow else {
+        throw CoreAIError.invalidInput("Input \"\(name)\" of shape \(shape) is too large.")
+      }
+      byteCount = product
+    }
+    guard data.count == byteCount else {
       throw CoreAIError.invalidInput(
-        "Input \"\(name)\" needs \(count * elementSize) bytes of \(Self.name(of: tensorType)) for shape \(shape), got \(data.count)."
+        "Input \"\(name)\" needs \(byteCount) bytes of \(Self.name(of: tensorType)) for shape \(shape), got \(data.count)."
       )
     }
 
@@ -244,9 +257,14 @@ extension RawModel {
     var bits = [UInt16](repeating: 0, count: floats.count)
     for (index, value) in floats.enumerated() {
       if type == .bfloat16 {
-        // Round to nearest even on the bits dropped from the mantissa
         let pattern = value.bitPattern
-        bits[index] = UInt16((pattern &+ 0x7FFF &+ ((pattern >> 16) & 1)) >> 16)
+        if value.isNaN {
+          // Rounding could carry a NaN into infinity, so it keeps a quiet NaN
+          bits[index] = UInt16(pattern >> 16) | 0x0040
+        } else {
+          // Round to nearest even on the bits dropped from the mantissa
+          bits[index] = UInt16((pattern &+ 0x7FFF &+ ((pattern >> 16) & 1)) >> 16)
+        }
       } else {
         bits[index] = Float16(value).bitPattern
       }

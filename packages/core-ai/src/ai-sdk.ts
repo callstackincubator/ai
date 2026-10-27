@@ -106,6 +106,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
 
   private loadedModel?: CoreAILoadedModel
   private loading?: Promise<CoreAILoadedModel>
+  private removing?: Promise<void>
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'language' }
@@ -150,10 +151,21 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     await NativeCoreAI.unloadModel((await loading).modelHandle)
   }
 
+  // Unloads the model before deleting its files. Loads that start meanwhile
+  // wait for the files to be gone
   async remove(): Promise<void> {
-    await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
-    this.loading = undefined
-    this.loadedModel = undefined
+    const removal = (async () => {
+      await this.unload().catch(() => {})
+      await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
+    })()
+    this.removing = removal
+    try {
+      await removal
+    } finally {
+      if (this.removing === removal) {
+        this.removing = undefined
+      }
+    }
   }
 
   async createSession(
@@ -267,7 +279,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
             if (event.streamId === streamId) {
               controller.enqueue({
                 type: 'error',
-                error: new Error(event.error),
+                error: toStreamError(event),
               })
               cleanup()
               controller.close()
@@ -312,19 +324,36 @@ export class CoreAILanguageModel implements LanguageModelV4 {
   private load(
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAILoadedModel> {
-    this.loading ??= (
-      NativeCoreAI.loadModel(
-        toNativeModelConfig(this.config),
-        options
-      ) as Promise<CoreAILoadedModel>
-    ).then(
-      (loadedModel) => (this.loadedModel = loadedModel),
-      (error) => {
-        this.loading = undefined
-        throw error
-      }
-    )
-    return this.loading
+    if (this.loading) {
+      return this.loading
+    }
+    const removing = this.removing ?? Promise.resolve()
+    const loading: Promise<CoreAILoadedModel> = removing
+      .catch(() => {})
+      .then(
+        () =>
+          NativeCoreAI.loadModel(
+            toNativeModelConfig(this.config),
+            options
+          ) as Promise<CoreAILoadedModel>
+      )
+      .then(
+        (loadedModel) => {
+          // unload() during the load drops it, and the next call loads again
+          if (this.loading === loading) {
+            this.loadedModel = loadedModel
+          }
+          return loadedModel
+        },
+        (error) => {
+          if (this.loading === loading) {
+            this.loading = undefined
+          }
+          throw error
+        }
+      )
+    this.loading = loading
+    return loading
   }
 }
 
@@ -462,7 +491,10 @@ export class CoreAIVideoModel implements VideoModelV4 {
     options: CoreAIVideoGenerationOptions = {},
     abortSignal?: AbortSignal
   ): Promise<CoreAIVideoGenerationResult> {
-    abortSignal?.throwIfAborted()
+    // React Native's AbortSignal has no throwIfAborted()
+    if (abortSignal?.aborted) {
+      throw toAbortError(abortSignal)
+    }
     const requestId = generateId()
     const onAbort = () => NativeCoreAI.cancelStream(requestId)
     abortSignal?.addEventListener('abort', onAbort)
@@ -575,6 +607,11 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
       })
     }
 
+    // React Native's AbortSignal has no throwIfAborted()
+    if (abortSignal?.aborted) {
+      throw toAbortError(abortSignal)
+    }
+
     const streamId = generateId()
     const config = toNativeModelConfig(this.config)
     const modelId = this.modelId
@@ -669,6 +706,9 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
           const result = (await NativeCoreAI.finishTranscriptionStream(
             streamId
           )) as CoreAITranscriptionResult
+          if (abortSignal?.aborted) {
+            throw abortSignal.reason ?? new Error('Transcription was aborted.')
+          }
           controller.enqueue({
             type: 'finish',
             text: result.text,
@@ -681,9 +721,12 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
           controller.close()
         } catch (error) {
           NativeCoreAI.cancelStream(streamId)
+          // Stops a live source, such as a microphone, from capturing on
+          audio.cancel(error).catch(() => {})
           controller.error(error)
         } finally {
           cleanup()
+          audio.releaseLock()
         }
       },
       cancel() {
@@ -809,7 +852,7 @@ function streamLanguageSession(
         (event: CoreAIStreamErrorEvent) => {
           if (event.streamId === streamId) {
             cleanup()
-            controller.error(new Error(event.error))
+            controller.error(toStreamError(event))
           }
         }
       )
@@ -999,6 +1042,11 @@ function toUsage(usage: CoreAIUsage | undefined): LanguageModelV4Usage {
       reasoning: usage?.reasoningTokens,
     },
   }
+}
+
+// Keeps the native error code, like errors from rejected native calls
+function toStreamError(event: CoreAIStreamErrorEvent): Error {
+  return Object.assign(new Error(event.error), { code: event.code })
 }
 
 function toAbortError(signal: AbortSignal): Error {

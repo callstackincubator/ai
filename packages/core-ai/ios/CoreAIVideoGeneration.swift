@@ -148,7 +148,7 @@ enum VideoGeneration {
     return VideoConfiguration(
       prompt: prompt,
       negativePrompt: options["negativePrompt"] as? String ?? "",
-      seed: UInt32(truncatingIfNeeded: (options["seed"] as? NSNumber)?.intValue ?? Int.random(in: 0..<Int(UInt32.max))),
+      seed: try CoreAIImpl.seed(from: options["seed"]),
       stepCount: (options["stepCount"] as? NSNumber)?.intValue ?? pipeline.defaultSteps,
       guidanceScale: (options["guidanceScale"] as? NSNumber)?.floatValue ?? pipeline.defaultGuidanceScale,
       numFrames: frameCount,

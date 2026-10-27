@@ -30,6 +30,7 @@ const loadModel = mock(async () => ({
   info: { task: 'language', platforms: ['iOS'], functions: [] },
 }))
 const unloadModel = mock(async (_modelHandle: string) => {})
+const removeModel = mock(async (_config: Record<string, unknown>) => {})
 const generateText = mock(
   async (
     _requestId: string,
@@ -116,6 +117,7 @@ mock.module('react-native', () => ({
     getEnforcing: () => ({
       loadModel,
       unloadModel,
+      removeModel,
       generateText,
       streamText,
       cancelStream,
@@ -173,6 +175,7 @@ async function waitForStreamId() {
 beforeEach(() => {
   loadModel.mockClear()
   unloadModel.mockClear()
+  removeModel.mockClear()
   generateText.mockClear()
   streamText.mockClear()
   cancelStream.mockClear()
@@ -222,6 +225,47 @@ describe('core ai language model', () => {
 
     await model.doGenerate(createCallOptions())
     expect(loadModel).toHaveBeenCalledTimes(2)
+  })
+
+  test('unloads the model before removing its files', async () => {
+    const model = createModel()
+    await model.doGenerate(createCallOptions())
+    const modelHandle = generateText.mock.calls[0]![1]
+
+    await model.remove()
+    expect(unloadModel).toHaveBeenCalledWith(modelHandle)
+    expect(removeModel).toHaveBeenCalledTimes(1)
+    expect(unloadModel.mock.invocationCallOrder[0]!).toBeLessThan(
+      removeModel.mock.invocationCallOrder[0]!
+    )
+    expect(model.modelHandle).toBeUndefined()
+  })
+
+  test('waits for a removal before loading again', async () => {
+    const model = createModel()
+    await model.prepare()
+    let finishRemoval: () => void = () => {}
+    removeModel.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRemoval = resolve
+        })
+    )
+
+    const removal = model.remove()
+    const loading = model.prepare()
+    while (removeModel.mock.calls.length === 0) {
+      await Promise.resolve()
+    }
+    expect(loadModel).toHaveBeenCalledTimes(1)
+
+    finishRemoval()
+    await removal
+    await loading
+    expect(loadModel).toHaveBeenCalledTimes(2)
+    expect(removeModel.mock.invocationCallOrder[0]!).toBeLessThan(
+      loadModel.mock.invocationCallOrder[1]!
+    )
   })
 
   test('passes session instructions to native', async () => {
@@ -316,6 +360,26 @@ describe('core ai language model', () => {
       'text-end',
       'finish',
     ])
+  })
+
+  test('keeps the native error code on stream errors', async () => {
+    const { stream } = await createModel().doStream(createCallOptions())
+    const parts = readAll(stream)
+
+    const streamId = await waitForStreamId()
+    onStreamError.emit({
+      streamId,
+      code: 'CORE_AI_UNSUPPORTED_CAPABILITY',
+      error: 'No guided generation.',
+    })
+
+    const error = (await parts).find((part) => part.type === 'error')
+    expect(error).toMatchObject({
+      error: {
+        message: 'No guided generation.',
+        code: 'CORE_AI_UNSUPPORTED_CAPABILITY',
+      },
+    })
   })
 
   test('cancels the native request when generation is aborted', async () => {
@@ -637,6 +701,57 @@ describe('core ai streaming transcription', () => {
     await expect(readAll(stream)).rejects.toThrow('model busy')
     expect(cancelStream).toHaveBeenCalled()
     expect(finishTranscriptionStream).not.toHaveBeenCalled()
+  })
+
+  test('cancels the audio source when transcription fails', async () => {
+    startTranscriptionStream.mockImplementationOnce(async () => {
+      throw new Error('no model')
+    })
+    let cancelReason: unknown
+    const audio = new ReadableStream<Uint8Array>({
+      cancel(reason) {
+        cancelReason = reason
+      },
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio,
+      inputAudioFormat: { type: 'audio/pcm' },
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('no model')
+    expect(cancelReason).toEqual(new Error('no model'))
+    expect(audio.locked).toBe(false)
+  })
+
+  test('does not start with an aborted signal', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      createTranscriptionModel().doStream({
+        audio: audioStream([]),
+        inputAudioFormat: { type: 'audio/pcm' },
+        abortSignal: controller.signal,
+      })
+    ).rejects.toThrow()
+    expect(startTranscriptionStream).not.toHaveBeenCalled()
+  })
+
+  test('errors when aborted while finishing', async () => {
+    const controller = new AbortController()
+    finishTranscriptionStream.mockImplementationOnce(async () => {
+      controller.abort(new Error('stopped'))
+      return transcriptionResult
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([0, 0])]),
+      inputAudioFormat: { type: 'audio/pcm' },
+      abortSignal: controller.signal,
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('stopped')
   })
 
   test('rejects audio that is not pcm', async () => {

@@ -46,16 +46,53 @@ export function createTensor<T extends CoreAITensorDataType>(
   elements: TypedArrayFor<T> | ArrayLike<number>
 ): CoreAITensor {
   const count = shape.reduce((product, size) => product * size, 1)
-  const array = ArrayBuffer.isView(elements)
-    ? elements
-    : new (typedArrays[dataType] as any)(Array.from(elements))
+  let tensorType: CoreAITensorDataType = dataType
+  let array: ArrayBufferView & { length: number }
+  if (ArrayBuffer.isView(elements)) {
+    // The bytes are sent as they are, so they have to be elements of dataType.
+    // Half-precision tensors also take float32, which the native side converts
+    const isHalfAsFloat32 =
+      (dataType === 'float16' || dataType === 'bfloat16') &&
+      elements instanceof Float32Array
+    if (!isHalfAsFloat32 && !(elements instanceof typedArrays[dataType])) {
+      throw new Error(
+        `A ${dataType} tensor takes a ${typedArrays[dataType].name}, got a ${elements.constructor.name}.`
+      )
+    }
+    array = elements as ArrayBufferView & { length: number }
+    if (isHalfAsFloat32) {
+      tensorType = 'float32'
+    }
+  } else if (dataType === 'float16' || dataType === 'bfloat16') {
+    // Numbers are not the bits of half-precision elements, so they are sent
+    // as float32 for the native side to convert
+    array = Float32Array.from(elements)
+    tensorType = 'float32'
+  } else if (dataType === 'int64' || dataType === 'uint64') {
+    // Numbers past 2^53 are already rounded, so they take a BigInt64Array
+    const values = Array.from(elements, (value) => {
+      const integer = Math.trunc(value)
+      if (!Number.isSafeInteger(integer)) {
+        throw new Error(
+          `${value} is not a safe integer. Pass a ${dataType === 'int64' ? 'BigInt64Array' : 'BigUint64Array'} for larger values.`
+        )
+      }
+      return BigInt(integer)
+    })
+    array =
+      dataType === 'int64'
+        ? BigInt64Array.from(values)
+        : BigUint64Array.from(values)
+  } else {
+    array = new (typedArrays[dataType] as any)(Array.from(elements))
+  }
   if (array.length !== count) {
     throw new Error(
       `A ${dataType} tensor of shape [${shape.join(', ')}] has ${count} elements, got ${array.length}.`
     )
   }
   const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength)
-  return { dataType, shape, data: bytesToBase64(bytes) }
+  return { dataType: tensorType, shape, data: bytesToBase64(bytes) }
 }
 
 // Reads the elements of a tensor that `CoreAI.runRawFunction` returned, in
