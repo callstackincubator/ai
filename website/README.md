@@ -41,7 +41,7 @@ The site is not a workspace of the monorepo; it has its own `bun.lock`.
 | --- | --- |
 | `src/site/content.ts` | Product facts and all copy |
 | `src/site/brand.ts` | The accent; injected as CSS variables everywhere |
-| `src/site/meta.ts` | Page titles: `Name: subtitle` on home, `Page | Name` everywhere else; never write a separator by hand |
+| `src/site/meta.ts` | Page titles: `Name: subtitle` on home, `Page \| Name` everywhere else; never write a separator by hand |
 | `src/pages/index.astro` | Home page layout; reorder sections with `order` |
 | `src/components/home/Hero.astro` | The hero. The visual sits between the `HERO VISUAL` comments |
 | `src/components/home/hero.ts` | The hero animation, loaded only when the hero nears the viewport |
