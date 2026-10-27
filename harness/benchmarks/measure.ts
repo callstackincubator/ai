@@ -1,4 +1,5 @@
 import type { streamText } from 'ai'
+import { activateKeepAwakeAsync } from 'expo-keep-awake'
 import RNBlobUtil from 'react-native-blob-util'
 
 import DeviceStats from '../../apps/expo-example/modules/device-stats'
@@ -6,6 +7,10 @@ import { LONG_PROMPT, SHORT_PROMPT } from './prompts'
 
 export const PROMPTS = { short: SHORT_PROMPT, long: LONG_PROMPT }
 export type PromptName = keyof typeof PROMPTS
+
+// A benchmark runs longer than the auto-lock delay, and a locked device
+// suspends the app
+activateKeepAwakeAsync('benchmark')
 
 export const MAX_OUTPUT_TOKENS = 256
 // Measured runs per configuration, after one warmup run that is not counted

@@ -23,7 +23,8 @@ cd "$BENCHMARKS_DIR/../../apps/expo-example"
 for config in ${CONFIGS[@]}; do
   echo "Running $config"
   HARNESS_BENCHMARK=true npx react-native-harness --harnessRunner ios \
-    "../../harness/benchmarks/$config.device.benchmark.harness.ts"
+    "../../harness/benchmarks/$config.device.benchmark.harness.ts" ||
+    echo "$config failed"
   sleep "$COOLDOWN"
 done
 

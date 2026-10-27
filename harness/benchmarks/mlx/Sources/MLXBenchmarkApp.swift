@@ -11,6 +11,8 @@ struct MLXBenchmarkApp: App {
       Text(status)
         .padding()
         .task {
+          // A locked device suspends the app
+          UIApplication.shared.isIdleTimerDisabled = true
           do {
             try await Benchmark.run()
             status = "Done"
