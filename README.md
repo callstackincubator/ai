@@ -2,30 +2,161 @@
 
 # React Native AI
 
-A collection of on-device AI primitives for React Native with first-class Vercel AI SDK support. Run AI models directly on users' devices for privacy-preserving, low-latency inference without server costs.
+Run AI models on users' devices from React Native, with first-class
+[Vercel AI SDK](https://ai-sdk.dev) support. Each provider wraps an on-device
+runtime and exposes it as an AI SDK provider, so `generateText`, `streamText`,
+`embed` and the other AI SDK functions work with local models the same way they
+work with cloud ones.
 
-## Features
-
-- 🚀 **Instant AI** - Use built-in system models immediately without downloads
+- 🚀 **Instant AI** - Use the models built into iOS and Android, with nothing to bundle
 - 🔒 **Privacy-first** - Inference runs on-device, so data stays local. Cloud models are opt-in
-- 🎯 **Vercel AI SDK compatible** - Use `generateText`, `streamText`, `embed` and other AI SDK functions with local models
-- 🎨 **Beyond text** - Embeddings, transcription, speech synthesis and image generation
+- 🎯 **Vercel AI SDK compatible** - Swap local and cloud models without changing your code
+- 🎨 **Beyond text** - Embeddings, reranking, transcription, speech and image generation
 
-## AI SDK Compatibility
+## Providers
 
-| React Native AI | AI SDK |
-| --------------- | ------ |
-| 0.11 and below  | v5     |
-| 0.12            | v6     |
-| 0.13 and above  | v7     |
+| Provider                           | Package                                          | Platforms    | Models                                     | Download needed |
+| ---------------------------------- | ------------------------------------------------ | ------------ | ------------------------------------------ | --------------- |
+| [Apple](#apple)                    | [`@react-native-ai/apple`](./packages/apple-llm) | iOS          | Apple Intelligence and system models       | No              |
+| [Google ADK](#google-adk)          | [`@react-native-ai/adk`](./packages/adk)         | Android      | Gemini Nano, optional cloud Gemini         | No              |
+| [Llama](#llama)                    | [`@react-native-ai/llama`](./packages/llama)     | iOS, Android | Any GGUF model, via llama.rn               | Yes             |
+| [Core AI](#core-ai) (not released) | [`@react-native-ai/core-ai`](./packages/core-ai) | iOS 27+      | Core AI bundles from `apple/coreai-models` | Yes             |
 
-## DevTools
+### Apple
+
+Use the AI built into iOS: Apple Intelligence for text generation,
+NLContextualEmbedding for embeddings, SpeechAnalyzer for transcription and
+AVSpeechSynthesizer for speech. Nothing to download, the models ship with the
+system.
+
+```bash
+npm install @react-native-ai/apple
+```
+
+```ts
+import { apple } from '@react-native-ai/apple'
+import { generateText } from 'ai'
+
+const { text } = await generateText({
+  model: apple(),
+  prompt: 'Explain quantum computing',
+})
+```
+
+| Feature          | iOS     | Additional requirements    |
+| ---------------- | ------- | -------------------------- |
+| Text generation  | iOS 26+ | Apple Intelligence device  |
+| Embeddings       | iOS 17+ | -                          |
+| Transcription    | iOS 26+ | -                          |
+| Speech synthesis | iOS 13+ | iOS 17+ for Personal Voice |
+
+[Package README](./packages/apple-llm) · [Documentation](https://react-native-ai.dev/docs/apple/getting-started)
+
+### Google ADK
+
+Use Gemini on Android through Google's
+[Agent Development Kit](https://developer.android.com/ai/adk). Gemini Nano runs
+on-device and is provided by the system through AICore, so there are no model
+files and no API key. Cloud Gemini is available when you need a larger model.
+
+```bash
+npm install @react-native-ai/adk
+```
+
+> [!IMPORTANT]
+> Requires Android `minSdkVersion` 26 and a physical device with AICore support (Android 14+) for Gemini Nano. Your app also needs packaging excludes for duplicate `META-INF` files, see the [getting started guide](https://react-native-ai.dev/docs/adk/getting-started).
+
+```ts
+import { adk } from '@react-native-ai/adk'
+import { generateText } from 'ai'
+
+if (!(await adk.isAvailable())) {
+  throw new Error('Gemini Nano is not available on this device')
+}
+
+await adk.prepareNano()
+
+const { text } = await generateText({
+  model: adk(),
+  prompt: 'Explain quantum computing',
+})
+```
+
+[Package README](./packages/adk) · [Documentation](https://react-native-ai.dev/docs/adk/getting-started)
+
+### Llama
+
+Run any GGUF model from Hugging Face on iOS and Android with
+[llama.rn](https://github.com/mybigday/llama.rn). Supports text generation,
+embeddings, reranking and speech.
+
+```bash
+npm install @react-native-ai/llama llama.rn react-native-blob-util
+```
+
+```ts
+import { downloadModel, llama } from '@react-native-ai/llama'
+import { generateText } from 'ai'
+
+// Model ID format: "owner/repo/filename.gguf"
+const modelPath = await downloadModel(
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
+)
+
+const model = llama.languageModel(modelPath)
+await model.prepare()
+
+const { text } = await generateText({
+  model,
+  prompt: 'Write a haiku about coding.',
+})
+```
+
+[Package README](./packages/llama) · [Documentation](https://react-native-ai.dev/docs/llama/getting-started)
+
+### Core AI
+
+> [!WARNING]
+> Work in progress. This package is not published to npm yet.
+
+Run model bundles exported with
+[`apple/coreai-models`](https://github.com/apple/coreai-models), such as Qwen3
+or FLUX.2, on iOS 27 with Apple's Core AI framework. Supports text and image
+generation through the AI SDK, plus native APIs for segmentation and object
+detection.
+
+```ts
+import { coreAI } from '@react-native-ai/core-ai'
+import { streamText } from 'ai'
+
+const result = streamText({
+  model: coreAI.languageModel({
+    id: 'qwen3-0.6b',
+    source: { type: 'file', uri: qwen3ModelDirectory },
+    variant: 'iOS',
+  }),
+  prompt: 'Explain Core AI in one sentence.',
+})
+```
+
+[Package README](./packages/core-ai)
+
+## Tools
+
+These work with any AI SDK provider, on-device or cloud.
+
+| Package                                              | Description                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| [`@react-native-ai/json-ui`](./packages/json-ui)     | Let a tool-calling model build React Native UI from a JSON spec           |
+| [`@react-native-ai/dev-tools`](./packages/dev-tools) | Inspect AI SDK calls in Rozenite DevTools                                 |
+| [`@react-native-ai/utils`](./packages/utils)         | Compact conversation history for small context windows (not released yet) |
+
+### DevTools
 
 ![AI SDK Profiler preview](website/src/public/dev-tools-preview.png)
 
 The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
-requests and surfaces them in Rozenite DevTools. DevTools are runtime
-agnostic, so they work with on-device and remote runtimes.
+requests and surfaces them in Rozenite DevTools.
 
 ```bash
 npm install @react-native-ai/dev-tools
@@ -43,189 +174,13 @@ If the `AI SDK Profiler` panel stays empty after you send a message, close the
 React Native DevTools window and open a new one. A stale debugger session can
 keep the panel mounted without receiving telemetry.
 
-## Available Providers
+## AI SDK Compatibility
 
-| Provider            | Built-in | Platforms    | Runtime                                                             | Description                                                |
-| ------------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [Apple](#apple)     | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
-| [ADK](#google-adk)  | ✅ Yes   | Android      | [Google ADK](https://developer.android.com/ai/adk)                  | On-device Gemini Nano, with optional cloud Gemini          |
-| [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
-
----
-
-### Apple
-
-Native integration with Apple's on-device AI capabilities. **Built-in** - no model downloads required, uses system models.
-
-- **Text Generation** - Apple Foundation Models for chat and completion
-- **Embeddings** - NLContextualEmbedding for 512-dimensional semantic vectors
-- **Transcription** - SpeechAnalyzer for fast, accurate speech-to-text
-- **Speech Synthesis** - AVSpeechSynthesizer for natural text-to-speech with system voices
-
-#### Installation
-
-```bash
-npm install @react-native-ai/apple
-```
-
-No additional linking needed, works immediately on iOS devices (autolinked).
-
-#### Usage
-
-```typescript
-import { apple } from '@react-native-ai/apple'
-import {
-  generateText,
-  embed,
-  transcribe,
-  generateSpeech as speech,
-} from 'ai'
-
-// Text generation with Apple Intelligence
-const { text } = await generateText({
-  model: apple(),
-  prompt: 'Explain quantum computing',
-})
-
-// Generate embeddings
-const { embedding } = await embed({
-  model: apple.embeddingModel(),
-  value: 'Hello world',
-})
-
-// Transcribe audio
-const { text: transcript } = await transcribe({
-  model: apple.transcriptionModel(),
-  audio: audioBuffer,
-})
-
-// Text-to-speech
-const { audio } = await speech({
-  model: apple.speechModel(),
-  text: 'Hello from Apple!',
-})
-```
-
-#### Availability
-
-| Feature          | iOS Version | Additional Requirements    |
-| ---------------- | ----------- | -------------------------- |
-| Text Generation  | iOS 26+     | Apple Intelligence device  |
-| Embeddings       | iOS 17+     | -                          |
-| Transcription    | iOS 26+     | -                          |
-| Speech Synthesis | iOS 13+     | iOS 17+ for Personal Voice |
-
-See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-started) for detailed setup and usage guides.
-
----
-
-### Google ADK
-
-Run Gemini Nano on-device on Android through Google's [Agent Development Kit](https://developer.android.com/ai/adk). **Built-in** - Gemini Nano is provisioned by the system via AICore, so there are no model files to bundle and no API key. Cloud Gemini is available as an option.
-
-- **Text Generation** - `generateText` and `streamText` with on-device Gemini Nano
-- **Tool Calling** - Native ADK agent loop with JavaScript tool executors
-- **Cloud Gemini** - Optional cloud inference via ADK `LlmAgent` when you need a larger model
-
-#### Installation
-
-```bash
-npm install @react-native-ai/adk
-```
-
-> [!IMPORTANT]
-> Requires Android `minSdkVersion` 26 and a physical device with AICore support (Android 14+) for Gemini Nano. Your app also needs packaging excludes for duplicate `META-INF` files, see the [getting started guide](https://react-native-ai.dev/docs/adk/getting-started).
-
-#### Usage
-
-```typescript
-import { adk } from '@react-native-ai/adk'
-import { generateText } from 'ai'
-
-if (!(await adk.isAvailable())) {
-  throw new Error('Gemini Nano is not available on this device')
-}
-
-await adk.prepareNano()
-
-const { text } = await generateText({
-  model: adk(),
-  prompt: 'Explain quantum computing',
-})
-```
-
-See the [ADK documentation](https://react-native-ai.dev/docs/adk/getting-started) for device checks, cloud Gemini, and tool calling.
-
----
-
-### Llama
-
-Run any GGUF model on-device using [llama.rn](https://github.com/mybigday/llama.rn). **Requires download** - models are downloaded from HuggingFace.
-
-#### Supported Features
-
-| Feature         | Method                   | Description                                   |
-| --------------- | ------------------------ | --------------------------------------------- |
-| Text Generation | `llama.languageModel()`  | Chat, completion, streaming, reasoning models |
-| Embeddings      | `llama.embeddingModel()` | Text embeddings for RAG and similarity search |
-| Speech          | `llama.speechModel()`    | Text-to-speech with vocoder models            |
-
-#### Installation
-
-```bash
-npm install @react-native-ai/llama llama.rn react-native-blob-util
-```
-
-#### Usage
-
-```typescript
-import { downloadModel, llama } from '@react-native-ai/llama'
-import { generateText } from 'ai'
-
-// Download from HuggingFace (Model ID format: "owner/repo/filename.gguf")
-const modelPath = await downloadModel(
-  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf',
-  (progress) => console.log(`Downloading: ${progress.percentage}%`)
-)
-
-// Create model instance
-const model = llama.languageModel(modelPath)
-
-// Initialize model (loads into memory)
-await model.prepare()
-
-// Generate text
-const { text } = await generateText({
-  model,
-  messages: [
-    { role: 'system', content: 'You are a helpful assistant.' },
-    { role: 'user', content: 'Write a haiku about coding.' },
-  ],
-})
-
-// Cleanup when done
-await model.unload()
-```
-
-#### Model Compatibility
-
-Any GGUF model from HuggingFace can be used. Use the format `owner/repo/filename.gguf` as the model ID. Popular choices include:
-
-- `bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf`
-- `bartowski/Llama-3.2-3B-Instruct-GGUF/Llama-3.2-3B-Instruct-Q4_K_M.gguf`
-- `Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf`
-
-📚 **[View full Llama documentation →](https://react-native-ai.dev/docs/llama/getting-started)**
-
-## JSON UI
-
-`@react-native-ai/json-ui` lets a tool-calling model build React Native UI. The model calls tools that add, update, and delete nodes in a JSON spec, and `GenerativeUIView` renders it. It's designed for small on-device models with limited context.
-
-```bash
-npm install @react-native-ai/json-ui
-```
-
-See the [JSON UI documentation](https://react-native-ai.dev/docs/json-ui/getting-started).
+| React Native AI | AI SDK |
+| --------------- | ------ |
+| 0.11 and below  | v5     |
+| 0.12            | v6     |
+| 0.13 and above  | v7     |
 
 ## Documentation
 

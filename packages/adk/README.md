@@ -1,6 +1,15 @@
-# ADK Provider for Vercel AI SDK
+# @react-native-ai/adk
 
-A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk) on Android. Use on-device Gemini Nano or cloud Gemini with tool calling and multi-turn sessions.
+Use Gemini on Android from React Native, through Google's
+[Agent Development Kit (ADK)](https://developer.android.com/ai/adk). Gemini
+Nano runs on-device and is provided by the system through AICore, so there is
+no model to download or bundle and no API key. Cloud Gemini is available when
+you need a larger model. The package comes with a
+[Vercel AI SDK](https://ai-sdk.dev) provider, so you can call both with
+`generateText` and `streamText`, including tool calling and image input.
+
+To run models you choose and ship yourself on Android, see
+[`@react-native-ai/llama`](../llama).
 
 **Requirements:**
 

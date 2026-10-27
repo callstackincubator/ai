@@ -1,6 +1,8 @@
-# React Native AI Utils
+# @react-native-ai/utils
 
-Shared utilities for React Native AI SDK providers.
+Utilities for running Vercel AI SDK language models on small on-device context
+windows. It works with any AI SDK language model, including the Apple, Llama
+and ADK providers.
 
 > Not published to npm yet. Use it from this monorepo, or copy
 > `src/index.ts` into your app. Its only dependency is `@ai-sdk/provider`.

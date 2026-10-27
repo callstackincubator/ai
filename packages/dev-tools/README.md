@@ -1,10 +1,11 @@
 ![rozenite-banner](https://www.rozenite.dev/rozenite-banner.jpg)
 
-### A Rozenite plugin that captures Vercel AI SDK spans in Rozenite
+# @react-native-ai/dev-tools
 
-The AI SDK Profiler plugin captures OpenTelemetry spans emitted by the Vercel AI
-SDK and shows them in Rozenite DevTools. It helps you inspect requests,
-inputs, outputs, provider metadata, and latency.
+See every Vercel AI SDK call your React Native app makes. The AI SDK Profiler
+is a [Rozenite](https://www.rozenite.dev) DevTools plugin that captures the
+OpenTelemetry spans the AI SDK emits and shows their inputs, outputs, tool
+calls, provider metadata and latency.
 
 ![AI SDK Profiler preview](../../website/src/public/dev-tools-preview.png)
 
@@ -27,31 +28,28 @@ https://www.rozenite.dev/docs/getting-started
 ### 1. Initialize the tracer and DevTools hook
 
 ```tsx
-import {
-  getAiSdkTracer,
-  useAiSdkDevTools,
-} from '@react-native-ai/dev-tools';
+import { getAiSdkTracer, useAiSdkDevTools } from '@react-native-ai/dev-tools'
 
 export function App() {
-  useAiSdkDevTools();
-  return <RootNavigator />;
+  useAiSdkDevTools()
+  return <RootNavigator />
 }
 ```
 
 ### 2. Enable AI SDK telemetry on requests
 
 ```ts
-import { OpenTelemetry } from '@ai-sdk/otel';
-import { generateText, registerTelemetry } from 'ai';
-import { openai } from '@ai-sdk/openai';
-import { getAiSdkTracer } from '@react-native-ai/dev-tools';
+import { OpenTelemetry } from '@ai-sdk/otel'
+import { generateText, registerTelemetry } from 'ai'
+import { openai } from '@ai-sdk/openai'
+import { getAiSdkTracer } from '@react-native-ai/dev-tools'
 
 // Register once, at app startup
 registerTelemetry(
   new OpenTelemetry({
     tracer: getAiSdkTracer({ serviceName: 'my-app' }),
   })
-);
+)
 
 await generateText({
   model: openai('gpt-4o-mini'),
@@ -59,7 +57,7 @@ await generateText({
   telemetry: {
     functionId: 'unique-identifier-where-the-call-comes-from',
   },
-});
+})
 ```
 
 ### 3. Open DevTools
