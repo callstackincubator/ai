@@ -175,7 +175,9 @@ export function useLiveTranscription(model: TranscriptionModel) {
     recorder.connect(recorderAdapterRef.current)
 
     try {
-      await recorder.start()
+      // The recorder reports some failures in its result instead of throwing
+      const result = await recorder.start()
+      if (result.status === 'error') throw new Error(result.message)
     } catch (error) {
       // Ends the transcription, which would otherwise wait for audio
       closeAudio()

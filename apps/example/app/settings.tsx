@@ -16,6 +16,7 @@ import React from 'react'
 import { Alert, StyleSheet } from 'react-native'
 
 import type { Runtime } from '../src/adapters/types'
+import { useChatGeneration } from '../src/chat/useChatGeneration'
 import { useUserNotes } from '../src/search/useSemanticSearch'
 import { useChats } from '../src/store/chats'
 import {
@@ -42,6 +43,7 @@ function confirm(title: string, message: string, onConfirm: () => void) {
 function ModelRow({ index }: { index: number }) {
   const adapter = chatModels[index]
   const { availability, downloadModel, deleteModel } = useModels()
+  const { isGenerating } = useChatGeneration()
   const progress = useDownloadProgress(adapter.modelId)
   const status = availability.get(adapter.modelId)
   const label = adapter.sizeBytes
@@ -64,13 +66,21 @@ function ModelRow({ index }: { index: number }) {
         <Button
           label="Delete"
           role="destructive"
-          onPress={() =>
+          onPress={() => {
+            // Deleting unloads the model, which would cut a reply short
+            if (isGenerating) {
+              Alert.alert(
+                'A reply is still being written',
+                'Delete the model once it finishes.'
+              )
+              return
+            }
             confirm(
               `Delete ${adapter.label}?`,
               'You can download it again later.',
               () => deleteModel(adapter)
             )
-          }
+          }}
         />
       ) : (
         <Button
