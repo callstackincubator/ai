@@ -54,7 +54,7 @@ import type {
   CoreAIVideoGenerationOptions,
   CoreAIVideoGenerationResult,
 } from './types'
-import { toNativeModelConfig } from './types'
+import { getModelId } from './types'
 
 export function createCoreAIProvider() {
   const provider = function (config: CoreAIModelConfig) {
@@ -110,7 +110,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'language' }
-    this.modelId = config.id
+    this.modelId = getModelId(config)
   }
 
   get modelHandle() {
@@ -118,9 +118,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
   }
 
   async inspect(): Promise<CoreAIModelInfo> {
-    return NativeCoreAI.inspectModel(
-      toNativeModelConfig(this.config)
-    ) as Promise<CoreAIModelInfo>
+    return NativeCoreAI.inspectModel(this.config) as Promise<CoreAIModelInfo>
   }
 
   // Loads the model once. Later calls, including generateText and streamText,
@@ -135,7 +133,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAIModelInfo> {
     return NativeCoreAI.specializeModel(
-      toNativeModelConfig(this.config),
+      this.config,
       options
     ) as Promise<CoreAIModelInfo>
   }
@@ -156,7 +154,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
   async remove(): Promise<void> {
     const removal = (async () => {
       await this.unload().catch(() => {})
-      await NativeCoreAI.removeModel(toNativeModelConfig(this.config))
+      await NativeCoreAI.removeModel(this.config)
     })()
     this.removing = removal
     try {
@@ -333,7 +331,7 @@ export class CoreAILanguageModel implements LanguageModelV4 {
       .then(
         () =>
           NativeCoreAI.loadModel(
-            toNativeModelConfig(this.config),
+            this.config,
             options
           ) as Promise<CoreAILoadedModel>
       )
@@ -367,7 +365,7 @@ export class CoreAITextEmbeddingModel implements EmbeddingModelV4 {
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'embedding' }
-    this.modelId = config.id
+    this.modelId = getModelId(config)
   }
 
   async embed(
@@ -375,7 +373,7 @@ export class CoreAITextEmbeddingModel implements EmbeddingModelV4 {
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAIEmbeddingResult> {
     return NativeCoreAI.embed(
-      toNativeModelConfig(this.config),
+      this.config,
       values,
       options
     ) as Promise<CoreAIEmbeddingResult>
@@ -389,7 +387,7 @@ export class CoreAITextEmbeddingModel implements EmbeddingModelV4 {
   ): Promise<CoreAIEmbeddingResult> {
     const result = (await NativeCoreAI.runTask(
       'embedding',
-      toNativeModelConfig(this.config),
+      this.config,
       { data: { imageUris } },
       options
     )) as { output: CoreAIEmbeddingResult }
@@ -422,7 +420,7 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'diffusion' }
-    this.modelId = config.id
+    this.modelId = getModelId(config)
   }
 
   async generate(
@@ -430,7 +428,7 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
     options: CoreAIImageGenerationOptions = {}
   ): Promise<CoreAIImageGenerationResult> {
     return NativeCoreAI.generateImage(
-      toNativeModelConfig(this.config),
+      this.config,
       prompt,
       options
     ) as Promise<CoreAIImageGenerationResult>
@@ -481,7 +479,7 @@ export class CoreAIVideoModel implements VideoModelV4 {
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'video-diffusion' }
-    this.modelId = config.id
+    this.modelId = getModelId(config)
   }
 
   // Generates an MP4 from the prompt. Takes minutes on device, and the abort
@@ -501,7 +499,7 @@ export class CoreAIVideoModel implements VideoModelV4 {
     try {
       return (await NativeCoreAI.generateVideo(
         requestId,
-        toNativeModelConfig(this.config),
+        this.config,
         prompt,
         options
       )) as CoreAIVideoGenerationResult
@@ -578,7 +576,7 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
 
   constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'asr' }
-    this.modelId = config.id
+    this.modelId = getModelId(config)
   }
 
   async transcribe(
@@ -587,7 +585,7 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
     options: CodegenTypes.UnsafeObject = {}
   ): Promise<CoreAITranscriptionResult> {
     return NativeCoreAI.transcribe(
-      toNativeModelConfig(this.config),
+      this.config,
       toBase64(audio),
       mediaType,
       options
@@ -613,7 +611,7 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
     }
 
     const streamId = generateId()
-    const config = toNativeModelConfig(this.config)
+    const config = this.config
     const modelId = this.modelId
     const audio = options.audio.getReader()
     let listener: { remove(): void } | undefined

@@ -22,8 +22,7 @@ export const createCoreAILanguageSetupAdapter = ({
   const modelPath = `${CORE_AI_STORAGE_PATH}/${id}`
   const model = coreAI.languageModel({
     id,
-    source: { type: 'file', uri: modelPath },
-    variant: 'iOS',
+    source: modelPath,
   })
   // expo-file-system requires that this URI starts with the file:// protocol
   const directory = new Directory(`file://${modelPath}`)

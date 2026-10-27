@@ -2,20 +2,14 @@ import type { CodegenTypes, TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
 
 export interface NativeCoreAIModelConfig {
-  id: string
-  sourceType: string
-  sourceUri?: string
-  bundleName?: string
-  bundleExtension?: string
-  bundleSubdirectory?: string
+  id?: string
+  // A path, a file:// URL, or bundle:// and a path in the app bundle
+  source: string
   task?: string
-  family?: string
-  variant?: string
 }
 
 export interface CoreAIModelInfo {
   id?: string
-  family?: string
   task: string
   platforms: string[]
   functions: CodegenTypes.UnsafeObject[]
