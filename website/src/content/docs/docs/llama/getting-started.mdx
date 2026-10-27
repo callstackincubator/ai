@@ -1,0 +1,75 @@
+---
+title: "Getting Started"
+---
+
+import PackageManagerTabs from '../../../../components/starlight/PackageManagerTabs.astro'
+
+`@react-native-ai/llama` runs GGUF models from Hugging Face on device with
+[llama.rn](https://github.com/mybigday/llama.rn), the React Native bindings for
+llama.cpp. It works on iOS and Android.
+
+| Model                     | Create with                    | Use with                     |
+| ------------------------- | ------------------------------ | ---------------------------- |
+| [Language](/docs/llama/generating)  | `llama.languageModel(path)`    | `generateText`, `streamText` |
+| [Embedding](/docs/llama/embeddings) | `llama.embeddingModel(path)`   | `embed`, `embedMany`         |
+| [Reranking](/docs/llama/reranking)  | `llama.rerankingModel(path)`   | `rerank`                     |
+| [Speech](/docs/llama/speech)        | `llama.speechModel(path, ...)` | `generateSpeech`             |
+
+## Installation
+
+<PackageManagerTabs command="install @react-native-ai/llama llama.rn ai" />
+
+The provider works with AI SDK v7 and needs its [polyfills](/docs/polyfills).
+It requires React Native 0.76 or newer and llama.rn 0.13.0-rc.8 or newer.
+
+### Expo
+
+Add the llama.rn config plugin to your app config:
+
+```json title="app.json"
+{
+  "expo": {
+    "plugins": ["llama.rn"]
+  }
+}
+```
+
+See [llama.rn's Expo setup](https://github.com/mybigday/llama.rn?tab=readme-ov-file#expo)
+for its options, such as entitlements and OpenCL on Android.
+
+## Usage
+
+Download a model, load it, and generate:
+
+```typescript
+import { downloadModel, llama } from '@react-native-ai/llama'
+import { streamText } from 'ai'
+
+const modelPath = await downloadModel(
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
+)
+
+const model = llama.languageModel(modelPath)
+await model.prepare()
+
+const { textStream } = streamText({
+  model,
+  prompt: 'Explain quantum computing in simple terms',
+})
+
+for await (const delta of textStream) {
+  console.log(delta)
+}
+
+await model.unload()
+```
+
+- **`downloadModel`** fetches the file from Hugging Face once and returns its
+  local path. Model IDs are `owner/repo/filename.gguf`.
+- **`prepare()`** loads the model into memory. Without it, the first request
+  loads the model and logs a warning.
+- **`unload()`** frees the memory when you are done.
+
+The rest of these docs start from a prepared `model`. See
+[Model Management](/docs/llama/model-management) for downloading, recommended models, and
+all model options.

@@ -1,10 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bun run build",
-  "cleanUrls": true,
   "framework": null,
   "installCommand": "bun install --frozen-lockfile",
-  "rewrites": [{ "source": "/(.*)", "destination": "/404.html" }],
-  "outputDirectory": "build",
-  "trailingSlash": false
+  "buildCommand": "bun run build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap-index.xml"
+    }
+  ]
 }

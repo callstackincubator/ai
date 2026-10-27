@@ -1,0 +1,231 @@
+---
+// The home page, in the family's order: nav, hero, marquee, numbered sections, FAQ, closing.
+// The words and code come from src/site/content.ts; this file only lays them out. To add,
+// drop or reorder a section, edit `order` and the numbers follow.
+import Site from '../layouts/Site.astro';
+import CodeBlock from '../components/site/CodeBlock.astro';
+import Closing from '../components/site/Closing.astro';
+import Faq from '../components/site/Faq.astro';
+import Footer from '../components/site/Footer.astro';
+import Marquee from '../components/site/Marquee.astro';
+import Nav from '../components/site/Nav.astro';
+import PixelIcon from '../components/site/PixelIcon.astro';
+import Tabs from '../components/site/Tabs.astro';
+import Window from '../components/site/Window.astro';
+import Hero from '../components/home/Hero.astro';
+import { docs, faq, home, runtimes, site } from '../site/content';
+
+// Section numbers, [01] onwards, in page order.
+const order = ['how', 'runtimes', 'feature', 'cells', 'safe', 'faq'] as const;
+const num = (id: (typeof order)[number]) => String(order.indexOf(id) + 1).padStart(2, '0');
+
+// Inline `code` in copy.
+const md = (s: string) => s.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+// Structured data: the site, Callstack, the product as an application and as source code, and
+// the FAQ on this page.
+const homeUrl = new URL('/', Astro.site).href;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': `${homeUrl}#website`,
+      url: homeUrl,
+      name: site.name,
+      description: site.description,
+      publisher: { '@id': 'https://callstack.com/#organization' },
+    },
+    {
+      '@type': 'Organization',
+      '@id': 'https://callstack.com/#organization',
+      name: 'Callstack',
+      url: 'https://callstack.com/',
+    },
+    {
+      '@type': 'SoftwareApplication',
+      '@id': `${homeUrl}#software`,
+      name: site.name,
+      description: site.description,
+      url: homeUrl,
+      applicationCategory: 'DeveloperApplication',
+      operatingSystem: site.platforms.join(', '),
+      license: site.license.spdx,
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      softwareHelp: new URL(docs.intro, Astro.site).href,
+      sameAs: [site.repo, site.npm],
+      publisher: { '@id': 'https://callstack.com/#organization' },
+    },
+    {
+      '@type': 'SoftwareSourceCode',
+      name: site.name,
+      codeRepository: site.repo,
+      programmingLanguage: site.language,
+      license: site.license.spdx,
+      targetProduct: { '@id': `${homeUrl}#software` },
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: faq.map(({ q, a }) => ({
+        '@type': 'Question',
+        name: q,
+        acceptedAnswer: { '@type': 'Answer', text: a.replace(/`/g, '') },
+      })),
+    },
+  ],
+};
+const { how, feature, cells, safe } = home;
+const rt = home.runtimes;
+---
+
+<Site description={site.description} jsonLd={jsonLd}>
+  <Nav />
+  <main class="frame">
+    <Hero />
+    <Marquee />
+
+    <section id="how" aria-labelledby="how-title">
+      <p class="section-head label"><b>[{num('how')}]</b> {how.label}</p>
+      <div class="intro">
+        <h2 class="h2" id="how-title">{how.headline[0]} <em>{how.headline[1]}</em></h2>
+      </div>
+      <ol class="cells cells--3">
+        {
+          how.steps.map((s, i) => (
+            <li class="cell">
+              <span class="label cell-num">{String(i + 1).padStart(2, '0')}</span>
+              <h3 class="h3">{s.title}</h3>
+              <p class="body" set:html={md(s.body)} />
+              <code class="cmdline">
+                <span class="p">$</span> {s.cmd}
+              </code>
+            </li>
+          ))
+        }
+      </ol>
+      <Tabs tabs={how.tabs} label="Setup" id="how" />
+    </section>
+
+    <section id="runtimes" aria-labelledby="runtimes-title">
+      <p class="section-head label"><b>[{num('runtimes')}]</b> {rt.label}</p>
+      <div class="intro">
+        <h2 class="h2" id="runtimes-title">{rt.headline[0]} <em>{rt.headline[1]}</em></h2>
+        <p class="lede" set:html={md(rt.lede)} />
+      </div>
+      <div class="cells cells--4">
+        {
+          runtimes.map((r) => (
+            <a class="cell cell--link runtime" href={r.href}>
+              <span class="label runtime-owner" data-owner={r.owner}>
+                {r.owner === 'native' ? 'Native module · ours' : 'Community binding'}
+              </span>
+              <h3 class="h3">{r.name}</h3>
+              <dl class="runtime-facts">
+                <dt class="label">Runtime</dt>
+                <dd>{r.runtime}</dd>
+                <dt class="label">Runs on</dt>
+                <dd>{r.platforms}</dd>
+                <dt class="label">Models</dt>
+                <dd>{r.models}</dd>
+              </dl>
+              <p class="body" set:html={md(r.body)} />
+              <code class="label runtime-pkg">{r.pkg}</code>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section id="feature" aria-labelledby="feature-title">
+      <p class="section-head label"><b>[{num('feature')}]</b> {feature.label}</p>
+      <div class="split">
+        <div class="split-copy">
+          <h2 class="h2" id="feature-title">{feature.headline[0]} <em>{feature.headline[1]}</em></h2>
+          <p class="lede" set:html={md(feature.lede)} />
+          <a class="label more" href={feature.link.href}>{feature.link.text} <span aria-hidden="true">→</span></a>
+        </div>
+        <Window title={feature.window}>
+          <CodeBlock code={feature.code} lang="tsx" minLines={8} />
+        </Window>
+      </div>
+    </section>
+
+    <section id="cells" aria-labelledby="cells-title">
+      <p class="section-head label"><b>[{num('cells')}]</b> {cells.label}</p>
+      <div class="intro">
+        <h2 class="h2" id="cells-title">{cells.headline[0]} <em>{cells.headline[1]}</em></h2>
+      </div>
+      <div class="cells cells--4">
+        {
+          cells.items.map((c) => (
+            <a class="cell cell--link" href={c.href}>
+              <span class="cell-top">
+                <PixelIcon name={c.icon} size={27} class="accent" />
+              </span>
+              <h3 class="h3">{c.title}</h3>
+              <p class="body" set:html={md(c.body)} />
+              <span class="label more">
+                Read more <span aria-hidden="true">→</span>
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section id="safe" aria-labelledby="safe-title">
+      <p class="section-head label"><b>[{num('safe')}]</b> {safe.label}</p>
+      <div class="intro">
+        <h2 class="h2" id="safe-title">{safe.headline[0]} <em>{safe.headline[1]}</em></h2>
+      </div>
+      <div class="cells cells--4">
+        {
+          safe.items.map((s) => (
+            <article class="cell">
+              <span class="cell-top">
+                <PixelIcon name={s.icon} size={27} class="accent" />
+              </span>
+              <h3 class="h3">{s.title}</h3>
+              <p class="body" set:html={md(s.body)} />
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <Faq num={num('faq')} />
+    <Closing />
+  </main>
+  <Footer />
+</Site>
+
+<style>
+  .runtime-owner {
+    color: var(--muted);
+  }
+  .runtime-owner[data-owner='native'] {
+    color: var(--accent);
+  }
+  .runtime-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.375rem 0.875rem;
+    margin: 0;
+    font-size: 0.875rem;
+  }
+  .runtime-facts dt {
+    color: var(--faint);
+    align-self: center;
+  }
+  .runtime-facts dd {
+    margin: 0;
+    color: var(--text);
+  }
+  .runtime-pkg {
+    margin-top: auto;
+    color: var(--faint);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+</style>
