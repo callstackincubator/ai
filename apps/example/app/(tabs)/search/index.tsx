@@ -18,6 +18,7 @@ import {
   type SearchResult,
   useSemanticSearch,
 } from '../../../src/search/useSemanticSearch'
+import { useEnabledFeatures } from '../../../src/store/features'
 import { useModels } from '../../../src/store/models'
 import { onAccent } from '../../../src/theme/brand'
 import { colors } from '../../../src/theme/colors'
@@ -68,6 +69,7 @@ export default function SearchScreen() {
     useSemanticSearch(query)
   const { send } = useChatGeneration()
   const { selectedModel } = useModels()
+  const { isEnabled } = useEnabledFeatures()
 
   // Answers the query in a new chat, grounded in the closest notes
   const askInChat = () => {
@@ -94,7 +96,8 @@ export default function SearchScreen() {
       <Text style={[styles.status, styles.resultsTitle]}>
         Closest in meaning to “{query.trim()}”
       </Text>
-      {selectedModel && results.length > 0 && (
+      {/* A hidden Chat tab can't be opened */}
+      {isEnabled('chat') && selectedModel && results.length > 0 && (
         <Pressable onPress={askInChat} hitSlop={8} style={styles.ask}>
           <SymbolView name="sparkles" size={14} tintColor={onAccent} />
           <Text style={styles.askText}>Ask in Chat</Text>
@@ -125,6 +128,14 @@ export default function SearchScreen() {
         onChangeText={(event) => setQuery(event.nativeEvent.text)}
         onCancelButtonPress={() => setQuery('')}
       />
+      {/* Settings opens from here too, for when the Chat tab is turned off */}
+      <Stack.Toolbar placement="left">
+        <Stack.Toolbar.Button
+          icon="gearshape"
+          accessibilityLabel="Settings"
+          onPress={() => router.push('/settings')}
+        />
+      </Stack.Toolbar>
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="square.and.pencil"

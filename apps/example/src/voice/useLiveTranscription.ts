@@ -60,17 +60,18 @@ export function useLiveTranscription(model: TranscriptionModel) {
   }
 
   // Stops the microphone and timers when the screen goes away mid-recording
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Fast Refresh reruns the effect after its cleanup
+    unmountedRef.current = false
+    return () => {
       unmountedRef.current = true
       if (simulationRef.current) clearInterval(simulationRef.current.timer)
       // stop() may be closing the same resources, so failures are ignored
       recorderRef.current?.stop().catch(() => {})
       closeAudio()
       audioContextRef.current?.close().catch(() => {})
-    },
-    []
-  )
+    }
+  }, [])
 
   // Reveals a scripted question word by word, with a moving level
   const startSimulation = () => {
@@ -113,16 +114,16 @@ export function useLiveTranscription(model: TranscriptionModel) {
     return (await result.text).trim()
   }
 
-  // Resolves once recording has started, false when the microphone is denied
-  const start = async () => {
+  // Resolves true once recording has started, false when the microphone is
+  // denied, and null when the screen went away before it started
+  const start = async (): Promise<boolean | null> => {
     if (isSimulator) {
       return startSimulation()
     }
     const permission = await AudioManager.requestRecordingPermissions()
     // The screen can go away while the permission prompt is up
-    if (permission !== 'Granted' || unmountedRef.current) {
-      return false
-    }
+    if (unmountedRef.current) return null
+    if (permission !== 'Granted') return false
 
     AudioManager.setAudioSessionOptions({
       iosCategory: 'playAndRecord',
@@ -144,6 +145,8 @@ export function useLiveTranscription(model: TranscriptionModel) {
       },
     })
     const transcription = transcribe(audio)
+    // Marks an error while recording handled, stop() still awaits and reports it
+    transcription.catch(() => {})
     transcriptionRef.current = transcription
 
     // Small chunks, so the text keeps up with the speech
@@ -176,13 +179,19 @@ export function useLiveTranscription(model: TranscriptionModel) {
     } catch (error) {
       // Ends the transcription, which would otherwise wait for audio
       closeAudio()
-      transcription.catch(() => {})
       audioContext.close()
       transcriptionRef.current = null
       recorderRef.current = null
       recorderAdapterRef.current = null
       audioContextRef.current = null
       throw error
+    }
+    // The screen can go away while the recorder starts, after its cleanup ran
+    if (unmountedRef.current) {
+      recorder.stop().catch(() => {})
+      closeAudio()
+      audioContext.close().catch(() => {})
+      return null
     }
     if (audioContext.state === 'suspended') {
       audioContext.resume()

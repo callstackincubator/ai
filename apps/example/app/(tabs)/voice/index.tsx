@@ -1,7 +1,7 @@
 import { apple } from '@react-native-ai/apple'
 import { streamText } from 'ai'
 import * as Haptics from 'expo-haptics'
-import { Stack } from 'expo-router'
+import { router, Stack } from 'expo-router'
 import { useHeaderHeight } from 'expo-router/react-navigation'
 import { SymbolView } from 'expo-symbols'
 import React, { useEffect, useRef, useState } from 'react'
@@ -90,6 +90,8 @@ export default function VoiceScreen() {
       setReply('')
       try {
         const started = await start()
+        // The screen went away before recording started
+        if (started === null) return
         if (!started) {
           Alert.alert(
             'Microphone access needed',
@@ -132,6 +134,14 @@ export default function VoiceScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Voice', headerTransparent: true }} />
+      {/* Settings opens from here too, for when the Chat tab is turned off */}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="gearshape"
+          accessibilityLabel="Settings"
+          onPress={() => router.push('/settings')}
+        />
+      </Stack.Toolbar>
       <View style={[styles.notice, { paddingTop: headerHeight + 8 }]}>
         <SimulatorNotice>
           Simulator preview: Voice hears a scripted question. On iPhone it
