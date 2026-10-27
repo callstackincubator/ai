@@ -67,7 +67,14 @@ enum Embeddings {
 
     var embeddings: [[Float]] = []
     for uris in batches(of: imageUris, fixedSize: descriptor.shape[0], options: options) {
-      let batch = try uris.map { try CoreAIImpl.loadCGImage(from: ["imageUri": $0]) }
+      // Padding repeats the last URI, which is decoded once
+      var decoded: [String: CGImage] = [:]
+      let batch = try uris.map { uri in
+        if let image = decoded[uri] { return image }
+        let image = try CoreAIImpl.loadCGImage(from: ["imageUri": uri])
+        decoded[uri] = image
+        return image
+      }
       // CLIP resizes the shorter side and crops the center
       let pixels = try batch.flatMap { image in
         try VisionTask.normalized(
