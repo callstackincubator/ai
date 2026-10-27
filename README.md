@@ -21,7 +21,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 
 ## DevTools
 
-![AI SDK Profiler preview](website/src/public/dev-tools-preview.png)
+![AI SDK Profiler preview](website/public/dev-tools-preview.png)
 
 The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
 requests and surfaces them in Rozenite DevTools. DevTools are runtime
