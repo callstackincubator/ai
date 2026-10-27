@@ -217,6 +217,7 @@ public class AppleTranscriptionImpl: NSObject {
   public func startLiveTranscription(
     _ sessionId: String,
     language: String,
+    echoCancellation: Bool,
     onResult: @escaping (String, String, Bool, Double, Double) -> Void,
     onError: @escaping (String, String) -> Void,
     resolve: @escaping (Any?) -> Void,
@@ -229,6 +230,7 @@ public class AppleTranscriptionImpl: NSObject {
           let session = try await LiveTranscriptionSession.start(
             sessionId: sessionId,
             language: language,
+            echoCancellation: echoCancellation,
             onResult: onResult,
             onError: onError
           )
@@ -586,7 +588,9 @@ final class StreamTranscriptionSession: TranscriptionSession, @unchecked Sendabl
 /// feeding the capture session's audio to a SpeechAnalyzer
 @available(iOS 27, *)
 final class LiveTranscriptionSession: TranscriptionSession, @unchecked Sendable {
-  private let provider: CaptureInputSequenceProvider
+  private let provider: CaptureInputSequenceProvider?
+  // Records instead of the capture session when echo cancellation is on
+  private let recorder: VoiceProcessingRecorder?
   private let analyzer: SpeechAnalyzer
   private let results: Task<Void, Never>
   private let stopFlag: LiveTranscriptionStopFlag
@@ -594,12 +598,14 @@ final class LiveTranscriptionSession: TranscriptionSession, @unchecked Sendable 
   private static let captureQueue = DispatchQueue(label: "com.callstack.ai.live-transcription")
 
   private init(
-    provider: CaptureInputSequenceProvider,
+    provider: CaptureInputSequenceProvider?,
+    recorder: VoiceProcessingRecorder? = nil,
     analyzer: SpeechAnalyzer,
     results: Task<Void, Never>,
     stopFlag: LiveTranscriptionStopFlag
   ) {
     self.provider = provider
+    self.recorder = recorder
     self.analyzer = analyzer
     self.results = results
     self.stopFlag = stopFlag
@@ -608,6 +614,7 @@ final class LiveTranscriptionSession: TranscriptionSession, @unchecked Sendable 
   static func start(
     sessionId: String,
     language: String,
+    echoCancellation: Bool,
     onResult: @escaping (String, String, Bool, Double, Double) -> Void,
     onError: @escaping (String, String) -> Void
   ) async throws -> LiveTranscriptionSession {
@@ -622,6 +629,9 @@ final class LiveTranscriptionSession: TranscriptionSession, @unchecked Sendable 
     }
 
     let transcriber = try await LiveTranscriber.create(for: locale)
+    if echoCancellation {
+      return try await startRecording(sessionId: sessionId, transcriber: transcriber, onResult: onResult, onError: onError)
+    }
 
     let provider = try await CaptureInputSequenceProvider.providerWithSession(
       from: device,
@@ -667,13 +677,62 @@ final class LiveTranscriptionSession: TranscriptionSession, @unchecked Sendable 
     return LiveTranscriptionSession(provider: provider, analyzer: analyzer, results: results, stopFlag: stopFlag)
   }
 
+  /// Records with voice processing instead of the capture session, which
+  /// cannot cancel echo
+  private static func startRecording(
+    sessionId: String,
+    transcriber: SpeechTranscriber,
+    onResult: @escaping (String, String, Bool, Double, Double) -> Void,
+    onError: @escaping (String, String) -> Void
+  ) async throws -> LiveTranscriptionSession {
+    guard let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+      throw LiveTranscriptionError.invalidAudioFormat
+    }
+    let recorder = VoiceProcessingRecorder(analyzerFormat: analyzerFormat) { error in
+      onError(sessionId, error.localizedDescription)
+    }
+    let analyzer = SpeechAnalyzer(modules: [transcriber])
+
+    let stopFlag = LiveTranscriptionStopFlag()
+    let results = LiveTranscriber.reportResults(
+      of: transcriber,
+      sessionId: sessionId,
+      stopFlag: stopFlag,
+      onResult: onResult,
+      onError: onError
+    )
+
+    do {
+      try await analyzer.start(inputSequence: recorder.analyzerInputs)
+      try recorder.start()
+    } catch {
+      _ = recorder.stop()
+      // Ends the results, so their task does not wait forever
+      stopFlag.stop()
+      await analyzer.cancelAndFinishNow()
+      await results.value
+      throw error
+    }
+
+    return LiveTranscriptionSession(provider: nil, recorder: recorder, analyzer: analyzer, results: results, stopFlag: stopFlag)
+  }
+
   /// Stops recording, finalizes what was heard so far and waits for its results
   func stop() async throws {
-    let captureSession = provider.captureSession
-    await withCheckedContinuation { continuation in
-      Self.captureQueue.async {
-        captureSession.stopRunning()
-        continuation.resume()
+    // An analyzer that never had audio neither finalizes nor finishes, and
+    // has no results to wait for
+    if let recorder, !recorder.stop() {
+      stopFlag.stop()
+      results.cancel()
+      Task { [analyzer] in await analyzer.cancelAndFinishNow() }
+      return
+    }
+    if let captureSession = provider?.captureSession {
+      await withCheckedContinuation { continuation in
+        Self.captureQueue.async {
+          captureSession.stopRunning()
+          continuation.resume()
+        }
       }
     }
     // The analyzer always finishes, so the results task ends even when
@@ -690,6 +749,121 @@ final class LiveTranscriptionSession: TranscriptionSession, @unchecked Sendable 
     if let finalizeError {
       throw finalizeError
     }
+  }
+}
+
+/// Records the microphone with voice processing, which takes what the device
+/// plays, e.g. the app speaking, out of what the analyzer hears
+@available(iOS 27, *)
+final class VoiceProcessingRecorder: @unchecked Sendable {
+  let analyzerInputs: AsyncStream<AnalyzerInput>
+  private let input: AsyncStream<AnalyzerInput>.Continuation
+  private let analyzerFormat: AVAudioFormat
+  private let onError: (Error) -> Void
+  private let engine = AVAudioEngine()
+  // The app's audio session as it was before recording
+  private let category: AVAudioSession.Category
+  private let mode: AVAudioSession.Mode
+  private let options: AVAudioSession.CategoryOptions
+  private var configurationObserver: NSObjectProtocol?
+  // Guards the converter, which the tap uses and a route change replaces
+  private let lock = NSLock()
+  private var converter: AVAudioConverter?
+  private var hasAudio = false
+
+  init(analyzerFormat: AVAudioFormat, onError: @escaping (Error) -> Void) {
+    (analyzerInputs, input) = AsyncStream.makeStream(of: AnalyzerInput.self)
+    self.analyzerFormat = analyzerFormat
+    self.onError = onError
+    let audioSession = AVAudioSession.sharedInstance()
+    category = audioSession.category
+    mode = audioSession.mode
+    options = audioSession.categoryOptions
+  }
+
+  func start() throws {
+    let audioSession = AVAudioSession.sharedInstance()
+    // Without defaultToSpeaker, playAndRecord plays through the receiver
+    try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker])
+    try audioSession.setActive(true)
+    let inputNode = engine.inputNode
+    try inputNode.setVoiceProcessingEnabled(true)
+    // Voice processing ducks the app's other audio, e.g. its speech, by default
+    inputNode.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(
+      enableAdvancedDucking: false,
+      duckingLevel: .min
+    )
+    // A route change, e.g. plugging in headphones, stops the engine
+    configurationObserver = NotificationCenter.default.addObserver(
+      forName: .AVAudioEngineConfigurationChange,
+      object: engine,
+      queue: nil
+    ) { [weak self] _ in
+      guard let self else { return }
+      do {
+        try self.startEngine()
+      } catch {
+        self.onError(error)
+      }
+    }
+    try startEngine()
+  }
+
+  /// Taps the input in its current format, which a route change can change
+  private func startEngine() throws {
+    let inputNode = engine.inputNode
+    inputNode.removeTap(onBus: 0)
+    let inputFormat = inputNode.outputFormat(forBus: 0)
+    guard let converter = AVAudioConverter(from: inputFormat, to: analyzerFormat) else {
+      throw LiveTranscriptionError.invalidAudioFormat
+    }
+    lock.withLock { self.converter = converter }
+    inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+      self?.yield(buffer)
+    }
+    engine.prepare()
+    try engine.start()
+  }
+
+  private func yield(_ buffer: AVAudioPCMBuffer) {
+    lock.withLock {
+      guard let converter else { return }
+      let ratio = converter.outputFormat.sampleRate / converter.inputFormat.sampleRate
+      // Room for the frames held back from the previous buffer too
+      let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 1024
+      guard let output = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: capacity) else {
+        return
+      }
+      var consumed = false
+      let status = converter.convert(to: output, error: nil) { _, inputStatus in
+        guard !consumed else {
+          inputStatus.pointee = .noDataNow
+          return nil
+        }
+        consumed = true
+        inputStatus.pointee = .haveData
+        return buffer
+      }
+      if status != .error, output.frameLength > 0 {
+        hasAudio = true
+        input.yield(AnalyzerInput(buffer: output))
+      }
+    }
+  }
+
+  /// Stops recording and restores the app's audio session. Returns whether
+  /// any audio was recorded
+  func stop() -> Bool {
+    if let configurationObserver {
+      NotificationCenter.default.removeObserver(configurationObserver)
+    }
+    engine.inputNode.removeTap(onBus: 0)
+    engine.stop()
+    try? engine.inputNode.setVoiceProcessingEnabled(false)
+    input.finish()
+    // The session stays active, so the app's playback is not interrupted
+    try? AVAudioSession.sharedInstance().setCategory(category, mode: mode, options: options)
+    return lock.withLock { hasAudio }
   }
 }
 #endif

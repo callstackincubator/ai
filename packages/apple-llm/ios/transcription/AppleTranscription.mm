@@ -148,10 +148,12 @@ using namespace react;
 
 - (void)startLiveTranscription:(nonnull NSString *)sessionId
                       language:(nonnull NSString *)language
+              echoCancellation:(BOOL)echoCancellation
                        resolve:(nonnull RCTPromiseResolveBlock)resolve
                         reject:(nonnull RCTPromiseRejectBlock)reject {
   [_transcription startLiveTranscription:sessionId
                                 language:language
+                        echoCancellation:echoCancellation
                                 onResult:^(NSString *sessionId, NSString *text, BOOL isFinal, double startSecond, double endSecond) {
     [self emitOnLiveTranscriptionResult:@{
       @"sessionId": sessionId,

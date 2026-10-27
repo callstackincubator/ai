@@ -19,6 +19,31 @@ describe('apple live transcription', () => {
     expect(errors.map((error) => error.message)).toEqual([])
   })
 
+  it('starts and stops recording with echo cancellation', async () => {
+    const errors: Error[] = []
+    const live = await AppleTranscription.transcribeLive({
+      language: 'en-US',
+      echoCancellation: true,
+      onResult: () => {},
+      onError: (error) => errors.push(error),
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await live.stop()
+
+    expect(errors.map((error) => error.message)).toEqual([])
+  })
+
+  it('stops right away with echo cancellation', async () => {
+    const live = await AppleTranscription.transcribeLive({
+      language: 'en-US',
+      echoCancellation: true,
+      onResult: () => {},
+    })
+
+    await expect(live.stop()).resolves.toBeUndefined()
+  })
+
   it('waits for the same stop when stopped twice at once', async () => {
     const live = await AppleTranscription.transcribeLive({
       language: 'en-US',

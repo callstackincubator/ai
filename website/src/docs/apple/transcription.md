@@ -105,6 +105,52 @@ Add `NSMicrophoneUsageDescription` to your app's Info.plist, since it asks for
 microphone access. It does not run in the iOS Simulator, and throws
 `UNSUPPORTED_OS` before iOS 27.
 
+### Echo Cancellation
+
+When the app speaks while it listens, for example a voice assistant that lets
+the user interrupt it, the microphone also hears the speaker. Set
+`echoCancellation` to keep what the device plays out of the transcript:
+
+```tsx
+const live = await AppleTranscription.transcribeLive({
+  language: 'en-US',
+  echoCancellation: true,
+  onResult: ({ text }) => console.log(text),
+})
+```
+
+It records with iOS voice processing, the echo cancellation that calls use,
+which removes any audio the device plays from what the microphone hears. That
+includes speech played by another library, such as `expo-audio` or
+`react-native-audio-api`. Without it, use headphones, or stop listening while
+the app speaks.
+
+It changes the app's audio session while recording:
+
+- The category is `playAndRecord` with the `voiceChat` mode, and playback goes
+  to the speaker. Recording stops other apps' audio, as with any recording.
+- Playback is quieter than usual, since the voice chat mode leaves out some
+  output processing.
+- On stop, the session gets back its earlier category, mode and options. It
+  stays active, so the app's own playback keeps going.
+
+A player that manages the audio session itself has to keep these settings.
+`react-native-audio-api` switches it to `playback` by default, which stops the
+recording:
+
+```tsx
+import { AudioManager } from 'react-native-audio-api'
+
+AudioManager.setAudioSessionOptions({
+  iosCategory: 'playAndRecord',
+  iosMode: 'voiceChat',
+  iosOptions: ['defaultToSpeaker'],
+})
+```
+
+It is off by default, because of these side effects. Streaming transcription
+does not take it, since there the app owns the recorder and its audio session.
+
 ## Languages
 
 The model does not detect the language of the audio. It uses the device

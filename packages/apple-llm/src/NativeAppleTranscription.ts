@@ -47,7 +47,11 @@ export interface Spec extends TurboModule {
   isAvailable(language: string): boolean
   getModelInfo(language: string): Promise<CodegenTypes.UnsafeObject>
   prepare(language: string): Promise<void>
-  startLiveTranscription(sessionId: string, language: string): Promise<void>
+  startLiveTranscription(
+    sessionId: string,
+    language: string,
+    echoCancellation: boolean
+  ): Promise<void>
   startStreamTranscription(
     sessionId: string,
     language: string,
@@ -78,6 +82,13 @@ export interface LiveTranscription {
 
 // Raw mono PCM samples, little endian
 export type StreamTranscriptionEncoding = 'int16' | 'float32'
+
+export interface MicrophoneTranscriptionOptions extends LiveTranscriptionOptions {
+  // Records with voice processing, so audio the device plays is not
+  // transcribed. Sets the app's audio session to playAndRecord with the
+  // voiceChat mode while recording. Defaults to false
+  echoCancellation?: boolean
+}
 
 export interface StreamTranscriptionOptions extends LiveTranscriptionOptions {
   sampleRate: number
@@ -157,11 +168,16 @@ export default {
    */
   transcribeLive: ({
     language,
+    echoCancellation = false,
     ...callbacks
-  }: LiveTranscriptionOptions): Promise<LiveTranscription> => {
+  }: MicrophoneTranscriptionOptions): Promise<LiveTranscription> => {
     const sessionId = generateId()
     return startSession(sessionId, callbacks, () =>
-      NativeAppleTranscription.startLiveTranscription(sessionId, language)
+      NativeAppleTranscription.startLiveTranscription(
+        sessionId,
+        language,
+        echoCancellation
+      )
     )
   },
   /**

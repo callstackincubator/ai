@@ -39,6 +39,7 @@ export type {
   LiveTranscription,
   LiveTranscriptionOptions,
   LiveTranscriptionResult,
+  MicrophoneTranscriptionOptions,
   StreamTranscription,
   StreamTranscriptionEncoding,
   StreamTranscriptionOptions,
