@@ -134,7 +134,8 @@ import { coreAI } from '@react-native-ai/core-ai'
 import { streamText } from 'ai'
 
 const result = streamText({
-  model: coreAI.languageModel({ source: qwen3ModelDirectory }),
+  // A model folder shipped in the app bundle, or a path in app storage
+  model: coreAI.languageModel({ source: 'bundle://models/qwen3-0.6b' }),
   prompt: 'Explain Core AI in one sentence.',
 })
 ```
