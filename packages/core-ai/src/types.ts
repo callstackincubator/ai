@@ -381,10 +381,13 @@ export interface CoreAICapabilities {
 
 // The folder or .aimodel name when the config has no id
 export function getModelId(config: CoreAIModelConfig): string {
-  const name = config.source
-    .replace(/\/+$/, '')
-    .split('/')
-    .pop()
-    ?.replace(/\.aimodelc?$/, '')
+  let name = config.source.replace(/\/+$/, '').split('/').pop() ?? ''
+  // file:// URLs are percent-encoded, unlike paths
+  if (config.source.startsWith('file://')) {
+    try {
+      name = decodeURIComponent(name)
+    } catch {}
+  }
+  name = name.replace(/\.aimodelc?$/, '')
   return config.id ?? (name || config.source)
 }

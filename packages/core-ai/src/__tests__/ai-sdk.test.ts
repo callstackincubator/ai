@@ -189,6 +189,8 @@ describe('core ai model config', () => {
     expect(
       coreAI.embeddingModel({ source: 'file:///m/clip.aimodel' }).modelId
     ).toBe('clip')
+    expect(coreAI({ source: 'file:///m/my%20model/' }).modelId).toBe('my model')
+    expect(coreAI({ source: '/m/my%20model' }).modelId).toBe('my%20model')
     expect(createModel().modelId).toBe('model')
   })
 
