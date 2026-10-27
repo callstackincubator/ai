@@ -9,7 +9,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 - 🚀 **Instant AI** - Use built-in system models immediately without downloads
 - 🔒 **Privacy-first** - Inference runs on-device, so data stays local. Cloud models are opt-in
 - 🎯 **Vercel AI SDK compatible** - Use `generateText`, `streamText`, `embed` and other AI SDK functions with local models
-- 🎨 **Beyond text** - Embeddings, transcription, speech synthesis and image generation
+- 🎨 **Beyond text** - Embeddings, transcription, speech synthesis, image and video generation, and vision models
 
 ## AI SDK Compatibility
 
@@ -49,6 +49,7 @@ keep the panel mounted without receiving telemetry.
 | ------------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
 | [Apple](#apple)     | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
 | [ADK](#google-adk)  | ✅ Yes   | Android      | [Google ADK](https://developer.android.com/ai/adk)                  | On-device Gemini Nano, with optional cloud Gemini          |
+| [Core AI](#core-ai) | ❌ No    | iOS          | [Core AI](https://github.com/apple/coreai-models)                   | Text, image, video, speech, embedding and vision models    |
 | [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
 
 ---
@@ -155,6 +156,69 @@ const { text } = await generateText({
 ```
 
 See the [ADK documentation](https://react-native-ai.dev/docs/adk/getting-started) for device checks, cloud Gemini, and tool calling.
+
+---
+
+### Core AI
+
+Run models exported with Apple's [`coreai-models`](https://github.com/apple/coreai-models) on Apple's Core AI runtime, on iOS 27 devices. Your app downloads or bundles the models, and every task has a [hosted export](https://react-native-ai.dev/docs/core-ai/models) to start from, except raw function calls, which run your own `.aimodel`.
+
+- **Text Generation** - Qwen3 and other LLM exports, with structured output and reasoning
+- **Image and Video Generation** - FLUX.2 diffusion pipelines, and Wan 2.1 video on macOS (it does not fit in iPhone memory yet)
+- **Transcription** - Parakeet TDT, for files and live audio
+- **Embeddings** - CLIP text and image embeddings in one space
+- **Vision** - Object detection, segmentation, video tracking, super-resolution, classification and depth
+- **Any `.aimodel`** - Raw function calls with tensors
+
+#### Installation
+
+```bash
+npm install @react-native-ai/core-ai @react-native-ai/apple ai
+```
+
+> [!IMPORTANT]
+> Requires Xcode 27, an iOS 27 deployment target and a physical device: the iOS Simulator has no Core AI framework. With Expo, add the `@react-native-ai/core-ai` config plugin.
+
+#### Usage
+
+```typescript
+import { coreAI } from '@react-native-ai/core-ai'
+import { generateImage, streamText, transcribe } from 'ai'
+
+// Text generation with an exported Qwen3
+const result = streamText({
+  model: coreAI.languageModel({
+    id: 'qwen3-0.6b',
+    source: { type: 'file', uri: qwen3 },
+    variant: 'iOS',
+  }),
+  prompt: 'Explain Core AI in one sentence.',
+})
+
+for await (const delta of result.textStream) {
+  console.log(delta)
+}
+
+// Image generation with FLUX.2 klein
+const { image } = await generateImage({
+  model: coreAI.imageModel({
+    id: 'flux2-klein-4b',
+    source: { type: 'file', uri: flux },
+  }),
+  prompt: 'a red apple on a wooden table',
+})
+
+// Transcription with Parakeet TDT
+const { text } = await transcribe({
+  model: coreAI.transcriptionModel({
+    id: 'parakeet',
+    source: { type: 'file', uri: parakeet },
+  }),
+  audio: recording,
+})
+```
+
+See the [Core AI documentation](https://react-native-ai.dev/docs/core-ai/getting-started) for native setup, every task and the hosted models.
 
 ---
 
