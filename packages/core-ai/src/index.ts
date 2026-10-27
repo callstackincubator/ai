@@ -45,4 +45,3 @@ export type {
   CoreAIVideoSegmentationOutput,
   CoreAIVisionTaskOptions,
 } from './types'
-export { toNativeModelConfig } from './types'

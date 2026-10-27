@@ -105,8 +105,7 @@ import { streamText } from 'ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 
 const result = streamText({
@@ -130,14 +129,21 @@ const response = await session.respond('What is Qwen3?')
 For lower-level calls, import `CoreAI` and call the native TurboModule directly:
 
 ```ts
-import { CoreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
+import { CoreAI } from '@react-native-ai/core-ai'
 
-await CoreAI.inspectModel(toNativeModelConfig(modelConfig))
+await CoreAI.inspectModel(modelConfig)
 ```
 
 ## Loading Models
 
-Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
+Core AI loads models from local `.aimodel` / `.aimodelc` files and model folders. `source` is a path or `file://` URL in app storage, or `bundle://` and a path in the app bundle for a model shipped with the app:
+
+```ts
+const downloaded = coreAI.languageModel({ source: `${modelsDirectory}/qwen3-0.6b` })
+const bundled = coreAI.languageModel({ source: 'bundle://models/qwen3-0.6b' })
+```
+
+`id` is optional. It names the model in AI SDK results and telemetry, and defaults to the folder or `.aimodel` name (`qwen3-0.6b` above). Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
 
 ## Documentation
 

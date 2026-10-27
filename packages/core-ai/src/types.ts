@@ -18,36 +18,15 @@ export type CoreAIModelTask =
   | 'raw'
   | 'unknown'
 
-export type CoreAIModelSource =
-  | {
-      type: 'file'
-      uri: string
-    }
-  | {
-      type: 'bundle'
-      name: string
-      extension?: string
-      subdirectory?: string
-    }
+// A path or `file://` URL in app storage, or `bundle://` and a path in the
+// app bundle, such as `bundle://models/qwen3-0.6b`
+export type CoreAIModelSource = string
 
 export interface CoreAIModelConfig {
-  id: string
+  // The AI SDK model id, the last path component of `source` by default
+  id?: string
   source: CoreAIModelSource
   task?: CoreAIModelTask
-  family?: string
-  variant?: CoreAIPlatform
-}
-
-export interface NativeCoreAIModelConfig {
-  id: string
-  sourceType: string
-  sourceUri?: string
-  bundleName?: string
-  bundleExtension?: string
-  bundleSubdirectory?: string
-  task?: string
-  family?: string
-  variant?: string
 }
 
 export interface CoreAITensorDescriptor {
@@ -59,7 +38,6 @@ export interface CoreAITensorDescriptor {
 
 export interface CoreAIModelInfo {
   id?: string
-  family?: string
   task: CoreAIModelTask
   platforms: CoreAIPlatform[]
   functions: {
@@ -401,28 +379,12 @@ export interface CoreAICapabilities {
   missingProducts: string[]
 }
 
-export function toNativeModelConfig(
-  config: CoreAIModelConfig
-): NativeCoreAIModelConfig {
-  if (config.source.type === 'file') {
-    return {
-      id: config.id,
-      sourceType: 'file',
-      sourceUri: config.source.uri,
-      task: config.task,
-      family: config.family,
-      variant: config.variant,
-    }
-  }
-
-  return {
-    id: config.id,
-    sourceType: 'bundle',
-    bundleName: config.source.name,
-    bundleExtension: config.source.extension,
-    bundleSubdirectory: config.source.subdirectory,
-    task: config.task,
-    family: config.family,
-    variant: config.variant,
-  }
+// The folder or .aimodel name when the config has no id
+export function getModelId(config: CoreAIModelConfig): string {
+  const name = config.source
+    .replace(/\/+$/, '')
+    .split('/')
+    .pop()
+    ?.replace(/\.aimodelc?$/, '')
+  return config.id ?? (name || config.source)
 }

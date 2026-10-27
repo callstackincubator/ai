@@ -138,8 +138,7 @@ mock.module('react-native', () => ({
 
 const { coreAI } = await import('../ai-sdk')
 
-const createModel = () =>
-  coreAI({ id: 'model', source: { type: 'bundle', name: 'm' } })
+const createModel = () => coreAI({ id: 'model', source: 'bundle://m' })
 
 function createCallOptions(
   overrides: Partial<LanguageModelV4CallOptions> = {}
@@ -179,6 +178,28 @@ beforeEach(() => {
   generateText.mockClear()
   streamText.mockClear()
   cancelStream.mockClear()
+})
+
+describe('core ai model config', () => {
+  test('names a model after its folder or .aimodel without an id', () => {
+    expect(coreAI({ source: '/models/qwen3-0.6b/' }).modelId).toBe('qwen3-0.6b')
+    expect(coreAI.imageModel({ source: 'bundle://flux2' }).modelId).toBe(
+      'flux2'
+    )
+    expect(
+      coreAI.embeddingModel({ source: 'file:///m/clip.aimodel' }).modelId
+    ).toBe('clip')
+    expect(createModel().modelId).toBe('model')
+  })
+
+  test('passes the config to native with its task', async () => {
+    await createModel().doGenerate(createCallOptions())
+
+    expect(loadModel.mock.calls.at(-1)).toEqual([
+      { id: 'model', source: 'bundle://m', task: 'language' },
+      {},
+    ])
+  })
 })
 
 describe('core ai language model', () => {
@@ -598,7 +619,7 @@ describe('core ai streaming transcription', () => {
   const createTranscriptionModel = () =>
     coreAI.transcriptionModel({
       id: 'parakeet',
-      source: { type: 'file', uri: '/parakeet' },
+      source: '/parakeet',
     })
 
   const audioStream = (chunks: (Uint8Array | string)[]) =>
@@ -768,7 +789,7 @@ describe('core ai embeddings', () => {
   const embeddingModel = () =>
     coreAI.embeddingModel({
       id: 'clip',
-      source: { type: 'file', uri: '/clip' },
+      source: '/clip',
     })
 
   test('passes core-ai provider options and returns the metadata', async () => {
@@ -788,15 +809,14 @@ describe('core ai embeddings', () => {
 
     const [task, config, input] = runTask.mock.calls.at(-1)!
     expect(task).toBe('embedding')
-    expect(config).toMatchObject({ sourceUri: '/clip', task: 'embedding' })
+    expect(config).toMatchObject({ source: '/clip', task: 'embedding' })
     expect(input).toEqual({ data: { imageUris: ['file:///a.jpg'] } })
     expect(result.embeddings).toEqual([[1, 0]])
   })
 })
 
 describe('core ai video generation', () => {
-  const videoModel = () =>
-    coreAI.videoModel({ id: 'wan', source: { type: 'file', uri: '/wan' } })
+  const videoModel = () => coreAI.videoModel({ id: 'wan', source: '/wan' })
 
   const callOptions = (overrides: object = {}) => ({
     prompt: 'a cat',

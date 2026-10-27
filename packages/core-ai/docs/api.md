@@ -12,8 +12,7 @@ import { generateText } from 'ai'
 
 const language = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 
 await generateText({ model: language, prompt: 'Hello' })
@@ -40,7 +39,7 @@ The `reasoning` call option sets the model's thinking effort (`minimal`/`low` â†
 `coreAI.embeddingModel(...)` runs CLIP-style exports: an `.aimodel` with an `encode_text(input_ids, attention_mask)` function, next to a `tokenizer/` folder with the CLIP `tokenizer.json`. Point `source` at the folder holding both, like the [CLIP ViT-B/32 export](https://huggingface.co/grabbou/clip-vit-base-patch32-CoreAI). Values are tokenized to 77 tokens and embedded 16 at a time (`providerOptions['core-ai'].batchSize`). The AI SDK has no image embeddings, so `model.embedImages(imageUris)` embeds images into the same space with the `encode_image` function, which resizes the shorter side, crops the center and normalizes with the CLIP mean and std:
 
 ```ts
-const model = coreAI.embeddingModel({ id: 'clip', source: { type: 'file', uri: folder } })
+const model = coreAI.embeddingModel({ id: 'clip', source: folder })
 
 const { embeddings } = await embedMany({ model, values: ['a photo of a cat', 'a photo of a car'] })
 const { embeddings: [image] } = await model.embedImages([imageUri])
@@ -55,7 +54,7 @@ Embeddings need no `coreai-models` product of their own: the CLIP tokenizer come
 import { experimental_generateVideo as generateVideo } from 'ai'
 
 const { video, providerMetadata } = await generateVideo({
-  model: coreAI.videoModel({ id: 'wan2.1', source: { type: 'file', uri: folder } }),
+  model: coreAI.videoModel({ id: 'wan2.1', source: folder }),
   prompt: 'a red ball rolling across a wooden table',
   providerOptions: { 'core-ai': { stepCount: 12 } },
 })
@@ -75,15 +74,14 @@ There are no adapters for reranking or speech generation, because `coreai-models
 Use direct APIs when Core AI has no AI SDK equivalent or when you need Core AI-specific lifecycle control:
 
 ```typescript
-import { CoreAI, coreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
+import { CoreAI, coreAI } from '@react-native-ai/core-ai'
 
 const config = {
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 } as const
 
-await CoreAI.inspectModel(toNativeModelConfig({ ...config, task: 'language' }))
+await CoreAI.inspectModel({ ...config, task: 'language' })
 
 const model = coreAI.languageModel(config)
 
@@ -124,13 +122,13 @@ Native-only API status:
 ```ts
 const { output } = await CoreAI.runTask(
   'classification',
-  { id: 'pvt-v2-b0', sourceType: 'file', sourceUri: folder },
+  { id: 'pvt-v2-b0', source: folder },
   { imageUri },
   { topK: 3 }
 )
 ```
 
-- Classification and depth normalize RGB with the ImageNet mean and std unless you pass `mean` and `std`. Classification reads class names from `options.labels`, or from a `labels.json` array next to the model, and `sourceUri` can be the folder holding both.
+- Classification and depth normalize RGB with the ImageNet mean and std unless you pass `mean` and `std`. Classification reads class names from `options.labels`, or from a `labels.json` array next to the model, and `source` can be the folder holding both.
 - Models that take several views, like Depth Anything 3, get the image as every view, and the output is the depth of the first.
 - Models stay loaded after the first call, by path and `computeUnits`.
 
@@ -142,7 +140,7 @@ Any exported `.aimodel` runs through its functions, for models that have no task
 import { CoreAI, createTensor, readTensor } from '@react-native-ai/core-ai'
 
 const { modelHandle, info } = await CoreAI.loadModel(
-  { id: 'edsr-x2', source: { type: 'file', uri }, task: 'raw' },
+  { id: 'edsr-x2', source: uri, task: 'raw' },
   {}
 )
 // [{ name: 'main', inputs: [{ name: 'x', dataType: 'float16', shape: [-1, 3, -1, -1] }], outputs: [...] }]
@@ -175,7 +173,7 @@ Ownership and performance:
 ```ts
 const { output } = await CoreAI.runTask(
   'video-segmentation',
-  { id: 'sam3-video', sourceType: 'file', sourceUri: bundle },
+  { id: 'sam3-video', source: bundle },
   { videoUri, data: { prompts: ['cat', 'person'] } },
   { maxFrames: 120, outputVideo: true }
 )
@@ -194,7 +192,14 @@ keep it inside the context window, see
 
 ## Loading Models
 
-Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
+Core AI loads models from local `.aimodel` / `.aimodelc` files and model folders. `source` is a path or `file://` URL in app storage, or `bundle://` and a path in the app bundle for a model shipped with the app:
+
+```ts
+const downloaded = coreAI.languageModel({ source: `${modelsDirectory}/qwen3-0.6b` })
+const bundled = coreAI.languageModel({ source: 'bundle://models/qwen3-0.6b' })
+```
+
+`id` is optional. It names the model in AI SDK results and telemetry, and defaults to the folder or `.aimodel` name (`qwen3-0.6b` above). Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
 
 ## Starter Models
 
