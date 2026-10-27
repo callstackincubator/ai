@@ -24,13 +24,33 @@ AI SDK adapter status:
 | ----------------- | --------------------------------------------- | -------------------------------- | ----------------------------- |
 | Text generation   | `generateText`, `streamText`                  | `coreAI.languageModel(...)`      | Supported                     |
 | Structured output | `generateText` / `streamText` response format | `coreAI.languageModel(...)`      | Supported, with a JSON schema |
-| Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Not supported yet (warns)     |
+| Tool calling      | `tools` option                                | `coreAI.languageModel(...)`      | Supported, function tools     |
 | Image generation  | `generateImage`                               | `coreAI.imageModel(...)`         | Supported                     |
 | Video generation  | `experimental_generateVideo`                  | `coreAI.videoModel(...)`         | Supported, text-to-video      |
 | Text embeddings   | `embed`, `embedMany`                          | `coreAI.embeddingModel(...)`     | Supported, CLIP               |
 | Transcription     | `transcribe`                                  | `coreAI.transcriptionModel(...)` | Supported, Parakeet TDT       |
 
 Structured output needs a JSON schema and runs as guided generation, so the output always matches it. Models whose inference engine cannot do guided generation reject with a `CORE_AI_UNSUPPORTED_CAPABILITY` error. When streaming, the JSON arrives in one piece once it is complete.
+
+Tool calls end the generation and come back as `tool-call` parts, so the AI SDK runs the tools and replays their results on the next call. Set `stopWhen` (for example `stepCountIs(3)`) to let the model answer the results. Core AI models decide themselves whether to call a tool, so a `required` or named `toolChoice` warns and is treated as optional (a named tool is the only one offered). Provider-defined tools are left out with a warning.
+
+```tsx
+import { generateText, stepCountIs, tool } from 'ai'
+import { z } from 'zod'
+
+const { text } = await generateText({
+  model: language,
+  prompt: 'What is the weather in Paris?',
+  tools: {
+    getWeather: tool({
+      description: 'Gets the weather in a city',
+      inputSchema: z.object({ city: z.string() }),
+      execute: async ({ city }) => ({ city, temperature: 21 }),
+    }),
+  },
+  stopWhen: stepCountIs(3),
+})
+```
 
 The `reasoning` call option sets the model's thinking effort (`minimal`/`low` → `light`, `medium` → `moderate`, `high` and above → `deep`), and `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence. Reasoning comes back as reasoning parts. Core AI ignores `topP`, `topK`, `seed`, stop sequences and penalties, and returns a warning when they are set.
 

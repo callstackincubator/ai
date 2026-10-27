@@ -72,7 +72,17 @@ export interface CoreAIGenerationOptions {
   maxTokens?: number
   // JSON schema of the structured output
   schema?: CodegenTypes.UnsafeObject
+  tools?: CoreAITool[]
   providerOptions?: { reasoningLevel?: CoreAIReasoningLevel }
+}
+
+// Function tool the model can call. The AI SDK runs it, and its result is
+// replayed on the next call
+export interface CoreAITool {
+  name: string
+  description?: string
+  // JSON schema of the tool input
+  inputSchema: CodegenTypes.UnsafeObject
 }
 
 // Foundation Models reasoning level. Core AI maps it to the chat template's

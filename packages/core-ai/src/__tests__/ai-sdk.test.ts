@@ -313,11 +313,10 @@ describe('core ai language model', () => {
     })
   })
 
-  test('returns reasoning and leaves out tool parts', async () => {
+  test('returns reasoning and text', async () => {
     generateText.mockImplementationOnce(async () => ({
       content: [
         { type: 'reasoning', id: 'r1', text: 'Thinking' },
-        { type: 'tool-call', toolCallId: 't1', toolName: 'x', input: '{}' },
         { type: 'text', text: 'Answer' },
       ],
       usage,
@@ -333,6 +332,7 @@ describe('core ai language model', () => {
       },
       { type: 'text', text: 'Answer' },
     ])
+    expect(result.finishReason).toEqual({ unified: 'stop', raw: 'stop' })
   })
 
   test('streams text deltas from native response snapshots', async () => {
@@ -455,13 +455,6 @@ describe('core ai language model warnings', () => {
         presencePenalty: 0.5,
         frequencyPenalty: 0.5,
         stopSequences: ['END'],
-        tools: [
-          {
-            type: 'function',
-            name: 'weather',
-            inputSchema: { type: 'object', properties: {} },
-          },
-        ],
       })
     )
 
@@ -476,11 +469,11 @@ describe('core ai language model warnings', () => {
       'presencePenalty',
       'frequencyPenalty',
       'stopSequences',
-      'tools',
     ])
     expect(generateText.mock.calls[0]![3]).toEqual({
       maxTokens: undefined,
       temperature: undefined,
+      tools: [],
       providerOptions: {},
     })
   })
@@ -527,6 +520,194 @@ describe('core ai language model warnings', () => {
       type: 'stream-start',
       warnings: [{ type: 'unsupported', feature: 'topK' }],
     })
+  })
+})
+
+describe('core ai tool calling', () => {
+  const weatherTool = {
+    type: 'function' as const,
+    name: 'getWeather',
+    description: 'Gets the weather in a city',
+    inputSchema: {
+      type: 'object' as const,
+      properties: { city: { type: 'string' as const } },
+      required: ['city'],
+    },
+  }
+  const toolCall = {
+    type: 'tool-call',
+    toolCallId: 'call-1',
+    toolName: 'getWeather',
+    input: '{"city":"Paris"}',
+  }
+
+  test('passes function tools to native', async () => {
+    await createModel().doGenerate(createCallOptions({ tools: [weatherTool] }))
+
+    expect(generateText.mock.calls[0]![3].tools).toEqual([
+      {
+        name: 'getWeather',
+        description: 'Gets the weather in a city',
+        inputSchema: weatherTool.inputSchema,
+      },
+    ])
+  })
+
+  test('returns tool calls for the AI SDK to run', async () => {
+    generateText.mockImplementationOnce(async () => ({
+      content: [{ type: 'reasoning', id: 'r1', text: 'Weather' }, toolCall],
+    }))
+
+    const result = await createModel().doGenerate(
+      createCallOptions({ tools: [weatherTool] })
+    )
+
+    expect(result.content).toEqual([
+      {
+        type: 'reasoning',
+        text: 'Weather',
+        providerMetadata: { 'core-ai': {} },
+      },
+      {
+        type: 'tool-call',
+        toolCallId: 'call-1',
+        toolName: 'getWeather',
+        input: '{"city":"Paris"}',
+      },
+    ])
+    expect(result.finishReason).toEqual({
+      unified: 'tool-calls',
+      raw: 'tool-calls',
+    })
+  })
+
+  test('replays tool calls and results as transcript parts', async () => {
+    await createModel().doGenerate(
+      createCallOptions({
+        tools: [weatherTool],
+        prompt: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'Weather in Paris?' }],
+          },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'call-1',
+                toolName: 'getWeather',
+                input: { city: 'Paris' },
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: 'call-1',
+                toolName: 'getWeather',
+                output: { type: 'json', value: { temperature: 21 } },
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    expect(generateText.mock.calls[0]![2]).toEqual([
+      { role: 'user', content: 'Weather in Paris?', attachments: [] },
+      { role: 'assistant', content: '', parts: [toolCall] },
+      {
+        role: 'tool',
+        content: '',
+        parts: [
+          {
+            type: 'tool-result',
+            toolCallId: 'call-1',
+            toolName: 'getWeather',
+            output: '{"temperature":21}',
+          },
+        ],
+      },
+    ])
+  })
+
+  test('streams tool calls once generation ends', async () => {
+    const { stream } = await createModel().doStream(
+      createCallOptions({ tools: [weatherTool] })
+    )
+    const parts = readAll(stream)
+
+    const streamId = await waitForStreamId()
+    onStreamUpdate.emit({
+      streamId,
+      content: '',
+      entries: [{ type: 'reasoning', id: 'r1', text: 'Weather' }],
+    })
+    onStreamUpdate.emit({
+      streamId,
+      content: '',
+      entries: [{ type: 'reasoning', id: 'r1', text: 'Weather' }, toolCall],
+    })
+    onStreamComplete.emit({ streamId, usage })
+
+    const allParts = await parts
+    expect(allParts.map((part) => part.type)).toEqual([
+      'stream-start',
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-end',
+      'tool-call',
+      'finish',
+    ])
+    expect(allParts.at(-2)).toEqual({
+      type: 'tool-call',
+      toolCallId: 'call-1',
+      toolName: 'getWeather',
+      input: '{"city":"Paris"}',
+    })
+    expect(allParts.at(-1)).toMatchObject({
+      finishReason: { unified: 'tool-calls' },
+    })
+  })
+
+  test('leaves tools out when the tool choice is none', async () => {
+    await createModel().doGenerate(
+      createCallOptions({ tools: [weatherTool], toolChoice: { type: 'none' } })
+    )
+
+    expect(generateText.mock.calls[0]![3].tools).toEqual([])
+  })
+
+  test('only offers the chosen tool and warns that it is not required', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({
+        tools: [weatherTool, { ...weatherTool, name: 'getTime' }],
+        toolChoice: { type: 'tool', toolName: 'getTime' },
+      })
+    )
+
+    expect(generateText.mock.calls[0]![3].tools).toMatchObject([
+      { name: 'getTime' },
+    ])
+    expect(result.warnings).toMatchObject([
+      { type: 'unsupported', feature: 'toolChoice' },
+    ])
+  })
+
+  test('warns about provider-defined tools', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({
+        tools: [{ type: 'provider', id: 'apple.ocr', name: 'ocr', args: {} }],
+      })
+    )
+
+    expect(generateText.mock.calls[0]![3].tools).toEqual([])
+    expect(result.warnings).toMatchObject([
+      { type: 'unsupported', feature: 'provider-defined tool apple.ocr' },
+    ])
   })
 })
 

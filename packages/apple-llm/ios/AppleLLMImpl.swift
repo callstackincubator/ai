@@ -1130,7 +1130,7 @@ public class AppleLLMImpl: NSObject {
   }
 
   @available(iOS 26, *)
-  private static func createGenerationSchema(fromSchema schema: [String: Any], name: String = "Root") throws -> GenerationSchema {
+  @_spi(CoreAI) public static func createGenerationSchema(fromSchema schema: [String: Any], name: String = "Root") throws -> GenerationSchema {
     do {
       return try AppleLLMSchemaParser.createGenerationSchema(from: schema, name: name)
     } catch let appleError as AppleLLMError {

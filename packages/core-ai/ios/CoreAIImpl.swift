@@ -1910,16 +1910,28 @@ private struct LanguageModelRequest {
   let generationOptions: GenerationOptions
   let contextOptions: ContextOptions
   let schema: GenerationSchema?
+  let toolCalls: ToolCallRecorder
 
   init(model: CoreAILanguageModel, messages: [[String: Any]], options: [String: Any]) throws {
-    // Tool calling is not wired up for Core AI yet, so the session has no tools
-    let (transcript, prompt, attachments) = try AppleLLMImpl.createTranscriptAndPrompt(from: messages, tools: [])
+    let toolCalls = ToolCallRecorder()
+    let tools = try (options["tools"] as? [[String: Any]] ?? []).map {
+      try DeferredTool($0, toolCalls: toolCalls)
+    }
+    // After tool results the conversation continues without a new user message.
+    // Core AI leaves empty prompts out of the chat template, so the model answers
+    // the tool results
+    var messages = messages
+    if messages.last?["role"] as? String != "user" {
+      messages.append(["role": "user", "content": ""])
+    }
+    let (transcript, prompt, attachments) = try AppleLLMImpl.createTranscriptAndPrompt(from: messages, tools: tools)
     guard attachments.isEmpty else {
       throw CoreAIError.invalidInput("Core AI language models do not accept image prompts yet.")
     }
 
     let schema = try AppleLLMImpl.createGenerationSchema(from: options)
-    self.session = LanguageModelSession(model: model, tools: [], transcript: transcript)
+    self.session = LanguageModelSession(model: model, tools: tools, transcript: transcript)
+    self.toolCalls = toolCalls
     self.prompt = prompt
     self.generationOptions = try AppleLLMImpl.createGenerationOptions(from: options)
     var providerOptions = options["providerOptions"] as? [String: Any] ?? [:]
@@ -1941,31 +1953,47 @@ private struct LanguageModelRequest {
 
   func respond() async throws -> [String: Any] {
     let prompt = self.prompt
+    let replayedEntryCount = session.transcript.count
 
-    if let schema {
-      let response = try await session.respond(
-        schema: schema,
-        options: generationOptions,
-        contextOptions: contextOptions
-      ) {
+    do {
+      if let schema {
+        let response = try await session.respond(
+          schema: schema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          prompt
+        }
+        // The JSON comes from the generated content rather than the response entry
+        let content = AppleLLMTranscriptSerializer.serialize(response.transcriptEntries, includeResponses: false)
+          + [["type": "text", "text": response.rawContent.jsonString]]
+        return ["content": content, "usage": CoreAIImpl.serializeUsage(response.usage)]
+      }
+
+      let response = try await session.respond(options: generationOptions, contextOptions: contextOptions) {
         prompt
       }
-      // The JSON comes from the generated content rather than the response entry
-      let content = AppleLLMTranscriptSerializer.serialize(response.transcriptEntries, includeResponses: false)
-        + [["type": "text", "text": response.rawContent.jsonString]]
-      return ["content": content, "usage": CoreAIImpl.serializeUsage(response.usage)]
+      return ["content": response.toModelMessages(), "usage": CoreAIImpl.serializeUsage(response.usage)]
+    } catch where !toolCalls.parts.isEmpty && !Task.isCancelled {
+      // The response has no usage, since generation ended at the tool call
+      return ["content": generatedEntries(after: replayedEntryCount, includeResponses: true)]
     }
+  }
 
-    let response = try await session.respond(options: generationOptions, contextOptions: contextOptions) {
-      prompt
-    }
-    return ["content": response.toModelMessages(), "usage": CoreAIImpl.serializeUsage(response.usage)]
+  /// Entries the session generated, then the tool calls that ended it. The
+  /// transcript leaves out tool calls whose tool threw, so they are recorded
+  private func generatedEntries(after replayedEntryCount: Int, includeResponses: Bool) -> [[String: Any]] {
+    let entries = session.transcript.dropFirst(replayedEntryCount)
+    return AppleLLMTranscriptSerializer.serialize(entries, includeResponses: includeResponses)
+      .filter { $0["type"] as? String != "tool-call" } + toolCalls.parts
   }
 
   /// Sends snapshots of the response text, plus the reasoning entries when they
   /// change, and returns the usage of the response
   func stream(onUpdate: @escaping (String, [[String: Any]]?) -> Void) async throws -> [String: Any]? {
     let prompt = self.prompt
+    let replayedEntryCount = session.transcript.count
+    var previousContent = ""
     var previousEntries: NSArray = []
     var usage: LanguageModelSession.Usage?
 
@@ -1973,39 +2001,99 @@ private struct LanguageModelRequest {
       let entries = AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: false)
       let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
       previousEntries = entries as NSArray
+      previousContent = content
       onUpdate(content, entriesChanged ? entries : nil)
     }
 
-    if let schema {
-      let responseStream = session.streamResponse(
-        schema: schema,
-        options: generationOptions,
-        contextOptions: contextOptions
-      ) {
-        prompt
+    do {
+      if let schema {
+        let responseStream = session.streamResponse(
+          schema: schema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          prompt
+        }
+        var json = ""
+        for try await chunk in responseStream {
+          try Task.checkCancellation()
+          // Partial JSON is not a prefix of the final JSON, so it is sent once complete
+          update("", chunk.transcriptEntries)
+          json = chunk.rawContent.jsonString
+          usage = chunk.usage
+        }
+        onUpdate(json, nil)
+      } else {
+        let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
+          prompt
+        }
+        for try await chunk in responseStream {
+          try Task.checkCancellation()
+          update(chunk.content, chunk.transcriptEntries)
+          usage = chunk.usage
+        }
       }
-      var json = ""
-      for try await chunk in responseStream {
-        try Task.checkCancellation()
-        // Partial JSON is not a prefix of the final JSON, so it is sent once complete
-        update("", chunk.transcriptEntries)
-        json = chunk.rawContent.jsonString
-        usage = chunk.usage
-      }
-      onUpdate(json, nil)
-    } else {
-      let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
-        prompt
-      }
-      for try await chunk in responseStream {
-        try Task.checkCancellation()
-        update(chunk.content, chunk.transcriptEntries)
-        usage = chunk.usage
-      }
+    } catch where !toolCalls.parts.isEmpty && !Task.isCancelled {
+      // Sends the tool calls that ended the generation as entries
+      onUpdate(previousContent, generatedEntries(after: replayedEntryCount, includeResponses: false))
     }
 
     return usage.map(CoreAIImpl.serializeUsage)
   }
+}
+
+/// Tool calls of a generation, as AI SDK tool-call parts
+private final class ToolCallRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var calls: [[String: Any]] = []
+
+  var parts: [[String: Any]] {
+    lock.withLock { calls }
+  }
+
+  func record(toolName: String, input: String) {
+    lock.withLock {
+      calls.append([
+        "type": "tool-call",
+        "toolCallId": UUID().uuidString,
+        "toolName": toolName,
+        "input": input,
+      ])
+    }
+  }
+}
+
+/// An AI SDK function tool. The AI SDK runs tools itself, so a tool call is
+/// recorded and ends the generation. The results are replayed as tool outputs
+/// on the next call
+@available(iOS 27, macOS 27, *)
+private struct DeferredTool: Tool {
+  let name: String
+  let description: String
+  let parameters: GenerationSchema
+  let toolCalls: ToolCallRecorder
+
+  init(_ definition: [String: Any], toolCalls: ToolCallRecorder) throws {
+    guard let name = definition["name"] as? String else {
+      throw CoreAIError.invalidInput("Tools must have a name.")
+    }
+    self.name = name
+    self.toolCalls = toolCalls
+    self.description = definition["description"] as? String ?? ""
+    self.parameters = try AppleLLMImpl.createGenerationSchema(
+      fromSchema: definition["inputSchema"] as? [String: Any] ?? ["type": "object", "properties": [:]],
+      name: name
+    )
+  }
+
+  func call(arguments: GeneratedContent) async throws -> String {
+    toolCalls.record(toolName: name, input: arguments.jsonString)
+    // Foundation Models wraps the error, so the recorded calls tell that
+    // generation ended at a tool call
+    throw ToolCallRequested()
+  }
+
+  struct ToolCallRequested: Error {}
 }
 #endif
 

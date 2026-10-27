@@ -49,6 +49,7 @@ import type {
   CoreAIStreamCompleteEvent,
   CoreAIStreamErrorEvent,
   CoreAIStreamUpdateEvent,
+  CoreAITool,
   CoreAITranscriptionResult,
   CoreAIUsage,
   CoreAIVideoGenerationOptions,
@@ -197,9 +198,14 @@ export class CoreAILanguageModel implements LanguageModelV4 {
         toCoreAIGenerationOptions(options)
       )) as CoreAIGenerationResult
 
+      const content = response.content.flatMap(toLanguageModelContent)
       return {
-        content: response.content.flatMap(toLanguageModelContent),
-        finishReason: toFinishReason(response.usage, options.maxOutputTokens),
+        content,
+        finishReason: toFinishReason(
+          response.usage,
+          options.maxOutputTokens,
+          content.some((part) => part.type === 'tool-call')
+        ),
         usage: toUsage(response.usage),
         warnings,
       }
@@ -244,14 +250,19 @@ export class CoreAILanguageModel implements LanguageModelV4 {
           streamId,
           'core-ai'
         )
+        // Tool calls end the generation, so they are sent once it completes
+        let toolCalls: LanguageModelV4StreamPart[] = []
 
         const updateListener = NativeCoreAI.onStreamUpdate(
           (event: CoreAIStreamUpdateEvent) => {
             if (event.streamId === streamId) {
-              snapshots.update(
-                event.content,
-                event.entries as AppleStreamEntry[] | undefined
-              )
+              const entries = event.entries as AppleStreamEntry[] | undefined
+              snapshots.update(event.content, entries)
+              if (entries) {
+                toolCalls = (entries as CoreAIGenerationPart[])
+                  .flatMap(toLanguageModelContent)
+                  .filter((part) => part.type === 'tool-call')
+              }
             }
           }
         )
@@ -259,11 +270,13 @@ export class CoreAILanguageModel implements LanguageModelV4 {
           (event: CoreAIStreamCompleteEvent) => {
             if (event.streamId === streamId) {
               snapshots.end()
+              toolCalls.forEach((part) => controller.enqueue(part))
               controller.enqueue({
                 type: 'finish',
                 finishReason: toFinishReason(
                   event.usage as CoreAIUsage | undefined,
-                  options.maxOutputTokens
+                  options.maxOutputTokens,
+                  toolCalls.length > 0
                 ),
                 usage: toUsage(event.usage as CoreAIUsage | undefined),
               })
@@ -925,8 +938,30 @@ function toCoreAIGenerationOptions(
       options.responseFormat?.type === 'json'
         ? options.responseFormat.schema
         : undefined,
+    tools: getTools(options),
     providerOptions: { reasoningLevel: getReasoningLevel(options) },
   }
+}
+
+// Function tools the model can call. Core AI models decide themselves whether
+// to call one, so a required tool choice only limits the tools offered
+function getTools(options: LanguageModelV4CallOptions): CoreAITool[] {
+  const { toolChoice } = options
+  if (toolChoice?.type === 'none') {
+    return []
+  }
+  return (options.tools ?? []).flatMap((tool) =>
+    tool.type === 'function' &&
+    (toolChoice?.type !== 'tool' || toolChoice.toolName === tool.name)
+      ? [
+          {
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+          },
+        ]
+      : []
+  )
 }
 
 function getReasoningLevel(
@@ -967,12 +1002,24 @@ function getCallWarnings(
       details: 'Core AI language models ignore this setting.',
     })
   }
-  if (options.tools?.length) {
+  for (const tool of options.tools ?? []) {
+    if (tool.type === 'provider') {
+      warnings.push({
+        type: 'unsupported',
+        feature: `provider-defined tool ${tool.id}`,
+        details: 'Core AI language models only call function tools.',
+      })
+    }
+  }
+  if (
+    options.toolChoice?.type === 'required' ||
+    options.toolChoice?.type === 'tool'
+  ) {
     warnings.push({
       type: 'unsupported',
-      feature: 'tools',
+      feature: 'toolChoice',
       details:
-        'Core AI tool calling is not supported yet, so the tools were not passed to the model.',
+        'Core AI language models decide themselves whether to call a tool, so it is not required.',
     })
   }
   if (
@@ -1005,18 +1052,32 @@ function toLanguageModelContent(
           },
         },
       ]
+    case 'tool-call':
+      // The AI SDK runs the tool and replays the result on the next call
+      return [
+        {
+          type: 'tool-call',
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          input: part.input,
+        },
+      ]
     default:
-      // No tools are passed to Core AI models, so there are no tool parts
+      // Tools run in the AI SDK, so Core AI returns no tool results
       return []
   }
 }
 
 // Core AI does not say why generation ended, so reaching maxOutputTokens
-// counts as stopping for length
+// counts as stopping for length. Tool calls end generation too
 function toFinishReason(
   usage: CoreAIUsage | undefined,
-  maxOutputTokens: number | undefined
+  maxOutputTokens: number | undefined,
+  hasToolCalls = false
 ): LanguageModelV4FinishReason {
+  if (hasToolCalls) {
+    return { unified: 'tool-calls', raw: 'tool-calls' }
+  }
   const raw =
     maxOutputTokens !== undefined &&
     usage !== undefined &&
