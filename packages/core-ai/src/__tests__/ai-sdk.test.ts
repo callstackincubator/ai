@@ -1190,6 +1190,16 @@ describe('core ai video generation', () => {
 
     await expect(
       videoModel().doGenerate(callOptions({ abortSignal: controller.signal }))
-    ).rejects.toThrow('cancelled')
+    ).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  test('passes native errors through when not aborted', async () => {
+    generateVideo.mockImplementationOnce(async () => {
+      throw new Error('out of memory')
+    })
+
+    await expect(videoModel().doGenerate(callOptions())).rejects.toThrow(
+      'out of memory'
+    )
   })
 })

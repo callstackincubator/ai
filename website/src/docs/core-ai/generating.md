@@ -98,7 +98,8 @@ const { text } = await generateText({
 })
 ```
 
-- Apple's VLM engine answers one image and one prompt. It reads the first image and joins the text of the user turns, and ignores assistant replies, `system`, sampling settings (it decodes greedily) and structured output. A prompt without an image is rejected.
+- Apple's VLM engine answers one image and one prompt. It reads the first image and joins the text of the user turns, and ignores assistant replies, `system` and sampling settings (it decodes greedily). A prompt without an image is rejected, and so is structured output, with `CORE_AI_UNSUPPORTED_CAPABILITY`.
+- Native sessions take text prompts only, so `createSession()` rejects vision language models. Use `generateText` or `streamText`.
 - Other language models reject image prompts.
 - The Qwen3-VL bundle is exported in the macOS format, which loads its weights on the GPU. On an iPhone it needs the [increased memory limit](./getting-started#memory-limit); without it, iOS stops the app while the model loads.
 
