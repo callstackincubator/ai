@@ -19,22 +19,22 @@ import { Platform } from 'react-native'
 import structuredClone from '@ungap/structured-clone'
 
 if (Platform.OS !== 'web') {
-  const setupPolyfills = async () => {
-    const { polyfillGlobal } =
-      await import('react-native/Libraries/Utilities/PolyfillFunctions')
+  // require, not import: it runs synchronously, before the rest of the app,
+  // and keeps React Native internals out of the web build.
+  const {
+    polyfillGlobal,
+  } = require('react-native/Libraries/Utilities/PolyfillFunctions')
+  const {
+    TextEncoderStream,
+    TextDecoderStream,
+  } = require('@stardazed/streams-text-encoding')
 
-    const { TextEncoderStream, TextDecoderStream } =
-      await import('@stardazed/streams-text-encoding')
-
-    if (!('structuredClone' in global)) {
-      polyfillGlobal('structuredClone', () => structuredClone)
-    }
-
-    polyfillGlobal('TextEncoderStream', () => TextEncoderStream)
-    polyfillGlobal('TextDecoderStream', () => TextDecoderStream)
+  if (!('structuredClone' in global)) {
+    polyfillGlobal('structuredClone', () => structuredClone)
   }
 
-  setupPolyfills()
+  polyfillGlobal('TextEncoderStream', () => TextEncoderStream)
+  polyfillGlobal('TextDecoderStream', () => TextDecoderStream)
 }
 
 export {}
@@ -66,34 +66,34 @@ import {
 } from 'web-streams-polyfill'
 
 if (Platform.OS !== 'web') {
-  const setupPolyfills = async () => {
-    const { polyfillGlobal } =
-      await import('react-native/Libraries/Utilities/PolyfillFunctions')
+  // require, not import: it runs synchronously, before the rest of the app,
+  // and keeps React Native internals out of the web build.
+  const {
+    polyfillGlobal,
+  } = require('react-native/Libraries/Utilities/PolyfillFunctions')
+  const {
+    TextEncoderStream,
+    TextDecoderStream,
+  } = require('@stardazed/streams-text-encoding')
 
-    const { TextEncoderStream, TextDecoderStream } =
-      await import('@stardazed/streams-text-encoding')
-
-    if (!('structuredClone' in global)) {
-      polyfillGlobal('structuredClone', () => structuredClone)
-    }
-
-    if (!('TransformStream' in global)) {
-      polyfillGlobal('TransformStream', () => TransformStream)
-    }
-
-    if (!('ReadableStream' in global)) {
-      polyfillGlobal('ReadableStream', () => ReadableStream)
-    }
-
-    if (!('WritableStream' in global)) {
-      polyfillGlobal('WritableStream', () => WritableStream)
-    }
-
-    polyfillGlobal('TextEncoderStream', () => TextEncoderStream)
-    polyfillGlobal('TextDecoderStream', () => TextDecoderStream)
+  if (!('structuredClone' in global)) {
+    polyfillGlobal('structuredClone', () => structuredClone)
   }
 
-  setupPolyfills()
+  if (!('TransformStream' in global)) {
+    polyfillGlobal('TransformStream', () => TransformStream)
+  }
+
+  if (!('ReadableStream' in global)) {
+    polyfillGlobal('ReadableStream', () => ReadableStream)
+  }
+
+  if (!('WritableStream' in global)) {
+    polyfillGlobal('WritableStream', () => WritableStream)
+  }
+
+  polyfillGlobal('TextEncoderStream', () => TextEncoderStream)
+  polyfillGlobal('TextDecoderStream', () => TextDecoderStream)
 }
 
 export {}

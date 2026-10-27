@@ -2,7 +2,7 @@
 title: "Generating"
 ---
 
-Generate text with any GGUF model: pass a llama language model to the AI
+Generate text with a GGUF model: pass a llama language model to the AI
 SDK's `generateText` or `streamText`. The examples start from a prepared model,
 as in [Getting Started](/docs/llama/getting-started#usage):
 

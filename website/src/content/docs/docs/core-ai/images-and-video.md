@@ -58,7 +58,7 @@ const { video, providerMetadata } = await generateVideo({
 ```
 
 - The hosted model makes 832x480 clips of 5 seconds (81 frames at 16 fps), and rejects other sizes and lengths.
-- Models you export with dynamic shapes take other sizes: `resolution` (multiples of 16) or `aspectRatio` (`16:9`, `9:16` or `1:1`), and `duration` up to 81 frames.
-- `providerOptions['core-ai']` tunes the pipeline: `stepCount` (50 by default), `guidanceScale`, `negativePrompt`, `cfgCutoff`, `vaeTileSize` and `frameCount`.
+- Models you export with dynamic shapes take other sizes and lengths: `resolution` (multiples of 16) or `aspectRatio` (`16:9`, `9:16` or `1:1`), and `duration` in seconds, up to about 5 (81 frames at 16 fps). `providerOptions['core-ai'].frameCount` sets the number of frames directly.
+- `providerOptions['core-ai']` tunes the pipeline: `stepCount` (50 by default), `guidanceScale`, `negativePrompt`, `cfgCutoff` and `vaeTileSize`.
 - Generation takes minutes. Aborting stops it after the current step.
 - Wan generates from text only: image, frame and audio inputs are ignored with a warning.

@@ -6,10 +6,10 @@ title: "Models & Availability"
 there's nothing to download or bundle, but only some devices can run it. When
 you need a larger model, or support for every device, use cloud Gemini.
 
-| Model        | `modelType`  | Default `modelName` | Runs                             |
-| ------------ | ------------ | ------------------- | -------------------------------- |
-| Gemini Nano  | `genai-nano` | `gemini-nano`       | On device, offline, no API key   |
-| Cloud Gemini | `gemini`     | `gemini-2.5-flash`  | Google AI API, with your API key |
+| Model        | `modelType`  | `modelName`                    | Runs                             |
+| ------------ | ------------ | ------------------------------ | -------------------------------- |
+| Gemini Nano  | `genai-nano` | `gemini-nano` (the default)    | On device, offline, no API key   |
+| Cloud Gemini | `gemini`     | Required, such as `gemini-2.5-flash` | Google AI API, with your API key |
 
 ## Gemini Nano
 
@@ -46,16 +46,15 @@ for the supported devices.
 
 ### Preparing
 
-`adk.prepareNano()` or `model.prepare()` loads Gemini Nano ahead of time. If you
-skip it, the first `generateText` or `streamText` call prepares it. That call
+`adk.prepareNano()` loads Gemini Nano ahead of time. If you skip it, the first `generateText` or `streamText` call prepares it. That call
 only checks `isNanoSupported()`, so check `isAvailable('genai-nano')` yourself
 before showing the model as ready, and handle errors in your chat flow.
 
 ## Cloud Gemini
 
 Use cloud Gemini on devices without Gemini Nano, on the emulator, or when you
-need a more capable model. Create a provider with `modelType: 'gemini'` and
-your API key:
+need a more capable model. Create a provider with `modelType: 'gemini'`, a
+`modelName` and your API key:
 
 ```typescript
 import { createAdkProvider } from '@react-native-ai/adk'
@@ -98,7 +97,7 @@ const model = adk()
 | Option           | Type                       | Description                                                       |
 | ---------------- | -------------------------- | ----------------------------------------------------------------- |
 | `modelType`      | `'genai-nano' \| 'gemini'` | On device or cloud (default: `genai-nano`)                        |
-| `modelName`      | `string`                   | Model name (default: `gemini-nano`)                               |
+| `modelName`      | `string`                   | Model name (default: `gemini-nano`; set it for cloud Gemini)      |
 | `apiKey`         | `string`                   | Google AI API key, for cloud Gemini only                          |
 | `instruction`    | `string`                   | System instruction                                                |
 | `availableTools` | `Record<string, Tool>`     | Tools ADK can call, see [Tool Calling](/docs/adk/generating#tool-calling) |

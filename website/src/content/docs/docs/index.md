@@ -29,7 +29,7 @@ const result = streamText({
 | [Apple](/docs/apple/getting-started)           | iOS             | Built in: Apple Intelligence, speech and embeddings    | Native, provided by the platform           |
 | [Core AI](/docs/core-ai/getting-started)       | iOS 27          | Yours: language, image, speech and vision models       | Native, provided by the platform           |
 | [ADK](/docs/adk/getting-started)               | Android         | Built in: Gemini Nano, or cloud Gemini                 | Native, provided by the platform           |
-| [Llama](/docs/llama/getting-started)           | iOS and Android | Yours: any GGUF model from Hugging Face                | Third-party binding, llama.rn              |
+| [Llama](/docs/llama/getting-started)           | iOS and Android | Yours: GGUF models from Hugging Face                   | Third-party binding, llama.rn              |
 
 Built-in models need no download and work on supported devices right away.
 With Core AI and Llama, your app downloads or bundles the models, and we point

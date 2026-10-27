@@ -250,9 +250,9 @@ export const runtimes = [
     runtime: 'llama.cpp via llama.rn',
     platforms: 'iOS and Android',
     pkg: '@react-native-ai/llama',
-    models: 'Any GGUF from Hugging Face',
+    models: 'GGUF models from Hugging Face that fit in memory',
     owner: 'community' as const,
-    body: 'The portable option: an AI SDK provider over the third-party llama.rn binding, for any GGUF model on both platforms.',
+    body: 'The portable option: an AI SDK provider over the third-party llama.rn binding, for GGUF models small enough for a phone, on both platforms.',
     href: docs.llama,
     file: 'llama.ts',
     code: code.llama,
@@ -281,7 +281,7 @@ export const home = {
     steps: [
       { title: 'Install the providers', body: 'Add the provider for each platform you ship to, next to the AI SDK.', cmd: site.install },
       { title: 'Pick a model per platform', body: 'Use `apple()` on iOS and `adk()` on Android, or a model you ship with Core AI or Llama.', cmd: 'npm install @react-native-ai/adk' },
-      { title: 'Call the AI SDK', body: 'Pass the model to `generateText`, `streamText`, `embed` or any other AI SDK function. The rest of your code stays the same.', cmd: 'npx expo run:ios' },
+      { title: 'Call the AI SDK', body: 'Pass the model to `generateText`, `streamText`, `embed` or any other AI SDK function. The rest of your code stays the same, on iOS and Android.', cmd: 'npx expo run:android' },
     ],
     /** One tab per runtime, each with its real setup snippet. */
     tabs: runtimes.map((r) => ({
@@ -299,7 +299,7 @@ export const home = {
   runtimes: {
     label: 'Runtimes',
     headline: ['The fastest runtime on each platform.', 'One API over all of them.'],
-    lede: 'Apple, Core AI and ADK run on the AI stack the platform provides: native, hardware-accelerated and with its system models. Llama runs any GGUF model on iOS and Android through llama.rn, a third-party binding.',
+    lede: 'Apple, Core AI and ADK run on the AI stack the platform provides: native, hardware-accelerated and with its system models. Llama runs GGUF models sized for phones on iOS and Android through llama.rn, a third-party binding.',
   },
 
   feature: {

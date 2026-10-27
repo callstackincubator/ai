@@ -53,8 +53,8 @@ const { usage } = await generateText({
   prompt: 'Count to five.',
 })
 
-console.log(usage.inputTokens.total)
-console.log(usage.outputTokens.total)
+console.log(usage.inputTokens)
+console.log(usage.outputTokens)
 console.log(usage.raw?.totalTokenCount)
 ```
 
@@ -89,14 +89,6 @@ const { text } = await generateText({
 })
 ```
 
-To add or replace tools later, call `updateTools` on the model:
-
-```typescript
-const model = adk()
-
-model.updateTools({ getCurrentTime })
-```
-
 Because ADK runs the loop:
 
 - AI SDK step controls, such as `stopWhen`, don't limit it.
@@ -127,18 +119,20 @@ File and HTTP URLs aren't supported yet, so read the image first.
 
 ## JSON Output
 
-Ask for JSON with JSON mode:
+Ask for JSON with `Output.json()`:
 
 ```typescript
-const { text } = await generateText({
+import { generateText, Output } from 'ai'
+
+const { output } = await generateText({
   model: adk(),
   prompt: 'Return a JSON object with name and age fields.',
-  responseFormat: { type: 'json' },
+  output: Output.json(),
 })
 ```
 
-ADK can't constrain the output to a schema or stream JSON yet, so parse and
-validate the response in your app.
+ADK can't constrain the output to a schema or stream JSON yet, so validate
+`output` in your app, for example with zod.
 
 ## Options
 

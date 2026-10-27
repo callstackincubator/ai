@@ -7,10 +7,10 @@ title: "Prior Art"
 - The LLM **streams** the UI in a predefined format; a stream parser consumes the output.
 - A **long system prompt** describes that format and includes examples.
 
-That works well for **large language models** (e.g. cloud APIs). For **on-device, small models** (e.g. Apple Foundation Models with limited context), you run into:
+That works well for **large language models** (such as cloud APIs). For **on-device, small models** (such as Apple Foundation Models, with limited context), you run into:
 
 1. **Context size** — Small models often have 4K-token windows (such as Apple Foundation having a 4096 token limit). A long system prompt plus conversation leaves little room; you end up summarizing or truncating, if you even fit into the window at all.
-2. **Task complexity** — json-render supports rich actions and state. For small models (e.g. 3B parameters), generating a correct static UI is already hard; a simpler, tool-based flow is more reliable.
+2. **Task complexity** — json-render supports rich actions and state. For small models (around 3B parameters), generating a correct static UI is already hard; a simpler, tool-based flow is more reliable.
 
 ## How this package differs
 
