@@ -20,20 +20,33 @@ never leaves the device.
 
 ## Providers
 
-| Provider                           | Package                                          | Platforms    | Models                                     | App downloads the model |
-| ---------------------------------- | ------------------------------------------------ | ------------ | ------------------------------------------ | ----------------------- |
-| [Apple](#apple)                    | [`@react-native-ai/apple`](./packages/apple-llm) | iOS          | Apple Intelligence and system models       | No                      |
-| [Google ADK](#google-adk)          | [`@react-native-ai/adk`](./packages/adk)         | Android      | Gemini Nano, optional cloud Gemini         | No                      |
-| [Llama](#llama)                    | [`@react-native-ai/llama`](./packages/llama)     | iOS, Android | llama.cpp-compatible GGUF models           | Yes                     |
-| [Core AI](#core-ai) (not released) | [`@react-native-ai/core-ai`](./packages/core-ai) | iOS 27+      | Core AI bundles from `apple/coreai-models` | Yes                     |
+Providers come in two kinds: built-in models that ship with the operating
+system, and custom models that your app downloads or bundles.
 
-### Apple
+**Built-in models**
 
-Use the AI built into iOS: Apple Intelligence for text generation,
-NLContextualEmbedding for embeddings, SpeechAnalyzer for transcription and
-AVSpeechSynthesizer for speech. The models ship with the system, so your app
-has nothing to bundle, although iOS may download model assets the first time
-they are used.
+| Provider                                  | Package                                          | Platform | Models                                                                                                |
+| ----------------------------------------- | ------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------- |
+| [Apple Intelligence](#apple-intelligence) | [`@react-native-ai/apple`](./packages/apple-llm) | iOS      | Foundation Models on-device and on Private Cloud Compute, system embeddings, transcription and speech |
+| [Google ADK](#google-adk)                 | [`@react-native-ai/adk`](./packages/adk)         | Android  | Gemini Nano on-device, optional cloud Gemini                                                          |
+
+**Custom models**
+
+| Provider                           | Package                                          | Platform     | Models                                            |
+| ---------------------------------- | ------------------------------------------------ | ------------ | ------------------------------------------------- |
+| [Llama](#llama)                    | [`@react-native-ai/llama`](./packages/llama)     | iOS, Android | llama.cpp-compatible GGUF models                  |
+| [Core AI](#core-ai) (not released) | [`@react-native-ai/core-ai`](./packages/core-ai) | iOS 27+      | Model bundles exported with `apple/coreai-models` |
+
+**Llama or Core AI?** Use Llama to run the same model on iOS and Android, or
+a GGUF model from Hugging Face. Use Core AI when your app targets iOS 27+ and
+you want Apple's own runtime, or need what Llama doesn't cover: image and video
+generation, and vision tasks such as segmentation and object detection.
+
+### Apple Intelligence
+
+Use the models built into iOS: Foundation Models for text generation, on-device
+or on Private Cloud Compute, plus system models for embeddings, transcription
+and speech. Your app has nothing to bundle.
 
 ```bash
 npm install @react-native-ai/apple ai
@@ -49,13 +62,6 @@ const { text } = await generateText({
 })
 ```
 
-| Feature          | iOS     | Additional requirements    |
-| ---------------- | ------- | -------------------------- |
-| Text generation  | iOS 26+ | Apple Intelligence device  |
-| Embeddings       | iOS 17+ | -                          |
-| Transcription    | iOS 26+ | -                          |
-| Speech synthesis | iOS 13+ | iOS 17+ for Personal Voice |
-
 [Package README](./packages/apple-llm) · [Documentation](https://react-native-ai.dev/docs/apple/getting-started)
 
 ### Google ADK
@@ -69,18 +75,9 @@ files and no API key. Cloud Gemini is available when you need a larger model.
 npm install @react-native-ai/adk ai
 ```
 
-> [!IMPORTANT]
-> Requires Android `minSdkVersion` 26 and a physical device with AICore support (Android 14+) for Gemini Nano. Your app also needs packaging excludes for duplicate `META-INF` files, see the [getting started guide](https://react-native-ai.dev/docs/adk/getting-started).
-
 ```ts
 import { adk } from '@react-native-ai/adk'
 import { generateText } from 'ai'
-
-if (!(await adk.isAvailable())) {
-  throw new Error('Gemini Nano is not available on this device')
-}
-
-await adk.prepareNano()
 
 const { text } = await generateText({
   model: adk(),
@@ -125,10 +122,7 @@ await model.unload()
 
 ### Core AI
 
-> [!WARNING]
-> Work in progress. This package is not published to npm yet.
-
-Run model bundles exported with
+Not published to npm yet. Run model bundles exported with
 [`apple/coreai-models`](https://github.com/apple/coreai-models), such as Qwen3
 or FLUX.2, on iOS 27 with Apple's Core AI framework. Supports text and image
 generation, transcription and embeddings through the AI SDK, plus native APIs
