@@ -52,7 +52,7 @@ function setup(config: CoreAIBenchmarkConfig) {
     create() {
       model = coreAI.languageModel({
         id: config.id,
-        source: { type: 'file', uri: path },
+        source: path,
       })
       return model
     },
