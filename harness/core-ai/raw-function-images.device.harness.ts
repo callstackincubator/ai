@@ -27,8 +27,7 @@ beforeAll(async () => {
   loaded = (await CoreAI.loadModel(
     {
       id: 'channel-mean.aimodel',
-      sourceType: 'file',
-      sourceUri: modelPath,
+      source: modelPath,
       task: 'raw',
     },
     {}
