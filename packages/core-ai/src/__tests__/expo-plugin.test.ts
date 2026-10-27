@@ -6,7 +6,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   CORE_AI_LINKABLE_TASKS,
   CORE_AI_TASKS_PROPERTY,
+  INCREASED_MEMORY_LIMIT_ENTITLEMENT,
   raiseDeploymentTarget,
+  setCoreAIEntitlements,
   setCoreAIPodfileProperties,
   setXcodeDeploymentTarget,
 } from '../expo-plugin-config'
@@ -68,6 +70,39 @@ describe('setCoreAIPodfileProperties', () => {
     ].map((match) => match[1])
 
     expect(podspecTasks).toEqual([...CORE_AI_LINKABLE_TASKS])
+  })
+})
+
+describe('setCoreAIEntitlements', () => {
+  test('adds the increased memory limit entitlement when asked', () => {
+    expect(
+      setCoreAIEntitlements(
+        { 'aps-environment': 'development' },
+        { increasedMemoryLimit: true }
+      )
+    ).toEqual({
+      'aps-environment': 'development',
+      [INCREASED_MEMORY_LIMIT_ENTITLEMENT]: true,
+    })
+  })
+
+  test('removes the entitlement when turned off', () => {
+    expect(
+      setCoreAIEntitlements(
+        {
+          'aps-environment': 'development',
+          [INCREASED_MEMORY_LIMIT_ENTITLEMENT]: true,
+        },
+        { increasedMemoryLimit: false }
+      )
+    ).toEqual({ 'aps-environment': 'development' })
+  })
+
+  test('adds no entitlements by default', () => {
+    expect(setCoreAIEntitlements({})).toEqual({})
+    expect(setCoreAIEntitlements({}, { increasedMemoryLimit: false })).toEqual(
+      {}
+    )
   })
 })
 

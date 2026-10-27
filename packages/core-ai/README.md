@@ -97,6 +97,22 @@ CORE_AI_TASKS=language npx pod-install
 
 Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 
+### Memory Limit
+
+iOS stops an app that uses more memory than its limit, which is about 3.4 GB on an iPhone 17 Pro. Larger models, such as the 3.1 GB text encoder of the Wan 2.1 video model, need the [increased memory limit](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.kernel.increased-memory-limit) entitlement, which raises it to about 6 GB. With Expo, the plugin adds it:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "increasedMemoryLimit": true }]]
+  }
+}
+```
+
+The App ID has to have the Increased Memory Limit capability, so sign with an explicit App ID (a wildcard profile cannot carry it). In a bare app, add the capability to the app target in Xcode.
+
+Even with it, Wan 2.1 does not finish on an iPhone yet: its VAE decoder needs more GPU memory than the raised limit allows ([#306](https://github.com/callstackincubator/ai/issues/306)).
+
 ## Usage
 
 ```ts
