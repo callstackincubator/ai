@@ -84,7 +84,9 @@ The MLX app builds with XcodeGen (`brew install xcodegen`) and Xcode:
 DEVICE=<udid> TEAM=<team id> harness/benchmarks/mlx/run.sh | tee mlx.log
 ```
 
-`collect.ts` turns the logs into the tables in RESULTS.md:
+`collect.ts` turns the logs into the tables in RESULTS.md. It takes the median
+over launches, and leaves out runs that started or ended throttled unless
+`--all` is passed:
 
 ```bash
 bun harness/benchmarks/collect.ts harness/benchmarks/benchmarks.jsonl mlx.log
