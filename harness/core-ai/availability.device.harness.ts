@@ -12,16 +12,31 @@ describe('core-ai availability', () => {
     expect(capabilities.isCoreAIObjectDetectionAvailable).toBe(true)
     expect(capabilities.isCoreAISegmentationAvailable).toBe(true)
     expect(capabilities.isCoreAIDiffusionAvailable).toBe(true)
+    expect(capabilities.isCoreAISpeechAvailable).toBe(true)
+
+    expect(capabilities.isCoreAIVideoSegmentationAvailable).toBe(true)
+    expect(capabilities.isCoreAIVideoDiffusionAvailable).toBe(true)
     expect(capabilities.missingProducts).toEqual([])
   })
 
   it('rejects a model that is not on disk', async () => {
     await expect(
-      CoreAI.generateImage(
-        { id: 'missing', sourceType: 'file', sourceUri: '/missing' },
-        'a cat',
-        {}
-      )
+      CoreAI.generateImage({ source: '/missing' }, 'a cat', {})
     ).rejects.toMatchObject({ code: expect.any(String) })
+  })
+
+  it('rejects a bundle source that is not in the app bundle', async () => {
+    await expect(
+      CoreAI.inspectModel({ source: 'bundle://models/missing' })
+    ).rejects.toMatchObject({
+      code: 'CORE_AI_MISSING_SOURCE',
+      message: 'The app bundle has no models/missing.',
+    })
+  })
+
+  it('names a model after its folder when the config has no id', async () => {
+    const info = await CoreAI.inspectModel({ source: '/missing/qwen3-0.6b/' })
+
+    expect(info.id).toBe('qwen3-0.6b')
   })
 })

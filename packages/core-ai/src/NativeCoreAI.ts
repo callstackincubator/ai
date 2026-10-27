@@ -2,20 +2,14 @@ import type { CodegenTypes, TurboModule } from 'react-native'
 import { TurboModuleRegistry } from 'react-native'
 
 export interface NativeCoreAIModelConfig {
-  id: string
-  sourceType: string
-  sourceUri?: string
-  bundleName?: string
-  bundleExtension?: string
-  bundleSubdirectory?: string
+  id?: string
+  // A path, a file:// URL, or bundle:// and a path in the app bundle
+  source: string
   task?: string
-  family?: string
-  variant?: string
 }
 
 export interface CoreAIModelInfo {
   id?: string
-  family?: string
   task: string
   platforms: string[]
   functions: CodegenTypes.UnsafeObject[]
@@ -54,6 +48,16 @@ export type CoreAIStreamErrorEvent = {
   streamId: string
   code?: string
   error: string
+}
+
+export type CoreAITranscriptionUpdateEvent = {
+  streamId: string
+  // Partial text of a segment grows append-only until the final update
+  type: string
+  segmentIndex: number
+  text: string
+  startSecond: number
+  endSecond: number
 }
 
 export interface Spec extends TurboModule {
@@ -116,6 +120,24 @@ export interface Spec extends TurboModule {
     mediaType: string,
     options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
+  // Live transcription on a streaming speech bundle. Audio is base64 16-bit
+  // little-endian mono PCM at options.sampleRate (16 kHz by default)
+  startTranscriptionStream(
+    streamId: string,
+    config: NativeCoreAIModelConfig,
+    options: CodegenTypes.UnsafeObject
+  ): Promise<void>
+  appendTranscriptionAudio(streamId: string, pcmBase64: string): Promise<void>
+  finishTranscriptionStream(
+    streamId: string
+  ): Promise<CodegenTypes.UnsafeObject>
+  // Cancel with cancelStream(requestId)
+  generateVideo(
+    requestId: string,
+    config: NativeCoreAIModelConfig,
+    prompt: string,
+    options: CodegenTypes.UnsafeObject
+  ): Promise<CodegenTypes.UnsafeObject>
   generateImage(
     config: NativeCoreAIModelConfig,
     prompt: string,
@@ -138,6 +160,7 @@ export interface Spec extends TurboModule {
   onStreamUpdate: CodegenTypes.EventEmitter<CoreAIStreamUpdateEvent>
   onStreamComplete: CodegenTypes.EventEmitter<CoreAIStreamCompleteEvent>
   onStreamError: CodegenTypes.EventEmitter<CoreAIStreamErrorEvent>
+  onTranscriptionUpdate: CodegenTypes.EventEmitter<CoreAITranscriptionUpdateEvent>
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeCoreAI')

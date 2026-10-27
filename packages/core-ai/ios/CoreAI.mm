@@ -24,28 +24,12 @@ using namespace JS::NativeCoreAI;
 
 static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
   NSMutableDictionary *dict = [NSMutableDictionary new];
-  dict[@"id"] = config.id_();
-  dict[@"sourceType"] = config.sourceType();
-  if (config.sourceUri()) {
-    dict[@"sourceUri"] = config.sourceUri();
+  if (config.id_()) {
+    dict[@"id"] = config.id_();
   }
-  if (config.bundleName()) {
-    dict[@"bundleName"] = config.bundleName();
-  }
-  if (config.bundleExtension()) {
-    dict[@"bundleExtension"] = config.bundleExtension();
-  }
-  if (config.bundleSubdirectory()) {
-    dict[@"bundleSubdirectory"] = config.bundleSubdirectory();
-  }
+  dict[@"source"] = config.source();
   if (config.task()) {
     dict[@"task"] = config.task();
-  }
-  if (config.family()) {
-    dict[@"family"] = config.family();
-  }
-  if (config.variant()) {
-    dict[@"variant"] = config.variant();
   }
   return dict;
 }
@@ -217,6 +201,43 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
            resolve:(nonnull RCTPromiseResolveBlock)resolve
             reject:(nonnull RCTPromiseRejectBlock)reject {
   [_coreAI transcribe:CoreAIConfigToDictionary(config) audioBase64:audioBase64 mediaType:mediaType options:options resolve:resolve reject:reject];
+}
+
+- (void)startTranscriptionStream:(nonnull NSString *)streamId
+                          config:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+                         options:(nonnull NSDictionary *)options
+                         resolve:(nonnull RCTPromiseResolveBlock)resolve
+                          reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI startTranscriptionStream:streamId
+                             config:CoreAIConfigToDictionary(config)
+                            options:options
+                           onUpdate:^(NSDictionary *update) {
+    [self emitOnTranscriptionUpdate:update];
+  }
+                            resolve:resolve
+                             reject:reject];
+}
+
+- (void)appendTranscriptionAudio:(nonnull NSString *)streamId
+                       pcmBase64:(nonnull NSString *)pcmBase64
+                         resolve:(nonnull RCTPromiseResolveBlock)resolve
+                          reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI appendTranscriptionAudio:streamId pcmBase64:pcmBase64 resolve:resolve reject:reject];
+}
+
+- (void)finishTranscriptionStream:(nonnull NSString *)streamId
+                          resolve:(nonnull RCTPromiseResolveBlock)resolve
+                           reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI finishTranscriptionStream:streamId resolve:resolve reject:reject];
+}
+
+- (void)generateVideo:(nonnull NSString *)requestId
+               config:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+               prompt:(nonnull NSString *)prompt
+              options:(nonnull NSDictionary *)options
+              resolve:(nonnull RCTPromiseResolveBlock)resolve
+               reject:(nonnull RCTPromiseRejectBlock)reject {
+  [_coreAI generateVideo:requestId config:CoreAIConfigToDictionary(config) prompt:prompt options:options resolve:resolve reject:reject];
 }
 
 - (void)generateImage:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config

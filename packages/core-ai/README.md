@@ -15,16 +15,15 @@ Foundation Models, NLContextualEmbedding, SpeechAnalyzer, and AVSpeechSynthesize
 
 Core AI exposes two layers:
 
-- AI SDK adapters: language models and image generation. Text embedding and
-  transcription adapters exist, because Apple has starter export recipes for
-  them, but they reject with an unsupported error until native runners land
-  ([#237](https://github.com/callstackincubator/ai/issues/237)).
+- AI SDK adapters: language models, image generation, transcription and
+  text embeddings (CLIP).
 - Direct native APIs: model loading, persistent language sessions, model
-  inspection, segmentation, and object detection. `specializeModel` returns
-  metadata only. Depth, super-resolution, and raw `.aimodel` function calls
-  reject with an unsupported error.
+  inspection, segmentation, video segmentation, object detection,
+  super-resolution, classification, depth estimation, and raw `.aimodel`
+  function calls. `specializeModel` returns metadata only.
 
-Reranking, speech generation, and video generation have no adapters, because
+Video generation runs through `coreAI.videoModel(...)` and AI SDK
+`experimental_generateVideo`. Reranking and speech generation have no adapters, because
 `coreai-models` has no runtime for them yet.
 
 ## Installation
@@ -76,6 +75,9 @@ By default the pod links native support for every task the module implements. Ea
 | `diffusion`        | `coreAI.imageModel(...)`                  | `CoreAIDiffusion`       |
 | `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
 | `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
+| `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
+| `video-segmentation` | `CoreAI.runTask('video-segmentation', ...)` | `CoreAIVideoSegmentation` |
+| `video-diffusion`  | `coreAI.videoModel(...)`                  | `CoreAIVideoDiffusion`  |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 
@@ -95,6 +97,22 @@ CORE_AI_TASKS=language npx pod-install
 
 Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 
+### Memory Limit
+
+iOS stops an app that uses more memory than its limit, which is about 3.4 GB on an iPhone 17 Pro. Larger models, such as the 3.1 GB text encoder of the Wan 2.1 video model, need the [increased memory limit](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.kernel.increased-memory-limit) entitlement, which raises it to about 6 GB. With Expo, the plugin adds it:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "increasedMemoryLimit": true }]]
+  }
+}
+```
+
+The App ID has to have the Increased Memory Limit capability, so sign with an explicit App ID (a wildcard profile cannot carry it). In a bare app, add the capability to the app target in Xcode.
+
+Even with it, Wan 2.1 does not finish on an iPhone yet: its VAE decoder needs more GPU memory than the raised limit allows ([#306](https://github.com/callstackincubator/ai/issues/306)).
+
 ## Usage
 
 ```ts
@@ -103,8 +121,7 @@ import { streamText } from 'ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 
 const result = streamText({
@@ -128,14 +145,21 @@ const response = await session.respond('What is Qwen3?')
 For lower-level calls, import `CoreAI` and call the native TurboModule directly:
 
 ```ts
-import { CoreAI, toNativeModelConfig } from '@react-native-ai/core-ai'
+import { CoreAI } from '@react-native-ai/core-ai'
 
-await CoreAI.inspectModel(toNativeModelConfig(modelConfig))
+await CoreAI.inspectModel(modelConfig)
 ```
 
 ## Loading Models
 
-Core AI loads models from local `.aimodel` / `.aimodelc` files, so download them into app storage yourself and pass a local `source: { type: 'file', uri }`. Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
+Core AI loads models from local `.aimodel` / `.aimodelc` files and model folders. `source` is a path or `file://` URL in app storage, or `bundle://` and a path in the app bundle for a model shipped with the app:
+
+```ts
+const downloaded = coreAI.languageModel({ source: `${modelsDirectory}/qwen3-0.6b` })
+const bundled = coreAI.languageModel({ source: 'bundle://models/qwen3-0.6b' })
+```
+
+`id` is optional. It names the model in AI SDK results and telemetry, and defaults to the folder or `.aimodel` name (`qwen3-0.6b` above). Built-in download, specialization and caching is tracked in [#235](https://github.com/callstackincubator/ai/issues/235).
 
 ## Documentation
 

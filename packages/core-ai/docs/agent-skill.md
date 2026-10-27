@@ -16,8 +16,7 @@ import { generateText } from 'ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 await model.prepare()
 const { text } = await generateText({ model, prompt: 'Hello' })
@@ -58,7 +57,7 @@ In a bare app, set `platform :ios, '27.0'` in the `Podfile` and the Xcode projec
 
 ### 2. Choose Linked Tasks (optional)
 
-By default the pod links native support for every task: `language` (`CoreAILM`), `diffusion` (`CoreAIDiffusion`), `segmentation` (`CoreAISegmentation`) and `object-detection` (`CoreAIObjectDetection`). To link fewer with Expo, pass `tasks` to the config plugin:
+By default the pod links native support for every task: `language` (`CoreAILM`), `diffusion` (`CoreAIDiffusion`), `segmentation` (`CoreAISegmentation`), `object-detection` (`CoreAIObjectDetection`), `asr` (`CoreAISpeech`), `video-segmentation` (`CoreAIVideoSegmentation`) and `video-diffusion` (`CoreAIVideoDiffusion`). To link fewer with Expo, pass `tasks` to the config plugin:
 
 ```json
 {
@@ -82,22 +81,27 @@ Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 uv run coreai.llm.export Qwen/Qwen3-0.6B --platform iOS --output-dir ./models
 ```
 
-Download or bundle the exported directory into app storage, and pass it as `source: { type: 'file', uri }`. There is no built-in downloader yet.
+Download the exported directory into app storage, or bundle it with the app, and pass it as `source`: a path in app storage, or `bundle://` and its path in the app bundle. `id` is optional and defaults to the folder name. There is no built-in downloader yet.
 
 ### 4. Use It
 
 - Language: `coreAI.languageModel(config)` with `generateText` / `streamText`. Supports message history, structured output with a schema, and the `reasoning` option (`providerOptions['core-ai'].reasoningLevel` wins)
 - Persistent native sessions: `await model.createSession()`, then `session.respond(...)`
 - Image generation: `coreAI.imageModel(config)` with `generateImage`
+- Video generation: `coreAI.videoModel(config)` with `experimental_generateVideo`, on a Wan 2.1 bundle (links `CoreAIVideoDiffusion`)
+- Transcription: `coreAI.transcriptionModel(config)` with `transcribe`, on a Parakeet TDT bundle
+- Text embeddings: `coreAI.embeddingModel(config)` with `embed` / `embedMany`, on a CLIP export folder (`.aimodel` + `tokenizer/`). Images: `model.embedImages(imageUris)`
 - Segmentation and object detection: `CoreAI.runTask('segmentation' | 'object-detection', ...)`
-- Model metadata: `CoreAI.inspectModel(...)`
+- Super-resolution, classification and depth: `CoreAI.runTask('super-resolution' | 'classification' | 'depth', config, { imageUri }, options)`, on EDSR, PVT and Depth Anything exports
+- Video segmentation and tracking: `CoreAI.runTask('video-segmentation', config, { videoUri, data: { prompts } }, options)` on a SAM 3 video bundle (links `CoreAIVideoSegmentation`)
+- Any other `.aimodel`: `CoreAI.loadModel({ ...config, task: 'raw' }, {})`, then `CoreAI.runRawFunction(modelHandle, functionName, inputs, {})` with tensors from `createTensor`, read back with `readTensor`
+- Model metadata and function signatures: `CoreAI.inspectModel(...)`
 
 ## Common Pitfalls
 
 - **Simulator builds fail**: Core AI is device-only. Exclude the package from simulator builds or test on a device.
-- **Unsupported adapters**: `coreAI.embeddingModel(...)` and `coreAI.transcriptionModel(...)` exist but reject with an unsupported error. Depth, super-resolution and raw `.aimodel` calls also reject.
 - **Structured output**: needs a JSON schema and runs as guided generation. Models whose engine cannot do guided generation reject with `CORE_AI_UNSUPPORTED_CAPABILITY`. Streamed JSON arrives in one piece once it is complete.
-- **Tools**: not supported yet. Tools are not passed to the model, and the call returns a warning.
+- **Tools**: function tools only. A tool call ends the generation, so set `stopWhen` (e.g. `stepCountIs(3)`) for the AI SDK to run the tool and let the model answer. `toolChoice: 'required'` is not enforced.
 - **Wrong package**: Apple Intelligence (Foundation Models system model) is `@react-native-ai/apple`, not Core AI.
 
 ## Related Skills

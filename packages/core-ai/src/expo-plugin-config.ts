@@ -3,26 +3,47 @@
 
 import type { CoreAIModelTask } from './types'
 
-/**
- * Tasks the native module implements. Each one links the coreai-models
- * product that runs it (see ReactNativeAICoreAI.podspec)
- */
+// Tasks the native module implements. Each one links the coreai-models
+// product that runs it (see ReactNativeAICoreAI.podspec)
 export const CORE_AI_LINKABLE_TASKS = [
   'language',
   'diffusion',
   'segmentation',
   'object-detection',
+  'asr',
+
+  'video-segmentation',
+  'video-diffusion',
 ] as const satisfies readonly CoreAIModelTask[]
 
 export type CoreAILinkableTask = (typeof CORE_AI_LINKABLE_TASKS)[number]
 
 export type CoreAIPluginOptions = {
-  /**
-   * Tasks to link native support for, with the same names as a model's
-   * `task`. Defaults to all of them. Tasks that are not linked reject at
-   * runtime with CORE_AI_MISSING_SPM_PRODUCT
-   */
+  // Tasks to link native support for, with the same names as a model's
+  // `task`. Defaults to all of them. Tasks that are not linked reject at
+  // runtime with CORE_AI_MISSING_SPM_PRODUCT
   tasks?: CoreAILinkableTask[]
+  // Adds the increased memory limit entitlement, which raises the memory an
+  // app may use before iOS stops it. Video generation needs it. The App ID
+  // must have the Increased Memory Limit capability, which free and
+  // wildcard provisioning profiles cannot carry
+  increasedMemoryLimit?: boolean
+}
+
+export const INCREASED_MEMORY_LIMIT_ENTITLEMENT =
+  'com.apple.developer.kernel.increased-memory-limit'
+
+export function setCoreAIEntitlements(
+  entitlements: Record<string, unknown>,
+  options: CoreAIPluginOptions = {}
+) {
+  if (options.increasedMemoryLimit) {
+    entitlements[INCREASED_MEMORY_LIMIT_ENTITLEMENT] = true
+  } else if (options.increasedMemoryLimit === false) {
+    // Prebuild without --clean keeps the entitlements file
+    delete entitlements[INCREASED_MEMORY_LIMIT_ENTITLEMENT]
+  }
+  return entitlements
 }
 
 // apple/coreai-models declares iOS 27 as its minimum platform
@@ -41,10 +62,8 @@ function compareVersions(a: string, b: string) {
   return 0
 }
 
-/**
- * Raises a deployment target below the iOS 27 that Core AI needs, and keeps a
- * higher one
- */
+// Raises a deployment target below the iOS 27 that Core AI needs, and keeps a
+// higher one
 export function raiseDeploymentTarget(current: string | undefined) {
   const version = current?.replace(/"/g, '')
   return version && compareVersions(version, CORE_AI_DEPLOYMENT_TARGET) >= 0

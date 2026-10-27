@@ -34,6 +34,10 @@ Pod::Spec.new do |s|
     "diffusion" => "CoreAIDiffusion",
     "segmentation" => "CoreAISegmentation",
     "object-detection" => "CoreAIObjectDetection",
+    "asr" => "CoreAISpeech",
+
+    "video-segmentation" => "CoreAIVideoSegmentation",
+    "video-diffusion" => "CoreAIVideoDiffusion",
   }
   tasks = ENV["CORE_AI_TASKS"]
   if tasks.nil? && defined?(Pod::Config)

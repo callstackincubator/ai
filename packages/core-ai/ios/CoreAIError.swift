@@ -2,7 +2,7 @@ import Foundation
 
 enum CoreAIError: LocalizedError {
   case unsupportedOS
-  case missingSource
+  case missingSource(String)
   case missingSwiftPackage(String)
   case modelNotLoaded(String)
   case sessionNotFound(String)
@@ -15,8 +15,8 @@ enum CoreAIError: LocalizedError {
     switch self {
     case .unsupportedOS:
       return "Core AI requires iOS 27 or macOS 27 or newer."
-    case .missingSource:
-      return "Core AI model source is missing. Provide a file URI or bundle resource."
+    case .missingSource(let reason):
+      return reason
     case .missingSwiftPackage(let product):
       return "Missing Apple Core AI Swift Package product: \(product). Add the \"\(Self.task(linkedBy: product))\" task to the Expo config plugin's tasks option (or to CORE_AI_TASKS) and run pod install again."
     case .modelNotLoaded(let handle):
@@ -45,6 +45,13 @@ enum CoreAIError: LocalizedError {
       return "segmentation"
     case "CoreAIObjectDetection":
       return "object-detection"
+    case "CoreAISpeech":
+      return "asr"
+
+    case "CoreAIVideoSegmentation":
+      return "video-segmentation"
+    case "CoreAIVideoDiffusion":
+      return "video-diffusion"
     default:
       return product
     }

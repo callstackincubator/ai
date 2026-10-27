@@ -30,6 +30,7 @@ const loadModel = mock(async () => ({
   info: { task: 'language', platforms: ['iOS'], functions: [] },
 }))
 const unloadModel = mock(async (_modelHandle: string) => {})
+const removeModel = mock(async (_config: Record<string, unknown>) => {})
 const generateText = mock(
   async (
     _requestId: string,
@@ -50,33 +51,94 @@ const streamText = mock(
   ) => {}
 )
 const cancelStream = mock((_streamId: string) => {})
+const generateVideo = mock(
+  async (
+    _requestId: string,
+    _config: Record<string, unknown>,
+    _prompt: string,
+    _options: Record<string, unknown>
+  ): Promise<Record<string, unknown>> => ({
+    video: 'AAAA',
+    mediaType: 'video/mp4',
+    uri: 'file:///tmp/video.mp4',
+    width: 832,
+    height: 480,
+    frameCount: 17,
+    fps: 16,
+    seed: 1,
+  })
+)
+const embed = mock(
+  async (
+    _config: Record<string, unknown>,
+    _values: string[],
+    _options: Record<string, unknown>
+  ) => ({ embeddings: [[0.6, 0.8]], metadata: { dimensions: 2 } })
+)
+const runTask = mock(
+  async (
+    _task: string,
+    _config: Record<string, unknown>,
+    _input: Record<string, unknown>,
+    _options: Record<string, unknown>
+  ) => ({ task: 'embedding', output: { embeddings: [[1, 0]] } })
+)
 const createLanguageSession = mock(
   async (_modelHandle: string, _options: Record<string, unknown>) => 'session'
 )
 const onStreamUpdate = createEmitter()
 const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
+const onTranscriptionUpdate = createEmitter()
+
+const transcriptionResult = {
+  text: 'hello world',
+  segments: [{ text: 'hello world', startSecond: 0, endSecond: 1 }],
+  durationInSeconds: 1,
+  metadata: { architecture: 'Parakeet TDT', streaming: true },
+}
+const startTranscriptionStream = mock(
+  async (
+    _streamId: string,
+    _config: Record<string, unknown>,
+    _options: Record<string, unknown>
+  ) => {}
+)
+const appendTranscriptionAudio = mock(
+  async (_streamId: string, _pcmBase64: string) => {}
+)
+const finishTranscriptionStream = mock(
+  async (_streamId: string): Promise<Record<string, unknown>> =>
+    transcriptionResult
+)
 
 mock.module('react-native', () => ({
   TurboModuleRegistry: {
     getEnforcing: () => ({
       loadModel,
       unloadModel,
+      removeModel,
       generateText,
       streamText,
       cancelStream,
+      generateVideo,
+      embed,
+      runTask,
       createLanguageSession,
       onStreamUpdate,
       onStreamComplete,
       onStreamError,
+      startTranscriptionStream,
+      appendTranscriptionAudio,
+      finishTranscriptionStream,
+      onTranscriptionUpdate,
     }),
   },
 }))
 
 const { coreAI } = await import('../ai-sdk')
 
-const createModel = () =>
-  coreAI({ id: 'model', source: { type: 'bundle', name: 'm' } })
+const createModel = () => coreAI({ id: 'model', source: 'bundle://m' })
 
 function createCallOptions(
   overrides: Partial<LanguageModelV4CallOptions> = {}
@@ -87,8 +149,10 @@ function createCallOptions(
   }
 }
 
-async function readAll(stream: ReadableStream<LanguageModelV4StreamPart>) {
-  const parts: LanguageModelV4StreamPart[] = []
+async function readAll<Part = LanguageModelV4StreamPart>(
+  stream: ReadableStream<Part>
+) {
+  const parts: Part[] = []
   const reader = stream.getReader()
   while (true) {
     const { done, value } = await reader.read()
@@ -110,9 +174,34 @@ async function waitForStreamId() {
 beforeEach(() => {
   loadModel.mockClear()
   unloadModel.mockClear()
+  removeModel.mockClear()
   generateText.mockClear()
   streamText.mockClear()
   cancelStream.mockClear()
+})
+
+describe('core ai model config', () => {
+  test('names a model after its folder or .aimodel without an id', () => {
+    expect(coreAI({ source: '/models/qwen3-0.6b/' }).modelId).toBe('qwen3-0.6b')
+    expect(coreAI.imageModel({ source: 'bundle://flux2' }).modelId).toBe(
+      'flux2'
+    )
+    expect(
+      coreAI.embeddingModel({ source: 'file:///m/clip.aimodel' }).modelId
+    ).toBe('clip')
+    expect(coreAI({ source: 'file:///m/my%20model/' }).modelId).toBe('my model')
+    expect(coreAI({ source: '/m/my%20model' }).modelId).toBe('my%20model')
+    expect(createModel().modelId).toBe('model')
+  })
+
+  test('passes the config to native with its task', async () => {
+    await createModel().doGenerate(createCallOptions())
+
+    expect(loadModel.mock.calls.at(-1)).toEqual([
+      { id: 'model', source: 'bundle://m', task: 'language' },
+      {},
+    ])
+  })
 })
 
 describe('core ai language model', () => {
@@ -161,6 +250,47 @@ describe('core ai language model', () => {
     expect(loadModel).toHaveBeenCalledTimes(2)
   })
 
+  test('unloads the model before removing its files', async () => {
+    const model = createModel()
+    await model.doGenerate(createCallOptions())
+    const modelHandle = generateText.mock.calls[0]![1]
+
+    await model.remove()
+    expect(unloadModel).toHaveBeenCalledWith(modelHandle)
+    expect(removeModel).toHaveBeenCalledTimes(1)
+    expect(unloadModel.mock.invocationCallOrder[0]!).toBeLessThan(
+      removeModel.mock.invocationCallOrder[0]!
+    )
+    expect(model.modelHandle).toBeUndefined()
+  })
+
+  test('waits for a removal before loading again', async () => {
+    const model = createModel()
+    await model.prepare()
+    let finishRemoval: () => void = () => {}
+    removeModel.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRemoval = resolve
+        })
+    )
+
+    const removal = model.remove()
+    const loading = model.prepare()
+    while (removeModel.mock.calls.length === 0) {
+      await Promise.resolve()
+    }
+    expect(loadModel).toHaveBeenCalledTimes(1)
+
+    finishRemoval()
+    await removal
+    await loading
+    expect(loadModel).toHaveBeenCalledTimes(2)
+    expect(removeModel.mock.invocationCallOrder[0]!).toBeLessThan(
+      loadModel.mock.invocationCallOrder[1]!
+    )
+  })
+
   test('passes session instructions to native', async () => {
     await createModel().createSession({ instructions: 'Be brief.' })
 
@@ -183,11 +313,10 @@ describe('core ai language model', () => {
     })
   })
 
-  test('returns reasoning and leaves out tool parts', async () => {
+  test('returns reasoning and text', async () => {
     generateText.mockImplementationOnce(async () => ({
       content: [
         { type: 'reasoning', id: 'r1', text: 'Thinking' },
-        { type: 'tool-call', toolCallId: 't1', toolName: 'x', input: '{}' },
         { type: 'text', text: 'Answer' },
       ],
       usage,
@@ -203,6 +332,7 @@ describe('core ai language model', () => {
       },
       { type: 'text', text: 'Answer' },
     ])
+    expect(result.finishReason).toEqual({ unified: 'stop', raw: 'stop' })
   })
 
   test('streams text deltas from native response snapshots', async () => {
@@ -255,6 +385,26 @@ describe('core ai language model', () => {
     ])
   })
 
+  test('keeps the native error code on stream errors', async () => {
+    const { stream } = await createModel().doStream(createCallOptions())
+    const parts = readAll(stream)
+
+    const streamId = await waitForStreamId()
+    onStreamError.emit({
+      streamId,
+      code: 'CORE_AI_UNSUPPORTED_CAPABILITY',
+      error: 'No guided generation.',
+    })
+
+    const error = (await parts).find((part) => part.type === 'error')
+    expect(error).toMatchObject({
+      error: {
+        message: 'No guided generation.',
+        code: 'CORE_AI_UNSUPPORTED_CAPABILITY',
+      },
+    })
+  })
+
   test('cancels the native request when generation is aborted', async () => {
     let rejectGeneration: (error: Error) => void = () => {}
     generateText.mockImplementationOnce(
@@ -305,13 +455,6 @@ describe('core ai language model warnings', () => {
         presencePenalty: 0.5,
         frequencyPenalty: 0.5,
         stopSequences: ['END'],
-        tools: [
-          {
-            type: 'function',
-            name: 'weather',
-            inputSchema: { type: 'object', properties: {} },
-          },
-        ],
       })
     )
 
@@ -326,11 +469,11 @@ describe('core ai language model warnings', () => {
       'presencePenalty',
       'frequencyPenalty',
       'stopSequences',
-      'tools',
     ])
     expect(generateText.mock.calls[0]![3]).toEqual({
       maxTokens: undefined,
       temperature: undefined,
+      tools: [],
       providerOptions: {},
     })
   })
@@ -377,6 +520,194 @@ describe('core ai language model warnings', () => {
       type: 'stream-start',
       warnings: [{ type: 'unsupported', feature: 'topK' }],
     })
+  })
+})
+
+describe('core ai tool calling', () => {
+  const weatherTool = {
+    type: 'function' as const,
+    name: 'getWeather',
+    description: 'Gets the weather in a city',
+    inputSchema: {
+      type: 'object' as const,
+      properties: { city: { type: 'string' as const } },
+      required: ['city'],
+    },
+  }
+  const toolCall = {
+    type: 'tool-call',
+    toolCallId: 'call-1',
+    toolName: 'getWeather',
+    input: '{"city":"Paris"}',
+  }
+
+  test('passes function tools to native', async () => {
+    await createModel().doGenerate(createCallOptions({ tools: [weatherTool] }))
+
+    expect(generateText.mock.calls[0]![3].tools).toEqual([
+      {
+        name: 'getWeather',
+        description: 'Gets the weather in a city',
+        inputSchema: weatherTool.inputSchema,
+      },
+    ])
+  })
+
+  test('returns tool calls for the AI SDK to run', async () => {
+    generateText.mockImplementationOnce(async () => ({
+      content: [{ type: 'reasoning', id: 'r1', text: 'Weather' }, toolCall],
+    }))
+
+    const result = await createModel().doGenerate(
+      createCallOptions({ tools: [weatherTool] })
+    )
+
+    expect(result.content).toEqual([
+      {
+        type: 'reasoning',
+        text: 'Weather',
+        providerMetadata: { 'core-ai': {} },
+      },
+      {
+        type: 'tool-call',
+        toolCallId: 'call-1',
+        toolName: 'getWeather',
+        input: '{"city":"Paris"}',
+      },
+    ])
+    expect(result.finishReason).toEqual({
+      unified: 'tool-calls',
+      raw: 'tool-calls',
+    })
+  })
+
+  test('replays tool calls and results as transcript parts', async () => {
+    await createModel().doGenerate(
+      createCallOptions({
+        tools: [weatherTool],
+        prompt: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'Weather in Paris?' }],
+          },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'call-1',
+                toolName: 'getWeather',
+                input: { city: 'Paris' },
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: 'call-1',
+                toolName: 'getWeather',
+                output: { type: 'json', value: { temperature: 21 } },
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    expect(generateText.mock.calls[0]![2]).toEqual([
+      { role: 'user', content: 'Weather in Paris?', attachments: [] },
+      { role: 'assistant', content: '', parts: [toolCall] },
+      {
+        role: 'tool',
+        content: '',
+        parts: [
+          {
+            type: 'tool-result',
+            toolCallId: 'call-1',
+            toolName: 'getWeather',
+            output: '{"temperature":21}',
+          },
+        ],
+      },
+    ])
+  })
+
+  test('streams tool calls once generation ends', async () => {
+    const { stream } = await createModel().doStream(
+      createCallOptions({ tools: [weatherTool] })
+    )
+    const parts = readAll(stream)
+
+    const streamId = await waitForStreamId()
+    onStreamUpdate.emit({
+      streamId,
+      content: '',
+      entries: [{ type: 'reasoning', id: 'r1', text: 'Weather' }],
+    })
+    onStreamUpdate.emit({
+      streamId,
+      content: '',
+      entries: [{ type: 'reasoning', id: 'r1', text: 'Weather' }, toolCall],
+    })
+    onStreamComplete.emit({ streamId, usage })
+
+    const allParts = await parts
+    expect(allParts.map((part) => part.type)).toEqual([
+      'stream-start',
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-end',
+      'tool-call',
+      'finish',
+    ])
+    expect(allParts.at(-2)).toEqual({
+      type: 'tool-call',
+      toolCallId: 'call-1',
+      toolName: 'getWeather',
+      input: '{"city":"Paris"}',
+    })
+    expect(allParts.at(-1)).toMatchObject({
+      finishReason: { unified: 'tool-calls' },
+    })
+  })
+
+  test('leaves tools out when the tool choice is none', async () => {
+    await createModel().doGenerate(
+      createCallOptions({ tools: [weatherTool], toolChoice: { type: 'none' } })
+    )
+
+    expect(generateText.mock.calls[0]![3].tools).toEqual([])
+  })
+
+  test('only offers the chosen tool and warns that it is not required', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({
+        tools: [weatherTool, { ...weatherTool, name: 'getTime' }],
+        toolChoice: { type: 'tool', toolName: 'getTime' },
+      })
+    )
+
+    expect(generateText.mock.calls[0]![3].tools).toMatchObject([
+      { name: 'getTime' },
+    ])
+    expect(result.warnings).toMatchObject([
+      { type: 'unsupported', feature: 'toolChoice' },
+    ])
+  })
+
+  test('warns about provider-defined tools', async () => {
+    const result = await createModel().doGenerate(
+      createCallOptions({
+        tools: [{ type: 'provider', id: 'apple.ocr', name: 'ocr', args: {} }],
+      })
+    )
+
+    expect(generateText.mock.calls[0]![3].tools).toEqual([])
+    expect(result.warnings).toMatchObject([
+      { type: 'unsupported', feature: 'provider-defined tool apple.ocr' },
+    ])
   })
 })
 
@@ -464,5 +795,306 @@ describe('core ai reasoning', () => {
 
     expect(lastReasoningLevel()).toBeUndefined()
     expect(result.warnings).toEqual([])
+  })
+})
+
+describe('core ai streaming transcription', () => {
+  const createTranscriptionModel = () =>
+    coreAI.transcriptionModel({
+      id: 'parakeet',
+      source: '/parakeet',
+    })
+
+  const audioStream = (chunks: (Uint8Array | string)[]) =>
+    new ReadableStream<Uint8Array | string>({
+      start(controller) {
+        chunks.forEach((chunk) => controller.enqueue(chunk))
+        controller.close()
+      },
+    })
+
+  const update = (
+    streamId: string,
+    type: string,
+    segmentIndex: number,
+    text: string
+  ) =>
+    onTranscriptionUpdate.emit({
+      streamId,
+      type,
+      segmentIndex,
+      text,
+      startSecond: segmentIndex,
+      endSecond: segmentIndex + 0.5,
+    })
+
+  beforeEach(() => {
+    startTranscriptionStream.mockClear()
+    appendTranscriptionAudio.mockClear()
+    finishTranscriptionStream.mockClear()
+  })
+
+  test('sends whole 16-bit samples at the input rate', async () => {
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([1, 2, 3]), btoa('\x04')]),
+      inputAudioFormat: { type: 'audio/pcm', rate: 24000 },
+    })
+    await readAll(stream)
+
+    expect(startTranscriptionStream.mock.calls[0][2]).toEqual({
+      sampleRate: 24000,
+    })
+    // The odd byte of the first chunk is carried into the second
+    expect(appendTranscriptionAudio.mock.calls.map(([, pcm]) => pcm)).toEqual([
+      btoa('\x01\x02'),
+      btoa('\x03\x04'),
+    ])
+  })
+
+  test('streams what each update adds and closes segments', async () => {
+    appendTranscriptionAudio.mockImplementationOnce(async (streamId) => {
+      update(streamId, 'partial', 0, 'Hello')
+      update(streamId, 'partial', 0, 'Hello world')
+      update(streamId, 'final', 0, 'Hello world.')
+      update(streamId, 'partial', 1, ' How')
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([0, 0])]),
+      inputAudioFormat: { type: 'audio/pcm' },
+    })
+    const parts = await readAll(stream)
+
+    expect(startTranscriptionStream.mock.calls[0][2]).toEqual({
+      sampleRate: 16000,
+    })
+    expect(parts.filter(({ type }) => type === 'transcript-delta')).toEqual([
+      { type: 'transcript-delta', id: 'segment-0', delta: 'Hello' },
+      { type: 'transcript-delta', id: 'segment-0', delta: ' world' },
+      { type: 'transcript-delta', id: 'segment-0', delta: '.' },
+      { type: 'transcript-delta', id: 'segment-1', delta: ' How' },
+    ])
+    expect(parts.filter(({ type }) => type === 'transcript-final')).toEqual([
+      {
+        type: 'transcript-final',
+        id: 'segment-0',
+        text: 'Hello world.',
+        startSecond: 0,
+        endSecond: 0.5,
+      },
+    ])
+    expect(parts.at(-1)).toEqual({
+      type: 'finish',
+      text: 'hello world',
+      segments: transcriptionResult.segments,
+      durationInSeconds: 1,
+      providerMetadata: { 'core-ai': transcriptionResult.metadata },
+    })
+  })
+
+  test('cancels the native stream when the audio fails', async () => {
+    appendTranscriptionAudio.mockImplementationOnce(async () => {
+      throw new Error('model busy')
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([0, 0])]),
+      inputAudioFormat: { type: 'audio/pcm' },
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('model busy')
+    expect(cancelStream).toHaveBeenCalled()
+    expect(finishTranscriptionStream).not.toHaveBeenCalled()
+  })
+
+  test('cancels the audio source when transcription fails', async () => {
+    startTranscriptionStream.mockImplementationOnce(async () => {
+      throw new Error('no model')
+    })
+    let cancelReason: unknown
+    const audio = new ReadableStream<Uint8Array>({
+      cancel(reason) {
+        cancelReason = reason
+      },
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio,
+      inputAudioFormat: { type: 'audio/pcm' },
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('no model')
+    expect(cancelReason).toEqual(new Error('no model'))
+    expect(audio.locked).toBe(false)
+  })
+
+  test('does not start with an aborted signal', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      createTranscriptionModel().doStream({
+        audio: audioStream([]),
+        inputAudioFormat: { type: 'audio/pcm' },
+        abortSignal: controller.signal,
+      })
+    ).rejects.toThrow()
+    expect(startTranscriptionStream).not.toHaveBeenCalled()
+  })
+
+  test('errors when aborted while finishing', async () => {
+    const controller = new AbortController()
+    finishTranscriptionStream.mockImplementationOnce(async () => {
+      controller.abort(new Error('stopped'))
+      return transcriptionResult
+    })
+
+    const { stream } = await createTranscriptionModel().doStream({
+      audio: audioStream([new Uint8Array([0, 0])]),
+      inputAudioFormat: { type: 'audio/pcm' },
+      abortSignal: controller.signal,
+    })
+
+    await expect(readAll(stream)).rejects.toThrow('stopped')
+  })
+
+  test('rejects audio that is not pcm', async () => {
+    await expect(
+      createTranscriptionModel().doStream({
+        audio: audioStream([]),
+        inputAudioFormat: { type: 'audio/pcmu', rate: 8000 },
+      })
+    ).rejects.toThrow('audio/pcm')
+  })
+})
+
+describe('core ai embeddings', () => {
+  const embeddingModel = () =>
+    coreAI.embeddingModel({
+      id: 'clip',
+      source: '/clip',
+    })
+
+  test('passes core-ai provider options and returns the metadata', async () => {
+    const result = await embeddingModel().doEmbed({
+      values: ['a cat'],
+      providerOptions: { 'core-ai': { batchSize: 4 } },
+    })
+
+    expect(embed.mock.calls.at(-1)![1]).toEqual(['a cat'])
+    expect(embed.mock.calls.at(-1)![2]).toEqual({ batchSize: 4 })
+    expect(result.embeddings).toEqual([[0.6, 0.8]])
+    expect(result.providerMetadata).toEqual({ 'core-ai': { dimensions: 2 } })
+  })
+
+  test('embeds images as a batch through the embedding task', async () => {
+    const result = await embeddingModel().embedImages(['file:///a.jpg'])
+
+    const [task, config, input] = runTask.mock.calls.at(-1)!
+    expect(task).toBe('embedding')
+    expect(config).toMatchObject({ source: '/clip', task: 'embedding' })
+    expect(input).toEqual({ data: { imageUris: ['file:///a.jpg'] } })
+    expect(result.embeddings).toEqual([[1, 0]])
+  })
+})
+
+describe('core ai video generation', () => {
+  const videoModel = () => coreAI.videoModel({ id: 'wan', source: '/wan' })
+
+  const callOptions = (overrides: object = {}) => ({
+    prompt: 'a cat',
+    n: 1,
+    aspectRatio: undefined,
+    resolution: undefined,
+    duration: undefined,
+    fps: undefined,
+    seed: undefined,
+    image: undefined,
+    frameImages: undefined,
+    inputReferences: undefined,
+    generateAudio: undefined,
+    providerOptions: {},
+    ...overrides,
+  })
+
+  const lastOptions = () => generateVideo.mock.calls.at(-1)![3]
+
+  test('returns the mp4 and its metadata', async () => {
+    const result = await videoModel().doGenerate(callOptions())
+
+    expect(result.videos).toEqual([
+      { type: 'base64', data: 'AAAA', mediaType: 'video/mp4' },
+    ])
+    expect(result.providerMetadata).toEqual({
+      'core-ai': {
+        uri: 'file:///tmp/video.mp4',
+        width: 832,
+        height: 480,
+        frameCount: 17,
+        fps: 16,
+        seed: 1,
+      },
+    })
+    expect(result.warnings).toEqual([])
+  })
+
+  test('maps resolution, duration, fps and seed', async () => {
+    await videoModel().doGenerate(
+      callOptions({
+        resolution: '320x192',
+        duration: 2,
+        fps: 8,
+        seed: 7,
+        providerOptions: { 'core-ai': { stepCount: 4 } },
+      })
+    )
+
+    expect(lastOptions()).toEqual({
+      width: 320,
+      height: 192,
+      duration: 2,
+      fps: 8,
+      seed: 7,
+      stepCount: 4,
+    })
+  })
+
+  test('maps known aspect ratios and warns about others', async () => {
+    await videoModel().doGenerate(callOptions({ aspectRatio: '9:16' }))
+    expect(lastOptions()).toMatchObject({ width: 480, height: 832 })
+
+    const { warnings } = await videoModel().doGenerate(
+      callOptions({ aspectRatio: '4:3' })
+    )
+    expect(warnings).toEqual([
+      expect.objectContaining({ type: 'unsupported', feature: 'aspectRatio' }),
+    ])
+  })
+
+  test('warns about image and audio inputs', async () => {
+    const { warnings } = await videoModel().doGenerate(
+      callOptions({
+        image: { type: 'url', url: 'https://example.com/a.png' },
+        generateAudio: true,
+      })
+    )
+
+    expect(warnings).toEqual([
+      expect.objectContaining({ feature: 'image' }),
+      expect.objectContaining({ feature: 'generateAudio' }),
+    ])
+  })
+
+  test('cancels the native request on abort', async () => {
+    const controller = new AbortController()
+    generateVideo.mockImplementationOnce(async (requestId) => {
+      controller.abort()
+      expect(cancelStream).toHaveBeenCalledWith(requestId)
+      throw new Error('cancelled')
+    })
+
+    await expect(
+      videoModel().doGenerate(callOptions({ abortSignal: controller.signal }))
+    ).rejects.toThrow('cancelled')
   })
 })

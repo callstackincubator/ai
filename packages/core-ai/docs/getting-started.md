@@ -58,6 +58,10 @@ By default the pod links native support for every task the module implements. Ea
 | `diffusion`        | `coreAI.imageModel(...)`                  | `CoreAIDiffusion`       |
 | `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
 | `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
+| `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
+
+| `video-segmentation` | `CoreAI.runTask('video-segmentation', ...)` | `CoreAIVideoSegmentation` |
+| `video-diffusion`  | `coreAI.videoModel(...)`                  | `CoreAIVideoDiffusion`  |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 
@@ -77,7 +81,7 @@ CORE_AI_TASKS=language npx pod-install
 
 Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 
-Supported today: text generation, image generation, segmentation, and object detection. Embeddings, transcription, depth, super-resolution, and classification are tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
+Supported today: text generation, image generation, segmentation, object detection, super-resolution, classification, depth estimation, and text and image embeddings. Transcription is tracked in [#237](https://github.com/callstackincubator/ai/issues/237).
 
 ## First iOS Model
 
@@ -95,8 +99,7 @@ import { streamText } from 'ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 
 const result = streamText({

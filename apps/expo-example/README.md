@@ -37,7 +37,7 @@ Run `npx expo prebuild --clean` without it to go back to the default build.
 
 The model picker then lists **Core AI qwen3-0.6b**, which downloads (~460 MB) from [an iOS export](https://huggingface.co/grabbou/qwen3-0.6b-CoreAI) made with the [`apple/coreai-models`](https://github.com/apple/coreai-models) recipe.
 
-The tests in [`harness/core-ai`](../../harness/core-ai) are part of the [device tests](#on-device-tests). They download Qwen3 0.6B and the [YOLOS-tiny](https://huggingface.co/grabbou/yolos-tiny-CoreAI) and [EfficientSAM-Ti](https://huggingface.co/grabbou/EfficientSAM-Ti-CoreAI) exports on the first run.
+The tests in [`harness/core-ai`](../../harness/core-ai) are part of the [device tests](#on-device-tests). They download Qwen3 0.6B and the [YOLOS-tiny](https://huggingface.co/grabbou/yolos-tiny-CoreAI), [EfficientSAM-Ti](https://huggingface.co/grabbou/EfficientSAM-Ti-CoreAI) and [Parakeet TDT 0.6B v3](https://huggingface.co/grabbou/parakeet-tdt-0.6b-v3-CoreAI) exports on the first run.
 
 ### Private Cloud Compute (iOS 27 devices)
 

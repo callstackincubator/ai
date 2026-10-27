@@ -30,12 +30,35 @@ import CoreAILanguageModels
 import CoreAIObjectDetector
 #endif
 
+#if canImport(CoreAISpeech)
+import AVFoundation
+import CoreAISpeech
+#endif
+
+#if canImport(CoreAIVideoSegmenter)
+import CoreAIVideoSegmenter
+#endif
+
+#if canImport(CoreAIVideoDiffusionPipeline)
+import CoreAIVideoDiffusionPipeline
+#endif
+
 @objc
 public class CoreAIImpl: NSObject {
   private let lock = NSLock()
   private var loadedModels: [String: Any] = [:]
   private var languageSessions: [String: LanguageSessionEntry] = [:]
   private var tasks: [String: Task<Void, Never>] = [:]
+  // The speech model last used, by bundle path, since loading one compiles
+  // and warms its graphs. One stays loaded, so switching models releases the
+  // last one
+  private var loadedSpeechModel: (path: String, load: Any)?
+  private var transcriptionStreams: [String: Any] = [:]
+  // Streams whose speech model is still loading, until they start or cancel
+  private var pendingTranscriptionStreams: Set<String> = []
+  // Paths of speech models with a transcription running, since a model runs
+  // one at a time
+  private var busySpeechModels: Set<String> = []
 
   @objc
   public func getCapabilities(
@@ -56,6 +79,15 @@ public class CoreAIImpl: NSObject {
 #if !canImport(CoreAIObjectDetector)
     missingProducts.append("CoreAIObjectDetection")
 #endif
+#if !canImport(CoreAISpeech)
+    missingProducts.append("CoreAISpeech")
+#endif
+#if !canImport(CoreAIVideoSegmenter)
+    missingProducts.append("CoreAIVideoSegmentation")
+#endif
+#if !canImport(CoreAIVideoDiffusionPipeline)
+    missingProducts.append("CoreAIVideoDiffusion")
+#endif
 
     resolve([
       "isCoreAIRuntimeAvailable": Self.isCoreAIRuntimeAvailable(),
@@ -63,6 +95,9 @@ public class CoreAIImpl: NSObject {
       "isCoreAIDiffusionAvailable": Self.isCoreAIDiffusionAvailable(),
       "isCoreAISegmentationAvailable": Self.isCoreAISegmentationAvailable(),
       "isCoreAIObjectDetectionAvailable": Self.isCoreAIObjectDetectionAvailable(),
+      "isCoreAISpeechAvailable": Self.isCoreAISpeechAvailable(),
+      "isCoreAIVideoSegmentationAvailable": Self.isCoreAIVideoSegmentationAvailable(),
+      "isCoreAIVideoDiffusionAvailable": Self.isCoreAIVideoDiffusionAvailable(),
       "supportedPlatform": Self.isSupportedPlatform(),
       "missingProducts": missingProducts
     ])
@@ -80,12 +115,33 @@ public class CoreAIImpl: NSObject {
       let exists = FileManager.default.fileExists(atPath: sourceURL.path, isDirectory: &isDirectory)
       let attributes = try? FileManager.default.attributesOfItem(atPath: sourceURL.path)
       let size = attributes?[.size] as? NSNumber
-
-      resolve(modelInfo(config: config, metadata: [
+      var info = modelInfo(config: config, metadata: [
         "exists": exists,
         "isDirectory": isDirectory.boolValue,
         "path": sourceURL.path
-      ], size: size))
+      ], size: size)
+
+#if canImport(CoreAI)
+      // A single .aimodel asset describes its functions. Bundles of several
+      // assets, such as diffusion pipelines, are described by their task
+      if #available(iOS 27, macOS 27, *), AIModelAsset.isValid(at: sourceURL) {
+        Task {
+          do {
+            let model = try await AIModel(contentsOf: sourceURL)
+            info["functions"] = Self.describeFunctions(of: model)
+          } catch {
+            // The file metadata still describes the model, so the load error
+            // goes with it
+            var metadata = info["metadata"] as? [String: Any] ?? [:]
+            metadata["functionsError"] = error.localizedDescription
+            info["metadata"] = metadata
+          }
+          resolve(info)
+        }
+        return
+      }
+#endif
+      resolve(info)
     } catch {
       reject(errorCode(error), error.localizedDescription, error)
     }
@@ -112,6 +168,9 @@ public class CoreAIImpl: NSObject {
       return
     case "object-detection":
       loadObjectDetectionModel(config, options: options, resolve: resolve, reject: reject)
+      return
+    case "raw":
+      loadRawModel(config, options: options, resolve: resolve, reject: reject)
       return
     default:
       break
@@ -353,6 +412,18 @@ public class CoreAIImpl: NSObject {
   public func cancelStream(_ streamId: String) {
     let task = locked { tasks.removeValue(forKey: streamId) }
     task?.cancel()
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      // A stream still starting is torn down once it starts
+      let stream = locked { () -> Any? in
+        pendingTranscriptionStreams.remove(streamId)
+        return transcriptionStreams.removeValue(forKey: streamId)
+      } as? TranscriptionStream
+      if let stream {
+        Task { await stream.cancel() }
+      }
+    }
+#endif
   }
 
   @objc
@@ -363,7 +434,26 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    rejectCoreAI(.unsupportedTask("embedding"), reject: reject)
+#if canImport(CoreAI) && canImport(CoreAIShared)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        Task {
+          do {
+            resolve(try await Embeddings.embed(texts: values, sourceURL: sourceURL, options: options ?? [:]))
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
   }
 
   @objc
@@ -375,7 +465,203 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    rejectCoreAI(.unsupportedTask("asr"), reject: reject)
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        guard let audio = Data(base64Encoded: audioBase64) else {
+          throw CoreAIError.invalidInput("Expected base64 encoded audio.")
+        }
+        try claimSpeechModel(at: sourceURL)
+        Task {
+          defer { self.releaseSpeechModel(at: sourceURL) }
+          do {
+            let model = try await self.speechModel(at: sourceURL)
+            let sampleRate = await model.sampleRate
+            let pcm = try Self.loadPCM(audio, mediaType: mediaType, sampleRate: sampleRate)
+            resolve(try await Self.transcribe(pcm, with: model))
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  /// Starts transcribing live audio, pushed with appendTranscriptionAudio as
+  /// 16-bit PCM at options.sampleRate. Needs a streaming Parakeet TDT bundle
+  @objc
+  public func startTranscriptionStream(
+    _ streamId: String,
+    config: [String: Any],
+    options: [String: Any]?,
+    onUpdate: @escaping ([String: Any]) -> Void,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        let inputSampleRate = options?["sampleRate"] as? Double ?? 16_000
+        try claimSpeechModel(at: sourceURL)
+        locked { _ = pendingTranscriptionStreams.insert(streamId) }
+        Task {
+          var stream: TranscriptionStream?
+          do {
+            let model = try await self.speechModel(at: sourceURL)
+            let started = try await TranscriptionStream(model: model, inputSampleRate: inputSampleRate) { update in
+              onUpdate(update.merging(["streamId": streamId]) { current, _ in current })
+            } onEnd: {
+              self.releaseSpeechModel(at: sourceURL)
+            }
+            stream = started
+            // cancelStream during startup removes the pending stream
+            let isCancelled = self.locked { () -> Bool in
+              guard self.pendingTranscriptionStreams.remove(streamId) != nil else { return true }
+              self.transcriptionStreams[streamId] = started
+              return false
+            }
+            if isCancelled {
+              await started.cancel()
+              throw CoreAIError.cancelled
+            }
+            resolve(nil)
+          } catch {
+            self.locked { _ = self.pendingTranscriptionStreams.remove(streamId) }
+            if stream == nil {
+              // A stream that started releases the model when it ends
+              self.releaseSpeechModel(at: sourceURL)
+            }
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  @objc
+  public func appendTranscriptionAudio(
+    _ streamId: String,
+    pcmBase64: String,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      guard let stream = locked({ transcriptionStreams[streamId] }) as? TranscriptionStream else {
+        rejectCoreAI(.invalidInput("Core AI transcription stream was not found: \(streamId)."), reject: reject)
+        return
+      }
+      guard let audio = Data(base64Encoded: pcmBase64) else {
+        rejectCoreAI(.invalidInput("Expected base64 encoded 16-bit PCM."), reject: reject)
+        return
+      }
+      Task {
+        do {
+          try await stream.append(audio)
+          resolve(nil)
+        } catch {
+          // A failed append cancels the stream, so its ID is free again. An
+          // append rejected while the stream finishes leaves it cancellable
+          let hasEnded = await stream.hasEnded
+          self.locked {
+            guard hasEnded else { return }
+            if self.transcriptionStreams[streamId] as? TranscriptionStream === stream {
+              self.transcriptionStreams.removeValue(forKey: streamId)
+            }
+          }
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  /// Transcribes the audio still buffered and resolves with the transcript
+  @objc
+  public func finishTranscriptionStream(
+    _ streamId: String,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAISpeech)
+    if #available(iOS 27, macOS 27, *) {
+      // The stream stays registered while it decodes the buffered tail, so
+      // cancelStream can still stop it
+      guard let stream = locked({ transcriptionStreams[streamId] }) as? TranscriptionStream else {
+        rejectCoreAI(.invalidInput("Core AI transcription stream was not found: \(streamId)."), reject: reject)
+        return
+      }
+      Task {
+        do {
+          let result = try await stream.finish()
+          self.locked { _ = self.transcriptionStreams.removeValue(forKey: streamId) }
+          resolve(result)
+        } catch {
+          // A second finish is rejected while the first one runs, which
+          // keeps the stream registered and cancellable
+          if await stream.hasEnded {
+            self.locked { _ = self.transcriptionStreams.removeValue(forKey: streamId) }
+          }
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAISpeech"), reject: reject)
+#endif
+  }
+
+  /// Generates a video into an MP4 file. Takes minutes on device, so
+  /// cancelStream(requestId) stops it after the current denoising step
+  @objc
+  public func generateVideo(
+    _ requestId: String,
+    config: [String: Any],
+    prompt: String,
+    options: [String: Any]?,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAIVideoDiffusionPipeline)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        startTask(requestId, onError: { _, code, message in
+          reject(code, message, nil)
+        }) {
+          resolve(try await VideoGeneration.generate(prompt: prompt, sourceURL: sourceURL, options: options ?? [:]))
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.missingSwiftPackage("CoreAIVideoDiffusion"), reject: reject)
+#endif
   }
 
   @objc
@@ -434,6 +720,76 @@ public class CoreAIImpl: NSObject {
       runSegmentationTask(config: config, input: input, options: options, resolve: resolve, reject: reject)
     case "object-detection":
       runObjectDetectionTask(config: config, input: input, options: options, resolve: resolve, reject: reject)
+    case "video-segmentation":
+#if canImport(CoreAIVideoSegmenter)
+      if #available(iOS 27, macOS 27, *) {
+        do {
+          let sourceURL = try resolveSourceURL(config)
+          Task {
+            do {
+              resolve(try await VideoSegmentation.run(sourceURL: sourceURL, input: input, options: options ?? [:]))
+            } catch {
+              reject(errorCode(error), error.localizedDescription, error)
+            }
+          }
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      } else {
+        rejectCoreAI(.unsupportedOS, reject: reject)
+      }
+#else
+      rejectCoreAI(.missingSwiftPackage("CoreAIVideoSegmentation"), reject: reject)
+#endif
+    case "embedding":
+#if canImport(CoreAI) && canImport(CoreAIShared)
+      if #available(iOS 27, macOS 27, *) {
+        do {
+          let sourceURL = try resolveSourceURL(config)
+          // One image, or a batch of them under data.imageUris
+          let uris = ((input["data"] as? [String: Any])?["imageUris"] as? [String]) ?? (input["imageUri"] as? String).map { [$0] } ?? []
+          guard !uris.isEmpty else {
+            throw CoreAIError.invalidInput("Expected input.imageUri or input.data.imageUris for image embeddings.")
+          }
+          Task {
+            do {
+              let output = try await Embeddings.embed(imageUris: uris, sourceURL: sourceURL, options: options ?? [:])
+              resolve(["task": "embedding", "output": output])
+            } catch {
+              reject(errorCode(error), error.localizedDescription, error)
+            }
+          }
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      } else {
+        rejectCoreAI(.unsupportedOS, reject: reject)
+      }
+#else
+      rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
+    case "super-resolution", "classification", "depth":
+#if canImport(CoreAI)
+      if #available(iOS 27, macOS 27, *) {
+        do {
+          let sourceURL = try resolveSourceURL(config)
+          let image = try Self.loadCGImage(from: input)
+          Task {
+            do {
+              resolve(try await VisionTask.run(task, sourceURL: sourceURL, image: image, options: options ?? [:]))
+            } catch {
+              reject(errorCode(error), error.localizedDescription, error)
+            }
+          }
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      } else {
+        rejectCoreAI(.unsupportedOS, reject: reject)
+      }
+#else
+      rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
     default:
       rejectCoreAI(.unsupportedTask(task), reject: reject)
     }
@@ -448,7 +804,67 @@ public class CoreAIImpl: NSObject {
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
-    rejectCoreAI(.unsupportedTask("raw"), reject: reject)
+#if canImport(CoreAI)
+    if #available(iOS 27, macOS 27, *) {
+      guard let model = locked({ loadedModels[modelHandle] }) as? RawModel else {
+        rejectCoreAI(.modelNotLoaded(modelHandle), reject: reject)
+        return
+      }
+      Task {
+        do {
+          let outputs = try await model.run(
+            functionName,
+            inputs: inputs,
+            keepsHalfPrecision: options?["outputDataType"] as? String == "native"
+          )
+          resolve(["outputs": outputs])
+        } catch {
+          reject(errorCode(error), error.localizedDescription, error)
+        }
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
+  }
+
+  private func loadRawModel(
+    _ config: [String: Any],
+    options: [String: Any]?,
+    resolve: @escaping (Any?) -> Void,
+    reject: @escaping (String, String, Error?) -> Void
+  ) {
+#if canImport(CoreAI)
+    if #available(iOS 27, macOS 27, *) {
+      do {
+        let sourceURL = try resolveSourceURL(config)
+        guard AIModelAsset.isValid(at: sourceURL) else {
+          throw CoreAIError.invalidInput("\(sourceURL.lastPathComponent) is not a valid .aimodel asset.")
+        }
+        let specialization = try RawModel.specializationOptions(options)
+        Task {
+          do {
+            let model = try await AIModel(contentsOf: sourceURL, options: specialization)
+            let handle = self.makeHandle("model")
+            self.locked { self.loadedModels[handle] = RawModel(model: model) }
+            var info = self.modelInfo(config: config)
+            info["functions"] = Self.describeFunctions(of: model)
+            resolve(["modelHandle": handle, "info": info])
+          } catch {
+            reject(errorCode(error), error.localizedDescription, error)
+          }
+        }
+      } catch {
+        reject(errorCode(error), error.localizedDescription, error)
+      }
+    } else {
+      rejectCoreAI(.unsupportedOS, reject: reject)
+    }
+#else
+    rejectCoreAI(.unsupportedOS, reject: reject)
+#endif
   }
 
   private func loadLanguageModel(
@@ -678,23 +1094,25 @@ public class CoreAIImpl: NSObject {
 #endif
   }
 
+  // A path, a file:// URL, or bundle:// and a path in the app bundle
   private func resolveSourceURL(_ config: [String: Any]) throws -> URL {
-    if let sourceUri = config["sourceUri"] as? String {
-      if sourceUri.hasPrefix("file://") {
-        return URL(string: sourceUri) ?? URL(fileURLWithPath: sourceUri.replacingOccurrences(of: "file://", with: ""))
-      }
-      return URL(fileURLWithPath: sourceUri)
+    guard let source = config["source"] as? String, !source.isEmpty else {
+      throw CoreAIError.missingSource("The model config has no source.")
     }
 
-    if let bundleName = config["bundleName"] as? String {
-      let ext = config["bundleExtension"] as? String
-      let subdirectory = config["bundleSubdirectory"] as? String
-      if let url = Bundle.main.url(forResource: bundleName, withExtension: ext, subdirectory: subdirectory) {
-        return url
+    if source.hasPrefix("bundle://") {
+      let path = String(source.dropFirst("bundle://".count))
+      guard let url = Bundle.main.resourceURL?.appendingPathComponent(path),
+            FileManager.default.fileExists(atPath: url.path) else {
+        throw CoreAIError.missingSource("The app bundle has no \(path).")
       }
+      return url
     }
 
-    throw CoreAIError.missingSource
+    if source.hasPrefix("file://") {
+      return URL(string: source) ?? URL(fileURLWithPath: source.replacingOccurrences(of: "file://", with: ""))
+    }
+    return URL(fileURLWithPath: source)
   }
 
   private func modelInfo(
@@ -703,8 +1121,7 @@ public class CoreAIImpl: NSObject {
     size: NSNumber? = nil
   ) -> [String: Any] {
     var info: [String: Any] = [
-      "id": config["id"] as? String ?? "unknown",
-      "family": config["family"] as? String ?? "",
+      "id": config["id"] as? String ?? Self.modelName(of: config["source"] as? String ?? ""),
       "task": config["task"] as? String ?? "unknown",
       "platforms": ["iOS", "macOS"],
       "functions": [],
@@ -714,6 +1131,24 @@ public class CoreAIImpl: NSObject {
       info["modelSizeBytes"] = size
     }
     return info
+  }
+
+  // The folder or .aimodel name, like getModelId in JS
+  private static func modelName(of source: String) -> String {
+    var name = source
+    while name.hasSuffix("/") {
+      name.removeLast()
+    }
+    name = name.components(separatedBy: "/").last ?? name
+    // file:// URLs are percent-encoded, unlike paths
+    if source.hasPrefix("file://") {
+      name = name.removingPercentEncoding ?? name
+    }
+    for suffix in [".aimodelc", ".aimodel"] where name.hasSuffix(suffix) {
+      name.removeLast(suffix.count)
+      break
+    }
+    return name.isEmpty ? source : name
   }
 
   private func makeHandle(_ prefix: String) -> String {
@@ -781,6 +1216,30 @@ public class CoreAIImpl: NSObject {
     return false
 #endif
   }
+
+  private static func isCoreAISpeechAvailable() -> Bool {
+#if canImport(CoreAISpeech)
+    return isSupportedPlatform()
+#else
+    return false
+#endif
+  }
+
+  private static func isCoreAIVideoSegmentationAvailable() -> Bool {
+#if canImport(CoreAIVideoSegmenter)
+    return isSupportedPlatform()
+#else
+    return false
+#endif
+  }
+
+  private static func isCoreAIVideoDiffusionAvailable() -> Bool {
+#if canImport(CoreAIVideoDiffusionPipeline)
+    return isSupportedPlatform()
+#else
+    return false
+#endif
+  }
 }
 
 #if canImport(CoreAIDiffusionPipeline)
@@ -802,7 +1261,7 @@ extension CoreAIImpl {
     let defaults = pipeline.config
     let scheduler = SchedulerType(rawValue: options?["schedulerType"] as? String ?? "") ?? .discreteFlow
     let decodeResolution = DecodeResolution(rawValue: options?["decodeResolution"] as? String ?? "full") ?? .full
-    let seed = UInt32(options?["seed"] as? Double ?? 0)
+    let seed = try Self.seed(from: options?["seed"])
     let stepCount = (options?["stepCount"] as? Double).map(Int.init) ?? defaults.defaultSteps ?? 50
     let guidanceScale = (options?["guidanceScale"] as? Double).map(Float.init) ?? defaults.defaultGuidanceScale ?? 7.5
 
@@ -939,6 +1398,346 @@ extension CoreAIImpl {
 }
 #endif
 
+#if canImport(CoreAISpeech)
+@available(iOS 27, macOS 27, *)
+extension CoreAIImpl {
+  /// Marks the speech model as transcribing. A second transcription on it
+  /// would fail to start its stream and fall back to a single window
+  private func claimSpeechModel(at sourceURL: URL) throws {
+    let claimed = locked { busySpeechModels.insert(sourceURL.path).inserted }
+    guard claimed else {
+      throw CoreAIError.invalidInput("This speech model is already transcribing. Wait for that transcription to finish, or cancel it.")
+    }
+  }
+
+  private func releaseSpeechModel(at sourceURL: URL) {
+    locked { _ = busySpeechModels.remove(sourceURL.path) }
+  }
+
+  // Concurrent calls for the same bundle share one load
+  private func speechModel(at sourceURL: URL) async throws -> SpeechRecognitionModel {
+    let load = locked { () -> Task<SpeechRecognitionModel, Error> in
+      if let cached = loadedSpeechModel, cached.path == sourceURL.path,
+         let load = cached.load as? Task<SpeechRecognitionModel, Error> {
+        return load
+      }
+      let load = Task { try await SpeechRecognitionModel(resourcesAt: sourceURL) }
+      loadedSpeechModel = (sourceURL.path, load)
+      return load
+    }
+    do {
+      return try await load.value
+    } catch {
+      // A failed load is retried on the next call
+      locked {
+        if loadedSpeechModel?.load as? Task<SpeechRecognitionModel, Error> == load {
+          loadedSpeechModel = nil
+        }
+      }
+      throw error
+    }
+  }
+
+  /// Streaming bundles slide their window over audio of any length and close
+  /// segments at pauses. Other bundles transcribe only as much audio as their
+  /// traced window holds, in one segment
+  private static func transcribe(_ pcm: [Float], with model: SpeechRecognitionModel) async throws -> [String: Any] {
+    let sampleRate = await model.sampleRate
+    let stream: TranscriptionStream
+    do {
+      stream = try await TranscriptionStream(model: model, inputSampleRate: sampleRate, onUpdate: nil)
+    } catch SpeechError.incompatibleResources, SpeechError.invalidStreamingConfig {
+      let durationInSeconds = Double(pcm.count) / sampleRate
+      let (text, _) = try await model.transcribe(pcm: pcm)
+      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      return [
+        "text": trimmed,
+        "segments": trimmed.isEmpty ? [] : [["text": trimmed, "startSecond": 0, "endSecond": durationInSeconds]],
+        "durationInSeconds": durationInSeconds,
+        "metadata": ["architecture": await model.architecture, "streaming": false]
+      ]
+    }
+
+    // One second at a time, as a microphone would push it
+    let chunkSize = Int(sampleRate)
+    for start in stride(from: 0, to: pcm.count, by: chunkSize) {
+      try await stream.append(samples: Array(pcm[start..<min(start + chunkSize, pcm.count)]))
+    }
+    return try await stream.finish()
+  }
+
+  /// Decodes audio to mono float PCM at the model's sample rate
+  private static func loadPCM(_ audio: Data, mediaType: String, sampleRate: Double) throws -> [Float] {
+    // AVAudioFile reads from files and picks the decoder by extension
+    let fileURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("core-ai-audio-\(UUID().uuidString)")
+      .appendingPathExtension(audioExtension(for: mediaType))
+    try audio.write(to: fileURL)
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+
+    let file: AVAudioFile
+    do {
+      file = try AVAudioFile(forReading: fileURL)
+    } catch {
+      throw CoreAIError.invalidInput("Could not decode \(mediaType) audio: \(error.localizedDescription)")
+    }
+    guard let outputFormat = AVAudioFormat(
+      commonFormat: .pcmFormatFloat32,
+      sampleRate: sampleRate,
+      channels: 1,
+      interleaved: false
+    ),
+      let converter = AVAudioConverter(from: file.processingFormat, to: outputFormat),
+      let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
+    else {
+      throw CoreAIError.invalidInput("Could not convert \(mediaType) audio to \(Int(sampleRate)) Hz mono.")
+    }
+    try file.read(into: input)
+
+    let capacity = AVAudioFrameCount(Double(input.frameLength) * sampleRate / file.processingFormat.sampleRate) + 1024
+    guard let output = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else {
+      throw CoreAIError.invalidInput("Could not allocate the audio buffer.")
+    }
+    var consumed = false
+    var conversionError: NSError?
+    converter.convert(to: output, error: &conversionError) { _, status in
+      if consumed {
+        status.pointee = .endOfStream
+        return nil
+      }
+      consumed = true
+      status.pointee = .haveData
+      return input
+    }
+    if let conversionError {
+      throw CoreAIError.invalidInput("Could not convert \(mediaType) audio: \(conversionError.localizedDescription)")
+    }
+    guard let samples = output.floatChannelData?[0] else {
+      return []
+    }
+    return Array(UnsafeBufferPointer(start: samples, count: Int(output.frameLength)))
+  }
+
+  fileprivate static func serializeSegment(_ segment: TranscriptSegment, type: String) -> [String: Any] {
+    return [
+      "type": type,
+      "segmentIndex": segment.segmentIndex,
+      "text": segment.text,
+      "startSecond": segment.startTime,
+      "endSecond": segment.endTime
+    ]
+  }
+
+  private static func audioExtension(for mediaType: String) -> String {
+    switch mediaType.lowercased() {
+    case "audio/mpeg", "audio/mp3":
+      return "mp3"
+    case "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/aac":
+      return "m4a"
+    case "audio/flac", "audio/x-flac":
+      return "flac"
+    case "audio/x-caf", "audio/caf":
+      return "caf"
+    case "audio/aiff", "audio/x-aiff":
+      return "aiff"
+    default:
+      return "wav"
+    }
+  }
+}
+
+/// One streaming session on a speech model. Partial updates are append-only
+/// and segments close at pauses. A model runs one session at a time
+@available(iOS 27, macOS 27, *)
+private actor TranscriptionStream {
+  private let model: SpeechRecognitionModel
+  private let sampleRate: Double
+  private let architecture: String
+  // Resamples pushed audio to the model's rate, keeping filter state across chunks
+  private let converter: AVAudioConverter?
+  private let collector: Task<[[String: Any]], Error>
+  private var sampleCount = 0
+  // Called once, when the stream finishes or is cancelled
+  private var onEnd: (() -> Void)?
+  private enum State { case running, finishing, ended }
+  private var state = State.running
+
+  var hasEnded: Bool { state == .ended }
+
+  init(
+    model: SpeechRecognitionModel,
+    inputSampleRate: Double,
+    onUpdate: (([String: Any]) -> Void)?,
+    onEnd: (() -> Void)? = nil
+  ) async throws {
+    self.model = model
+    self.onEnd = onEnd
+    self.sampleRate = await model.sampleRate
+    self.architecture = await model.architecture
+
+    if inputSampleRate != sampleRate {
+      guard let inputFormat = AVAudioFormat(
+        commonFormat: .pcmFormatFloat32, sampleRate: inputSampleRate, channels: 1, interleaved: false),
+        let outputFormat = AVAudioFormat(
+          commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false),
+        let converter = AVAudioConverter(from: inputFormat, to: outputFormat)
+      else {
+        throw CoreAIError.invalidInput("Could not resample \(Int(inputSampleRate)) Hz audio to \(Int(sampleRate)) Hz.")
+      }
+      self.converter = converter
+    } else {
+      self.converter = nil
+    }
+
+    let updates = try await model.startStream()
+    self.collector = Task {
+      var segments: [[String: Any]] = []
+      for try await update in updates {
+        switch update {
+        case .partial(let segment):
+          onUpdate?(CoreAIImpl.serializeSegment(segment, type: "partial"))
+        case .finalized(let segment):
+          onUpdate?(CoreAIImpl.serializeSegment(segment, type: "final"))
+          let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+          if !text.isEmpty {
+            segments.append(["text": text, "startSecond": segment.startTime, "endSecond": segment.endTime])
+          }
+        }
+      }
+      return segments
+    }
+  }
+
+  /// Appends 16-bit little-endian mono PCM
+  func append(_ pcm16: Data) async throws {
+    guard pcm16.count % 2 == 0 else {
+      throw CoreAIError.invalidInput("Expected 16-bit PCM, got an odd number of bytes.")
+    }
+    let samples = pcm16.withUnsafeBytes { bytes in
+      bytes.bindMemory(to: Int16.self).map { Float(Int16(littleEndian: $0)) / 32_768 }
+    }
+    try await append(samples: samples)
+  }
+
+  func append(samples: [Float]) async throws {
+    guard state == .running else {
+      throw CoreAIError.invalidInput("The transcription stream is finishing or has ended, so it takes no more audio.")
+    }
+    do {
+      let resampled = try resample(samples, isLast: false)
+      sampleCount += resampled.count
+      try await model.append(pcm: resampled)
+    } catch {
+      await cancel()
+      throw error
+    }
+  }
+
+  func finish() async throws -> [String: Any] {
+    // Only cancel() can run on the session while it finishes
+    guard state == .running else {
+      throw CoreAIError.invalidInput("The transcription stream is already finishing or has ended.")
+    }
+    state = .finishing
+    do {
+      let tail = try resample([], isLast: true)
+      if !tail.isEmpty {
+        sampleCount += tail.count
+        try await model.append(pcm: tail)
+      }
+    } catch {
+      // The tail failed before the finalizer ran, so it runs once here
+      _ = try? await model.finishStream()
+      collector.cancel()
+      end()
+      throw error
+    }
+    do {
+      try await model.finishStream()
+    } catch {
+      // The finalizer already ran and isn't repeated. If it left the session
+      // open, the model's next startStream reports that
+      collector.cancel()
+      end()
+      throw error
+    }
+    defer { end() }
+    let segments = try await collector.value
+    return [
+      "text": segments.compactMap { $0["text"] as? String }.joined(separator: " "),
+      "segments": segments,
+      "durationInSeconds": Double(sampleCount) / sampleRate,
+      "metadata": ["architecture": architecture, "streaming": true]
+    ]
+  }
+
+  // A session left running would make the model's next startStream throw.
+  // Once the stream has ended, the model may run a newer session, so this
+  // does nothing
+  func cancel() async {
+    switch state {
+    case .ended:
+      return
+    case .finishing:
+      // finish() is already finalizing the session, and ends the stream once
+      // that returns, so this only stops collecting its transcript
+      collector.cancel()
+    case .running:
+      _ = try? await model.finishStream()
+      collector.cancel()
+      end()
+    }
+  }
+
+  private func end() {
+    state = .ended
+    onEnd?()
+    onEnd = nil
+  }
+
+  private func resample(_ samples: [Float], isLast: Bool) throws -> [Float] {
+    guard let converter else {
+      return samples
+    }
+    let input = AVAudioPCMBuffer(pcmFormat: converter.inputFormat, frameCapacity: AVAudioFrameCount(max(samples.count, 1)))
+    let ratio = converter.outputFormat.sampleRate / converter.inputFormat.sampleRate
+    let output = AVAudioPCMBuffer(
+      pcmFormat: converter.outputFormat,
+      frameCapacity: AVAudioFrameCount(Double(samples.count) * ratio) + 1024
+    )
+    guard let input, let output else {
+      throw CoreAIError.invalidInput("Could not allocate the audio buffer.")
+    }
+    samples.withUnsafeBufferPointer { pointer in
+      if let baseAddress = pointer.baseAddress {
+        input.floatChannelData?[0].update(from: baseAddress, count: samples.count)
+      }
+    }
+    input.frameLength = AVAudioFrameCount(samples.count)
+
+    var consumed = samples.isEmpty
+    var conversionError: NSError?
+    converter.convert(to: output, error: &conversionError) { _, status in
+      if consumed {
+        // More audio follows unless this is the last call, which flushes the filter
+        status.pointee = isLast ? .endOfStream : .noDataNow
+        return nil
+      }
+      consumed = true
+      status.pointee = .haveData
+      return input
+    }
+    if let conversionError {
+      throw CoreAIError.invalidInput("Could not resample audio: \(conversionError.localizedDescription)")
+    }
+    guard let channel = output.floatChannelData?[0] else {
+      return []
+    }
+    return Array(UnsafeBufferPointer(start: channel, count: Int(output.frameLength)))
+  }
+}
+#endif
+
 #if canImport(CoreAIObjectDetector)
 extension CoreAIImpl {
   private func makeDetectionParameters(options: [String: Any]?) -> DetectionParameters {
@@ -970,7 +1769,7 @@ extension CoreAIImpl {
 #endif
 
 extension CoreAIImpl {
-  private static func loadCGImage(from input: [String: Any]) throws -> CGImage {
+  static func loadCGImage(from input: [String: Any]) throws -> CGImage {
     guard let imageUri = input["imageUri"] as? String else {
       throw CoreAIError.invalidInput("Expected input.imageUri for this Core AI task.")
     }
@@ -1001,7 +1800,21 @@ extension CoreAIImpl {
     return image
   }
 
-  private static func pngBase64(_ image: CGImage) throws -> String {
+  /// A 32-bit diffusion seed: the given number truncated and wrapped to 32
+  /// bits, or a random one when none is given
+  static func seed(from option: Any?) throws -> UInt32 {
+    guard let value = (option as? NSNumber)?.doubleValue else {
+      return UInt32.random(in: 0...UInt32.max)
+    }
+    guard value.isFinite else {
+      throw CoreAIError.invalidInput("seed must be a finite number, got \(value).")
+    }
+    // The remainder is below 2^32 in magnitude, so it fits in an Int64
+    let wrapped = value.rounded(.towardZero).truncatingRemainder(dividingBy: 4_294_967_296)
+    return UInt32(truncatingIfNeeded: Int64(wrapped))
+  }
+
+  static func pngBase64(_ image: CGImage) throws -> String {
     let data = NSMutableData()
     guard let destination = CGImageDestinationCreateWithData(
       data,
@@ -1097,16 +1910,28 @@ private struct LanguageModelRequest {
   let generationOptions: GenerationOptions
   let contextOptions: ContextOptions
   let schema: GenerationSchema?
+  let toolCalls: ToolCallRecorder
 
   init(model: CoreAILanguageModel, messages: [[String: Any]], options: [String: Any]) throws {
-    // Tool calling is not wired up for Core AI yet, so the session has no tools
-    let (transcript, prompt, attachments) = try AppleLLMImpl.createTranscriptAndPrompt(from: messages, tools: [])
+    let toolCalls = ToolCallRecorder()
+    let tools = try (options["tools"] as? [[String: Any]] ?? []).map {
+      try DeferredTool($0, toolCalls: toolCalls)
+    }
+    // After tool results the conversation continues without a new user message.
+    // Core AI leaves empty prompts out of the chat template, so the model answers
+    // the tool results
+    var messages = messages
+    if messages.last?["role"] as? String != "user" {
+      messages.append(["role": "user", "content": ""])
+    }
+    let (transcript, prompt, attachments) = try AppleLLMImpl.createTranscriptAndPrompt(from: messages, tools: tools)
     guard attachments.isEmpty else {
       throw CoreAIError.invalidInput("Core AI language models do not accept image prompts yet.")
     }
 
     let schema = try AppleLLMImpl.createGenerationSchema(from: options)
-    self.session = LanguageModelSession(model: model, tools: [], transcript: transcript)
+    self.session = LanguageModelSession(model: model, tools: tools, transcript: transcript)
+    self.toolCalls = toolCalls
     self.prompt = prompt
     self.generationOptions = try AppleLLMImpl.createGenerationOptions(from: options)
     var providerOptions = options["providerOptions"] as? [String: Any] ?? [:]
@@ -1128,31 +1953,47 @@ private struct LanguageModelRequest {
 
   func respond() async throws -> [String: Any] {
     let prompt = self.prompt
+    let replayedEntryCount = session.transcript.count
 
-    if let schema {
-      let response = try await session.respond(
-        schema: schema,
-        options: generationOptions,
-        contextOptions: contextOptions
-      ) {
+    do {
+      if let schema {
+        let response = try await session.respond(
+          schema: schema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          prompt
+        }
+        // The JSON comes from the generated content rather than the response entry
+        let content = AppleLLMTranscriptSerializer.serialize(response.transcriptEntries, includeResponses: false)
+          + [["type": "text", "text": response.rawContent.jsonString]]
+        return ["content": content, "usage": CoreAIImpl.serializeUsage(response.usage)]
+      }
+
+      let response = try await session.respond(options: generationOptions, contextOptions: contextOptions) {
         prompt
       }
-      // The JSON comes from the generated content rather than the response entry
-      let content = AppleLLMTranscriptSerializer.serialize(response.transcriptEntries, includeResponses: false)
-        + [["type": "text", "text": response.rawContent.jsonString]]
-      return ["content": content, "usage": CoreAIImpl.serializeUsage(response.usage)]
+      return ["content": response.toModelMessages(), "usage": CoreAIImpl.serializeUsage(response.usage)]
+    } catch where !toolCalls.parts.isEmpty && !Task.isCancelled {
+      // The response has no usage, since generation ended at the tool call
+      return ["content": generatedEntries(after: replayedEntryCount, includeResponses: true)]
     }
+  }
 
-    let response = try await session.respond(options: generationOptions, contextOptions: contextOptions) {
-      prompt
-    }
-    return ["content": response.toModelMessages(), "usage": CoreAIImpl.serializeUsage(response.usage)]
+  /// Entries the session generated, then the tool calls that ended it. The
+  /// transcript leaves out tool calls whose tool threw, so they are recorded
+  private func generatedEntries(after replayedEntryCount: Int, includeResponses: Bool) -> [[String: Any]] {
+    let entries = session.transcript.dropFirst(replayedEntryCount)
+    return AppleLLMTranscriptSerializer.serialize(entries, includeResponses: includeResponses)
+      .filter { $0["type"] as? String != "tool-call" } + toolCalls.parts
   }
 
   /// Sends snapshots of the response text, plus the reasoning entries when they
   /// change, and returns the usage of the response
   func stream(onUpdate: @escaping (String, [[String: Any]]?) -> Void) async throws -> [String: Any]? {
     let prompt = self.prompt
+    let replayedEntryCount = session.transcript.count
+    var previousContent = ""
     var previousEntries: NSArray = []
     var usage: LanguageModelSession.Usage?
 
@@ -1160,39 +2001,99 @@ private struct LanguageModelRequest {
       let entries = AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: false)
       let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
       previousEntries = entries as NSArray
+      previousContent = content
       onUpdate(content, entriesChanged ? entries : nil)
     }
 
-    if let schema {
-      let responseStream = session.streamResponse(
-        schema: schema,
-        options: generationOptions,
-        contextOptions: contextOptions
-      ) {
-        prompt
+    do {
+      if let schema {
+        let responseStream = session.streamResponse(
+          schema: schema,
+          options: generationOptions,
+          contextOptions: contextOptions
+        ) {
+          prompt
+        }
+        var json = ""
+        for try await chunk in responseStream {
+          try Task.checkCancellation()
+          // Partial JSON is not a prefix of the final JSON, so it is sent once complete
+          update("", chunk.transcriptEntries)
+          json = chunk.rawContent.jsonString
+          usage = chunk.usage
+        }
+        onUpdate(json, nil)
+      } else {
+        let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
+          prompt
+        }
+        for try await chunk in responseStream {
+          try Task.checkCancellation()
+          update(chunk.content, chunk.transcriptEntries)
+          usage = chunk.usage
+        }
       }
-      var json = ""
-      for try await chunk in responseStream {
-        try Task.checkCancellation()
-        // Partial JSON is not a prefix of the final JSON, so it is sent once complete
-        update("", chunk.transcriptEntries)
-        json = chunk.rawContent.jsonString
-        usage = chunk.usage
-      }
-      onUpdate(json, nil)
-    } else {
-      let responseStream = session.streamResponse(options: generationOptions, contextOptions: contextOptions) {
-        prompt
-      }
-      for try await chunk in responseStream {
-        try Task.checkCancellation()
-        update(chunk.content, chunk.transcriptEntries)
-        usage = chunk.usage
-      }
+    } catch where !toolCalls.parts.isEmpty && !Task.isCancelled {
+      // Sends the tool calls that ended the generation as entries
+      onUpdate(previousContent, generatedEntries(after: replayedEntryCount, includeResponses: false))
     }
 
     return usage.map(CoreAIImpl.serializeUsage)
   }
+}
+
+/// Tool calls of a generation, as AI SDK tool-call parts
+private final class ToolCallRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var calls: [[String: Any]] = []
+
+  var parts: [[String: Any]] {
+    lock.withLock { calls }
+  }
+
+  func record(toolName: String, input: String) {
+    lock.withLock {
+      calls.append([
+        "type": "tool-call",
+        "toolCallId": UUID().uuidString,
+        "toolName": toolName,
+        "input": input,
+      ])
+    }
+  }
+}
+
+/// An AI SDK function tool. The AI SDK runs tools itself, so a tool call is
+/// recorded and ends the generation. The results are replayed as tool outputs
+/// on the next call
+@available(iOS 27, macOS 27, *)
+private struct DeferredTool: Tool {
+  let name: String
+  let description: String
+  let parameters: GenerationSchema
+  let toolCalls: ToolCallRecorder
+
+  init(_ definition: [String: Any], toolCalls: ToolCallRecorder) throws {
+    guard let name = definition["name"] as? String else {
+      throw CoreAIError.invalidInput("Tools must have a name.")
+    }
+    self.name = name
+    self.toolCalls = toolCalls
+    self.description = definition["description"] as? String ?? ""
+    self.parameters = try AppleLLMImpl.createGenerationSchema(
+      fromSchema: definition["inputSchema"] as? [String: Any] ?? ["type": "object", "properties": [:]],
+      name: name
+    )
+  }
+
+  func call(arguments: GeneratedContent) async throws -> String {
+    toolCalls.record(toolName: name, input: arguments.jsonString)
+    // Foundation Models wraps the error, so the recorded calls tell that
+    // generation ended at a tool call
+    throw ToolCallRequested()
+  }
+
+  struct ToolCallRequested: Error {}
 }
 #endif
 
