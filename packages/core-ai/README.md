@@ -19,7 +19,7 @@ built into iOS (Apple Intelligence, system speech and embeddings), use
 
 As a Vercel AI SDK provider:
 
-- Text generation and streaming with language models
+- Text generation, streaming and tool calling with language models
 - Image generation
 - Video generation with `experimental_generateVideo`
 - Transcription

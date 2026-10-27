@@ -122,19 +122,15 @@ const { text } = await generateText({
 Run model bundles exported with
 [`apple/coreai-models`](https://github.com/apple/coreai-models), such as Qwen3
 or FLUX.2, on iOS 27 with Apple's Core AI framework. Supports text and image
-generation through the AI SDK, plus native APIs for segmentation and object
-detection.
+generation, transcription and embeddings through the AI SDK, plus native APIs
+for segmentation, object detection and other vision tasks.
 
 ```ts
 import { coreAI } from '@react-native-ai/core-ai'
 import { streamText } from 'ai'
 
 const result = streamText({
-  model: coreAI.languageModel({
-    id: 'qwen3-0.6b',
-    source: { type: 'file', uri: qwen3ModelDirectory },
-    variant: 'iOS',
-  }),
+  model: coreAI.languageModel({ source: qwen3ModelDirectory }),
   prompt: 'Explain Core AI in one sentence.',
 })
 ```
