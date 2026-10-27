@@ -9,19 +9,21 @@ public class DeviceStatsModule: Module {
   private let queue = DispatchQueue(label: "com.callstack.ai.device-stats")
   private var timer: DispatchSourceTimer?
   private var peak: UInt64 = 0
+  private var worstThermalState = ProcessInfo.ThermalState.nominal
+
+  // Runs on queue
+  private func recordThermalState() {
+    let state = ProcessInfo.processInfo.thermalState
+    if state.rawValue > worstThermalState.rawValue {
+      worstThermalState = state
+    }
+  }
 
   public func definition() -> ModuleDefinition {
     Name("DeviceStats")
 
-    // nominal, fair, serious or critical. iOS throttles from serious on
     Function("getThermalState") { () -> String in
-      switch ProcessInfo.processInfo.thermalState {
-      case .nominal: return "nominal"
-      case .fair: return "fair"
-      case .serious: return "serious"
-      case .critical: return "critical"
-      @unknown default: return "unknown"
-      }
+      thermalStateName(ProcessInfo.processInfo.thermalState)
     }
 
     Function("isLowPowerModeEnabled") { () -> Bool in
@@ -37,17 +39,20 @@ public class DeviceStatsModule: Module {
       Double(readVMInfo()?.ledger_phys_footprint_peak ?? 0)
     }
 
-    // Samples the footprint on a background queue until stopSampling, which
-    // returns the highest sample
+    // Samples the footprint and thermal state on a background queue until
+    // stopSampling, which returns the highest footprint. The device can
+    // throttle in the middle of a run and recover before it ends
     Function("startSampling") { (intervalMs: Int) in
       self.queue.sync {
         self.timer?.cancel()
         self.peak = readVMInfo()?.phys_footprint ?? 0
+        self.worstThermalState = ProcessInfo.processInfo.thermalState
         let timer = DispatchSource.makeTimerSource(queue: self.queue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(intervalMs))
         timer.setEventHandler { [weak self] in
           guard let self, let footprint = readVMInfo()?.phys_footprint else { return }
           self.peak = max(self.peak, footprint)
+          self.recordThermalState()
         }
         timer.resume()
         self.timer = timer
@@ -59,9 +64,26 @@ public class DeviceStatsModule: Module {
         self.timer?.cancel()
         self.timer = nil
         self.peak = max(self.peak, readVMInfo()?.phys_footprint ?? 0)
+        self.recordThermalState()
         return Double(self.peak)
       }
     }
+
+    // The worst thermal state of the last sampling window
+    Function("getSampledThermalState") { () -> String in
+      self.queue.sync { thermalStateName(self.worstThermalState) }
+    }
+  }
+}
+
+// nominal, fair, serious or critical. iOS throttles from serious on
+private func thermalStateName(_ state: ProcessInfo.ThermalState) -> String {
+  switch state {
+  case .nominal: return "nominal"
+  case .fair: return "fair"
+  case .serious: return "serious"
+  case .critical: return "critical"
+  @unknown default: return "unknown"
   }
 }
 

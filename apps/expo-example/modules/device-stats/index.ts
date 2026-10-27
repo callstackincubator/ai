@@ -7,6 +7,8 @@ type DeviceStatsModule = {
   getLifetimePeakFootprint(): number
   startSampling(intervalMs: number): void
   stopSampling(): number
+  // The worst thermal state while sampling
+  getSampledThermalState(): ThermalState
   getThermalState(): ThermalState
   isLowPowerModeEnabled(): boolean
 }
