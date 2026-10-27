@@ -249,6 +249,14 @@ public class CoreAIImpl: NSObject {
         rejectCoreAI(.modelNotLoaded(modelHandle), reject: reject)
         return
       }
+      // Session prompts are text, which the VLM engine rejects without an image
+      if model is CoreAIVisionLanguageModel {
+        rejectCoreAI(
+          .invalidInput("Vision language models answer image prompts through generateText and streamText, not sessions."),
+          reject: reject
+        )
+        return
+      }
 
       let session = LanguageModelSession(model: model, instructions: options?["instructions"] as? String)
       let sessionHandle = makeHandle("session")
@@ -1947,6 +1955,12 @@ private struct LanguageModelRequest {
     }
 
     let schema = try AppleLLMImpl.createGenerationSchema(from: options)
+    // The VLM engine has no guided generation
+    if schema != nil, model is CoreAIVisionLanguageModel {
+      throw CoreAIError.unsupportedCapability(
+        "Vision language models do not support structured output (responseFormat with a schema)."
+      )
+    }
     self.session = LanguageModelSession(model: model, tools: tools, transcript: transcript)
     self.toolCalls = toolCalls
     self.prompt = prompt

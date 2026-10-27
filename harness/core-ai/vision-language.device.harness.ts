@@ -1,5 +1,6 @@
-import { generateText, streamText } from 'ai'
+import { generateText, Output, streamText } from 'ai'
 import { beforeAll, describe, expect, it } from 'react-native-harness'
+import { z } from 'zod'
 
 import { base64ToBytes, cats } from '../fixtures'
 import {
@@ -73,5 +74,20 @@ describe('core-ai vision language model', () => {
     if (streamError) throw new Error(String(streamError))
     expect(chunks.length).toBeGreaterThan(1)
     expect(chunks.join('')).toMatch(/cat/i)
+  })
+
+  it('rejects structured output', async () => {
+    await expect(
+      generateText({
+        ...ask(base64ToBytes(cats), 'What animals are in this picture?'),
+        output: Output.object({ schema: z.object({ animal: z.string() }) }),
+      })
+    ).rejects.toMatchObject({ code: 'CORE_AI_UNSUPPORTED_CAPABILITY' })
+  })
+
+  it('rejects native sessions, whose prompts are text only', async () => {
+    await expect(model().createSession()).rejects.toMatchObject({
+      code: 'CORE_AI_INVALID_INPUT',
+    })
   })
 })
