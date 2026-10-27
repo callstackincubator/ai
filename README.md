@@ -26,11 +26,12 @@ work with cloud ones.
 
 Use the AI built into iOS: Apple Intelligence for text generation,
 NLContextualEmbedding for embeddings, SpeechAnalyzer for transcription and
-AVSpeechSynthesizer for speech. Your app has nothing to bundle or download, the
-models ship with the system.
+AVSpeechSynthesizer for speech. The models ship with the system, so your app
+has nothing to bundle, although iOS may download model assets the first time
+they are used.
 
 ```bash
-npm install @react-native-ai/apple
+npm install @react-native-ai/apple ai
 ```
 
 ```ts
@@ -60,7 +61,7 @@ on-device and is provided by the system through AICore, so there are no model
 files and no API key. Cloud Gemini is available when you need a larger model.
 
 ```bash
-npm install @react-native-ai/adk
+npm install @react-native-ai/adk ai
 ```
 
 > [!IMPORTANT]
@@ -91,7 +92,7 @@ Run llama.cpp-compatible GGUF models from Hugging Face on iOS and Android with
 embeddings, reranking and speech.
 
 ```bash
-npm install @react-native-ai/llama llama.rn react-native-blob-util
+npm install @react-native-ai/llama llama.rn react-native-blob-util ai
 ```
 
 ```ts
@@ -110,6 +111,9 @@ const { text } = await generateText({
   model,
   prompt: 'Write a haiku about coding.',
 })
+
+// Release the native context when you no longer need the model
+await model.unload()
 ```
 
 [Package README](./packages/llama) · [Documentation](https://react-native-ai.dev/docs/llama/getting-started)
