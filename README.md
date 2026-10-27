@@ -2,11 +2,16 @@
 
 # React Native AI
 
-Run AI models on users' devices from React Native, with first-class
-[Vercel AI SDK](https://ai-sdk.dev) support. Each provider wraps an on-device
-runtime and exposes it as an AI SDK provider, so `generateText`, `streamText`,
-`embed` and the other AI SDK functions work with local models the same way they
-work with cloud ones.
+**On-device AI for React Native, built on the [Vercel AI SDK](https://ai-sdk.dev).**
+
+React Native AI is a set of packages that run AI models on your users' phones.
+Each provider package wraps one on-device runtime, such as Apple Intelligence on iOS,
+Gemini Nano on Android or llama.cpp on both, and exposes it as an AI SDK
+provider.
+
+You write the same `generateText`, `streamText` or `embed` call you would for a
+cloud model, and it runs locally: no server, no per-request cost, and the data
+never leaves the device.
 
 - 🚀 **Instant AI** - Use the models built into iOS and Android, with nothing to bundle
 - 🔒 **Privacy-first** - Inference runs on-device, so data stays local. Cloud models are opt-in
