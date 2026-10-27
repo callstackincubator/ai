@@ -13,7 +13,7 @@ with, on one iPhone:
 | `executorch-xnnpack.device.benchmark.harness.ts` | `react-native-executorch`, XNNPACK backend |
 | `mlx/` | mlx-swift-lm in a minimal Swift app |
 
-Results are in [RESULTS.md](RESULTS.md).
+Results are in [RESULTS.md](RESULTS.md), with the raw data in `results/`.
 
 ## What is measured
 
