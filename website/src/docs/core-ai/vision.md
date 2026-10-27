@@ -2,12 +2,12 @@
 
 Vision tasks run through `CoreAI.runTask(task, config, input, options)`, since the AI SDK has no API for them. Images are file URIs, and are decoded with their EXIF orientation applied, so coordinates match the image as it is displayed. Super-resolution, classification, depth and video segmentation keep the model last used loaded, while object detection and segmentation load theirs on each call.
 
-These calls take the flat native config, `{ id, sourceType: 'file', sourceUri }`. To reuse a provider config (`{ id, source: { type: 'file', uri } }`), convert it with `toNativeModelConfig(config)`.
+These calls take the same config as the providers, with `source` and an optional `id`.
 
 ```typescript
 import { CoreAI } from '@react-native-ai/core-ai'
 
-const model = { id: 'yolos-tiny', sourceType: 'file', sourceUri: yolosModel }
+const model = { id: 'yolos-tiny', source: yolosModel }
 
 const { output, metadata } = await CoreAI.runTask(
   'object-detection',
@@ -31,8 +31,7 @@ Runs `coreai-models` segmenters (the [hosted EfficientSAM-Ti export](./models#ho
 ```typescript
 const efficientSAM = {
   id: 'efficient-sam',
-  sourceType: 'file',
-  sourceUri: efficientSAMModel,
+  source: efficientSAMModel,
 }
 
 await CoreAI.runTask('segmentation', efficientSAM, {
@@ -45,7 +44,7 @@ await CoreAI.runTask('segmentation', efficientSAM, {
   data: { points: [{ x: 235, y: 100, label: 1 }] },
 })
 
-const sam3 = { id: 'sam3', sourceType: 'file', sourceUri: sam3Model }
+const sam3 = { id: 'sam3', source: sam3Model }
 
 await CoreAI.runTask('segmentation', sam3, { imageUri, text: 'cat' })
 ```
@@ -61,7 +60,7 @@ Finds the objects that text prompts describe in a video, and tracks them from fr
 ```typescript
 const { output } = await CoreAI.runTask(
   'video-segmentation',
-  { id: 'sam3-video', sourceType: 'file', sourceUri: sam3VideoBundle },
+  { id: 'sam3-video', source: sam3VideoBundle },
   { videoUri, data: { prompts: ['cat', 'person'] } },
   { maxFrames: 120, outputVideo: true }
 )
@@ -92,14 +91,14 @@ Classifies an image with a model that takes `[1, 3, height, width]` normalized R
 ```typescript
 const { output } = await CoreAI.runTask(
   'classification',
-  { id: 'pvt-v2-b0', sourceType: 'file', sourceUri: pvtFolder },
+  { id: 'pvt-v2-b0', source: pvtFolder },
   { imageUri },
   { topK: 3 }
 )
 // output.classifications: [{ index: 281, label: 'tabby, tabby cat', confidence: 0.36 }, ...]
 ```
 
-- Class names come from `options.labels`, or a `labels.json` array next to the model. Set `sourceUri` to the folder that contains both the model and `labels.json`
+- Class names come from `options.labels`, or a `labels.json` array next to the model. Set `source` to the folder that contains both the model and `labels.json`
 - `applySoftmax: false` keeps the scores of models that already return probabilities
 
 ## Depth Estimation

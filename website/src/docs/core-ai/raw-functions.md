@@ -6,7 +6,7 @@ Any exported `.aimodel` runs through its functions, for models no task covers. L
 import { CoreAI, createTensor, readTensor } from '@react-native-ai/core-ai'
 
 const { modelHandle, info } = await CoreAI.loadModel(
-  { id: 'edsr-x2', sourceType: 'file', sourceUri: edsrModel, task: 'raw' },
+  { id: 'edsr-x2', source: edsrModel, task: 'raw' },
   {}
 )
 

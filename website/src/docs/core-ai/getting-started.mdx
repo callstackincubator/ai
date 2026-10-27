@@ -117,15 +117,11 @@ import { coreAI } from '@react-native-ai/core-ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: {
-    type: 'file',
-    uri: `${documentDirectory}/coreai-models/qwen3-0.6b`,
-  },
-  variant: 'iOS',
+  source: `${documentDirectory}/coreai-models/qwen3-0.6b`,
 })
 ```
 
-Bundled models use `source: { type: 'bundle', name, extension, subdirectory }`. The [Models](./models) page lists exports hosted on Hugging Face for every task, and how to export your own.
+For a model shipped with the app, use `bundle://` and its path in the app bundle, such as `source: 'bundle://models/qwen3-0.6b'`. `id` is optional: it names the model in AI SDK results and telemetry, and defaults to the folder or `.aimodel` name. The [Models](./models) page lists exports hosted on Hugging Face for every task, and how to export your own.
 
 ## Basic Usage
 

@@ -190,8 +190,7 @@ import { generateImage, streamText, transcribe } from 'ai'
 const result = streamText({
   model: coreAI.languageModel({
     id: 'qwen3-0.6b',
-    source: { type: 'file', uri: qwen3 },
-    variant: 'iOS',
+    source: qwen3,
   }),
   prompt: 'Explain Core AI in one sentence.',
 })
@@ -204,7 +203,7 @@ for await (const delta of result.textStream) {
 const { image } = await generateImage({
   model: coreAI.imageModel({
     id: 'flux2-klein-4b',
-    source: { type: 'file', uri: flux },
+    source: flux,
   }),
   prompt: 'a red apple on a wooden table',
 })
@@ -213,7 +212,7 @@ const { image } = await generateImage({
 const { text } = await transcribe({
   model: coreAI.transcriptionModel({
     id: 'parakeet',
-    source: { type: 'file', uri: parakeet },
+    source: parakeet,
   }),
   audio: recording,
 })

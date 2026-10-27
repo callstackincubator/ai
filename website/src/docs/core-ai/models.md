@@ -1,6 +1,6 @@
 # Models
 
-`@react-native-ai/core-ai` runs `.aimodel` bundles exported with Apple's [`coreai-models`](https://github.com/apple/coreai-models). Apple publishes the export recipes, not the exported files, and the package does not ship a model catalog: your app downloads or bundles the models it uses and passes them as `source: { type: 'file', uri }`.
+`@react-native-ai/core-ai` runs `.aimodel` bundles exported with Apple's [`coreai-models`](https://github.com/apple/coreai-models). Apple publishes the export recipes, not the exported files, and the package does not ship a model catalog: your app downloads or bundles the models it uses and passes their path as `source`.
 
 ## Hosted Exports
 

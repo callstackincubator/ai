@@ -8,8 +8,7 @@ import { generateText, streamText } from 'ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 
 const { text } = await generateText({
@@ -24,7 +23,7 @@ for await (const delta of result.textStream) {
 }
 ```
 
-`variant` is the platform the model was exported for (`iOS` or `macOS`). The model loads on the first call and stays loaded. Call `await model.prepare()` to load it ahead of time, and `await model.unload()` to release it.
+The model loads on the first call and stays loaded. Call `await model.prepare()` to load it ahead of time, and `await model.unload()` to release it.
 
 Every call replays the whole message history into a new native session, so the AI SDK owns the conversation. To keep it inside the model's context window, see [Conversation History](../history).
 
@@ -78,7 +77,7 @@ Vision language model bundles (`kind: "vlm"` in their `metadata.json`), such as 
 ```typescript
 const vision = coreAI.languageModel({
   id: 'qwen3-vl-2b',
-  source: { type: 'file', uri: qwen3VLModelDirectory },
+  source: qwen3VLModelDirectory,
 })
 
 const { text } = await generateText({
