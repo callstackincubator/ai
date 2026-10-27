@@ -1,3 +1,5 @@
+import CoreGraphics
+import CoreVideo
 import Foundation
 
 #if canImport(CoreAI)
@@ -7,7 +9,8 @@ import CoreAI
 /// cross the bridge as `{ dataType, shape, data }`, with `data` holding the
 /// little-endian elements in row-major order as base64. Every call copies its
 /// tensors, so JS never holds native memory, and functions stay loaded with
-/// their weights until the model is unloaded
+/// their weights until the model is unloaded. Image inputs take
+/// `{ imageUri }` instead, decoded into a pixel buffer of the input's size
 @available(iOS 27, macOS 27, *)
 final class RawModel: @unchecked Sendable {
   private let model: AIModel
@@ -30,17 +33,21 @@ final class RawModel: @unchecked Sendable {
     let function = try loadFunction(functionName)
     let descriptor = function.descriptor
 
-    var arrays: [String: NDArray] = [:]
+    var values: [String: InferenceFunction.AsyncValue] = [:]
     for name in descriptor.inputNames {
       guard let tensor = inputs[name] as? [String: Any] else {
         throw CoreAIError.invalidInput(
           "Missing input \"\(name)\" for \(functionName). It takes \(descriptor.inputNames.joined(separator: ", "))."
         )
       }
-      guard case .ndArray(let arrayDescriptor) = descriptor.inputDescriptor(of: name) else {
-        throw CoreAIError.invalidInput("Input \"\(name)\" is an image, which raw function calls do not support yet.")
+      switch descriptor.inputDescriptor(of: name) {
+      case .ndArray(let arrayDescriptor):
+        values[name] = .init(try Self.makeArray(tensor, name: name, descriptor: arrayDescriptor))
+      case .image(let imageDescriptor):
+        values[name] = .init(try Self.makePixelBuffer(tensor, name: name, descriptor: imageDescriptor))
+      default:
+        throw CoreAIError.invalidInput("Input \"\(name)\" has a type raw function calls do not support.")
       }
-      arrays[name] = try Self.makeArray(tensor, name: name, descriptor: arrayDescriptor)
     }
     let unknown = Set(inputs.keys).subtracting(descriptor.inputNames)
     if !unknown.isEmpty {
@@ -49,13 +56,15 @@ final class RawModel: @unchecked Sendable {
       )
     }
 
-    var outputs = try await function.run(inputs: arrays)
+    // Async values own their arrays and pixel buffers, which run's Inputs
+    // would only borrow within one scope
+    let outputs = try function.encode(inputs: values, to: ComputeStream())
     var result: [String: Any] = [:]
     for name in descriptor.outputNames {
-      guard let value = outputs.remove(name) else {
+      guard let value = outputs[name] else {
         throw CoreAIError.invalidInput("\(functionName) returned no output \"\(name)\".")
       }
-      guard let array = value.ndArray else {
+      guard let array = try await value.ndArray else {
         throw CoreAIError.invalidInput("Output \"\(name)\" is an image, which raw function calls do not support yet.")
       }
       result[name] = try Self.serialize(array, keepsHalfPrecision: keepsHalfPrecision)
@@ -131,7 +140,14 @@ extension RawModel {
       // -1 marks a dynamic dimension
       return ["name": name, "dataType": Self.name(of: array.scalarType), "shape": array.shape]
     case .image(let image):
-      return ["name": name, "dataType": "image", "shape": [image.height, image.width]]
+      // -1 marks a dynamic width or height
+      return [
+        "name": name,
+        "dataType": "image",
+        "width": image.width,
+        "height": image.height,
+        "pixelFormat": Self.name(ofPixelFormat: image.pixelFormatType)
+      ]
     case nil:
       return ["name": name]
     }
@@ -189,6 +205,104 @@ extension RawModel {
       }
     }
     return array
+  }
+
+  /// Pixel formats Core AI images take, by the names describeTensor reports
+  static let pixelFormats: [(name: String, type: OSType)] = [
+    ("32BGRA", kCVPixelFormatType_32BGRA),
+    ("32ARGB", kCVPixelFormatType_32ARGB),
+    ("24RGB", kCVPixelFormatType_24RGB),
+    ("420YpCbCr8Planar", kCVPixelFormatType_420YpCbCr8Planar),
+  ]
+
+  static func name(ofPixelFormat type: OSType) -> String {
+    if let name = pixelFormats.first(where: { $0.type == type })?.name {
+      return name
+    }
+    // The four-character code, as Core Video names most formats
+    let bytes = [24, 16, 8, 0].map { UInt8((type >> $0) & 0xFF) }
+    return bytes.allSatisfy({ $0 >= 0x20 && $0 < 0x7F }) ? String(decoding: bytes, as: UTF8.self) : String(type)
+  }
+
+  /// Decodes input.imageUri and draws it stretched to the input's width and
+  /// height, or at its own size along a dynamic dimension
+  private static func makePixelBuffer(
+    _ input: [String: Any],
+    name: String,
+    descriptor: ImageDescriptor
+  ) throws -> CVReadOnlyPixelBuffer {
+    guard input["imageUri"] is String else {
+      throw CoreAIError.invalidInput("Input \"\(name)\" is an image and needs { imageUri }.")
+    }
+    let format = descriptor.pixelFormatType
+    guard [kCVPixelFormatType_32BGRA, kCVPixelFormatType_32ARGB, kCVPixelFormatType_24RGB].contains(format) else {
+      throw CoreAIError.invalidInput(
+        "Input \"\(name)\" takes \(Self.name(ofPixelFormat: format)) images, which raw function calls do not support yet."
+      )
+    }
+    let image = try CoreAIImpl.loadCGImage(from: input)
+    let width = descriptor.width == -1 ? image.width : descriptor.width
+    let height = descriptor.height == -1 ? image.height : descriptor.height
+
+    var buffer: CVPixelBuffer?
+    let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary
+    guard CVPixelBufferCreate(nil, width, height, format, attributes, &buffer) == kCVReturnSuccess,
+          let buffer else {
+      throw CoreAIError.invalidInput("Could not create a \(width)x\(height) pixel buffer for input \"\(name)\".")
+    }
+    try draw(image, into: buffer, name: name)
+    return CVReadOnlyPixelBuffer(unsafeBuffer: buffer)
+  }
+
+  private static func draw(_ image: CGImage, into buffer: CVPixelBuffer, name: String) throws {
+    guard CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess else {
+      throw CoreAIError.invalidInput("Could not lock the pixel buffer for input \"\(name)\".")
+    }
+    defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+    let format = CVPixelBufferGetPixelFormatType(buffer)
+    let width = CVPixelBufferGetWidth(buffer)
+    let height = CVPixelBufferGetHeight(buffer)
+    guard let base = CVPixelBufferGetBaseAddress(buffer) else {
+      throw CoreAIError.invalidInput("The pixel buffer for input \"\(name)\" has no memory to draw into.")
+    }
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+
+    // Core Graphics draws 32-bit pixels only, so 24RGB is drawn as RGBX and
+    // packed after
+    let isPacked = format == kCVPixelFormatType_24RGB
+    let bitmapInfo: CGBitmapInfo = switch format {
+    case kCVPixelFormatType_32BGRA:
+      CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue)
+    case kCVPixelFormatType_32ARGB:
+      CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue)
+    default:
+      CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.noneSkipLast.rawValue)
+    }
+    guard let context = CGContext(
+      data: isPacked ? nil : base,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: isPacked ? 0 : bytesPerRow,
+      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+      bitmapInfo: bitmapInfo.rawValue
+    ) else {
+      throw CoreAIError.invalidInput("Could not draw input \"\(name)\".")
+    }
+    context.interpolationQuality = .high
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+    if isPacked, let pixels = context.data {
+      for row in 0..<height {
+        let source = pixels.advanced(by: row * context.bytesPerRow).assumingMemoryBound(to: UInt8.self)
+        let destination = base.advanced(by: row * bytesPerRow).assumingMemoryBound(to: UInt8.self)
+        for column in 0..<width {
+          destination[column * 3] = source[column * 4]
+          destination[column * 3 + 1] = source[column * 4 + 1]
+          destination[column * 3 + 2] = source[column * 4 + 2]
+        }
+      }
+    }
   }
 
   private static func serialize(_ array: NDArray, keepsHalfPrecision: Bool) throws -> [String: Any] {
