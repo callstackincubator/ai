@@ -4,6 +4,7 @@ import {
   type LlamaLanguageModel,
 } from '@react-native-ai/llama'
 import { tool } from 'ai'
+import * as Device from 'expo-device'
 import { afterAll, beforeAll } from 'react-native-harness'
 import { z } from 'zod'
 
@@ -14,7 +15,8 @@ const PROJECTOR_ID =
 
 // Loads the language model before the tests of a file and unloads it after.
 // Models already on the device are not downloaded again. Without vision, the
-// projector is not loaded, which crashes the Metal driver of iOS simulators
+// projector is not loaded. In iOS simulators the projector runs on the CPU,
+// because loading it on the GPU crashes their Metal driver
 export function setupLanguageModel({ vision = true } = {}) {
   let model: LlamaLanguageModel | undefined
 
@@ -23,7 +25,10 @@ export function setupLanguageModel({ vision = true } = {}) {
       downloadModel(MODEL_ID),
       vision ? downloadModel(PROJECTOR_ID) : undefined,
     ])
-    model = llama.languageModel(modelPath, { projectorPath })
+    model = llama.languageModel(modelPath, {
+      projectorPath,
+      projectorUseGpu: Device.isDevice,
+    })
   })
 
   afterAll(async () => {
