@@ -139,6 +139,29 @@ export function setupEmbeddingModel() {
   })
 }
 
+// Wan 2.1 T2V 1.3B exported for iOS with the coreai-models recipe, 4-bit:
+// the transformer, the UMT5 text encoder and the VAE decoder
+const VIDEO_MODEL = {
+  id: 'wan2.1-t2v-1.3b',
+  repo: 'grabbou/Wan2.1-T2V-1.3B-CoreAI',
+  folder: 'ios',
+}
+
+export function setupVideoModel() {
+  const path = `${CORE_AI_STORAGE_PATH}/${VIDEO_MODEL.id}`
+
+  beforeAll(async () => {
+    if (!(await RNBlobUtil.fs.exists(path))) {
+      await downloadHubFolder(VIDEO_MODEL.repo, VIDEO_MODEL.folder, path)
+    }
+  })
+
+  return coreAI.videoModel({
+    id: VIDEO_MODEL.id,
+    source: { type: 'file', uri: path },
+  })
+}
+
 // Native tasks read images from files, so the fixture is written to one
 export async function writeCatsImage() {
   const path = `${RNBlobUtil.fs.dirs.CacheDir}/harness-cats.jpg`

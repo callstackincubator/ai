@@ -58,7 +58,7 @@ In a bare app, set `platform :ios, '27.0'` in the `Podfile` and the Xcode projec
 
 ### 2. Choose Linked Tasks (optional)
 
-By default the pod links native support for every task: `language` (`CoreAILM`), `diffusion` (`CoreAIDiffusion`), `segmentation` (`CoreAISegmentation`), `object-detection` (`CoreAIObjectDetection`), `asr` (`CoreAISpeech`) and `video-segmentation` (`CoreAIVideoSegmentation`). To link fewer with Expo, pass `tasks` to the config plugin:
+By default the pod links native support for every task: `language` (`CoreAILM`), `diffusion` (`CoreAIDiffusion`), `segmentation` (`CoreAISegmentation`), `object-detection` (`CoreAIObjectDetection`), `asr` (`CoreAISpeech`), `video-segmentation` (`CoreAIVideoSegmentation`) and `video-diffusion` (`CoreAIVideoDiffusion`). To link fewer with Expo, pass `tasks` to the config plugin:
 
 ```json
 {
@@ -89,6 +89,7 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 - Language: `coreAI.languageModel(config)` with `generateText` / `streamText`. Supports message history, structured output with a schema, and the `reasoning` option (`providerOptions['core-ai'].reasoningLevel` wins)
 - Persistent native sessions: `await model.createSession()`, then `session.respond(...)`
 - Image generation: `coreAI.imageModel(config)` with `generateImage`
+- Video generation: `coreAI.videoModel(config)` with `experimental_generateVideo`, on a Wan 2.1 bundle (links `CoreAIVideoDiffusion`)
 - Transcription: `coreAI.transcriptionModel(config)` with `transcribe`, on a Parakeet TDT bundle
 - Text embeddings: `coreAI.embeddingModel(config)` with `embed` / `embedMany`, on a CLIP export folder (`.aimodel` + `tokenizer/`). Images: `model.embedImages(imageUris)`
 - Segmentation and object detection: `CoreAI.runTask('segmentation' | 'object-detection', ...)`

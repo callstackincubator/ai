@@ -61,6 +61,7 @@ By default the pod links native support for every task the module implements. Ea
 | `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
 
 | `video-segmentation` | `CoreAI.runTask('video-segmentation', ...)` | `CoreAIVideoSegmentation` |
+| `video-diffusion`  | `coreAI.videoModel(...)`                  | `CoreAIVideoDiffusion`  |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 

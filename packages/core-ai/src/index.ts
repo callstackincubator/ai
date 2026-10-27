@@ -5,6 +5,7 @@ export {
   CoreAILanguageModel,
   CoreAITextEmbeddingModel,
   CoreAITranscriptionModel,
+  CoreAIVideoModel,
   createCoreAIProvider,
 } from './ai-sdk'
 export { default as CoreAI } from './NativeCoreAI'
@@ -38,6 +39,8 @@ export type {
   CoreAITensorDataType,
   CoreAITensorDescriptor,
   CoreAITranscriptionResult,
+  CoreAIVideoGenerationOptions,
+  CoreAIVideoGenerationResult,
   CoreAIVideoSegmentationOptions,
   CoreAIVideoSegmentationOutput,
   CoreAIVisionTaskOptions,

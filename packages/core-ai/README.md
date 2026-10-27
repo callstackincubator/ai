@@ -22,7 +22,8 @@ Core AI exposes two layers:
   super-resolution, classification, depth estimation, and raw `.aimodel`
   function calls. `specializeModel` returns metadata only.
 
-Reranking, speech generation, and video generation have no adapters, because
+Video generation runs through `coreAI.videoModel(...)` and AI SDK
+`experimental_generateVideo`. Reranking and speech generation have no adapters, because
 `coreai-models` has no runtime for them yet.
 
 ## Installation
@@ -76,6 +77,7 @@ By default the pod links native support for every task the module implements. Ea
 | `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
 | `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
 | `video-segmentation` | `CoreAI.runTask('video-segmentation', ...)` | `CoreAIVideoSegmentation` |
+| `video-diffusion`  | `coreAI.videoModel(...)`                  | `CoreAIVideoDiffusion`  |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 
