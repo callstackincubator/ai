@@ -1140,6 +1140,10 @@ public class CoreAIImpl: NSObject {
       name.removeLast()
     }
     name = name.components(separatedBy: "/").last ?? name
+    // file:// URLs are percent-encoded, unlike paths
+    if source.hasPrefix("file://") {
+      name = name.removingPercentEncoding ?? name
+    }
     for suffix in [".aimodelc", ".aimodel"] where name.hasSuffix(suffix) {
       name.removeLast(suffix.count)
       break
