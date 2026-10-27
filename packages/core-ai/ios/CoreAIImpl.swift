@@ -2030,8 +2030,11 @@ private struct LanguageModelRequest {
   }
 
   /// Sends snapshots of the response text, plus the reasoning entries when they
-  /// change, and returns the usage of the response
+  /// change, and returns the usage of the response, with the time to the first
+  /// and the last token measured here rather than where the snapshots arrive
   func stream(onUpdate: @escaping (String, [[String: Any]]?) -> Void) async throws -> [String: Any]? {
+    let startTime = CFAbsoluteTimeGetCurrent()
+    var firstTokenTime: CFAbsoluteTime?
     let prompt = self.prompt
     let attachments = self.attachments
     defer { AppleLLMImpl.removeTemporaryFiles(temporaryFileURLs) }
@@ -2041,6 +2044,9 @@ private struct LanguageModelRequest {
     var usage: LanguageModelSession.Usage?
 
     func update(_ content: String, _ transcriptEntries: ArraySlice<Transcript.Entry>) {
+      if firstTokenTime == nil {
+        firstTokenTime = CFAbsoluteTimeGetCurrent()
+      }
       let entries = AppleLLMTranscriptSerializer.serialize(transcriptEntries, includeResponses: false)
       let entriesChanged = !(entries as NSArray).isEqual(previousEntries)
       previousEntries = entries as NSArray
@@ -2087,7 +2093,15 @@ private struct LanguageModelRequest {
       onUpdate(previousContent, generatedEntries(after: replayedEntryCount, includeResponses: false))
     }
 
-    return usage.map(CoreAIImpl.serializeUsage)
+    let endTime = CFAbsoluteTimeGetCurrent()
+    return usage.map { usage in
+      var result = CoreAIImpl.serializeUsage(usage)
+      result["timings"] = [
+        "firstTokenMs": ((firstTokenTime ?? endTime) - startTime) * 1000,
+        "totalMs": (endTime - startTime) * 1000,
+      ]
+      return result
+    }
   }
 }
 
