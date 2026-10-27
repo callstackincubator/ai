@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics'
 import React from 'react'
 import { Pressable, StyleSheet, Text } from 'react-native'
 
+import { accent, onAccent } from '../theme/brand'
 import { colors } from '../theme/colors'
 import { Glass } from './Glass'
 
@@ -20,7 +21,7 @@ export function PrimaryButton({
   return (
     <Glass
       isInteractive
-      tintColor={disabled ? undefined : '#007AFF'}
+      tintColor={disabled ? undefined : accent}
       style={[styles.glass, disabled && styles.disabled]}
     >
       <Pressable
@@ -54,7 +55,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: onAccent,
   },
   titleDisabled: {
     color: colors.secondaryLabel,

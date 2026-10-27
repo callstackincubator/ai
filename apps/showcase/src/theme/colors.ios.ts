@@ -1,4 +1,6 @@
-import { PlatformColor } from 'react-native'
+import { DynamicColorIOS, PlatformColor } from 'react-native'
+
+import { accent } from './brand'
 
 export const colors = {
   // Text
@@ -22,6 +24,10 @@ export const colors = {
   systemYellow: PlatformColor('systemYellow'),
   systemGreen: PlatformColor('systemGreen'),
   systemIndigo: PlatformColor('systemIndigo'),
+
+  // Brand: the fill, and a darker shade for text on light backgrounds
+  accent,
+  accentText: DynamicColorIOS({ light: '#32744b', dark: accent }),
 
   // Separators
   separator: PlatformColor('separator'),

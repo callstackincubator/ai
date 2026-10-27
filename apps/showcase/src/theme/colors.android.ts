@@ -1,5 +1,7 @@
 import { PlatformColor } from 'react-native'
 
+import { accent } from './brand'
+
 export const colors = {
   // Text
   label: PlatformColor('@android:color/primary_text_light'),
@@ -22,6 +24,10 @@ export const colors = {
   systemYellow: PlatformColor('@android:color/holo_orange_light'),
   systemGreen: PlatformColor('@android:color/holo_green_light'),
   systemIndigo: PlatformColor('@android:color/holo_purple'),
+
+  // Brand: the fill, and a darker shade for text on light backgrounds
+  accent,
+  accentText: '#32744b',
 
   // Separators
   separator: PlatformColor('@android:color/darker_gray'),

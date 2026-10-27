@@ -11,16 +11,20 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0a0a0a"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.callstack.ai.showcase"
+      "bundleIdentifier": "com.callstack.ai.showcase",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0a0a0a"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.callstack.ai.showcase"
@@ -50,6 +54,7 @@
         }
       ],
       "llama.rn"
-    ]
+    ],
+    "primaryColor": "#3fae6a"
   }
 }

@@ -2,12 +2,13 @@ import { NativeTabs } from 'expo-router/native-tabs'
 import React from 'react'
 
 import { useEnabledFeatures } from '../../src/store/features'
+import { colors } from '../../src/theme/colors'
 
 export default function TabsLayout() {
   const { isEnabled } = useEnabledFeatures()
 
   return (
-    <NativeTabs minimizeBehavior="onScrollDown">
+    <NativeTabs minimizeBehavior="onScrollDown" tintColor={colors.accentText}>
       <NativeTabs.Trigger name="chat" hidden={!isEnabled('chat')}>
         <NativeTabs.Trigger.Icon
           sf={{ default: 'bubble.left', selected: 'bubble.left.fill' }}
