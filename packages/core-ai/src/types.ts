@@ -31,9 +31,16 @@ export interface CoreAIModelConfig {
 
 export interface CoreAITensorDescriptor {
   name?: string
+  // `image` for an image input, which takes a `CoreAIImageInput`
   dataType?: string
   // -1 marks a dynamic dimension
   shape?: number[]
+  // Size of an image, -1 when dynamic
+  width?: number
+  height?: number
+  // Pixel format of an image: `32BGRA`, `32ARGB`, `24RGB` or
+  // `420YpCbCr8Planar`, or the Core Video four-character code of another
+  pixelFormat?: string
 }
 
 export interface CoreAIModelInfo {
@@ -223,6 +230,13 @@ export interface CoreAITensor {
   dataType: CoreAITensorDataType
   shape: number[]
   data: string
+}
+
+// An image input of `CoreAI.runRawFunction`, decoded from a file and stretched
+// to the input's width and height. A dynamic width or height keeps the
+// image's own
+export interface CoreAIImageInput {
+  imageUri: string
 }
 
 // Options of `CoreAI.loadModel` for a model with the `raw` task

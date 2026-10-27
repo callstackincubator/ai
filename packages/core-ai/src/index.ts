@@ -20,6 +20,7 @@ export type {
   CoreAIGenerationPart,
   CoreAIImageGenerationOptions,
   CoreAIImageGenerationResult,
+  CoreAIImageInput,
   CoreAILoadedModel,
   CoreAIMessage,
   CoreAIModelConfig,
