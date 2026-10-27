@@ -47,6 +47,9 @@ enum CoreAIError: LocalizedError {
       return "object-detection"
     case "CoreAISpeech":
       return "asr"
+
+    case "CoreAIVideoSegmentation":
+      return "video-segmentation"
     default:
       return product
     }

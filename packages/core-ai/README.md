@@ -18,9 +18,9 @@ Core AI exposes two layers:
 - AI SDK adapters: language models, image generation, transcription and
   text embeddings (CLIP).
 - Direct native APIs: model loading, persistent language sessions, model
-  inspection, segmentation, object detection, super-resolution,
-  classification, depth estimation, and raw `.aimodel` function calls.
-  `specializeModel` returns metadata only.
+  inspection, segmentation, video segmentation, object detection,
+  super-resolution, classification, depth estimation, and raw `.aimodel`
+  function calls. `specializeModel` returns metadata only.
 
 Reranking, speech generation, and video generation have no adapters, because
 `coreai-models` has no runtime for them yet.
@@ -75,6 +75,7 @@ By default the pod links native support for every task the module implements. Ea
 | `segmentation`     | `CoreAI.runTask('segmentation', ...)`     | `CoreAISegmentation`    |
 | `object-detection` | `CoreAI.runTask('object-detection', ...)` | `CoreAIObjectDetection` |
 | `asr`              | `coreAI.transcriptionModel(...)`          | `CoreAISpeech`          |
+| `video-segmentation` | `CoreAI.runTask('video-segmentation', ...)` | `CoreAIVideoSegmentation` |
 
 To link fewer, list the tasks you use. With Expo, pass them to the plugin:
 

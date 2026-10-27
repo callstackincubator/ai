@@ -6,7 +6,7 @@ import {
   CORE_AI_STORAGE_PATH,
   downloadHubFolder,
 } from '../../apps/expo-example/src/utils/coreAIStorageUtils'
-import { cats } from '../fixtures'
+import { cats, catsVideo } from '../fixtures'
 
 // Qwen3 0.6B exported for iOS with the coreai-models recipe, as in the example
 // app. The model is downloaded on the first run
@@ -144,4 +144,39 @@ export async function writeCatsImage() {
   const path = `${RNBlobUtil.fs.dirs.CacheDir}/harness-cats.jpg`
   await RNBlobUtil.fs.writeFile(path, cats, 'base64')
   return path
+}
+
+export async function writeCatsVideo() {
+  const path = `${RNBlobUtil.fs.dirs.CacheDir}/harness-cats.mp4`
+  await RNBlobUtil.fs.writeFile(path, catsVideo, 'base64')
+  return path
+}
+
+// SAM 3 video exported with the coreai-models recipe at 672 px
+// (models/sam3_video/export.py --dtype float16 --image-size 672), under the
+// SAM License
+const VIDEO_SEGMENTATION_MODEL = {
+  id: 'sam3-video',
+  repo: 'grabbou/sam3-video-CoreAI',
+  folder: 'sam3-video',
+}
+
+export function setupVideoSegmentationModel() {
+  const path = `${CORE_AI_STORAGE_PATH}/${VIDEO_SEGMENTATION_MODEL.id}`
+
+  beforeAll(async () => {
+    if (!(await RNBlobUtil.fs.exists(path))) {
+      await downloadHubFolder(
+        VIDEO_SEGMENTATION_MODEL.repo,
+        VIDEO_SEGMENTATION_MODEL.folder,
+        path
+      )
+    }
+  })
+
+  return {
+    id: VIDEO_SEGMENTATION_MODEL.id,
+    sourceType: 'file',
+    sourceUri: path,
+  }
 }

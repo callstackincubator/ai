@@ -35,6 +35,8 @@ Pod::Spec.new do |s|
     "segmentation" => "CoreAISegmentation",
     "object-detection" => "CoreAIObjectDetection",
     "asr" => "CoreAISpeech",
+
+    "video-segmentation" => "CoreAIVideoSegmentation",
   }
   tasks = ENV["CORE_AI_TASKS"]
   if tasks.nil? && defined?(Pod::Config)

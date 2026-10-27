@@ -58,7 +58,7 @@ In a bare app, set `platform :ios, '27.0'` in the `Podfile` and the Xcode projec
 
 ### 2. Choose Linked Tasks (optional)
 
-By default the pod links native support for every task: `language` (`CoreAILM`), `diffusion` (`CoreAIDiffusion`), `segmentation` (`CoreAISegmentation`), `object-detection` (`CoreAIObjectDetection`) and `asr` (`CoreAISpeech`). To link fewer with Expo, pass `tasks` to the config plugin:
+By default the pod links native support for every task: `language` (`CoreAILM`), `diffusion` (`CoreAIDiffusion`), `segmentation` (`CoreAISegmentation`), `object-detection` (`CoreAIObjectDetection`), `asr` (`CoreAISpeech`) and `video-segmentation` (`CoreAIVideoSegmentation`). To link fewer with Expo, pass `tasks` to the config plugin:
 
 ```json
 {
@@ -93,6 +93,7 @@ Download or bundle the exported directory into app storage, and pass it as `sour
 - Text embeddings: `coreAI.embeddingModel(config)` with `embed` / `embedMany`, on a CLIP export folder (`.aimodel` + `tokenizer/`). Images: `model.embedImages(imageUris)`
 - Segmentation and object detection: `CoreAI.runTask('segmentation' | 'object-detection', ...)`
 - Super-resolution, classification and depth: `CoreAI.runTask('super-resolution' | 'classification' | 'depth', config, { imageUri }, options)`, on EDSR, PVT and Depth Anything exports
+- Video segmentation and tracking: `CoreAI.runTask('video-segmentation', config, { videoUri, data: { prompts } }, options)` on a SAM 3 video bundle (links `CoreAIVideoSegmentation`)
 - Any other `.aimodel`: `CoreAI.loadModel({ ...config, task: 'raw' }, {})`, then `CoreAI.runRawFunction(modelHandle, functionName, inputs, {})` with tensors from `createTensor`, read back with `readTensor`
 - Model metadata and function signatures: `CoreAI.inspectModel(...)`
 

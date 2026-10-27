@@ -85,6 +85,7 @@ Native-only API status:
 | Persistent sessions  | `model.createSession(...)`                | Supported for language models           | AI SDK owns message history; Core AI sessions own native transcript state. |
 | Segmentation         | `CoreAI.runTask('segmentation', ...)`     | Supported                               | AI SDK image APIs do not model segmentation masks.                         |
 | Object detection     | `CoreAI.runTask('object-detection', ...)` | Supported                               | AI SDK has no detection primitive.                                         |
+| Video segmentation   | `CoreAI.runTask('video-segmentation', ...)` | Supported                             | AI SDK has no video segmentation or tracking primitive.                    |
 | Depth estimation     | `CoreAI.runTask('depth', ...)`            | Supported                               | AI SDK has no depth primitive.                                             |
 | Super-resolution     | `CoreAI.runTask('super-resolution', ...)` | Supported                               | AI SDK has no image-to-image upscaling primitive.                          |
 | Classification       | `CoreAI.runTask('classification', ...)`   | Supported                               | AI SDK has no image classification primitive.                              |
@@ -146,6 +147,26 @@ Ownership and performance:
 - Hermes has no `Float16Array`, so float16 and bfloat16 inputs can be given as float32, and their outputs come back as float32. Pass `{ outputDataType: 'native' }` to get the bits of each element instead (a `Uint16Array` from `readTensor`).
 - Base64 adds a third to the size of each tensor, and every call encodes and decodes it on the JS thread. Use a task wrapper, or keep tensors to a few megabytes, for work that runs every frame.
 - Image inputs (pixel buffers) are not supported yet.
+
+### Video Segmentation
+
+`CoreAI.runTask('video-segmentation', config, input, options)` runs `coreai-models` video segmentation bundles (SAM 3 video): it finds the objects that text prompts describe in a video and tracks them from frame to frame.
+
+```ts
+const { output } = await CoreAI.runTask(
+  'video-segmentation',
+  { id: 'sam3-video', sourceType: 'file', sourceUri: bundle },
+  { videoUri, data: { prompts: ['cat', 'person'] } },
+  { maxFrames: 120, outputVideo: true }
+)
+// output.frames[i].objects: [{ id, prompt, score, box }], ids stay the same across frames
+// output.video: file:// URL of a copy with the masks and boxes drawn on
+```
+
+- One prompt can also go in `input.text`.
+- `includeMasks: true` adds each object's mask as a base64 PNG at the video size, which is large for long videos.
+- `scoreThreshold` (0.5), `newObjectThreshold` (0.7) and `maxObjects` tune tracking.
+- The bundle stays loaded after the first call. The [hosted SAM 3 video export](https://huggingface.co/grabbou/sam3-video-CoreAI) runs at 672 px, a balance of speed and accuracy on iPhone. The recipe also exports 336 px (faster) and 1008 px (more accurate on small objects): `uv run models/sam3_video/export.py --image-size 336`. SAM 3 is gated on Hugging Face, so exporting it needs Meta's license accepted, and the weights stay under the [SAM License](https://huggingface.co/facebook/sam3/blob/main/LICENSE).
 
 When the AI SDK owns message history, every request sends the whole chat. To
 keep it inside the context window, see
