@@ -2,7 +2,7 @@
 title: "Raw Function Calls"
 ---
 
-Any exported `.aimodel` runs through its functions, for models no task covers. Load it with the `raw` task, which needs no `coreai-models` product, and call a function by name with tensors:
+For a model no task covers, call its functions directly. Load it with the `raw` task and call a function by name, with tensors as inputs:
 
 ```typescript
 import { CoreAI, createTensor, readTensor } from '@react-native-ai/core-ai'
@@ -27,7 +27,7 @@ const upscaled = readTensor(outputs.output) // Float32Array of 1 × 3 × 128 × 
 await CoreAI.unloadModel(modelHandle)
 ```
 
-`CoreAI.inspectModel(config)` lists the functions of an `.aimodel` on disk without running them. A shape of `-1` marks a dynamic dimension, which the input's `shape` sets.
+To see what a model takes without loading it, `CoreAI.inspectModel(config)` lists its functions. A `-1` in a shape is a dynamic dimension, which your input's `shape` sets.
 
 ## Tensors
 

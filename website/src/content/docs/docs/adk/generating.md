@@ -2,13 +2,11 @@
 title: "Generating"
 ---
 
-Generate text on Android with Gemini Nano on the device, or with cloud Gemini, through the AI SDK's `generateText` and `streamText`. Pass `adk()` as the model; by default it targets on-device Gemini Nano. ADK runs the agent loop natively on Android, and the provider bridges tool calls and streaming back to JavaScript.
-
-## Requirements
-
-- **Physical Android device with AICore** - Required for Gemini Nano; the device must be capable of running Gemini Nano. Please consult the [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device). We provide runtime checks for this capability - please refer to [Models & Availability](/docs/adk/models#on-device-gemini-nano).
-- **Polyfills** - Streaming requires `ReadableStream`; see [Polyfills](/docs/polyfills)
-- **Prepare Nano** - Call `prepareNano()` or `model.prepare()` before first on-device use (see [Models & Availability](/docs/adk/models#on-device-gemini-nano))
+Generate text on Android with Gemini Nano: pass `adk()` to the AI SDK's
+`generateText` or `streamText`. The examples on this page run on device. For
+cloud Gemini, create the model as shown in
+[Models & Availability](/docs/adk/models#cloud-gemini); everything else stays
+the same.
 
 ## Text Generation
 
@@ -16,49 +14,23 @@ Generate text on Android with Gemini Nano on the device, or with cloud Gemini, t
 import { adk } from '@react-native-ai/adk'
 import { generateText } from 'ai'
 
-await adk.prepareNano()
-
 const { text } = await generateText({
   model: adk(),
   prompt: 'Explain quantum computing in simple terms',
 })
 ```
 
-### Cloud Gemini
-
-Cloud models use ADK's `LlmAgent` with Google's Gemini API. This is useful when Gemini Nano is unavailable, you need a more capable model, or you want to develop on an emulator without AICore. Create a provider with `modelType: 'gemini'` and an API key:
-
-```typescript
-import { createAdkProvider } from '@react-native-ai/adk'
-import { generateText } from 'ai'
-
-const adk = createAdkProvider({
-  modelType: 'gemini',
-  modelName: 'gemini-2.5-flash',
-  apiKey: process.env.GOOGLE_API_KEY,
-})
-
-const { text } = await generateText({
-  model: adk(),
-  prompt: 'Explain quantum computing in simple terms',
-})
-```
-
-Cloud models do not require a separate download or prepare step.
-
-> Do not embed API keys in production client apps. Prefer a backend proxy or secure runtime configuration.
+The first call prepares Gemini Nano. To avoid the wait, call `adk.prepareNano()`
+ahead of time, once [the availability check](/docs/adk/models#availability-check)
+passes.
 
 ## Streaming
-
-Stream responses for real-time output:
 
 ```typescript
 import { adk } from '@react-native-ai/adk'
 import { streamText } from 'ai'
 
-await adk.prepareNano()
-
-const { textStream } = await streamText({
+const { textStream } = streamText({
   model: adk(),
   prompt: 'Write a short story about a robot learning to paint',
 })
@@ -68,97 +40,33 @@ for await (const delta of textStream) {
 }
 ```
 
-During streaming, the provider emits standard AI SDK stream parts: `text-start`, `text-delta`, `text-end`, and `finish` with usage metadata.
+Streaming needs the [polyfills](/docs/polyfills).
 
-## Usage Metadata
+## Token Usage
 
-ADK returns token usage in response events (`promptTokenCount`, `candidatesTokenCount`, `totalTokenCount`). The provider maps this into AI SDK `usage` on both `generateText` results and streaming `finish` events:
+`usage` reports Gemini's token counts, on `generateText` results and in the
+`finish` part of a stream:
 
 ```typescript
-import { adk } from '@react-native-ai/adk'
-import { generateText } from 'ai'
-
-await adk.prepareNano()
-
 const { usage } = await generateText({
   model: adk(),
   prompt: 'Count to five.',
 })
 
-console.log(usage.inputTokens.total) // promptTokenCount
-console.log(usage.outputTokens.total) // candidatesTokenCount
+console.log(usage.inputTokens.total)
+console.log(usage.outputTokens.total)
 console.log(usage.raw?.totalTokenCount)
 ```
 
 ## Tool Calling
 
-Enable ADK agents to call JavaScript tools during generation. Works on both on-device Nano and cloud Gemini.
-
-### Important ADK-Specific Behavior
-
-Tools are orchestrated by ADK natively, which means:
-
-- **Pre-register executors**: Pass tools to `createAdkProvider` via `availableTools` so ADK can invoke their `execute` handlers
-- **Provider-executed**: Streamed tool calls are marked with `providerExecuted: true`
-- **Native agent loop**: ADK runs the multi-turn tool loop; AI SDK `maxSteps` does not control ADK's internal iteration
-
-### Setup
-
-ADK needs tool executors registered both in the AI SDK and on the provider. Use `createAdkProvider` with `availableTools`, then pass tools to the AI SDK and call `adk()` as usual. Example:
+Let the model call your JavaScript functions, on device or in the cloud. ADK
+runs the tool loop natively, so register each tool with the provider in
+`availableTools`, and pass the ones a request may use in `tools` as usual:
 
 ```typescript
 import { createAdkProvider } from '@react-native-ai/adk'
 import { generateText, tool } from 'ai'
-import { z } from 'zod'
-
-const getCurrentTime = tool({
-  description: 'Get the current time for a city',
-  inputSchema: z.object({
-    city: z.string(),
-  }),
-  execute: async ({ city }) => ({
-    city,
-    time: new Date().toLocaleTimeString(),
-  }),
-})
-
-const adk = createAdkProvider({
-  availableTools: { getCurrentTime },
-})
-
-await adk.prepareNano()
-
-const { text } = await generateText({
-  model: adk(),
-  tools: { getCurrentTime },
-  prompt: 'What time is it in Warsaw?',
-})
-```
-
-During streaming, the provider emits `tool-input-start`, `tool-input-delta`, `tool-input-end`, and `tool-call` stream parts when ADK surfaces function calls from the model.
-
-Pass tools through the AI SDK `tools` option as usual; the provider bridges execution to JavaScript while ADK orchestrates the agent loop natively.
-
-### Updating Tools at Runtime
-
-Register tools when creating the provider so ADK can execute them from JavaScript:
-
-```typescript
-import { adk } from '@react-native-ai/adk'
-
-const model = adk()
-
-// Add or replace tools on an existing model instance
-model.updateTools({
-  getCurrentTime,
-})
-```
-
-To register executors at provider creation time:
-
-```typescript
-import { createAdkProvider } from '@react-native-ai/adk'
-import { tool } from 'ai'
 import { z } from 'zod'
 
 const getCurrentTime = tool({
@@ -174,23 +82,33 @@ const adk = createAdkProvider({
   availableTools: { getCurrentTime },
 })
 
-const model = adk()
-
-model.updateTools({
-  getCurrentTime,
+const { text } = await generateText({
+  model: adk(),
+  tools: { getCurrentTime },
+  prompt: 'What time is it in Warsaw?',
 })
 ```
 
-## Multimodal Input
-
-Pass file parts in user messages using the standard AI SDK prompt format:
+To add or replace tools later, call `updateTools` on the model:
 
 ```typescript
-import { adk } from '@react-native-ai/adk'
-import { generateText } from 'ai'
+const model = adk()
 
-await adk.prepareNano()
+model.updateTools({ getCurrentTime })
+```
 
+Because ADK runs the loop:
+
+- AI SDK step controls, such as `stopWhen`, don't limit it.
+- Streamed tool calls are marked `providerExecuted: true`.
+- A `required` `toolChoice` is ignored with a warning.
+
+## Image Input
+
+Ask about an image by passing it as a file part, as base64, a data URL or a
+`Uint8Array`:
+
+```typescript
 const { text } = await generateText({
   model: adk(),
   messages: [
@@ -198,34 +116,20 @@ const { text } = await generateText({
       role: 'user',
       content: [
         { type: 'text', text: 'What is in this image?' },
-        {
-          type: 'file',
-          mediaType: 'image/jpeg',
-          data: base64Image,
-        },
+        { type: 'file', mediaType: 'image/jpeg', data: base64Image },
       ],
     },
   ],
 })
 ```
 
-Supported file data formats:
+File and HTTP URLs aren't supported yet, so read the image first.
 
-- **Base64 strings** - Raw base64 or `data:image/jpeg;base64,...` data URLs
-- **`Uint8Array`** - Binary image data
+## JSON Output
 
-> **Note**: File URLs (`file://` or HTTP) are not supported yet. Pass base64 or `Uint8Array` data directly.
-
-## Structured Output
-
-Generate JSON responses using AI SDK JSON mode:
+Ask for JSON with JSON mode:
 
 ```typescript
-import { adk } from '@react-native-ai/adk'
-import { generateText } from 'ai'
-
-await adk.prepareNano()
-
 const { text } = await generateText({
   model: adk(),
   prompt: 'Return a JSON object with name and age fields.',
@@ -233,29 +137,14 @@ const { text } = await generateText({
 })
 ```
 
-> **Note**: JSON schema constraints (`responseFormat.schema`) are not supported yet. Use JSON mode without a schema, or parse and validate the response in your app.
+ADK can't constrain the output to a schema or stream JSON yet, so parse and
+validate the response in your app.
 
-Streaming structured JSON is not supported by ADK yet.
+## Options
 
-## Available Options
-
-Configure model behavior with generation options:
-
-| Option        | Type   | Description                                              |
-| ------------- | ------ | -------------------------------------------------------- |
-| `temperature` | number | Controls randomness                                      |
-| `maxTokens`   | number | Maximum tokens to generate (`maxOutputTokens` in AI SDK) |
-| `topP`        | number | Nucleus sampling threshold                               |
-| `topK`        | number | Top-K sampling parameter                                 |
-
-Example:
+`temperature`, `maxOutputTokens`, `topP` and `topK` work as usual:
 
 ```typescript
-import { adk } from '@react-native-ai/adk'
-import { generateText } from 'ai'
-
-await adk.prepareNano()
-
 const { text } = await generateText({
   model: adk(),
   prompt: 'Write a creative story',
@@ -271,15 +160,3 @@ Gemini Nano has a small context window and every request sends the whole chat.
 To keep a rolling window and summarize older messages, wrap the model with
 `wrapLanguageModelWithHistory`. See [Conversation History](/docs/history).
 :::
-
-## Limitations
-
-The following features are not yet supported:
-
-| Feature                            | Status                                       |
-| ---------------------------------- | -------------------------------------------- |
-| `responseFormat.schema`            | Not supported - use JSON mode without schema |
-| Streaming JSON                     | Not supported                                |
-| `toolChoice: { type: 'required' }` | Ignored with a warning - defaults to auto    |
-| File URLs in multimodal prompts    | Not supported - use base64 or `Uint8Array`   |
-| iOS / web                          | Android only                                 |

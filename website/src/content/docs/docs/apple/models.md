@@ -2,11 +2,9 @@
 title: "Models & Availability"
 ---
 
-Check that Apple Intelligence can run before you offer it, and pick which
-Apple model answers. `apple()` uses the on-device model,
-`SystemLanguageModel.default`. On iOS 27 you can also use Apple's Private Cloud
-Compute model, and tune the on-device model with guardrail and use-case
-options.
+Check that Apple Intelligence is ready before you offer it, and choose which
+model answers: the on-device model that `apple()` uses, or, on iOS 27, Apple's
+Private Cloud Compute.
 
 ## Availability And Model Info
 
@@ -21,7 +19,7 @@ if (!apple.isAvailable()) {
 }
 ```
 
-For details, ask native for the model's metadata:
+`getModelInfo()` tells you more:
 
 ```typescript
 const info = await apple.getModelInfo({ locale: 'en-US' })

@@ -4,7 +4,7 @@ title: "Polyfills"
 
 import PackageManagerTabs from '../../../components/starlight/PackageManagerTabs.astro'
 
-Several functions that are internally used by the AI SDK might not be available in the React Native runtime depending on your configuration and the target platform.
+The AI SDK uses a few web APIs that React Native doesn't have, such as text encoding streams and `structuredClone`. Add them once, before anything else in your app runs.
 
 ## Expo
 
@@ -12,7 +12,7 @@ First, install the following packages:
 
 <PackageManagerTabs command="install @ungap/structured-clone @stardazed/streams-text-encoding" />
 
-Then create a new file in the root of your project with the following polyfills:
+Then create a `polyfills.js` file in the root of your project:
 
 ```js title="polyfills.js"
 import { Platform } from 'react-native'
@@ -40,7 +40,7 @@ if (Platform.OS !== 'web') {
 export {}
 ```
 
-Make sure to import this file early in your app's entry point (e.g., at the top of your `App.tsx` or `index.js`):
+Import it first in your app's entry point, such as `index.js` or `App.tsx`:
 
 ```js
 import './polyfills'
@@ -48,13 +48,13 @@ import './polyfills'
 
 ## Bare React Native
 
-For projects not using Expo, you'll need additional stream polyfills since Expo provides some of these out of the box.
+Without Expo, you also need web streams, which Expo provides.
 
 First, install the following packages:
 
 <PackageManagerTabs command="install @ungap/structured-clone @stardazed/streams-text-encoding web-streams-polyfill" />
 
-Then create a new file in the root of your project with the following polyfills:
+Then create a `polyfills.js` file in the root of your project:
 
 ```js title="polyfills.js"
 import { Platform } from 'react-native'
@@ -99,7 +99,7 @@ if (Platform.OS !== 'web') {
 export {}
 ```
 
-Make sure to import this file early in your app's entry point (e.g., at the top of your `App.tsx` or `index.js`):
+Import it first in your app's entry point, such as `index.js` or `App.tsx`:
 
 ```js
 import './polyfills'

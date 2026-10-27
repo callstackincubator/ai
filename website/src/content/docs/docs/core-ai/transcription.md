@@ -2,11 +2,14 @@
 title: "Transcription"
 ---
 
-Turn speech into text with a model you ship, from a recording or live from the microphone, through the AI SDK's `transcribe` and `experimental_streamTranscribe`. Create the model with `coreAI.transcriptionModel(config)`, pointing at a Parakeet TDT or Whisper bundle exported with `coreai-models`. The [hosted Parakeet TDT 0.6B v3 export](/docs/core-ai/models#hosted-exports) transcribes 25 European languages. For the transcriber built into iOS, see [Apple transcription](/docs/apple/transcription).
+Transcribe recordings, or speech as it happens, with a model you ship. The
+[hosted Parakeet TDT 0.6B v3 model](/docs/core-ai/models#hosted-exports) covers
+25 European languages, and Whisper exports work too. To use the transcriber
+built into iOS instead, see [Apple transcription](/docs/apple/transcription).
 
-## Files
+## Recordings
 
-Transcribe a recorded file with `transcribe`:
+Pass the audio to `transcribe`:
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
@@ -25,13 +28,16 @@ const { text, segments, durationInSeconds } = await transcribe({
 // segments: [{ text, startSecond, endSecond }]
 ```
 
-- Audio can be any format AVFoundation decodes (WAV, MP3, M4A, FLAC, CAF, AIFF), picked by the media type, and is resampled to the model's rate.
-- Parakeet bundles exported with `--streaming` (like the hosted one) transcribe audio of any length, and split the transcript into segments at pauses. Other bundles transcribe in one segment: bundles exported with `--dynamic` take the whole file, and static ones as much audio as their traced window holds (`--audio-seconds`, 5 by default).
-- Parakeet does not detect the language, so `language` is not set.
+- Any format AVFoundation decodes works: WAV, MP3, M4A, FLAC, CAF or AIFF.
+- The hosted model takes audio of any length and splits the transcript into
+  segments at pauses. Bundles you export yourself without `--streaming` take
+  one fixed window of audio.
+- Parakeet doesn't detect the language, so the result has no `language`.
 
 ## Live Audio
 
-Transcribe while the user speaks. `experimental_streamTranscribe` takes a stream of 16-bit little-endian mono PCM at any rate, for example from a microphone, and streams the transcript as it grows:
+To show text while the user speaks, stream microphone audio to
+`experimental_streamTranscribe` as 16-bit mono PCM, at any sample rate:
 
 ```typescript
 import { experimental_streamTranscribe as streamTranscribe } from 'ai'
@@ -54,10 +60,13 @@ for await (const part of result.fullStream) {
 console.log(await result.text)
 ```
 
-- Each segment's text only grows until the segment closes at a pause, so deltas append to what came before, and each closed segment arrives as a `transcript-final` part.
-- Chunks can end in the middle of a sample. The provider reassembles samples across chunks, and resamples the audio to the model's rate on the device.
-- The abort signal, or cancelling the stream, stops the session. A model runs one live session at a time.
+- Deltas append to the current segment. When the speaker pauses, the segment
+  closes and arrives as a `transcript-final` part.
+- Abort the call, or cancel the stream, to stop. A model runs one live session
+  at a time.
+- Without the AI SDK, `CoreAI.startTranscriptionStream`,
+  `appendTranscriptionAudio`, `finishTranscriptionStream` and the
+  `onTranscriptionUpdate` event run the same session.
 
-Without the AI SDK, `CoreAI.startTranscriptionStream`, `CoreAI.appendTranscriptionAudio` and `CoreAI.finishTranscriptionStream`, with the `CoreAI.onTranscriptionUpdate` event, run the same session.
-
-The model stays loaded after the first call, until another speech model is used.
+The model stays loaded after the first call, until you use another speech
+model.

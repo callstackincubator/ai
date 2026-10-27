@@ -102,9 +102,7 @@ if (info.supportsImagePrompts) {
 ```
 
 Use `supportsReasoning` before setting `reasoning`, and `availability` with
-`{ model: 'private-cloud-compute' }` before using Private Cloud Compute. Other
-options that need a missing feature throw `UNSUPPORTED_OS`, while missing output
-is left out.
+`{ model: 'private-cloud-compute' }` before using Private Cloud Compute.
 
 ## Image Generation
 

@@ -2,7 +2,7 @@
 title: "Error Handling"
 ---
 
-Errors from the native module carry a `code`. Errors the JavaScript side throws, such as `createTensor` rejecting its elements, are plain `Error`s, so check `code` before relying on it. Errors that Core AI or a `coreai-models` runtime throws on their own, such as a model that fails to load, pass through with the `CORE_AI_ERROR` code and the runtime's message.
+Errors from Core AI carry a `code` you can branch on. A few errors thrown in JavaScript, such as `createTensor` rejecting its elements, have none, so check that `code` is set first.
 
 ```typescript
 import { generateText } from 'ai'

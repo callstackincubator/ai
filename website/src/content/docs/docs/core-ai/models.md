@@ -2,11 +2,11 @@
 title: "Models"
 ---
 
-`@react-native-ai/core-ai` runs `.aimodel` bundles exported with Apple's [`coreai-models`](https://github.com/apple/coreai-models). Apple publishes the export recipes, not the exported files, and the package does not ship a model catalog: your app downloads or bundles the models it uses and passes their path as `source`.
+Core AI runs models exported with Apple's [`coreai-models`](https://github.com/apple/coreai-models). Apple publishes the recipes, not the exported models, so we host ready-to-use ones. Your app downloads or bundles the models it needs and passes each folder as `source`.
 
 ## Hosted Exports
 
-These are exported with Apple's recipes, tested on an iPhone 17 Pro with iOS 27 (Wan 2.1 on macOS), and hosted on Hugging Face. Each repository's card has the exact export command, the sizes and the license. Download the folder in the Folder column into app storage, and point `source` at it.
+Tested on an iPhone 17 Pro with iOS 27 (Wan 2.1 on macOS) and hosted on Hugging Face. Download the folder from the Folder column into app storage, and point `source` at it. Each repository's card lists its license.
 
 | Task               | Model                                                                       | Hugging Face repository                                                                                 | Folder                   | Size   | Platforms                                                           | Use with                                                          |
 | ------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------ | ------ | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -41,30 +41,6 @@ The package runs on iOS, so macOS-only models are listed for reference.
 
 ## Making Your Own
 
-Apple's recipes cover more models and sizes than the hosted ones, for example Qwen2.5, Gemma, Sana Sprint, YOLOS-base, SAM 3 at other resolutions, and Whisper. Start with:
+For a model or size that isn't hosted, export it yourself with Apple's [`coreai-models` recipes](https://github.com/apple/coreai-models/tree/main/models). The [export guide](https://github.com/apple/coreai-models/blob/main/models/README.md) covers setup, iOS presets and quantization, and each hosted repository's card has the exact command used for it. Export for iOS where a recipe has a platform option.
 
-- [`coreai-models` export guide](https://github.com/apple/coreai-models/blob/main/models/README.md): setup with `uv`, the model registry, iOS and macOS presets, quantization and context length for language models
-- [The recipe catalog](https://github.com/apple/coreai-models/tree/main/models): one folder per model family, each with a README of its options
-- [Swift runtimes](https://github.com/apple/coreai-models/tree/main/swift/Sources): what each `coreai-models` product expects from a bundle
-
-Export for iOS where the recipe has a platform option: iOS exports use 4-bit palettization and a fixed context length. These are the commands behind the hosted exports:
-
-```bash
-# from an apple/coreai-models checkout
-uv run coreai.llm.export qwen3-0.6b --platform iOS
-uv run coreai.diffusion.export flux2-klein-4b --single-function --components transformer_512 text_encoder vae_decoder_half
-uv run coreai.diffusion.export Wan-AI/Wan2.1-T2V-1.3B-Diffusers --platform iOS --compression 4bit-asym
-# then the Wan decoder again for 32x32 tiles, see the repository card. The export runs on macOS, and does not fit in iPhone memory yet (#306)
-uv run models/parakeet/export.py --streaming --dtype float16
-uv run models/yolo/export.py --model hustvl/yolos-tiny
-uv run models/efficient-sam/export.py --model efficient_sam_vitt
-uv run models/sam3_video/export.py --dtype float16 --image-size 672
-uv run models/edsr/export.py --dtype float16 --dynamic
-uv run models/pvt/export.py --dtype float16
-uv run models/depth-anything/export.py
-```
-
-- The CLIP export splits Apple's [`models/clip`](https://github.com/apple/coreai-models/tree/main/models/clip) recipe into separate `encode_text` and `encode_image` functions, with [this script](https://huggingface.co/grabbou/clip-vit-base-patch32-CoreAI/blob/main/export.py), so text and images embed on their own.
-- PVT's folder adds a `labels.json` of the ImageNet class names, which classification reads.
-- SAM 3 is gated: accept Meta's license on [its page](https://huggingface.co/facebook/sam3) and log in with `hf auth login` before exporting it.
-- `CoreAI.inspectModel(...)` lists the functions of an `.aimodel`, with their inputs and outputs, so you can check an export before wiring it to a task.
+To check what an export expects before wiring it to a task, list its functions with [`CoreAI.inspectModel`](/docs/core-ai/raw-functions).

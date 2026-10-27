@@ -2,83 +2,46 @@
 title: "Introduction"
 ---
 
-A collection of on-device AI primitives for React Native with first-class Vercel AI SDK support. Run AI models directly on users' devices for privacy-preserving, low-latency inference without server costs.
+React Native AI runs AI models on your users' devices, through the Vercel AI
+SDK. Each provider uses the models its platform offers, or ones you ship, so
+you can swap the model per platform and keep the rest of your code.
 
-## Why On-Device AI?
+```typescript
+import { apple } from '@react-native-ai/apple'
+import { streamText } from 'ai'
 
-- **Privacy-first:** Inference runs locally, so data stays on the device. Cloud models are opt-in
-- **Instant responses:** No network latency, immediate AI capabilities
-- **Offline-ready:** Works anywhere, even without internet
-- **Zero server costs:** No API fees or infrastructure to maintain
+const result = streamText({
+  model: apple(),
+  prompt: 'Plan a 3-day trip to Kyoto',
+})
+```
 
-## DevTools
+## Why On Device
 
-The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
-requests and surfaces them in Rozenite DevTools. DevTools are runtime
-agnostic, so they work with on-device and remote runtimes.
+- **Private.** Prompts and replies stay on the device. Cloud models are opt-in.
+- **Offline.** No network round trip, and it works in airplane mode.
+- **No server costs.** No API keys for system models, and no per-token bills.
 
-Learn more in the [DevTools documentation](/docs/dev-tools).
+## Providers
 
-## Available Providers
+| Provider                                       | Platform        | Models                                                 | Runtime                                    |
+| ---------------------------------------------- | --------------- | ------------------------------------------------------ | ------------------------------------------ |
+| [Apple](/docs/apple/getting-started)           | iOS             | Built in: Apple Intelligence, speech and embeddings    | Native, provided by the platform           |
+| [Core AI](/docs/core-ai/getting-started)       | iOS 27          | Yours: language, image, speech and vision models       | Native, provided by the platform           |
+| [ADK](/docs/adk/getting-started)               | Android         | Built in: Gemini Nano, or cloud Gemini                 | Native, provided by the platform           |
+| [Llama](/docs/llama/getting-started)           | iOS and Android | Yours: any GGUF model from Hugging Face                | Third-party binding, llama.rn              |
 
-### Built-in Models
+Built-in models need no download and work on supported devices right away.
+With Core AI and Llama, your app downloads or bundles the models, and we point
+you to ready-to-use ones.
 
-These use models that ship with the operating system. There's nothing to download, so they work immediately on supported devices.
+Every provider needs the AI SDK's [polyfills](/docs/polyfills).
 
-#### Apple Intelligence
+## Tools
 
-Native integration with Apple's on-device AI capabilities through `@react-native-ai/apple`:
-
-- **Text Generation** - Apple Foundation Models for chat and completion
-- **Embeddings** - NLContextualEmbedding for semantic search and similarity
-- **Transcription** - SpeechAnalyzer for fast, accurate speech-to-text
-- **Speech Synthesis** - AVSpeechSynthesizer for natural text-to-speech
-
-No model downloads. Works on supported iOS devices out of the box.
-
-#### Google Gemini
-
-Native integration with Gemini on Android through `@react-native-ai/adk`, built on Google's Agent Development Kit:
-
-- **On-device** - Gemini Nano, provisioned by the system via AICore
-- **Cloud** - Larger Gemini models through the Google AI API, when you need them
-- **Tool Calling** - ADK agent loop with JavaScript tool executors
-- **Streaming** - Text and tool-call stream parts
-
-No model downloads or API key for on-device use. Works on supported Android devices out of the box. See the [ADK docs](/docs/adk/getting-started).
-
-### Bring Your Own Model
-
-These run open-source models that you download or bundle with your app.
-
-#### Apple Core AI
-
-Run models exported with Apple's `coreai-models` on Apple's Core AI runtime (iOS 27) through `@react-native-ai/core-ai`:
-
-- **Text and Images** - Language models with structured output and reasoning, image and video generation
-- **Speech** - Transcription of files and live audio
-- **Embeddings** - Text and images in one space, with CLIP
-- **Vision** - Object detection, segmentation, video tracking, super-resolution, classification and depth
-- **Any `.aimodel`** - Raw function calls with tensors
-
-Every task has a hosted export to start from. See the [Core AI docs](/docs/core-ai/getting-started).
-
-#### Llama Engine
-
-Run any GGUF model from HuggingFace locally using `llama.rn` through `@react-native-ai/llama`:
-
-- **Text Generation** - High-performance GGUF inference with full streaming support
-- **Model Management** - Automatic downloading and caching from HuggingFace
-- **Customizable** - Support for context size, threads, and GGUF-specific parameters
-
-Works on iOS and Android.
-
-## JSON UI
-
-Build UIs from tool-calling models with `@react-native-ai/json-ui`:
-
-- **Tool-based spec** - Model calls tools to add/set/delete nodes and props
-- **GenerativeUIView** - Renders the spec in React Native; override styles or supply a custom node renderer
-- **Small-model friendly** - Designed for on-device models with limited context
-
-See the [JSON UI docs](/docs/json-ui/getting-started) for setup and API.
+- [Conversation History](/docs/history) keeps long chats within the small
+  context windows of on-device models.
+- [DevTools](/docs/dev-tools) shows every AI SDK call as a trace in Rozenite,
+  for on-device and remote models alike.
+- [JSON UI](/docs/json-ui/getting-started) builds React Native views from tool
+  calls, and is designed for small models. It's experimental.

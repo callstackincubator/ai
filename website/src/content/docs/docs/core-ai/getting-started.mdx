@@ -4,33 +4,17 @@ title: "Getting Started"
 
 import PackageManagerTabs from '../../../../components/starlight/PackageManagerTabs.astro'
 
-The Core AI provider runs model bundles exported with Apple's [`coreai-models`](https://github.com/apple/coreai-models) on iOS 27, through Apple's Core AI runtime. Your app downloads or bundles the models it uses, and the provider runs them with the Vercel AI SDK, or through direct native calls for tasks the AI SDK has no API for.
+Run models you ship with your app on iOS 27, through Apple's Core AI runtime: language and vision models, image and video generation, transcription, embeddings, and vision tasks such as object detection and segmentation. Most of them work with the Vercel AI SDK calls you already know.
 
-| Task               | API                                                                            | Hosted model                                                    |
-| ------------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Text generation    | `generateText`, `streamText` with `coreAI.languageModel`                       | [Qwen3 0.6B](/docs/core-ai/models#hosted-exports)                           |
-| Image prompts      | Image parts in `generateText`, `streamText` with `coreAI.languageModel`        | [Qwen3-VL 2B](/docs/core-ai/models#hosted-exports)                          |
-| Image generation   | `generateImage` with `coreAI.imageModel`                                       | [FLUX.2 klein 4B](/docs/core-ai/models#hosted-exports)                      |
-| Video generation   | `experimental_generateVideo` with `coreAI.videoModel`                          | [Wan 2.1 T2V 1.3B](/docs/core-ai/models#hosted-exports), macOS only for now |
-| Transcription      | `transcribe`, `experimental_streamTranscribe` with `coreAI.transcriptionModel` | [Parakeet TDT 0.6B v3](/docs/core-ai/models#hosted-exports)                 |
-| Embeddings         | `embed`, `embedMany` with `coreAI.embeddingModel`                              | [CLIP ViT-B/32](/docs/core-ai/models#hosted-exports)                        |
-| Object detection   | `CoreAI.runTask('object-detection', ...)`                                      | [YOLOS-tiny](/docs/core-ai/models#hosted-exports)                           |
-| Segmentation       | `CoreAI.runTask('segmentation', ...)`                                          | [EfficientSAM-Ti](/docs/core-ai/models#hosted-exports)                      |
-| Video segmentation | `CoreAI.runTask('video-segmentation', ...)`                                    | [SAM 3 video](/docs/core-ai/models#hosted-exports)                          |
-| Super-resolution   | `CoreAI.runTask('super-resolution', ...)`                                      | [EDSR x2](/docs/core-ai/models#hosted-exports)                              |
-| Classification     | `CoreAI.runTask('classification', ...)`                                        | [PVT v2 b0](/docs/core-ai/models#hosted-exports)                            |
-| Depth estimation   | `CoreAI.runTask('depth', ...)`                                                 | [Depth Anything 3 small](/docs/core-ai/models#hosted-exports)               |
-| Any `.aimodel`     | `CoreAI.runRawFunction(...)`                                                   | Your own export                                                 |
+You don't have to export anything to start: we host [ready-to-use models](/docs/core-ai/models#hosted-exports) for every task. Download one into your app and point the provider at it.
 
 For Apple's built-in system models (Foundation Models, SpeechAnalyzer and others), use the [Apple provider](/docs/apple/getting-started) instead.
 
 ## Installation
 
-<PackageManagerTabs command="install @react-native-ai/core-ai @react-native-ai/apple" />
+<PackageManagerTabs command="install @react-native-ai/core-ai @react-native-ai/apple ai" />
 
-`@react-native-ai/apple` is a peer dependency: Core AI language models run through the same Foundation Models session as Apple Intelligence. To use the AI SDK functions, you'll need v7+ and [required polyfills](/docs/polyfills):
-
-<PackageManagerTabs command="install ai" />
+`@react-native-ai/apple` is a peer dependency, since Core AI language models run through Foundation Models. The AI SDK needs its [polyfills](/docs/polyfills).
 
 ## Requirements
 
@@ -40,7 +24,7 @@ For Apple's built-in system models (Foundation Models, SpeechAnalyzer and others
 
 ## Native Setup
 
-The pod links Apple's `coreai-models` Swift Package (1.0.0 up to the next major version) during `pod install`, so there is no Xcode step.
+There's no Xcode step: `pod install` links Apple's `coreai-models` package. You only need to raise the deployment target to iOS 27.
 
 ### Expo
 

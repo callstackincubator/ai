@@ -2,9 +2,8 @@
 title: "Generating"
 ---
 
-Use `apple()` with the AI SDK's `generateText` and `streamText` to run Apple
-Foundation Models. Text generation needs iOS 26. Features that need a newer
-version say so, and [iOS Versions](/docs/apple/ios-versions) has the full matrix.
+Generate text with Apple Foundation Models: pass `apple()` to the AI SDK's
+`generateText` or `streamText`.
 
 ## Text Generation
 
@@ -69,8 +68,9 @@ for await (const delta of result.textStream) {
 
 ## Structured Output
 
-Use `Output.object` to generate an object that matches a schema. It uses
-Apple's guided generation, so the model can only produce valid output:
+Get a typed object back instead of free text with `Output.object`. Apple's
+guided generation constrains the model to the schema, so the output always
+matches it:
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
@@ -163,10 +163,9 @@ Apple has three levels. `minimal` and `low` map to `light`, `medium` to
 `moderate`, and `high` and above to `deep`. `none` and `provider-default` keep
 Apple's default.
 
-Private Cloud Compute supports reasoning. Models that cannot reason, such as
-the on-device model on current hardware and every model before iOS 27, ignore
-the option and return an `unsupported` warning, so check `supportsReasoning`
-from `getModelInfo` first.
+Today, only Private Cloud Compute reasons. Other models ignore the option with
+an `unsupported` warning, so check `supportsReasoning` from `getModelInfo`
+first.
 
 Reasoning is returned as `reasoning` content, and streamed as reasoning parts.
 It is replayed in later turns, while reasoning from other providers is left out

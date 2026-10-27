@@ -2,9 +2,7 @@
 title: "Vision"
 ---
 
-Find objects in photos, cut them out, track them through a video, upscale, label, or estimate depth, all on the device. The AI SDK has no API for these tasks, so they run through `CoreAI.runTask(task, config, input, options)`. Images are file URIs, and are decoded with their EXIF orientation applied, so coordinates match the image as it is displayed. Super-resolution, classification, depth and video segmentation keep the model last used loaded, while object detection and segmentation load theirs on each call.
-
-These calls take the same config as the providers, with `source` and an optional `id`.
+Find objects in photos, cut them out, track them through a video, upscale, label, or estimate depth, all on the device. The AI SDK has no API for these tasks, so each one runs through `CoreAI.runTask`, with the same model config as the providers:
 
 ```typescript
 import { CoreAI } from '@react-native-ai/core-ai'
@@ -21,14 +19,14 @@ const { output, metadata } = await CoreAI.runTask(
 
 ## Object Detection
 
-Find the objects in a photo, each with a label and a box. Runs DETR-style detectors (the [hosted YOLOS-tiny export](/docs/core-ai/models#hosted-exports), COCO classes):
+Find the objects in a photo, each with a label and a box, as in the example above. The [hosted YOLOS-tiny](/docs/core-ai/models#hosted-exports) knows the 80 COCO classes, such as person, car and dog.
 
 - **Output**: `output.detections`, each with `label`, `labelIndex`, `confidence` and `box` (`x`, `y`, `width`, `height` in image pixels)
 - **Options**: `threshold`, `maxDetections`, `inputWidth`, `inputHeight`
 
 ## Segmentation
 
-Cut an object out of a photo as a mask. Runs `coreai-models` segmenters (the [hosted EfficientSAM-Ti export](/docs/core-ai/models#hosted-exports), or the [SAM 3 community export](/docs/core-ai/models#community-exports) for text prompts). Describe what to segment with a box, points or text:
+Cut an object out of a photo as a mask. Point at it with a box or points using the [hosted EfficientSAM-Ti](/docs/core-ai/models#hosted-exports), or describe it in words with [SAM 3](/docs/core-ai/models#community-exports):
 
 ```typescript
 const efficientSAM = {
@@ -51,13 +49,13 @@ const sam3 = { id: 'sam3', source: sam3Model }
 await CoreAI.runTask('segmentation', sam3, { imageUri, text: 'cat' })
 ```
 
-- **Output**: `output.segments`, each with `score`, `box`, and `mask`, a base64 PNG at image resolution that is white where the object is and transparent elsewhere, to tint and draw over the image
+- **Output**: `output.segments`, each with `score`, `box` and `mask`: a PNG the size of the image, white where the object is and transparent elsewhere, ready to tint and draw over it
 - **Points**: `label: 1` marks the object and `label: 0` the background. `data.queries` takes several point groups at once
 - **Options**: `maskThreshold`, `maxSegments`, and `tokenizerContextLength` for text prompts
 
 ## Video Segmentation
 
-Finds the objects that text prompts describe in a video, and tracks them from frame to frame (the [hosted SAM 3 video export](/docs/core-ai/models#hosted-exports)):
+Find the objects you describe in a video and follow them from frame to frame, with the [hosted SAM 3 video](/docs/core-ai/models#hosted-exports):
 
 ```typescript
 const { output } = await CoreAI.runTask(
@@ -72,23 +70,23 @@ const { output } = await CoreAI.runTask(
 ```
 
 - Object ids stay the same across frames. One prompt can also go in `input.text`
-- `includeMasks: true` adds each object's mask as a base64 PNG at the video size, which adds up for long videos
+- `includeMasks: true` adds each object's mask as a PNG, which adds up for long videos
 - `scoreThreshold` (0.5), `newObjectThreshold` (0.7) and `maxObjects` tune tracking
 
 ## Super-resolution
 
-Make a photo sharper at a larger size. Upscales an image with an EDSR-style model that takes `[batch, 3, height, width]` RGB in 0...1 (the [hosted EDSR x2 export](/docs/core-ai/models#hosted-exports)):
+Make a photo larger and sharper. The [hosted EDSR x2](/docs/core-ai/models#hosted-exports) doubles its size:
 
 ```typescript
 const { output } = await CoreAI.runTask('super-resolution', edsr, { imageUri })
 // output: { image, width, height, scale }, image is a base64 PNG
 ```
 
-Images larger than `tileSize` (256 px) are upscaled in tiles that overlap by `tileOverlap` (16 px), so any image size works.
+Large images are upscaled in overlapping tiles, so any size works. `tileSize` (256 px) and `tileOverlap` (16 px) set them.
 
 ## Classification
 
-Say what a photo shows. Classifies an image with a model that takes `[1, 3, height, width]` normalized RGB and returns logits (the [hosted PVT v2 b0 export](/docs/core-ai/models#hosted-exports), ImageNet-1k):
+Say what a photo shows. The [hosted PVT v2 b0](/docs/core-ai/models#hosted-exports) picks from the 1,000 ImageNet classes:
 
 ```typescript
 const { output } = await CoreAI.runTask(
@@ -100,12 +98,12 @@ const { output } = await CoreAI.runTask(
 // output.classifications: [{ index: 281, label: 'tabby, tabby cat', confidence: 0.36 }, ...]
 ```
 
-- Class names come from `options.labels`, or a `labels.json` array next to the model. Set `source` to the folder that contains both the model and `labels.json`
+- Class names come from the `labels.json` next to the model, so point `source` at the folder. `options.labels` overrides them
 - `applySoftmax: false` keeps the scores of models that already return probabilities
 
 ## Depth Estimation
 
-Tell which parts of a photo are near and which are far. Estimates relative depth with a Depth Anything-style model (the [hosted Depth Anything 3 small export](/docs/core-ai/models#hosted-exports)):
+Tell which parts of a photo are near and which are far, with the [hosted Depth Anything 3 small](/docs/core-ai/models#hosted-exports):
 
 ```typescript
 const { output } = await CoreAI.runTask('depth', depthAnything, { imageUri })
@@ -113,12 +111,13 @@ const { output } = await CoreAI.runTask('depth', depthAnything, { imageUri })
 // output.depth: the float32 depth map at model resolution, smaller is nearer
 ```
 
-`readTensor(output.depth)` returns the map as a `Float32Array`, with `output.min` and `output.max`. Models that take several views get the image as each view.
+`readTensor(output.depth)` returns the map as a `Float32Array`, with `output.min` and `output.max`.
 
-The task reads the model's output as depth, where smaller is nearer, like Depth Anything 3. Models that return inverse depth (disparity), such as Depth Anything V2, have larger values for nearer points, so their map comes back reversed: use `output.depth` and flip it, or run them as [raw function calls](/docs/core-ai/raw-functions).
+Models that return inverse depth instead, such as Depth Anything V2, come back reversed: flip `output.depth`, or run them as [raw function calls](/docs/core-ai/raw-functions).
 
 ## Common Options
 
-- Classification and depth normalize RGB with the ImageNet mean and std, and `mean` and `std` override them
-- `computeUnits` (`'default' | 'cpu' | 'gpu' | 'neural-engine'`) picks the compute unit Core AI specializes super-resolution, classification and depth models for
-- `functionName` runs a function other than `main`
+- Images are file URIs. Their EXIF orientation is applied, so coordinates match the image as displayed.
+- `computeUnits` (`'default' | 'cpu' | 'gpu' | 'neural-engine'`) picks where super-resolution, classification and depth run.
+- `mean` and `std` override the ImageNet normalization of classification and depth.
+- `functionName` runs a function other than `main`, for your own exports.

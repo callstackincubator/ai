@@ -2,7 +2,7 @@
 title: "Generating"
 ---
 
-Run open language models that you ship with your app, such as Qwen3, with the AI SDK's `generateText` and `streamText`. Create the model with `coreAI.languageModel(config)`, pointing at a bundle exported with the `coreai-models` LLM recipes, such as [Qwen3 0.6B](/docs/core-ai/models#hosted-exports).
+Generate text with a language model you ship, such as the [hosted Qwen3 0.6B](/docs/core-ai/models#hosted-exports): pass `coreAI.languageModel(config)` to the AI SDK's `generateText` or `streamText`.
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
@@ -25,13 +25,13 @@ for await (const delta of result.textStream) {
 }
 ```
 
-The model loads on the first call and stays loaded. Call `await model.prepare()` to load it ahead of time, and `await model.unload()` to release it.
+The model loads on the first call and stays loaded. Call `model.prepare()` to load it ahead of time, and `model.unload()` to free the memory.
 
-Every call replays the whole message history into a new native session, so the AI SDK owns the conversation. To keep it inside the model's context window, see [Conversation History](/docs/history).
+Each call sends the whole conversation, as with any AI SDK model. To keep long chats within the context window, see [Conversation History](/docs/history).
 
 ## Structured Output
 
-Get a typed object back instead of free text. Pass a schema, and the model runs guided generation, so its output always matches it:
+Get a typed object back instead of free text. The model is constrained to the schema, so its output always matches it:
 
 ```typescript
 import { generateText, Output } from 'ai'
@@ -46,11 +46,11 @@ const { output } = await generateText({
 })
 ```
 
-When streaming, the JSON arrives in one piece once it is complete. Models whose inference engine has no per-step logits cannot run guided generation, and reject with a `CORE_AI_UNSUPPORTED_CAPABILITY` error.
+When streaming, the object arrives in one piece once it is complete. A few model types can't constrain their output and reject with `CORE_AI_UNSUPPORTED_CAPABILITY`.
 
 ## Tool Calling
 
-Let the model call your JavaScript functions, for example to look something up in your app. Function tools are passed to the model. A tool call ends the generation and comes back as a `tool-call` part, so the AI SDK runs the tool and replays its result on the next call. Set `stopWhen` to let the model answer with the result:
+Let the model call your JavaScript functions, for example to look something up in your app. The AI SDK runs the tool and sends the result back, so set `stopWhen` to give the model a step to answer with it:
 
 ```typescript
 import { generateText, stepCountIs, tool } from 'ai'
@@ -70,11 +70,11 @@ const { text } = await generateText({
 })
 ```
 
-Core AI models decide themselves whether to call a tool, so a `required` or named `toolChoice` returns a warning and is treated as optional. A named tool is the only one offered. Provider-defined tools are left out with a warning.
+The model always decides whether to call a tool: a `required` or named `toolChoice` is treated as optional, with a warning. Provider-defined tools aren't supported.
 
 ## Image Prompts
 
-Ask questions about a photo. Vision language model bundles (`kind: "vlm"` in their `metadata.json`), such as [Qwen3-VL 2B](/docs/core-ai/models#hosted-exports), read an image alongside the prompt. Pass the image as a file part of the last user message, from a `file://` URL or as base64:
+Ask questions about a photo with a vision language model, such as the [hosted Qwen3-VL 2B](/docs/core-ai/models#hosted-exports). Pass the image as a file part of the last user message, from a `file://` URL or as base64:
 
 ```typescript
 const vision = coreAI.languageModel({
@@ -100,14 +100,13 @@ const { text } = await generateText({
 })
 ```
 
-- Apple's VLM engine answers one image and one prompt. It reads the first image and joins the text of the user turns, and ignores assistant replies, `system` and sampling settings (it decodes greedily). A prompt without an image is rejected, and so is structured output, with `CORE_AI_UNSUPPORTED_CAPABILITY`.
-- Native sessions take text prompts only, so `createSession()` rejects vision language models. Use `generateText` or `streamText`.
-- Other language models reject image prompts.
-- The Qwen3-VL bundle is exported in the macOS format, which loads its weights on the GPU. On an iPhone it needs the [increased memory limit](/docs/core-ai/getting-started#memory-limit); without it, iOS stops the app while the model loads.
+- Each call answers one image and one prompt. Earlier replies, `system`, sampling settings and structured output aren't supported, and a prompt without an image is rejected.
+- Vision models don't work with [native sessions](#native-sessions).
+- On an iPhone, Qwen3-VL needs the [increased memory limit](/docs/core-ai/getting-started#memory-limit), or iOS stops the app while the model loads.
 
 ## Reasoning
 
-Let the model think before it answers, for harder questions. The `reasoning` call option sets the thinking effort: `minimal` and `low` map to `light`, `medium` to `moderate`, and `high` and above to `deep`. `reasoning: 'none'` turns thinking off. `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`) takes precedence:
+Let the model think before it answers, for harder questions. Set the effort with the AI SDK's `reasoning` option, or with Core AI's own levels in `providerOptions['core-ai'].reasoningLevel` (`'none' | 'light' | 'moderate' | 'deep'`):
 
 ```typescript
 const result = await generateText({
@@ -119,15 +118,15 @@ const result = await generateText({
 console.log(result.reasoningText)
 ```
 
-Reasoning comes back as reasoning parts, and `usage` reports reasoning tokens.
+`reasoning: 'none'` turns thinking off. `minimal` and `low` map to `light`, `medium` to `moderate`, and anything higher to `deep`. `usage` counts reasoning tokens.
 
 ## Settings
 
-Core AI language models read `temperature` and `maxOutputTokens`. They ignore `topP`, `topK`, `seed`, `presencePenalty`, `frequencyPenalty` and `stopSequences`, and return a warning when those are set.
+Core AI language models support `temperature` and `maxOutputTokens`. Other sampling settings are ignored with a warning.
 
 ## Native Sessions
 
-A native session keeps its transcript on the device, for apps that don't need the AI SDK to own the history:
+If you don't need the AI SDK to manage the conversation, a native session keeps it on the device instead:
 
 ```typescript
 const session = await model.createSession({
@@ -144,4 +143,4 @@ for await (const update of stream) {
 await session.close()
 ```
 
-`respond` resolves with the response parts, and `stream` emits the full response text so far with each update. Sessions end when the model unloads.
+Each `stream` update holds the whole response so far. Sessions end when the model unloads.

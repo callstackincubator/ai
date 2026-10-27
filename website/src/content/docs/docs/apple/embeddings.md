@@ -2,10 +2,10 @@
 title: "Embeddings"
 ---
 
-Generate text embeddings on device with Apple's
-[`NLContextualEmbedding`](https://developer.apple.com/documentation/naturallanguage/nlcontextualembedding),
-a BERT-style model available on iOS 17 and later. Use them for semantic
-search, similarity, and clustering.
+Turn text into embeddings for semantic search, similarity and clustering, with
+Apple's built-in
+[`NLContextualEmbedding`](https://developer.apple.com/documentation/naturallanguage/nlcontextualembedding)
+model. It needs iOS 17.
 
 ## Usage
 

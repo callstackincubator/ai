@@ -2,7 +2,10 @@
 title: "Embeddings"
 ---
 
-Search across text and photos by meaning, on the device. `coreAI.embeddingModel(config)` runs CLIP-style exports with the AI SDK's `embed` and `embedMany`, and embeds images into the same space, so a text query such as "a dog on a beach" finds the matching photos.
+Search text and photos by meaning. A CLIP model puts text and images in the
+same space, so a query such as "a dog on a beach" finds the matching photos.
+Use the [hosted CLIP ViT-B/32 model](/docs/core-ai/models#hosted-exports) with
+the AI SDK's `embed` and `embedMany`:
 
 ```typescript
 import { coreAI } from '@react-native-ai/core-ai'
@@ -21,9 +24,12 @@ const { embeddings } = await embedMany({
 })
 ```
 
+The hosted model returns 512-dimensional, normalized embeddings.
+
 ## Images
 
-The AI SDK has no image embedding call, so the model has its own:
+The AI SDK has no call for image embeddings, so the model has its own. It
+takes file URIs:
 
 ```typescript
 const {
@@ -33,19 +39,16 @@ const {
 const scores = embeddings.map((text) => cosineSimilarity(text, photo))
 ```
 
-`embedImages` takes file URIs, and embeds them in batches.
+## Options
 
-## Model Format
+- `providerOptions['core-ai'].batchSize` sets how many texts are embedded at
+  once (16 by default), for models with a dynamic batch size.
+- `mean` and `std` override the CLIP normalization of images.
 
-The model folder holds an `.aimodel` with two functions, and the CLIP tokenizer:
+## Your Own Exports
 
-- `encode_text(input_ids, attention_mask)`: `[batch, 77]` int32 token ids, returning `[batch, dimensions]`
-- `encode_image(pixel_values)`: `[batch, 3, 224, 224]` RGB, returning `[batch, dimensions]`
-- `tokenizer/tokenizer.json`
-
-The [hosted CLIP ViT-B/32 export](/docs/core-ai/models#hosted-exports) returns 512-dimensional L2-normalized embeddings. Its card links the export script, which splits Apple's CLIP recipe into the two functions.
-
-- Text is tokenized to the function's context length (77 for CLIP), and embedded 16 values at a time. `providerOptions['core-ai'].batchSize` changes that, for functions with a dynamic batch dimension. Functions exported with a fixed batch size embed that many at a time, padding the last batch.
-- Images are resized on the shorter side, cropped to the center, and normalized with the CLIP mean and std. `mean` and `std` options override them.
-- `textFunction` and `imageFunction` options name other functions, and models with a single `main` function work too.
-- Embeddings need no `coreai-models` product of their own: the CLIP tokenizer ships with every product.
+An export needs an `encode_text` and an `encode_image` function, plus the CLIP
+tokenizer in `tokenizer/tokenizer.json`. Apple's CLIP recipe exports a single
+function, so the hosted model's card links a script that splits it. Use
+`textFunction` and `imageFunction` to name other functions; a model with a
+single `main` function works too.

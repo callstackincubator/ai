@@ -2,13 +2,12 @@
 title: "AI SDK Profiler DevTools"
 ---
 
-A Rozenite plugin that captures Vercel AI SDK spans and surfaces them in
-Rozenite DevTools. Inspect requests, inputs, outputs, provider metadata, and
-latency.
+See every AI SDK call your app makes, with its inputs, outputs, provider
+metadata and timing, in Rozenite DevTools.
 
 ![AI SDK Profiler preview](/dev-tools-preview.png)
 
-DevTools are runtime agnostic, so they work with on-device and remote runtimes.
+It works the same for on-device and remote models.
 
 ## Installation
 
@@ -18,9 +17,8 @@ npm install @react-native-ai/dev-tools @ai-sdk/otel
 
 ## Rozenite setup
 
-This plugin requires Rozenite to be installed and enabled in your app.
-Follow the Rozenite getting started guide to install and configure it:
-https://www.rozenite.dev/docs/getting-started
+The plugin runs inside Rozenite, so install and enable it first with the
+[Rozenite getting started guide](https://www.rozenite.dev/docs/getting-started).
 
 ## Quick Start
 

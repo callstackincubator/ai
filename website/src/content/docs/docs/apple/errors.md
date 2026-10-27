@@ -2,10 +2,9 @@
 title: "Error Handling"
 ---
 
-Errors from Foundation Models carry a stable `code` you can use for control
-flow. Other errors, such as a tool that is not registered or a code this
-version of the library does not know, are plain `Error`s without one, so check
-`code` before relying on it.
+Errors from Foundation Models carry a stable `code` you can branch on. A few
+errors, such as calling a tool you didn't register, have none, so check that
+`code` is set first.
 
 ## Content Filters
 

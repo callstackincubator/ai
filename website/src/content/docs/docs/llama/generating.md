@@ -2,9 +2,9 @@
 title: "Generating"
 ---
 
-Use a llama language model with the AI SDK's `generateText` and `streamText`.
-The examples start from a prepared model, see
-[Getting Started](/docs/llama/getting-started#usage):
+Generate text with any GGUF model: pass a llama language model to the AI
+SDK's `generateText` or `streamText`. The examples start from a prepared model,
+as in [Getting Started](/docs/llama/getting-started#usage):
 
 ```typescript
 import { downloadModel, llama } from '@react-native-ai/llama'
