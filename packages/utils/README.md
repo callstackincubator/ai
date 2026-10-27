@@ -1,7 +1,6 @@
 # @react-native-ai/utils
 
-**Fit long chats into small on-device context windows.**
-
+Keep long chats working on small on-device context windows.
 `wrapLanguageModelWithHistory` wraps any Vercel AI SDK language model,
 including the Apple, Llama and ADK providers, and compacts the conversation
 before each request.

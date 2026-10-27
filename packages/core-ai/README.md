@@ -1,14 +1,13 @@
 # @react-native-ai/core-ai
 
-**Your own Core AI models on iPhone, as a Vercel AI SDK provider for React Native.**
+Bring your own model to iPhone and run it on Apple's Core AI framework. Export
+a model with [`apple/coreai-models`](https://github.com/apple/coreai-models),
+such as Qwen3 for chat or FLUX.2 for images, and run it on-device from React
+Native. Use it for text, image and video generation, transcription, embeddings,
+and vision tasks such as segmentation and object detection.
 
-Bring a model bundle exported with
-[`apple/coreai-models`](https://github.com/apple/coreai-models), such as Qwen3
-or FLUX.2, and run it on-device with Apple's Core AI framework.
-
-Call it with `generateText`, `streamText`, `generateImage`, `transcribe`,
-`embed` and `experimental_generateVideo`, or use the native APIs for vision
-tasks.
+It also comes as a [Vercel AI SDK](https://ai-sdk.dev) provider, so it drops
+into code that already uses the AI SDK.
 
 > [!WARNING]
 > Work in progress. This package is not published to npm yet.

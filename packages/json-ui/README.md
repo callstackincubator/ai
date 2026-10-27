@@ -1,11 +1,8 @@
 # @react-native-ai/json-ui
 
-**Let a language model build React Native UI.**
-
-The model calls tools that add, update and remove nodes in a JSON spec, and
-`GenerativeUIView` renders it.
-
-It plugs into Vercel AI SDK tool calling and is designed for small on-device
+Let a language model build React Native UI. The model calls tools that add,
+update and remove nodes in a JSON spec, and `GenerativeUIView` renders it. It
+plugs into Vercel AI SDK tool calling, and is designed for small on-device
 models with limited context.
 
 **This package provides:**

@@ -2,11 +2,10 @@
 
 # @react-native-ai/dev-tools
 
-**See every Vercel AI SDK call your React Native app makes.**
-
-The AI SDK Profiler is a [Rozenite](https://www.rozenite.dev) DevTools plugin.
-It captures the OpenTelemetry spans the AI SDK emits and shows their inputs,
-outputs, tool calls, provider metadata and latency.
+See every Vercel AI SDK call your React Native app makes. The AI SDK Profiler
+is a [Rozenite](https://www.rozenite.dev) DevTools plugin that captures the
+OpenTelemetry spans the AI SDK emits and shows their inputs, outputs, tool
+calls, provider metadata and latency.
 
 ![AI SDK Profiler preview](../../website/src/public/dev-tools-preview.png)
 

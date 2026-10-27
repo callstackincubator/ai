@@ -1,15 +1,15 @@
 # @react-native-ai/apple
 
-**Apple Intelligence and the other built-in iOS models, as a Vercel AI SDK provider for React Native.**
+Add AI features to your iOS app without shipping a model. Chat, summaries,
+structured data extraction and tool-using assistants run on Apple Intelligence,
+and semantic search, voice input and spoken output run on system models. Data
+stays on the device, there are no API costs, and your app stays small, since
+iOS provides the models.
 
-Text generation (Foundation Models), embeddings, speech-to-text and
-text-to-speech all run on-device with the models that ship with iOS.
-
-Your app has no model to bundle or download, although iOS may download model
-assets the first time they are used.
-
-Call them with the usual AI SDK functions: `generateText`, `streamText`,
-`embed`, `transcribe` and `generateSpeech`.
+When a task needs more than the on-device model, iOS 27 can send it to Apple's
+Private Cloud Compute instead. It also comes as a
+[Vercel AI SDK](https://ai-sdk.dev) provider, so it drops into code that
+already uses the AI SDK.
 
 To run models you choose and ship yourself, see
 [`@react-native-ai/core-ai`](../core-ai) or

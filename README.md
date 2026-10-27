@@ -9,15 +9,6 @@ Each provider package wraps one on-device runtime, such as Apple Intelligence
 on iOS, Gemini Nano on Android or llama.cpp on both, and exposes it as an AI
 SDK provider.
 
-You write the same `generateText`, `streamText` or `embed` call you would for a
-cloud model, and it runs locally: no server, no per-request cost, and the data
-never leaves the device.
-
-- 🚀 **Instant AI** - Use the models built into iOS and Android, with nothing to bundle
-- 🔒 **Privacy-first** - Inference runs on-device, so data stays local. Cloud models are opt-in
-- 🎯 **Vercel AI SDK compatible** - Swap local and cloud models without changing your code
-- 🎨 **Beyond text** - Embeddings, reranking, transcription, speech and image generation
-
 ## Providers
 
 Providers come in two kinds: built-in models that ship with the operating
@@ -37,10 +28,11 @@ system, and custom models that your app downloads or bundles.
 | [Llama](#llama)                    | [`@react-native-ai/llama`](./packages/llama)     | iOS, Android | llama.cpp-compatible GGUF models                  |
 | [Core AI](#core-ai) (not released) | [`@react-native-ai/core-ai`](./packages/core-ai) | iOS 27+      | Model bundles exported with `apple/coreai-models` |
 
-**Llama or Core AI?** Use Llama to run the same model on iOS and Android, or
-a GGUF model from Hugging Face. Use Core AI when your app targets iOS 27+ and
-you want Apple's own runtime, or need what Llama doesn't cover: image and video
-generation, and vision tasks such as segmentation and object detection.
+> [!TIP]
+> **Llama or Core AI?** Use Llama to run the same model on iOS and Android, or
+> a GGUF model from Hugging Face. Use Core AI when your app targets iOS 27+ and
+> you want Apple's own runtime, or need what Llama doesn't cover: image and
+> video generation, and vision tasks such as segmentation and object detection.
 
 ### Apple Intelligence
 
@@ -150,31 +142,6 @@ These work with any AI SDK provider, on-device or cloud.
 | [`@react-native-ai/json-ui`](./packages/json-ui)     | Let a tool-calling model build React Native UI from a JSON spec           |
 | [`@react-native-ai/dev-tools`](./packages/dev-tools) | Inspect AI SDK calls in Rozenite DevTools                                 |
 | [`@react-native-ai/utils`](./packages/utils)         | Compact conversation history for small context windows (not released yet) |
-
-### DevTools
-
-![AI SDK Profiler preview](website/src/public/dev-tools-preview.png)
-
-The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
-requests and surfaces them in Rozenite DevTools.
-
-```bash
-npm install @react-native-ai/dev-tools @ai-sdk/otel
-```
-
-Register the profiler's tracer with `registerTelemetry` at app startup, see the
-[package README](./packages/dev-tools) for the setup. Rozenite must be
-installed and enabled in your app. See the
-[Rozenite getting started guide](https://www.rozenite.dev/docs/getting-started).
-
-The Expo demo app in [apps/expo-example](./apps/expo-example)
-includes native-development Rozenite wiring for this plugin. Run the example
-app, open React Native DevTools, and select `AI SDK Profiler` to inspect chat
-spans emitted by the Vercel AI SDK.
-
-If the `AI SDK Profiler` panel stays empty after you send a message, close the
-React Native DevTools window and open a new one. A stale debugger session can
-keep the panel mounted without receiving telemetry.
 
 ## AI SDK Compatibility
 
