@@ -45,6 +45,7 @@ export function setupLanguageModel() {
 const VISION_MODELS = {
   'yolos-tiny.aimodel': 'grabbou/yolos-tiny-CoreAI',
   'efficient-sam': 'grabbou/EfficientSAM-Ti-CoreAI',
+  'edsr-x2.aimodel': 'grabbou/edsr-x2-CoreAI',
 }
 
 export function setupVisionModel(name: keyof typeof VISION_MODELS) {
