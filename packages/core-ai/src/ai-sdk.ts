@@ -519,6 +519,11 @@ export class CoreAIVideoModel implements VideoModelV4 {
         prompt,
         options
       )) as CoreAIVideoGenerationResult
+    } catch (error) {
+      if (abortSignal?.aborted) {
+        throw toAbortError(abortSignal)
+      }
+      throw error
     } finally {
       abortSignal?.removeEventListener('abort', onAbort)
     }
