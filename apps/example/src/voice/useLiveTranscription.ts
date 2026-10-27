@@ -2,7 +2,7 @@ import {
   experimental_streamTranscribe as streamTranscribe,
   type TranscriptionModel,
 } from 'ai'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AudioContext,
   AudioManager,
@@ -46,6 +46,17 @@ export function useLiveTranscription(model: TranscriptionModel) {
     timer: ReturnType<typeof setInterval>
     text: string
   } | null>(null)
+
+  // Stops the microphone and timers when the screen goes away mid-recording
+  useEffect(
+    () => () => {
+      if (simulationRef.current) clearInterval(simulationRef.current.timer)
+      recorderRef.current?.stop()
+      audioRef.current?.close()
+      audioContextRef.current?.close()
+    },
+    []
+  )
 
   // Reveals a scripted question word by word, with a moving level
   const startSimulation = () => {
@@ -117,7 +128,8 @@ export function useLiveTranscription(model: TranscriptionModel) {
         audioRef.current = null
       },
     })
-    transcriptionRef.current = transcribe(audio)
+    const transcription = transcribe(audio)
+    transcriptionRef.current = transcription
 
     // Small chunks, so the text keeps up with the speech
     recorder.onAudioReady(
@@ -150,6 +162,12 @@ export function useLiveTranscription(model: TranscriptionModel) {
       // Ends the transcription, which would otherwise wait for audio
       audioRef.current?.close()
       audioRef.current = null
+      transcription.catch(() => {})
+      audioContext.close()
+      transcriptionRef.current = null
+      recorderRef.current = null
+      recorderAdapterRef.current = null
+      audioContextRef.current = null
       throw error
     }
     if (audioContext.state === 'suspended') {
@@ -188,6 +206,7 @@ export function useLiveTranscription(model: TranscriptionModel) {
       transcriptionRef.current = null
       recorderRef.current = null
       recorderAdapterRef.current = null
+      audioContextRef.current?.close()
       audioContextRef.current = null
       setStatus('idle')
     }

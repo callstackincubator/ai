@@ -19,7 +19,10 @@ In the iOS Simulator, Voice hears a scripted question and Search matches shared 
 
 ## Running the App
 
+Run the commands in this README from `apps/example`:
+
 ```bash
+cd apps/example
 bun run ios
 ```
 
@@ -43,6 +46,8 @@ The device build sets `CORE_AI=1 PCC=1`:
 
 - `CORE_AI=1` links `@react-native-ai/core-ai`, which needs an iOS 27 deployment target and can't build for the Simulator. The tests in [`harness/core-ai`](../../harness/core-ai) download their models on the first run.
 - `PCC=1` adds Apple's managed Private Cloud Compute entitlement, so the team signing the app needs it, or the app crashes.
+
+The Qwen3-VL test in `harness/core-ai` needs more memory than iOS gives an app by default. Add `CORE_AI_MEMORY=1` to the device command for the increased memory limit entitlement, which the signing team's App ID must have. Without it, that test fails.
 
 Both commands regenerate the `ios` folder, so run `npx expo prebuild --clean` afterwards to go back to the default build.
 

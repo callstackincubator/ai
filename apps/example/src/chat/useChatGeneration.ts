@@ -35,7 +35,8 @@ const isGeneratingAtom = atom(false)
 let abortController: AbortController | null = null
 
 export function useChatGeneration() {
-  const { currentChat, selectChat, addMessage, truncateAfter } = useChats()
+  const { currentChat, selectChat, addMessage, addReply, truncateAfter } =
+    useChats()
   const { selectedModel } = useModels()
   const setStreamingReply = useSetStreamingReply()
   const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom)
@@ -86,7 +87,7 @@ export function useChatGeneration() {
     } finally {
       // The finished reply is saved once
       if (reply.content) {
-        addMessage(chatId, {
+        addReply(chatId, {
           id: reply.id,
           role: 'assistant',
           content: reply.content,
@@ -104,7 +105,8 @@ export function useChatGeneration() {
     // A new chat can be titled, otherwise it takes the message's start
     { newChat = false, title }: { newChat?: boolean; title?: string } = {}
   ) => {
-    if (isGenerating) return
+    // Without a model the message would never get a reply
+    if (isGenerating || !selectedModel) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     const message: Message = {
       id: generateId(),

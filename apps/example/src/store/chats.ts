@@ -1,7 +1,10 @@
 import { generateId } from 'ai'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
 
-import type { ImageAttachment } from '../utils/imageAttachments'
+import {
+  deleteAttachment,
+  type ImageAttachment,
+} from '../utils/imageAttachments'
 import { atomWithPersistence } from './storage'
 
 export type Message = {
@@ -68,6 +71,18 @@ export function useChats() {
     return id
   }
 
+  // Adds a reply to a chat that still exists, so a chat deleted while the
+  // reply was generating isn't brought back
+  const addReply = (chatId: string, message: Message) => {
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId
+          ? { ...chat, messages: [...chat.messages, message] }
+          : chat
+      )
+    )
+  }
+
   // Drops the messages after the given one, to regenerate its reply
   const truncateAfter = (chatId: string, messageId: string) => {
     setChats((prev) =>
@@ -79,7 +94,16 @@ export function useChats() {
     )
   }
 
+  // Photos are copied into the app, so they go with their chats
+  const deleteAttachments = (removed: Chat[]) => {
+    removed
+      .flatMap((chat) => chat.messages)
+      .flatMap((message) => message.attachments ?? [])
+      .forEach(deleteAttachment)
+  }
+
   const deleteChat = (chatId: string) => {
+    deleteAttachments(chats.filter((chat) => chat.id === chatId))
     setChats((prev) => prev.filter((chat) => chat.id !== chatId))
     if (chatId === currentChatId) {
       setCurrentChatId(null)
@@ -87,6 +111,7 @@ export function useChats() {
   }
 
   const deleteAllChats = () => {
+    deleteAttachments(chats)
     setChats([])
     setCurrentChatId(null)
   }
@@ -96,6 +121,7 @@ export function useChats() {
     currentChat,
     selectChat: setCurrentChatId,
     addMessage,
+    addReply,
     truncateAfter,
     deleteChat,
     deleteAllChats,

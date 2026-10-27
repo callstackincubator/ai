@@ -101,7 +101,13 @@ export function useModels() {
     availability,
     readyModels,
     selectedModel,
-    selectModel: setSelectedModelId,
+    // Frees the previous model, as each open model holds gigabytes of memory
+    selectModel: (modelId: string) => {
+      if (selectedModel && selectedModel.modelId !== modelId) {
+        selectedModel.unload()
+      }
+      setSelectedModelId(modelId)
+    },
     downloadModel,
     deleteModel,
   }

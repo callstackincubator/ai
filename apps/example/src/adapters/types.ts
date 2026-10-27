@@ -31,4 +31,6 @@ export interface SetupAdapter<TModel> {
   delete: () => Promise<void>
   // Load and prepare the model for inference
   prepare: () => Promise<void>
+  // Free the loaded model, when another one is selected
+  unload: () => Promise<void>
 }

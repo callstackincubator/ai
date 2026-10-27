@@ -1,7 +1,7 @@
 import { apple } from '@react-native-ai/apple'
 import { cosineSimilarity, embed, embedMany, generateId } from 'ai'
 import { File, Paths } from 'expo-file-system'
-import { atom, useAtom } from 'jotai'
+import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useState } from 'react'
 
 import { isSimulator } from '../simulator'
@@ -34,21 +34,49 @@ function readCache(): Vectors {
   }
 }
 
+// Deletes notes along with their cached vectors, which hold the note's text
+function useDeleteNotes() {
+  const setUserNotes = useSetAtom(userNotesAtom)
+  const [vectors, setVectors] = useAtom(vectorsAtom)
+
+  return (ids: string[]) => {
+    setUserNotes((prev) => prev.filter((note) => !ids.includes(note.id)))
+    const next = { ...(vectors ?? readCache()) }
+    ids.forEach((id) => delete next[id])
+    cacheFile.write(JSON.stringify(next))
+    if (vectors) setVectors(next)
+  }
+}
+
 export function useUserNotes() {
-  return useAtom(userNotesAtom)
+  const userNotes = useAtomValue(userNotesAtom)
+  const deleteNotes = useDeleteNotes()
+  return {
+    userNotes,
+    deleteAllNotes: () => deleteNotes(userNotes.map((note) => note.id)),
+  }
 }
 
 export function useSemanticSearch(query: string) {
   const [userNotes, setUserNotes] = useAtom(userNotesAtom)
   const [vectors, setVectors] = useAtom(vectorsAtom)
-  const [results, setResults] = useState<SearchResult[] | null>(null)
+  const deleteNotes = useDeleteNotes()
+  // Tagged with the query that produced them, so results for an older query
+  // are not shown while a newer one is embedded
+  const [results, setResults] = useState<{
+    query: string
+    items: SearchResult[]
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const notes: Note[] = [...userNotes, ...sampleNotes]
 
-  // Embeds the notes that have no vector yet
+  // Embeds the notes that have no vector yet. It depends on the notes and
+  // vectors only, so typing a query doesn't start another batch
   useEffect(() => {
     const cached = vectors ?? readCache()
-    const missing = notes.filter((note) => cached[note.id]?.text !== note.text)
+    const missing = [...userNotes, ...sampleNotes].filter(
+      (note) => cached[note.id]?.text !== note.text
+    )
     if (vectors && missing.length === 0) return
 
     let cancelled = false
@@ -64,9 +92,14 @@ export function useSemanticSearch(query: string) {
           missing.forEach((note, index) => {
             next[note.id] = { text: note.text, embedding: embeddings[index] }
           })
+          // Notes deleted meanwhile cancel this batch, so it can't write them back
+          if (cancelled) return
           cacheFile.write(JSON.stringify(next))
         }
-        if (!cancelled) setVectors(next)
+        if (!cancelled) {
+          setVectors(next)
+          setError(null)
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       }
@@ -74,7 +107,7 @@ export function useSemanticSearch(query: string) {
     return () => {
       cancelled = true
     }
-  })
+  }, [userNotes, vectors, setVectors])
 
   // Ranks the notes by how close their meaning is to the query
   useEffect(() => {
@@ -89,8 +122,9 @@ export function useSemanticSearch(query: string) {
           value: text,
         })
         if (cancelled) return
-        setResults(
-          [...userNotes, ...sampleNotes]
+        setResults({
+          query: text,
+          items: [...userNotes, ...sampleNotes]
             .filter((note) => vectors[note.id])
             .map((note) => ({
               ...note,
@@ -99,8 +133,9 @@ export function useSemanticSearch(query: string) {
             // Notes that share nothing with the query are left out
             .filter((note) => note.score > 0)
             .sort((a, b) => b.score - a.score)
-            .slice(0, 12)
-        )
+            .slice(0, 12),
+        })
+        setError(null)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       }
@@ -115,14 +150,12 @@ export function useSemanticSearch(query: string) {
     setUserNotes((prev) => [{ id: generateId(), text }, ...prev])
   }
 
-  const deleteNote = (id: string) => {
-    setUserNotes((prev) => prev.filter((note) => note.id !== id))
-  }
+  const deleteNote = (id: string) => deleteNotes([id])
 
   return {
     notes,
-    // Results only apply while there is a query
-    results: query.trim() ? results : null,
+    // Results only apply to the current query
+    results: results && results.query === query.trim() ? results.items : null,
     isIndexing: vectors === null && error === null,
     error,
     addNote,

@@ -25,5 +25,7 @@ export function createAppleLanguageSetupAdapter(): SetupAdapter<LanguageModelV4>
     async prepare() {
       await model.prepare()
     },
+    // The system manages Apple's model
+    async unload() {},
   }
 }

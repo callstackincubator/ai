@@ -36,7 +36,7 @@ This is a monorepo with the following packages:
    # Run example app
    cd apps/example
    bun run start
-   bun run android  # or ios
+   bun run ios  # the example app is iOS only
    ```
 
 ## Development Guidelines
@@ -96,7 +96,7 @@ bun run typecheck
 ```bash
 cd apps/example
 bun run start
-bun run android
+bun run ios
 ```
 
 ### Native Development

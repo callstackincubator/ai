@@ -102,11 +102,11 @@ function RuntimeSection({ runtime }: { runtime: Runtime }) {
 }
 
 export default function Settings() {
-  const { isEnabled, toggleFeature } = useEnabledFeatures()
+  const { enabledFeatures, isEnabled, toggleFeature } = useEnabledFeatures()
   const { setOnboarded } = useOnboarding()
   const { readyModels, selectedModel, selectModel } = useModels()
   const { chats, deleteAllChats } = useChats()
-  const [userNotes, setUserNotes] = useUserNotes()
+  const { userNotes, deleteAllNotes } = useUserNotes()
 
   return (
     <Host style={styles.host}>
@@ -118,7 +118,13 @@ export default function Settings() {
               label={feature.title}
               systemImage={feature.symbol}
               isOn={isEnabled(feature.id)}
-              onIsOnChange={() => toggleFeature(feature.id)}
+              onIsOnChange={() => {
+                // With every feature off there would be no tab to come back to
+                if (isEnabled(feature.id) && enabledFeatures.length === 1) {
+                  return
+                }
+                toggleFeature(feature.id)
+              }}
             />
           ))}
         </Section>
@@ -160,8 +166,10 @@ export default function Settings() {
             label={`Delete My Notes (${userNotes.length})`}
             role="destructive"
             onPress={() =>
-              confirm('Delete your notes?', 'Sample notes stay.', () =>
-                setUserNotes([])
+              confirm(
+                'Delete your notes?',
+                'Sample notes stay.',
+                deleteAllNotes
               )
             }
           />

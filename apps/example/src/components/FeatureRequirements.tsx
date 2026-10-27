@@ -7,6 +7,7 @@ import type { FeatureId } from '../store/features'
 import {
   isTranscriptionAvailable,
   useEmbeddingsStatus,
+  useEnabledFeatures,
 } from '../store/features'
 import {
   chatModels,
@@ -126,6 +127,7 @@ function EmbeddingsRow() {
 
 // What a feature needs, with a way to get each missing piece
 export function FeatureRequirements({ feature }: { feature: FeatureId }) {
+  const { isEnabled } = useEnabledFeatures()
   switch (feature) {
     case 'chat':
       return (
@@ -155,6 +157,13 @@ export function FeatureRequirements({ feature }: { feature: FeatureId }) {
             subtitle="An on-device voice, answers come from your chat model"
             state="ready"
           />
+          {/* Voice answers with a chat model, listed under Chat when it's on */}
+          {!isEnabled('chat') && (
+            <>
+              <RuntimeGroup runtime="apple" />
+              <RuntimeGroup runtime="llama" />
+            </>
+          )}
         </>
       )
     case 'search':

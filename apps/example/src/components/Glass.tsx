@@ -33,7 +33,11 @@ export function Glass({
     <BlurView
       tint="systemChromeMaterial"
       intensity={100}
-      style={[styles.blur, style]}
+      style={[
+        styles.blur,
+        tintColor ? { backgroundColor: tintColor } : null,
+        style,
+      ]}
     >
       {children}
     </BlurView>

@@ -70,10 +70,15 @@ export function createLlamaLanguageSetupAdapter({
       }
     },
     async delete() {
+      // Frees the loaded model before its files go
+      await model.unload()
       await Promise.all(files.map(removeModel))
     },
     async prepare() {
       await model.prepare()
+    },
+    async unload() {
+      await model.unload()
     },
   }
 }

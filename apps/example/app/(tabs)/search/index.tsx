@@ -76,12 +76,13 @@ export default function SearchScreen() {
       .slice(0, 5)
       .map((note) => `- ${note.text}`)
       .join('\n')
-    send(
+    const messageId = send(
       `Using only my notes below, answer: ${query.trim()}\n\nMy notes:\n${context}`,
       [],
       { newChat: true, title: `Notes: ${query.trim()}` }
     )
-    router.navigate('/chat')
+    // Nothing is sent while another reply is generating
+    if (messageId) router.navigate('/chat')
   }
 
   const status = error ? (

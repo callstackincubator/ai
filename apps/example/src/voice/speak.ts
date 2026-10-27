@@ -16,21 +16,29 @@ export async function speak(text: string, signal?: AbortSignal) {
     iosMode: 'spokenAudio',
   })
   const context = new AudioContext()
-  // Copied into its own buffer, as the bytes can be a view into a larger one
-  const buffer = await context.decodeAudioData(
-    new Uint8Array(audio.uint8Array).buffer
-  )
-  const source = context.createBufferSource()
-  source.buffer = buffer
-  source.connect(context.destination)
+  try {
+    // Copied into its own buffer, as the bytes can be a view into a larger one
+    const buffer = await context.decodeAudioData(
+      new Uint8Array(audio.uint8Array).buffer
+    )
+    // Stop can be tapped while the audio decodes
+    if (signal?.aborted) return
+    const source = context.createBufferSource()
+    source.buffer = buffer
+    source.connect(context.destination)
 
-  await new Promise<void>((resolve) => {
-    source.onEnded = () => resolve()
-    signal?.addEventListener('abort', () => {
-      source.stop()
-      resolve()
+    let onAbort: (() => void) | undefined
+    await new Promise<void>((resolve) => {
+      onAbort = () => {
+        source.stop()
+        resolve()
+      }
+      source.onEnded = () => resolve()
+      signal?.addEventListener('abort', onAbort)
+      source.start()
     })
-    source.start()
-  })
-  context.close()
+    if (onAbort) signal?.removeEventListener('abort', onAbort)
+  } finally {
+    context.close()
+  }
 }

@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics'
 import { Stack } from 'expo-router'
 import { useHeaderHeight } from 'expo-router/react-navigation'
 import { SymbolView } from 'expo-symbols'
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   FadeIn,
@@ -43,6 +43,9 @@ export default function VoiceScreen() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [reply, setReply] = useState('')
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // A reply still generating or speaking stops with the screen
+  useEffect(() => () => abortControllerRef.current?.abort(), [])
 
   const orbStyle = useAnimatedStyle(() => ({
     transform: [{ scale: withSpring(1 + level.value * 0.35) }],
@@ -104,11 +107,21 @@ export default function VoiceScreen() {
         )
       }
     } else if (phase === 'listening') {
-      const question = await stop()
-      if (question) {
-        answer(question)
-      } else {
+      // Leaves listening right away, so a second tap can't stop twice
+      setPhase('thinking')
+      try {
+        const question = await stop()
+        if (question) {
+          answer(question)
+        } else {
+          setPhase('idle')
+        }
+      } catch (error) {
         setPhase('idle')
+        Alert.alert(
+          'Could not hear that',
+          error instanceof Error ? error.message : undefined
+        )
       }
     } else {
       abortControllerRef.current?.abort()
