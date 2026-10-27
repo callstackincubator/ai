@@ -22,10 +22,14 @@ function isDownloaded(modelId: string): boolean {
 
 export function createLlamaLanguageSetupAdapter({
   label,
+  description,
+  sizeBytes,
   modelId,
   projectorId,
 }: {
   label: string
+  description: string
+  sizeBytes: number
   // HuggingFace ID of the GGUF model
   modelId: string
   // HuggingFace ID of the multimodal projector (mmproj) for image input
@@ -44,6 +48,10 @@ export function createLlamaLanguageSetupAdapter({
     model,
     modelId: model.modelId,
     label,
+    description,
+    runtime: 'llama',
+    capabilities: projectorId ? ['vision', 'reasoning'] : ['reasoning'],
+    sizeBytes,
     builtIn: false,
     imageInput: Boolean(projectorId),
     isAvailable(): Availability {

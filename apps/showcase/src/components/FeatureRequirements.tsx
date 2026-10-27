@@ -1,16 +1,31 @@
 import React, { useState } from 'react'
-import { Alert } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
 
+import type { Capability, Runtime } from '../adapters/types'
+import { isSimulator } from '../simulator'
 import type { FeatureId } from '../store/features'
 import {
   isTranscriptionAvailable,
   useEmbeddingsStatus,
 } from '../store/features'
-import { chatModels, useDownloadProgress, useModels } from '../store/models'
+import {
+  chatModels,
+  formatSize,
+  runtimes,
+  useDownloadProgress,
+  useModels,
+} from '../store/models'
+import { colors } from '../theme/colors'
 import { RequirementRow } from './RequirementRow'
 
 const showError = (title: string) => (error: unknown) =>
   Alert.alert(title, error instanceof Error ? error.message : undefined)
+
+const capabilityLabels: Record<Capability, string> = {
+  vision: 'sees photos',
+  reasoning: 'reasons',
+  tools: 'uses tools',
+}
 
 function ChatModelRow({ index }: { index: number }) {
   const adapter = chatModels[index]
@@ -25,23 +40,25 @@ function ChatModelRow({ index }: { index: number }) {
         title={adapter.label}
         subtitle={
           status === 'yes'
-            ? 'Built into iOS, nothing to download'
-            : 'Needs an iPhone with Apple Intelligence turned on'
+            ? adapter.description
+            : 'Needs an iPhone 15 Pro or later with Apple Intelligence on'
         }
         state={status === 'yes' ? 'ready' : 'unavailable'}
       />
     )
   }
 
+  const details = [
+    adapter.description,
+    adapter.capabilities.includes('vision') ? capabilityLabels.vision : null,
+    adapter.sizeBytes ? formatSize(adapter.sizeBytes) : null,
+  ].filter(Boolean)
+
   return (
     <RequirementRow
-      symbol="arrow.down.circle"
+      symbol="cpu"
       title={adapter.label}
-      subtitle={
-        status === 'yes'
-          ? 'Downloaded, runs offline'
-          : 'Open model, downloads once and runs offline'
-      }
+      subtitle={details.join(' · ')}
       state={
         progress !== undefined
           ? 'working'
@@ -58,6 +75,20 @@ function ChatModelRow({ index }: { index: number }) {
   )
 }
 
+function RuntimeGroup({ runtime }: { runtime: Runtime }) {
+  return (
+    <View style={styles.group}>
+      <Text style={styles.groupTitle}>{runtimes[runtime].title}</Text>
+      <Text style={styles.groupSubtitle}>{runtimes[runtime].subtitle}</Text>
+      {chatModels.map((adapter, index) =>
+        adapter.runtime === runtime ? (
+          <ChatModelRow key={adapter.modelId} index={index} />
+        ) : null
+      )}
+    </View>
+  )
+}
+
 function EmbeddingsRow() {
   const { status, prepare } = useEmbeddingsStatus()
   const [isPreparing, setIsPreparing] = useState(false)
@@ -67,9 +98,11 @@ function EmbeddingsRow() {
       symbol="point.3.connected.trianglepath.dotted"
       title="Apple embeddings"
       subtitle={
-        status === 'unsupported'
-          ? 'Not available on this device'
-          : 'Turns text into meaning, built into iOS'
+        isSimulator
+          ? 'Simulator preview: matches shared words instead'
+          : status === 'unsupported'
+            ? 'Not available on this iPhone'
+            : 'Turns text into meaning, built into iOS'
       }
       state={
         isPreparing || status === null
@@ -95,23 +128,51 @@ function EmbeddingsRow() {
 export function FeatureRequirements({ feature }: { feature: FeatureId }) {
   switch (feature) {
     case 'chat':
-      return chatModels.map((adapter, index) => (
-        <ChatModelRow key={adapter.modelId} index={index} />
-      ))
+      return (
+        <>
+          <RuntimeGroup runtime="apple" />
+          <RuntimeGroup runtime="llama" />
+        </>
+      )
     case 'voice':
       return (
-        <RequirementRow
-          symbol="mic"
-          title="Speech recognition"
-          subtitle={
-            isTranscriptionAvailable()
-              ? 'Transcribes on device as you speak'
-              : 'Not available for your language'
-          }
-          state={isTranscriptionAvailable() ? 'ready' : 'unavailable'}
-        />
+        <>
+          <RequirementRow
+            symbol="mic"
+            title="Speech recognition"
+            subtitle={
+              isSimulator
+                ? 'Simulator preview: hears a scripted question'
+                : isTranscriptionAvailable()
+                  ? 'Transcribes on device as you speak'
+                  : 'Not available for your language'
+            }
+            state={isTranscriptionAvailable() ? 'ready' : 'unavailable'}
+          />
+          <RequirementRow
+            symbol="speaker.wave.2"
+            title="Spoken replies"
+            subtitle="An on-device voice, answers come from your chat model"
+            state="ready"
+          />
+        </>
       )
     case 'search':
       return <EmbeddingsRow />
   }
 }
+
+const styles = StyleSheet.create({
+  group: {
+    marginTop: 12,
+  },
+  groupTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.label,
+  },
+  groupSubtitle: {
+    fontSize: 13,
+    color: colors.secondaryLabel,
+  },
+})

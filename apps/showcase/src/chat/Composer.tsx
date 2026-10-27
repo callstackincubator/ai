@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { Glass } from '../components/Glass'
+import { onAccent } from '../theme/brand'
 import { colors } from '../theme/colors'
 import {
   deleteAttachment,
@@ -126,7 +127,7 @@ export function Composer({
                   name="arrow.up"
                   size={18}
                   weight="semibold"
-                  tintColor="#FFFFFF"
+                  tintColor={canSend ? onAccent : '#FFFFFF'}
                 />
               </Pressable>
             )}
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.systemBlue,
+    backgroundColor: colors.accent,
   },
   sendDisabled: {
     backgroundColor: colors.tertiaryLabel,

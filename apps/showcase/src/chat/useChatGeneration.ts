@@ -1,6 +1,6 @@
 import { generateId, type ModelMessage, streamText } from 'ai'
 import * as Haptics from 'expo-haptics'
-import { useRef, useState } from 'react'
+import { atom, useAtom } from 'jotai'
 
 import { type Message, useChats, useSetStreamingReply } from '../store/chats'
 import { useModels } from '../store/models'
@@ -30,18 +30,21 @@ function toModelMessage({ role, content, attachments }: Message): ModelMessage {
   }
 }
 
+// Shared, so other screens (Search's "Ask in Chat") can start a chat too
+const isGeneratingAtom = atom(false)
+let abortController: AbortController | null = null
+
 export function useChatGeneration() {
   const { currentChat, selectChat, addMessage, truncateAfter } = useChats()
   const { selectedModel } = useModels()
   const setStreamingReply = useSetStreamingReply()
-  const [isGenerating, setIsGenerating] = useState(false)
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom)
 
   const generate = async (chatId: string, history: Message[]) => {
     if (!selectedModel) return
 
     const controller = new AbortController()
-    abortControllerRef.current = controller
+    abortController = controller
     const reply = { chatId, id: generateId(), content: '' }
     setStreamingReply(reply)
     setIsGenerating(true)
@@ -76,7 +79,12 @@ export function useChatGeneration() {
     }
   }
 
-  const send = (content: string, attachments: ImageAttachment[]) => {
+  const send = (
+    content: string,
+    attachments: ImageAttachment[],
+    // A new chat can be titled, otherwise it takes the message's start
+    { newChat = false, title }: { newChat?: boolean; title?: string } = {}
+  ) => {
     if (isGenerating) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     const message: Message = {
@@ -85,8 +93,9 @@ export function useChatGeneration() {
       content,
       attachments,
     }
-    const history = [...(currentChat?.messages ?? []), message]
-    const chatId = addMessage(currentChat?.id ?? null, message)
+    const chat = newChat ? null : currentChat
+    const history = [...(chat?.messages ?? []), message]
+    const chatId = addMessage(chat?.id ?? null, message, title)
     selectChat(chatId)
     generate(chatId, history)
     return message.id
@@ -102,7 +111,7 @@ export function useChatGeneration() {
     generate(currentChat.id, currentChat.messages.slice(0, index))
   }
 
-  const stop = () => abortControllerRef.current?.abort()
+  const stop = () => abortController?.abort()
 
   return { isGenerating, send, regenerate, stop }
 }

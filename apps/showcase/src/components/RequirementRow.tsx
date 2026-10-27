@@ -34,7 +34,7 @@ export function RequirementRow({
   return (
     <View style={styles.row}>
       <View style={styles.icon}>
-        <SymbolView name={symbol} size={22} tintColor={colors.systemBlue} />
+        <SymbolView name={symbol} size={22} tintColor={colors.accentText} />
       </View>
       <View style={styles.text}>
         <Text style={styles.title}>{title}</Text>
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     height: 4,
-    backgroundColor: colors.systemBlue,
+    backgroundColor: colors.accent,
   },
   percent: {
     fontSize: 15,
@@ -126,6 +126,6 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.systemBlue,
+    color: colors.accentText,
   },
 })

@@ -4,6 +4,7 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithRefresh, loadable } from 'jotai/utils'
 import { Platform } from 'react-native'
 
+import { isSimulator } from '../simulator'
 import { atomWithPersistence } from './storage'
 
 export type FeatureId = 'chat' | 'voice' | 'search'
@@ -13,6 +14,8 @@ export type Feature = {
   title: string
   description: string
   symbol: SFSymbol
+  // Shown on the feature's onboarding page
+  highlights: string[]
 }
 
 export const features: Feature[] = [
@@ -21,18 +24,33 @@ export const features: Feature[] = [
     title: 'Chat',
     description: 'Ask anything, attach photos, get answers in seconds.',
     symbol: 'bubble.left.and.text.bubble.right.fill',
+    highlights: [
+      'Answers stream in as they are written',
+      'Attach photos with models that can see',
+      'Pick Apple Intelligence or an open model',
+    ],
   },
   {
     id: 'voice',
     title: 'Voice',
     description: 'Talk and hear the answer, transcribed live as you speak.',
     symbol: 'waveform',
+    highlights: [
+      'Your words appear while you talk',
+      'Replies are read aloud with an on-device voice',
+      'No audio is recorded or uploaded',
+    ],
   },
   {
     id: 'search',
     title: 'Search',
     description: 'Find notes by meaning, not by matching words.',
     symbol: 'text.magnifyingglass',
+    highlights: [
+      '“Pet health” finds the vet visit note',
+      'Add your own notes and search them',
+      'Notes are indexed on device, once',
+    ],
   },
 ]
 
@@ -71,12 +89,16 @@ function deviceLanguage() {
 }
 
 export function isTranscriptionAvailable() {
+  if (isSimulator) return true
   return Platform.OS === 'ios' && apple.transcriptionModel().isAvailable()
 }
 
 // Apple's embedding assets ship separately and download on first prepare
 const embeddingsStatusAtom = atomWithRefresh(
   async (): Promise<AppleAssetStatus> => {
+    if (isSimulator) {
+      return 'ready'
+    }
     if (Platform.OS !== 'ios') {
       return 'unsupported'
     }

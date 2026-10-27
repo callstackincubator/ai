@@ -4,25 +4,44 @@ import { atomWithRefresh } from 'jotai/utils'
 
 import { createAppleLanguageSetupAdapter } from '../adapters/apple'
 import { createLlamaLanguageSetupAdapter } from '../adapters/llama'
-import type { Availability, SetupAdapter } from '../adapters/types'
+import type { Availability, Runtime, SetupAdapter } from '../adapters/types'
 import { atomWithPersistence } from './storage'
 
 export const chatModels: SetupAdapter<LanguageModelV4>[] = [
   createAppleLanguageSetupAdapter(),
-  // Vision, reasoning and tool calling in a small download
   createLlamaLanguageSetupAdapter({
     label: 'Qwen3.5 2B',
+    description: 'Small and quick',
+    sizeBytes: 1_396_198_496 + 668_227_136,
     modelId: 'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf',
     projectorId:
       'bartowski/Qwen_Qwen3.5-2B-GGUF/mmproj-Qwen_Qwen3.5-2B-f16.gguf',
   }),
-  // Vision, audio, reasoning and tool calling
   createLlamaLanguageSetupAdapter({
     label: 'Gemma 4 E2B',
+    description: "Google's open model, stronger answers",
+    sizeBytes: 2_841_481_184 + 557_368_064,
     modelId: 'ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q4_0.gguf',
     projectorId: 'ggml-org/gemma-4-E2B-it-GGUF/mmproj-gemma-4-E2B-it-Q8_0.gguf',
   }),
 ]
+
+export const runtimes: Record<Runtime, { title: string; subtitle: string }> = {
+  apple: {
+    title: 'Built into iOS',
+    subtitle: 'Apple Intelligence runs on Apple silicon. Nothing to download.',
+  },
+  llama: {
+    title: 'Open models',
+    subtitle: 'Run with llama.cpp. Download once, then they work offline.',
+  },
+}
+
+export function formatSize(bytes: number) {
+  return bytes >= 1e9
+    ? `${(bytes / 1e9).toFixed(1)} GB`
+    : `${Math.round(bytes / 1e6)} MB`
+}
 
 const availabilityAtom = atomWithRefresh(
   () =>

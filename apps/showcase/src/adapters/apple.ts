@@ -10,6 +10,9 @@ export function createAppleLanguageSetupAdapter(): SetupAdapter<LanguageModelV4>
     model,
     modelId: model.modelId,
     label: 'Apple Intelligence',
+    description: 'Fast and private, built into iOS',
+    runtime: 'apple',
+    capabilities: ['tools'],
     builtIn: true,
     // Image prompts need iOS 27
     imageInput:

@@ -38,14 +38,18 @@ export function useChats() {
 
   // Adds a message to the chat, starting a new chat when there is none, and
   // returns the chat's ID
-  const addMessage = (chatId: string | null, message: Message) => {
+  const addMessage = (
+    chatId: string | null,
+    message: Message,
+    title?: string
+  ) => {
     const id = chatId ?? generateId()
     setChats((prev) => {
       if (!prev.some((chat) => chat.id === id)) {
         return [
           {
             id,
-            title: message.content.slice(0, 60) || 'Photo',
+            title: title ?? (message.content.slice(0, 60) || 'Photo'),
             createdAt: new Date().toISOString(),
             messages: [message],
           },
@@ -79,6 +83,11 @@ export function useChats() {
     }
   }
 
+  const deleteAllChats = () => {
+    setChats([])
+    setCurrentChatId(null)
+  }
+
   return {
     chats,
     currentChat,
@@ -86,6 +95,7 @@ export function useChats() {
     addMessage,
     truncateAfter,
     deleteChat,
+    deleteAllChats,
   }
 }
 

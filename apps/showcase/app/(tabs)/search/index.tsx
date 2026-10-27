@@ -1,57 +1,119 @@
-import { Stack } from 'expo-router'
+import { router, Stack } from 'expo-router'
+import { SymbolView } from 'expo-symbols'
 import React, { useState } from 'react'
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native'
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated'
 
+import { useChatGeneration } from '../../../src/chat/useChatGeneration'
+import { SimulatorNotice } from '../../../src/components/SimulatorNotice'
 import {
   type Note,
   type SearchResult,
   useSemanticSearch,
 } from '../../../src/search/useSemanticSearch'
+import { useModels } from '../../../src/store/models'
+import { onAccent } from '../../../src/theme/brand'
 import { colors } from '../../../src/theme/colors'
 
-function NoteRow({ note }: { note: Note | SearchResult }) {
+function NoteRow({
+  note,
+  onDelete,
+}: {
+  note: Note | SearchResult
+  // Only notes the user added can be deleted
+  onDelete?: () => void
+}) {
   const score = 'score' in note ? note.score : null
   return (
-    <Animated.View
-      entering={FadeIn}
-      layout={LinearTransition.springify()}
-      style={styles.note}
-    >
-      <Text style={styles.noteText}>{note.text}</Text>
-      {score !== null && (
-        <View style={styles.relevance}>
-          <View style={styles.track}>
-            <View
-              style={[
-                styles.bar,
-                { width: `${Math.max(0, Math.min(1, score)) * 100}%` },
-              ]}
-            />
+    <Animated.View entering={FadeIn} layout={LinearTransition.springify()}>
+      <Pressable
+        disabled={!onDelete}
+        onLongPress={() =>
+          Alert.alert('Delete this note?', note.text, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: onDelete },
+          ])
+        }
+        style={styles.note}
+      >
+        <Text style={styles.noteText}>{note.text}</Text>
+        {score !== null && (
+          <View style={styles.relevance}>
+            <View style={styles.track}>
+              <View
+                style={[
+                  styles.bar,
+                  { width: `${Math.max(0, Math.min(1, score)) * 100}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.score}>{Math.round(score * 100)}%</Text>
           </View>
-          <Text style={styles.score}>{Math.round(score * 100)}%</Text>
-        </View>
-      )}
+        )}
+      </Pressable>
     </Animated.View>
   )
 }
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('')
-  const { notes, results, isIndexing, error, addNote } =
+  const { notes, results, isIndexing, error, addNote, deleteNote } =
     useSemanticSearch(query)
+  const { send } = useChatGeneration()
+  const { selectedModel } = useModels()
 
-  const header = error ? (
+  // Answers the query in a new chat, grounded in the closest notes
+  const askInChat = () => {
+    if (!results) return
+    const context = results
+      .slice(0, 5)
+      .map((note) => `- ${note.text}`)
+      .join('\n')
+    send(
+      `Using only my notes below, answer: ${query.trim()}\n\nMy notes:\n${context}`,
+      [],
+      { newChat: true, title: `Notes: ${query.trim()}` }
+    )
+    router.navigate('/chat')
+  }
+
+  const status = error ? (
     <Text style={styles.status}>Search is unavailable: {error}</Text>
   ) : isIndexing ? (
     <Text style={styles.status}>Reading your notes…</Text>
   ) : results ? (
-    <Text style={styles.status}>Closest in meaning to “{query.trim()}”</Text>
+    <View style={styles.resultsHeader}>
+      <Text style={[styles.status, styles.resultsTitle]}>
+        Closest in meaning to “{query.trim()}”
+      </Text>
+      {selectedModel && results.length > 0 && (
+        <Pressable onPress={askInChat} hitSlop={8} style={styles.ask}>
+          <SymbolView name="sparkles" size={14} tintColor={onAccent} />
+          <Text style={styles.askText}>Ask in Chat</Text>
+        </Pressable>
+      )}
+    </View>
   ) : (
     <Text style={styles.status}>
       {notes.length} notes. Search by meaning, try “pet health” or “things to
-      fix at home”.
+      fix at home”. Long-press your own notes to delete them.
     </Text>
+  )
+  const header = (
+    <View style={styles.header}>
+      <SimulatorNotice>
+        Simulator preview: search matches shared words. On iPhone it matches
+        meaning with Apple embeddings.
+      </SimulatorNotice>
+      {status}
+    </View>
   )
 
   return (
@@ -81,7 +143,23 @@ export default function SearchScreen() {
         data={results ?? notes}
         keyExtractor={(note) => note.id}
         ListHeaderComponent={header}
-        renderItem={({ item }) => <NoteRow note={item} />}
+        ListEmptyComponent={
+          results ? (
+            <Text style={styles.empty}>
+              No notes come close. Try other words.
+            </Text>
+          ) : undefined
+        }
+        renderItem={({ item }) => (
+          <NoteRow
+            note={item}
+            onDelete={
+              item.id.startsWith('sample-')
+                ? undefined
+                : () => deleteNote(item.id)
+            }
+          />
+        )}
       />
     </>
   )
@@ -97,10 +175,41 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 10,
   },
+  header: {
+    gap: 10,
+    paddingBottom: 6,
+  },
   status: {
     paddingHorizontal: 4,
-    paddingBottom: 6,
     fontSize: 14,
+    color: colors.secondaryLabel,
+  },
+  resultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  resultsTitle: {
+    flex: 1,
+  },
+  ask: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: colors.accent,
+  },
+  askText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: onAccent,
+  },
+  empty: {
+    paddingTop: 40,
+    fontSize: 16,
+    textAlign: 'center',
     color: colors.secondaryLabel,
   },
   note: {
@@ -129,7 +238,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     height: 4,
-    backgroundColor: colors.systemBlue,
+    backgroundColor: colors.accent,
   },
   score: {
     fontSize: 12,

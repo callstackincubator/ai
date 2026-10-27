@@ -34,7 +34,7 @@ export default function PickFeatures() {
                 <SymbolView
                   name={feature.symbol}
                   size={28}
-                  tintColor={colors.systemBlue}
+                  tintColor={colors.accentText}
                   style={styles.cardIcon}
                 />
                 <View style={styles.cardText}>
@@ -47,7 +47,7 @@ export default function PickFeatures() {
                   name={selected ? 'checkmark.circle.fill' : 'circle'}
                   size={26}
                   tintColor={
-                    selected ? colors.systemBlue : colors.tertiaryLabel
+                    selected ? colors.accentText : colors.tertiaryLabel
                   }
                 />
               </Pressable>
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondarySystemBackground,
   },
   cardSelected: {
-    borderColor: colors.systemBlue,
+    borderColor: colors.accent,
   },
   cardIcon: {
     width: 36,

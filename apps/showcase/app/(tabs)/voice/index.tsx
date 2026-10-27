@@ -2,6 +2,7 @@ import { apple } from '@react-native-ai/apple'
 import { streamText } from 'ai'
 import * as Haptics from 'expo-haptics'
 import { Stack } from 'expo-router'
+import { useHeaderHeight } from 'expo-router/react-navigation'
 import { SymbolView } from 'expo-symbols'
 import React, { useRef, useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
@@ -13,7 +14,9 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { Glass } from '../../../src/components/Glass'
+import { SimulatorNotice } from '../../../src/components/SimulatorNotice'
 import { useModels } from '../../../src/store/models'
+import { accent, onAccent } from '../../../src/theme/brand'
 import { colors } from '../../../src/theme/colors'
 import { speak } from '../../../src/voice/speak'
 import { useLiveTranscription } from '../../../src/voice/useLiveTranscription'
@@ -34,6 +37,7 @@ const hints: Record<Phase, string> = {
 
 export default function VoiceScreen() {
   const { selectedModel } = useModels()
+  const headerHeight = useHeaderHeight()
   const { transcript, level, start, stop } =
     useLiveTranscription(transcriptionModel)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -110,6 +114,12 @@ export default function VoiceScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Voice', headerTransparent: true }} />
+      <View style={[styles.notice, { paddingTop: headerHeight + 8 }]}>
+        <SimulatorNotice>
+          Simulator preview: Voice hears a scripted question. On iPhone it
+          listens to you.
+        </SimulatorNotice>
+      </View>
       <View style={styles.conversation}>
         {transcript ? (
           <Animated.Text entering={FadeIn} style={styles.question}>
@@ -130,7 +140,7 @@ export default function VoiceScreen() {
         <Animated.View style={orbStyle}>
           <Glass
             isInteractive
-            tintColor={phase === 'listening' ? '#FF3B30' : '#007AFF'}
+            tintColor={phase === 'listening' ? '#FF3B30' : accent}
             style={styles.orb}
           >
             <Pressable
@@ -148,7 +158,7 @@ export default function VoiceScreen() {
                       : 'stop.fill'
                 }
                 size={40}
-                tintColor="#FFFFFF"
+                tintColor={phase === 'listening' ? '#FFFFFF' : onAccent}
                 animationSpec={
                   phase === 'listening'
                     ? { effect: { type: 'pulse' }, repeating: true }
@@ -164,7 +174,11 @@ export default function VoiceScreen() {
           exiting={FadeOut}
           style={styles.hint}
         >
-          {selectedModel ? hints[phase] : 'Set up a chat model in Settings'}
+          {selectedModel
+            ? phase === 'idle'
+              ? `${hints.idle} · ${selectedModel.label} answers`
+              : hints[phase]
+            : 'Set up a chat model in Settings'}
         </Animated.Text>
       </View>
     </View>
@@ -175,6 +189,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.systemBackground,
+  },
+  notice: {
+    paddingHorizontal: 16,
   },
   conversation: {
     flex: 1,

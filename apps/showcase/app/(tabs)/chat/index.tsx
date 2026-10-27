@@ -6,35 +6,69 @@ import {
 import type { LegendListRef } from '@legendapp/list/react-native'
 import { router, Stack } from 'expo-router'
 import { useHeaderHeight } from 'expo-router/react-navigation'
-import { SymbolView } from 'expo-symbols'
 import React, { useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, View, type ViewInstance } from 'react-native'
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewInstance,
+} from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Composer } from '../../../src/chat/Composer'
 import { type ChatItem, MessageRow } from '../../../src/chat/MessageRow'
 import { useChatGeneration } from '../../../src/chat/useChatGeneration'
+import { BrandMark } from '../../../src/components/BrandMark'
+import { Glass } from '../../../src/components/Glass'
 import { useChats, useStreamingReply } from '../../../src/store/chats'
 import { useModels } from '../../../src/store/models'
 import { colors } from '../../../src/theme/colors'
 import type { ImageAttachment } from '../../../src/utils/imageAttachments'
 
-function EmptyState({ modelLabel }: { modelLabel?: string }) {
+const suggestions = [
+  'Plan a relaxed weekend in Lisbon',
+  'Explain how on-device AI works',
+  'Write a haiku about morning coffee',
+]
+
+function EmptyState({
+  modelLabel,
+  onSuggestion,
+}: {
+  modelLabel?: string
+  onSuggestion: (text: string) => void
+}) {
   return (
     <Animated.View entering={FadeIn.duration(400)} style={styles.empty}>
-      <SymbolView
-        name="apple.intelligence"
-        size={44}
-        tintColor={colors.systemIndigo}
-      />
+      <BrandMark size={54} />
       <Text style={styles.emptyTitle}>What can I help with?</Text>
       <Text style={styles.emptySubtitle}>
         {modelLabel
           ? `${modelLabel} runs on this iPhone. Nothing leaves the device.`
           : 'Download a model in Settings to start chatting.'}
       </Text>
+      {modelLabel && (
+        <View style={styles.suggestions}>
+          {suggestions.map((suggestion, index) => (
+            <Animated.View
+              key={suggestion}
+              entering={FadeInDown.delay(150 + index * 80)}
+            >
+              <Glass isInteractive style={styles.suggestion}>
+                <Pressable
+                  onPress={() => onSuggestion(suggestion)}
+                  style={styles.suggestionPressable}
+                >
+                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                </Pressable>
+              </Glass>
+            </Animated.View>
+          ))}
+        </View>
+      )}
     </Animated.View>
   )
 }
@@ -93,7 +127,7 @@ export default function ChatScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: currentChat?.title ?? '',
+          title: currentChat?.title ?? selectedModel?.label ?? '',
           headerTransparent: true,
         }}
       />
@@ -130,7 +164,10 @@ export default function ChatScreen() {
       </Stack.Toolbar>
 
       {items.length === 0 ? (
-        <EmptyState modelLabel={selectedModel?.label} />
+        <EmptyState
+          modelLabel={selectedModel?.label}
+          onSuggestion={(text) => handleSend(text, [])}
+        />
       ) : (
         <KeyboardAwareLegendList
           key={currentChat?.id}
@@ -143,6 +180,8 @@ export default function ChatScreen() {
             <MessageRow item={item} onRegenerate={regenerate} />
           )}
           estimatedItemSize={80}
+          // Rows animate in when they mount, which recycling would replay
+          recycleItems={false}
           initialScrollAtEnd
           maintainScrollAtEnd
           keyboardLiftBehavior="whenAtEnd"
@@ -207,6 +246,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     color: colors.secondaryLabel,
+  },
+  suggestions: {
+    marginTop: 16,
+    gap: 10,
+    alignItems: 'center',
+  },
+  suggestion: {
+    borderRadius: 20,
+  },
+  suggestionPressable: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  suggestionText: {
+    fontSize: 15,
+    color: colors.label,
   },
   composerContainer: {
     position: 'absolute',

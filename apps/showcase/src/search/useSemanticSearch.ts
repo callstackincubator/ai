@@ -4,7 +4,9 @@ import { File, Paths } from 'expo-file-system'
 import { atom, useAtom } from 'jotai'
 import { useEffect, useState } from 'react'
 
+import { isSimulator } from '../simulator'
 import { atomWithPersistence } from '../store/storage'
+import { KeywordEmbeddingModel } from './keywordEmbeddingModel'
 import sampleNotes from './sampleNotes.json'
 
 export type Note = { id: string; text: string }
@@ -12,9 +14,14 @@ export type SearchResult = Note & { score: number }
 
 type Vectors = Record<string, { text: string; embedding: number[] }>
 
-const embeddingModel = apple.embeddingModel()
-// Vectors are cached on disk, so notes are embedded once
-const cacheFile = new File(Paths.document, 'note-embeddings.json')
+const embeddingModel = isSimulator
+  ? new KeywordEmbeddingModel()
+  : apple.embeddingModel()
+// Vectors are cached on disk per model, so notes are embedded once
+const cacheFile = new File(
+  Paths.document,
+  `note-embeddings-${embeddingModel.modelId}.json`
+)
 
 const userNotesAtom = atomWithPersistence<Note[]>('userNotes', [])
 const vectorsAtom = atom<Vectors | null>(null)
@@ -25,6 +32,10 @@ function readCache(): Vectors {
   } catch {
     return {}
   }
+}
+
+export function useUserNotes() {
+  return useAtom(userNotesAtom)
 }
 
 export function useSemanticSearch(query: string) {
@@ -85,6 +96,8 @@ export function useSemanticSearch(query: string) {
               ...note,
               score: cosineSimilarity(embedding, vectors[note.id].embedding),
             }))
+            // Notes that share nothing with the query are left out
+            .filter((note) => note.score > 0)
             .sort((a, b) => b.score - a.score)
             .slice(0, 12)
         )
@@ -102,6 +115,10 @@ export function useSemanticSearch(query: string) {
     setUserNotes((prev) => [{ id: generateId(), text }, ...prev])
   }
 
+  const deleteNote = (id: string) => {
+    setUserNotes((prev) => prev.filter((note) => note.id !== id))
+  }
+
   return {
     notes,
     // Results only apply while there is a query
@@ -109,5 +126,6 @@ export function useSemanticSearch(query: string) {
     isIndexing: vectors === null && error === null,
     error,
     addNote,
+    deleteNote,
   }
 }
