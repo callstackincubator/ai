@@ -34,6 +34,8 @@
 - Monorepo with `packages/` (libraries) and `apps/` (example apps)
 - Libraries live in `packages/`, each published as `@react-native-ai/<name>` (see its `package.json`)
 - Example app: Expo SDK 58 in `apps/expo-example/`
+- Website and docs: Astro + Starlight in `website/` (its own `bun.lock`, not a workspace)
+- For anything visual (the website, social cards, slides, diagrams, videos), follow [docs/DESIGN.md](docs/DESIGN.md)
 
 ## Tech Stack
 
