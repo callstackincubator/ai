@@ -11,10 +11,20 @@ import {
 } from 'react-native-audio-api'
 import { useSharedValue, withTiming } from 'react-native-reanimated'
 
+import { isSimulator } from '../simulator'
+
 const SAMPLE_RATE = 16000
 const STOP_DELAY_MS = 500
 
 const join = (...texts: string[]) => texts.filter(Boolean).join(' ')
+
+// What the Simulator "hears", as it has no speech recognition
+const simulatedQuestions = [
+  'What should I pack for a weekend hike?',
+  'Give me a quick idea for dinner tonight.',
+  'How do I keep a sourdough starter alive?',
+]
+let simulatedIndex = 0
 
 // Records the microphone and transcribes it while it records. The flow
 // follows the record button in apps/expo-example
@@ -33,6 +43,27 @@ export function useLiveTranscription(model: TranscriptionModel) {
     null
   )
   const transcriptionRef = useRef<Promise<string> | null>(null)
+  const simulationRef = useRef<{
+    timer: ReturnType<typeof setInterval>
+    text: string
+  } | null>(null)
+
+  // Reveals a scripted question word by word, with a moving level
+  const startSimulation = () => {
+    const text =
+      simulatedQuestions[simulatedIndex++ % simulatedQuestions.length]
+    const words = text.split(' ')
+    let count = 0
+    setTranscript('')
+    const timer = setInterval(() => {
+      count = Math.min(words.length, count + 1)
+      setTranscript(words.slice(0, count).join(' '))
+      level.value = withTiming(0.3 + Math.random() * 0.5, { duration: 150 })
+    }, 300)
+    simulationRef.current = { timer, text }
+    setStatus('recording')
+    return true
+  }
 
   const transcribe = async (audio: ReadableStream<Uint8Array>) => {
     const result = streamTranscribe({
@@ -60,6 +91,9 @@ export function useLiveTranscription(model: TranscriptionModel) {
 
   // Resolves once recording has started, false when the microphone is denied
   const start = async () => {
+    if (isSimulator) {
+      return startSimulation()
+    }
     const permission = await AudioManager.requestRecordingPermissions()
     if (permission !== 'Granted') {
       return false
@@ -128,6 +162,15 @@ export function useLiveTranscription(model: TranscriptionModel) {
 
   // Resolves with the full transcript
   const stop = async () => {
+    const simulation = simulationRef.current
+    if (simulation) {
+      clearInterval(simulation.timer)
+      simulationRef.current = null
+      level.value = withTiming(0)
+      setTranscript(simulation.text)
+      setStatus('idle')
+      return simulation.text
+    }
     const recorder = recorderRef.current
     if (!recorder) return ''
 
