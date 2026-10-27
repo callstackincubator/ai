@@ -1242,8 +1242,7 @@ extension CoreAIImpl {
     let defaults = pipeline.config
     let scheduler = SchedulerType(rawValue: options?["schedulerType"] as? String ?? "") ?? .discreteFlow
     let decodeResolution = DecodeResolution(rawValue: options?["decodeResolution"] as? String ?? "full") ?? .full
-    // A random seed unless one is given, wrapped to 32 bits like video generation
-    let seed = UInt32(truncatingIfNeeded: (options?["seed"] as? NSNumber)?.intValue ?? Int.random(in: 0..<Int(UInt32.max)))
+    let seed = try Self.seed(from: options?["seed"])
     let stepCount = (options?["stepCount"] as? Double).map(Int.init) ?? defaults.defaultSteps ?? 50
     let guidanceScale = (options?["guidanceScale"] as? Double).map(Float.init) ?? defaults.defaultGuidanceScale ?? 7.5
 
@@ -1771,6 +1770,20 @@ extension CoreAIImpl {
       throw CoreAIError.invalidInput("Could not load image at \(url.path).")
     }
     return image
+  }
+
+  /// A 32-bit diffusion seed: the given number truncated and wrapped to 32
+  /// bits, or a random one when none is given
+  static func seed(from option: Any?) throws -> UInt32 {
+    guard let value = (option as? NSNumber)?.doubleValue else {
+      return UInt32.random(in: 0...UInt32.max)
+    }
+    guard value.isFinite else {
+      throw CoreAIError.invalidInput("seed must be a finite number, got \(value).")
+    }
+    // The remainder is below 2^32 in magnitude, so it fits in an Int64
+    let wrapped = value.rounded(.towardZero).truncatingRemainder(dividingBy: 4_294_967_296)
+    return UInt32(truncatingIfNeeded: Int64(wrapped))
   }
 
   static func pngBase64(_ image: CGImage) throws -> String {
