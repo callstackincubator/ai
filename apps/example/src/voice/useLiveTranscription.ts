@@ -26,8 +26,7 @@ const simulatedQuestions = [
 ]
 let simulatedIndex = 0
 
-// Records the microphone and transcribes it while it records. The flow
-// follows the record button in apps/expo-example
+// Records the microphone and transcribes it while it records
 export function useLiveTranscription(model: TranscriptionModel) {
   const [status, setStatus] = useState<'idle' | 'recording' | 'finishing'>(
     'idle'

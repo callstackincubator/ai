@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "React Native AI",
-    "slug": "rn-ai-showcase",
+    "slug": "rn-ai-example",
     "scheme": "rnai",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.callstack.ai.showcase",
+      "bundleIdentifier": "com.callstack.ai.example",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -27,7 +27,7 @@
         "backgroundColor": "#0a0a0a"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.callstack.ai.showcase"
+      "package": "com.callstack.ai.example"
     },
     "plugins": [
       "expo-router",

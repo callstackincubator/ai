@@ -12,7 +12,7 @@ Thank you for your interest in contributing to React Native AI! This guide will 
 This is a monorepo with the following packages:
 
 - **`packages/apple-llm/`** - Apple Intelligence turbo module for iOS
-- **`apps/expo-example/`** - example Expo app
+- **`apps/example/`** - example Expo app, which also hosts the harness tests in `harness/`
 
 ## Quick Start
 
@@ -34,7 +34,7 @@ This is a monorepo with the following packages:
 3. **Test your changes:**
    ```bash
    # Run example app
-   cd apps/expo-example
+   cd apps/example
    bun run start
    bun run android  # or ios
    ```
@@ -94,15 +94,15 @@ bun run typecheck
 ### Running examples
 
 ```bash
-cd apps/expo-example
+cd apps/example
 bun run start
 bun run android
 ```
 
 ### Native Development
 
-- **Android**: Open `apps/expo-example/android` in Android Studio
-- **RN example app**: Open `apps/expo-example/ios/example.xcworkspace` in Xcode
+- **Android**: Open `apps/example/android` in Android Studio
+- **RN example app**: Open `apps/example/ios/ReactNativeAI.xcworkspace` in Xcode
   - The Apple Intelligence package is a Turbo Module - work directly from the integrated Xcode project
   - Native code is in `packages/apple-llm/ios/` but best developed through the example app
 

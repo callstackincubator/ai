@@ -1,5 +1,6 @@
 // Core AI needs an iOS 27 deployment target and has no Simulator support, so
-// it is opt-in: CORE_AI=1 npx expo prebuild --clean (see react-native.config.js)
+// it is opt-in: CORE_AI=1 npx expo prebuild --clean (see react-native.config.js).
+// The app doesn't use it; the harness tests in harness/core-ai do
 //
 // Video generation needs more memory than iOS gives an app by default.
 // CORE_AI=1 CORE_AI_MEMORY=1 adds the increased memory limit entitlement,
@@ -22,7 +23,6 @@ module.exports = ({ config }) => ({
                 'object-detection',
                 'segmentation',
                 'asr',
-
                 'video-segmentation',
                 'video-diffusion',
               ],

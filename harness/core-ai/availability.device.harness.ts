@@ -1,7 +1,7 @@
 import { CoreAI, type CoreAICapabilities } from '@react-native-ai/core-ai'
 import { describe, expect, it } from 'react-native-harness'
 
-// The example app links every task (see apps/expo-example/app.config.js)
+// The example app links every task (see apps/example/app.config.js)
 
 describe('core-ai availability', () => {
   it('reports the linked products', async () => {
