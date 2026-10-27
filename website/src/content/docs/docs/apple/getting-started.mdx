@@ -1,0 +1,54 @@
+---
+title: "Getting Started"
+---
+
+import PackageManagerTabs from '../../../../components/starlight/PackageManagerTabs.astro'
+
+Use the AI that ships with iOS: Apple Intelligence for text, plus speech
+recognition, speech synthesis and embeddings. The models are part of the
+system and run on the device, so there's nothing to bundle. iOS downloads some
+assets on first use.
+
+| Feature                          | Model                        | Apple API               |
+| -------------------------------- | ---------------------------- | ----------------------- |
+| [Text generation](/docs/apple/generating)  | `apple()`                    | Foundation Models       |
+| [Embeddings](/docs/apple/embeddings)       | `apple.embeddingModel()`     | `NLContextualEmbedding` |
+| [Transcription](/docs/apple/transcription) | `apple.transcriptionModel()` | `SpeechAnalyzer`        |
+| [Speech](/docs/apple/speech)               | `apple.speechModel()`        | `AVSpeechSynthesizer`   |
+
+## Installation
+
+<PackageManagerTabs command="install @react-native-ai/apple ai" />
+
+The provider works with AI SDK v7 and needs its [polyfills](/docs/polyfills).
+Examples with schemas also use `zod`.
+
+## Requirements
+
+- React Native New Architecture
+- iOS 26 for text generation and transcription, on a device with Apple
+  Intelligence turned on. Embeddings and speech work on older versions.
+- Xcode 27 to build with the iOS 27 features. Older SDKs leave them out, see
+  [iOS Versions](/docs/apple/ios-versions).
+
+## Usage
+
+```typescript
+import { apple } from '@react-native-ai/apple'
+import { generateText } from 'ai'
+
+if (apple.isAvailable()) {
+  const { text } = await generateText({
+    model: apple(),
+    prompt: 'Explain quantum computing in simple terms.',
+  })
+}
+```
+
+`isAvailable()` is `false` when the device is not eligible, Apple Intelligence
+is off, or the model is still downloading. [`getModelInfo()`](/docs/apple/models#availability-and-model-info)
+tells you which. Before iOS 26, `isAvailable()` is `false` and `getModelInfo()`
+rejects with `UNSUPPORTED_OS`.
+
+To test in the iOS Simulator, turn on Apple Intelligence on your Mac first, see
+[Running on Simulator](/docs/apple/running-on-simulator).

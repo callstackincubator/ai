@@ -1,0 +1,28 @@
+---
+// An install command for each package manager, in synced tabs. `command` is the npm form
+// without `npm`, such as "install @react-native-ai/apple ai".
+import { Code, TabItem, Tabs } from '@astrojs/starlight/components';
+
+interface Props {
+  command: string;
+}
+
+const { command } = Astro.props;
+const args = command.replace(/^install\s+/, '');
+const managers = [
+  ['npm', `npm install ${args}`],
+  ['yarn', `yarn add ${args}`],
+  ['pnpm', `pnpm add ${args}`],
+  ['bun', `bun add ${args}`],
+];
+---
+
+<Tabs syncKey="pkg">
+  {
+    managers.map(([label, cmd]) => (
+      <TabItem label={label!}>
+        <Code code={cmd!} lang="sh" />
+      </TabItem>
+    ))
+  }
+</Tabs>

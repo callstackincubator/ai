@@ -1,0 +1,95 @@
+---
+title: "Getting Started"
+---
+
+import PackageManagerTabs from '../../../../components/starlight/PackageManagerTabs.astro'
+
+Run Gemini Nano on Android, on the device, with the Vercel AI SDK. Android
+provides the model through AICore, so there's no model to bundle and no API key.
+When you need a larger model or support for every device, the same provider
+runs cloud Gemini. It's built on
+[Google's Agent Development Kit](https://developer.android.com/ai/adk).
+
+## Installation
+
+<PackageManagerTabs command="install @react-native-ai/adk ai" />
+
+The AI SDK needs its [polyfills](/docs/polyfills).
+
+## Requirements
+
+- Android with `minSdkVersion` 26 or higher
+- React Native 0.76 or newer, with the New Architecture
+- For Gemini Nano, a physical device with AICore support, running Android 14
+  or newer. See the
+  [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device)
+  for the supported devices. Cloud Gemini works on any device.
+
+## Native Setup
+
+Raise `minSdkVersion` to 26, and exclude two files that Google's libraries both ship, so the build doesn't fail on duplicates.
+
+### Expo
+
+With `expo-build-properties`:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "packagingOptions": {
+              "exclude": ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
+            }
+          }
+        }
+      ]
+    ]
+  }
+}
+```
+
+Then regenerate the native project:
+
+```bash
+npx expo prebuild --clean
+```
+
+### Bare React Native
+
+Add this to `android/app/build.gradle`, and set `minSdkVersion` to 26:
+
+```groovy
+android {
+  packagingOptions {
+    excludes += ["META-INF/INDEX.LIST", "META-INF/DEPENDENCIES"]
+  }
+}
+```
+
+## Basic Usage
+
+Pass `adk()` to the AI SDK. Check that Gemini Nano can run on the device first:
+
+```typescript
+import { adk } from '@react-native-ai/adk'
+import { generateText } from 'ai'
+
+if (await adk.isAvailable('genai-nano')) {
+  const { text } = await generateText({
+    model: adk(),
+    prompt: 'Summarize on-device AI in one sentence.',
+  })
+}
+```
+
+[Models & Availability](/docs/adk/models) covers the availability checks and cloud Gemini.
+
+## Next Steps
+
+- [Generating](/docs/adk/generating): streaming, tool calling, image input and JSON output
+- [Models & Availability](/docs/adk/models): checking for Gemini Nano, cloud Gemini and provider options

@@ -1,0 +1,183 @@
+---
+// The home page hero: the motto in two beats, a lede, GET STARTED and the install command, a
+// `zsh` window with the setup beside them on wide screens, then the product visual on the
+// signature scene. The visual is the one part every product draws for itself.
+import CodeBlock from '../site/CodeBlock.astro';
+import CopyCommand from '../site/CopyCommand.astro';
+import Dither from '../site/Dither.astro';
+import Window from '../site/Window.astro';
+import { code, docs, home, site } from '../../site/content';
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-top hero-top--split">
+    <div class="hero-copy">
+      <h1 class="h1" id="hero-title">{site.headline[0]} <em>{site.headline[1]}</em></h1>
+      <p class="lede">{site.lede}</p>
+      <div class="actions">
+        <a class="btn" href={docs.start}>Get started <span aria-hidden="true">→</span></a>
+        <CopyCommand command={site.install} />
+      </div>
+    </div>
+    <Window title="zsh" class="hero-side">
+      <div class="term">
+        {/* One line per element: .term is white-space: pre-wrap, so markup whitespace shows. */}
+        {home.setup.map((l) => ('cmd' in l ? <div class="ln"><span class="p">$</span> {l.cmd}</div> : <div class="ln dim"># {l.comment}</div>))}
+      </div>
+    </Window>
+  </div>
+
+  <!-- The stage: the chip scene, with the code and the phone it runs on over it. -->
+  <div class="viz" data-hero role="img" aria-label="A streamText call with the Apple model, next to a phone in airplane mode streaming the reply on device.">
+    <Dither scene="die" focus={0.62} />
+    <!-- HERO VISUAL -->
+    <div class="rig">
+      <Window title="TripPlanner.tsx" class="rig-code">
+        <CodeBlock code={code.hero} lang="ts" minLines={12} />
+      </Window>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="phone-status label">
+            <span>9:41</span>
+            <span class="air"><span aria-hidden="true">✈</span> Airplane mode</span>
+          </div>
+          <p class="bubble bubble--me">Plan a 3-day trip to Kyoto</p>
+          <div class="bubble bubble--ai" data-reply>
+            {home.reply.map((l) => <p>{l}</p>)}
+          </div>
+          <p class="phone-foot label"><span class="live-dot" aria-hidden="true"></span> apple() · on device</p>
+        </div>
+      </div>
+    </div>
+    <!-- /HERO VISUAL -->
+  </div>
+</section>
+
+<script>
+  // The animation code loads only when the hero first nears the viewport.
+  import { whenNear } from '../site/lazy';
+
+  const root = document.querySelector<HTMLElement>('[data-hero]');
+  if (root) whenNear(root, () => void import('./hero').then((m) => m.default(root)));
+</script>
+
+<style>
+  .hero-top--split {
+    grid-template-columns: minmax(0, 1fr) 28.5rem;
+    align-items: center;
+    padding-block: clamp(2rem, 4.5vw, 3.75rem);
+  }
+  .hero-top--split .h1 {
+    max-width: 20ch;
+  }
+  :global(.hero-side) .term {
+    font-size: 0.6875rem;
+    overflow-wrap: normal;
+  }
+  .rig {
+    position: relative;
+    display: flex;
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    align-items: center;
+    justify-content: center;
+    padding: clamp(2rem, 5vw, 3.5rem) var(--pad);
+  }
+  .rig :global(.rig-code) {
+    flex: 1 1 27rem;
+    max-width: 31rem;
+  }
+  /* A phone: a dark slab with 4px-stepped corners and a 1px outline that follows the steps. */
+  .phone {
+    --steps: polygon(
+      0 12px, 4px 12px, 4px 8px, 8px 8px, 8px 4px, 12px 4px, 12px 0,
+      calc(100% - 12px) 0, calc(100% - 12px) 4px, calc(100% - 8px) 4px, calc(100% - 8px) 8px,
+      calc(100% - 4px) 8px, calc(100% - 4px) 12px, 100% 12px,
+      100% calc(100% - 12px), calc(100% - 4px) calc(100% - 12px), calc(100% - 4px) calc(100% - 8px),
+      calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) calc(100% - 4px), calc(100% - 12px) calc(100% - 4px),
+      calc(100% - 12px) 100%, 12px 100%, 12px calc(100% - 4px), 8px calc(100% - 4px),
+      8px calc(100% - 8px), 4px calc(100% - 8px), 4px calc(100% - 12px), 0 calc(100% - 12px)
+    );
+    flex: 0 0 17.5rem;
+    padding: 1px;
+    background: #313131;
+    clip-path: var(--steps);
+  }
+  .phone-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 26rem;
+    padding: 0.875rem 1rem 1rem;
+    background: #050505;
+    clip-path: var(--steps);
+  }
+  .phone-status {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    color: var(--muted);
+  }
+  .phone-status .air {
+    color: var(--text);
+  }
+  .bubble {
+    margin: 0;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  .bubble--me {
+    align-self: flex-end;
+    max-width: 85%;
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .bubble--ai {
+    flex: 1;
+    border: 1px solid var(--line-strong);
+    color: var(--text);
+  }
+  .bubble--ai p {
+    margin: 0 0 0.5rem;
+  }
+  .bubble--ai p:last-child {
+    margin: 0;
+  }
+  .phone-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    color: var(--muted);
+    text-transform: none;
+  }
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+  }
+  @media (max-width: 64rem) {
+    .hero-top--split {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    :global(.hero-side) {
+      display: none;
+    }
+    /* Too narrow for two across: the pictures stack. */
+    .rig {
+      flex-direction: column;
+    }
+    .rig :global(.rig-code) {
+      flex: none;
+      width: min(100%, 31rem);
+      max-width: none;
+    }
+    .phone {
+      flex: none;
+      width: min(100%, 19rem);
+    }
+    .phone-screen {
+      min-height: 0;
+    }
+  }
+</style>
