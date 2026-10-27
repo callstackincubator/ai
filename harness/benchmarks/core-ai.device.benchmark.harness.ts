@@ -1,4 +1,4 @@
 import { benchmarkCoreAI } from './core-ai'
-import { CORE_AI_MODEL } from './core-ai-models'
+import { coreAIExport } from './models'
 
-benchmarkCoreAI('core-ai', CORE_AI_MODEL)
+benchmarkCoreAI('core-ai', coreAIExport('coreAI'))

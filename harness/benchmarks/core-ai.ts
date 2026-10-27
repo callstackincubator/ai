@@ -9,17 +9,20 @@ import {
 } from '../../apps/expo-example/src/utils/coreAIStorageUtils'
 import {
   benchmarkPrompt,
+  decodeTokensPerSecond,
   footprintMB,
   LOAD_RUNS,
   MAX_OUTPUT_TOKENS,
   measureStream,
   median,
+  memoryAfterUnload,
   PROMPTS,
   report,
   timeMs,
   waitForCooldown,
   withPeakMemory,
 } from './measure'
+import type { CoreAIExport } from './models'
 
 // Where Core AI keeps models it specialized for this device
 const SPECIALIZATION_CACHE = `${RNBlobUtil.fs.dirs.CacheDir}/coreai-cache`
@@ -30,14 +33,7 @@ async function clearSpecializationCache() {
   }
 }
 
-type CoreAIBenchmarkConfig = {
-  id: string
-  repo: string
-  folder: string
-  contextLength: number
-}
-
-function setup(config: CoreAIBenchmarkConfig) {
+function setup(config: CoreAIExport) {
   const path = `${CORE_AI_STORAGE_PATH}/${config.id}`
   let model: CoreAILanguageModel
   return {
@@ -79,7 +75,7 @@ function setup(config: CoreAIBenchmarkConfig) {
 // compile heats the device
 export function benchmarkCoreAIColdStart(
   runtime: string,
-  config: CoreAIBenchmarkConfig
+  config: CoreAIExport
 ) {
   const benchmark = setup(config)
 
@@ -113,17 +109,16 @@ export function benchmarkCoreAIColdStart(
 
 // Loads and generation with the model specialized and compiled, as on every
 // launch after the first
-export function benchmarkCoreAI(
-  runtime: string,
-  config: CoreAIBenchmarkConfig
-) {
+export function benchmarkCoreAI(runtime: string, config: CoreAIExport) {
   const benchmark = setup(config)
 
   describe(`${runtime} benchmark`, () => {
+    let baselineMB: number
+
     it('loads', async () => {
       await benchmark.download()
       // Taken first, since Core AI keeps some memory after an unload
-      const baselineMB = footprintMB()
+      baselineMB = footprintMB()
       // Specialized and compiled before the measured loads
       await benchmark.create().prepare()
       await benchmark.firstTokenMs()
@@ -158,14 +153,28 @@ export function benchmarkCoreAI(
       it(`generates from the ${prompt} prompt`, async () => {
         const result = await benchmarkPrompt(
           (text) =>
-            measureStream(() =>
-              streamText({
-                model: benchmark.model,
-                prompt: text,
-                maxOutputTokens: MAX_OUTPUT_TOKENS,
-                temperature: 0,
-                reasoning: 'none',
-              })
+            measureStream(
+              () =>
+                streamText({
+                  model: benchmark.model,
+                  prompt: text,
+                  maxOutputTokens: MAX_OUTPUT_TOKENS,
+                  temperature: 0,
+                  reasoning: 'none',
+                }),
+              (metadata, outputTokens) => {
+                const timings = metadata?.['core-ai']?.timings
+                return (
+                  timings && {
+                    ttftMs: timings.firstTokenMs,
+                    decodeTokensPerSecond: decodeTokensPerSecond(
+                      outputTokens,
+                      timings.firstTokenMs,
+                      timings.totalMs
+                    ),
+                  }
+                )
+              }
             ),
           prompt
         )
@@ -175,6 +184,10 @@ export function benchmarkCoreAI(
 
     it('unloads', async () => {
       await benchmark.model.unload()
+      await report(runtime, {
+        stage: 'unload',
+        ...(await memoryAfterUnload(baselineMB)),
+      })
     })
   })
 }

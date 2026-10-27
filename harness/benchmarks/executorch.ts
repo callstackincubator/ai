@@ -4,10 +4,12 @@ import { describe, it } from 'react-native-harness'
 
 import {
   benchmarkPrompt,
+  decodeTokensPerSecond,
   footprintMB,
   LOAD_RUNS,
   MAX_OUTPUT_TOKENS,
   median,
+  memoryAfterUnload,
   report,
   timeMs,
   toRun,
@@ -66,6 +68,7 @@ export function benchmarkExecuTorch(
     let runner: llm.LLMRunner
     let modelPath: string
     let tokenizerPath: string
+    let baselineMB: number
 
     it('loads', async () => {
       ;[modelPath, tokenizerPath] = await Promise.all([
@@ -73,7 +76,7 @@ export function benchmarkExecuTorch(
         download('tokenizer.json'),
       ])
       await waitForCooldown()
-      const baselineMB = footprintMB()
+      baselineMB = footprintMB()
 
       const { value: coldLoadMs, peakMemoryMB: loadPeakMemoryMB } =
         await withPeakMemory(() =>
@@ -110,18 +113,32 @@ export function benchmarkExecuTorch(
       it(`generates from the ${prompt} prompt`, async () => {
         const result = await benchmarkPrompt(async (text) => {
           const { stats, ...times } = await generate(runner, renderPrompt(text))
-          return toRun({
+          const run = toRun({
             promptTokens: stats.numPromptTokens,
             outputTokens: stats.numGeneratedTokens,
             ...times,
           })
+          // The runner's own timestamps
+          run.native = {
+            ttftMs: stats.firstTokenMs - stats.inferenceStartMs,
+            decodeTokensPerSecond: decodeTokensPerSecond(
+              stats.numGeneratedTokens,
+              stats.firstTokenMs,
+              stats.inferenceEndMs
+            ),
+          }
+          return run
         }, prompt)
         await report(runtime, { stage: 'generate', ...result })
       })
     }
 
-    it('unloads', () => {
+    it('unloads', async () => {
       runner.dispose()
+      await report(runtime, {
+        stage: 'unload',
+        ...(await memoryAfterUnload(baselineMB)),
+      })
     })
   })
 }

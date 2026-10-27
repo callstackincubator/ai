@@ -3,7 +3,8 @@
 # Builds the MLX benchmark app, installs it on a device, runs it and prints the
 # BENCHMARK lines it logs. Needs XcodeGen (brew install xcodegen).
 #
-#   DEVICE=<udid> TEAM=<team id> harness/benchmarks/mlx/run.sh [-model <repo>]
+#   DEVICE=<udid> TEAM=<team id> [MODEL=qwen3-1.7b] [LAUNCHES=3] \
+#     harness/benchmarks/mlx/run.sh
 
 set -euo pipefail
 
@@ -21,7 +22,19 @@ xcodebuild -project MLXBenchmark.xcodeproj -scheme MLXBenchmark \
   -derivedDataPath build -allowProvisioningUpdates \
   DEVELOPMENT_TEAM="$TEAM" -quiet build
 
+# The models in ../models.ts, as MLX community 4-bit weights
+MODEL="${MODEL:-qwen3-0.6b}"
+case "$MODEL" in
+  qwen3-0.6b) REPO=mlx-community/Qwen3-0.6B-4bit ;;
+  qwen3-1.7b) REPO=mlx-community/Qwen3-1.7B-4bit ;;
+  *) echo "Unknown model $MODEL" >&2; exit 1 ;;
+esac
+
 xcrun devicectl device install app --device "$DEVICE" \
   build/Build/Products/Release-iphoneos/MLXBenchmark.app
-xcrun devicectl device process launch --device "$DEVICE" --console \
-  --terminate-existing com.callstack.ai.mlxbenchmark "$@" | grep '^BENCHMARK'
+for launch in $(seq "${LAUNCHES:-3}"); do
+  xcrun devicectl device process launch --device "$DEVICE" --console \
+    --terminate-existing com.callstack.ai.mlxbenchmark -model "$REPO" -name "$MODEL" |
+    grep '^BENCHMARK'
+  sleep "${COOLDOWN:-60}"
+done

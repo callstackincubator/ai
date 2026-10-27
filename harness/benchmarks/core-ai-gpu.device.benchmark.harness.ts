@@ -1,4 +1,4 @@
 import { benchmarkCoreAI } from './core-ai'
-import { CORE_AI_GPU_MODEL } from './core-ai-models'
+import { coreAIExport } from './models'
 
-benchmarkCoreAI('core-ai-gpu', CORE_AI_GPU_MODEL)
+benchmarkCoreAI('core-ai-gpu', coreAIExport('coreAIGpu'))

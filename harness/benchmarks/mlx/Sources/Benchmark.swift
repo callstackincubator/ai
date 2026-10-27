@@ -9,8 +9,10 @@ import Tokenizers
 // The MLX counterpart of harness/benchmarks/measure.ts: the same prompts,
 // output length, runs and metrics, measured the same way
 enum Benchmark {
+  static let protocolVersion = 2
   static let maxOutputTokens = 256
-  static let runs = 3
+  static let warmupRuns = 3
+  static let runs = 10
   static let loadRuns = 3
   static let runtime = "mlx-swift"
 
@@ -26,12 +28,17 @@ enum Benchmark {
     let prefillTokensPerSecond: Double
     let decodeTokensPerSecond: Double
     let totalMs: Double
+    var peakMemoryMB = 0.0
+    // The worst thermal state during the run
+    var thermalState = "nominal"
   }
 
   static func run() async throws {
-    // Launch with `-model <repo>` to benchmark another model
+    // Launch with `-model <repo> -name <name>` to benchmark another model. The
+    // name is the one in ../models.ts
     let modelId =
       UserDefaults.standard.string(forKey: "model") ?? "mlx-community/Qwen3-0.6B-4bit"
+    let modelName = UserDefaults.standard.string(forKey: "name") ?? "qwen3-0.6b"
     let promptsURL = Bundle.main.url(forResource: "prompts", withExtension: "json")!
     let prompts = try JSONDecoder().decode(Prompts.self, from: Data(contentsOf: promptsURL))
 
@@ -70,39 +77,77 @@ enum Benchmark {
       }
     }
     report([
-      "stage": "load", "model": modelId, "baselineMB": baselineMB, "loadedMB": loadedMB,
+      "stage": "load", "model": modelName, "repo": modelId, "baselineMB": baselineMB, "loadedMB": loadedMB,
       "loadPeakMemoryMB": loadPeakMemoryMB, "coldLoadMs": coldLoadMs,
       "warmLoadMs": median(warmLoadMs),
     ])
 
     for (name, prompt) in [("short", prompts.short), ("long", prompts.long)] {
-      // The warmup run is reported as `first`, and the peak covers all runs
-      await waitForCooldown()
+      // As benchmarkPrompt in measure.ts: warmup runs, then measured runs,
+      // each after the device cooled down. Runs that throttled the device or
+      // stopped early are left out
       let before = deviceState()
-      sampler.start()
-      let first = try await generate(container!, prompt: prompt)
       var results: [Run] = []
-      for _ in 0..<runs {
-        results.append(try await generate(container!, prompt: prompt))
+      for _ in 0..<(warmupRuns + runs) {
+        await waitForCooldown()
+        sampler.start()
+        var result = try await generate(container!, prompt: prompt)
+        result.peakMemoryMB = sampler.stop()
+        result.thermalState = sampler.worstThermalState
+        results.append(result)
       }
-      let peakMemoryMB = sampler.stop()
-      let pick = { (key: KeyPath<Run, Double>) in median(results.map { $0[keyPath: key] }) }
+      let measured = Array(results.dropFirst(warmupRuns))
+      let isFull = { (run: Run) in run.outputTokens >= maxOutputTokens - 1 }
+      let valid = measured.filter { isFull($0) && $0.thermalState == "nominal" }
+      guard !valid.isEmpty else {
+        report(["stage": "generate", "model": modelName, "repo": modelId, "prompt": name, "validRuns": 0])
+        continue
+      }
+      let stats = { (key: KeyPath<Run, Double>) in summarize(valid.map { $0[keyPath: key] }) }
+      let spread = [
+        "ttftMs": stats(\.ttftMs),
+        "prefillTokensPerSecond": stats(\.prefillTokensPerSecond),
+        "decodeTokensPerSecond": stats(\.decodeTokensPerSecond),
+      ]
+      let first = results[0]
       report([
-        "stage": "generate", "model": modelId, "prompt": name,
-        "promptTokens": median(results.map { Double($0.promptTokens) }),
-        "outputTokens": median(results.map { Double($0.outputTokens) }),
-        "ttftMs": pick(\.ttftMs),
-        "prefillTokensPerSecond": pick(\.prefillTokensPerSecond),
-        "decodeTokensPerSecond": pick(\.decodeTokensPerSecond),
-        "totalMs": pick(\.totalMs),
-        "peakMemoryMB": peakMemoryMB,
+        "stage": "generate", "model": modelName, "repo": modelId, "prompt": name,
+        "validRuns": valid.count,
+        "shortRuns": measured.filter { !isFull($0) }.count,
+        "throttledRuns": measured.filter { $0.thermalState != "nominal" }.count,
+        "promptTokens": median(valid.map { Double($0.promptTokens) }),
+        "outputTokens": median(valid.map { Double($0.outputTokens) }),
+        "ttftMs": spread["ttftMs"]!["median"]!,
+        "prefillTokensPerSecond": spread["prefillTokensPerSecond"]!["median"]!,
+        "decodeTokensPerSecond": spread["decodeTokensPerSecond"]!["median"]!,
+        "totalMs": median(valid.map(\.totalMs)),
+        "spread": spread,
+        "peakMemoryMB": results.map(\.peakMemoryMB).max()!,
         "first": [
           "ttftMs": first.ttftMs, "decodeTokensPerSecond": first.decodeTokensPerSecond,
         ],
+        "runs": measured.map { run in
+          [
+            "promptTokens": run.promptTokens, "outputTokens": run.outputTokens,
+            "ttftMs": run.ttftMs, "prefillTokensPerSecond": run.prefillTokensPerSecond,
+            "decodeTokensPerSecond": run.decodeTokensPerSecond,
+            "peakMemoryMB": run.peakMemoryMB, "thermalState": run.thermalState,
+          ] as [String: Any]
+        },
         "before": before,
         "after": deviceState(),
       ])
     }
+
+    container = nil
+    MLX.GPU.clearCache()
+    // As memoryAfterUnload in measure.ts
+    try await Task.sleep(for: .seconds(2))
+    let unloadedMB = Memory.footprintMB()
+    report([
+      "stage": "unload", "model": modelName, "repo": modelId, "baselineMB": baselineMB,
+      "unloadedMB": unloadedMB, "retainedMB": unloadedMB - baselineMB,
+    ])
   }
 
   // Times from before the chat template is applied, as the AI SDK runtimes do.
@@ -152,17 +197,19 @@ enum Benchmark {
     }
   }
 
+  static func thermalStateName(_ state: ProcessInfo.ThermalState) -> String {
+    switch state {
+    case .nominal: "nominal"
+    case .fair: "fair"
+    case .serious: "serious"
+    case .critical: "critical"
+    @unknown default: "unknown"
+    }
+  }
+
   static func deviceState() -> [String: Any] {
-    let thermalState =
-      switch ProcessInfo.processInfo.thermalState {
-      case .nominal: "nominal"
-      case .fair: "fair"
-      case .serious: "serious"
-      case .critical: "critical"
-      @unknown default: "unknown"
-      }
-    return [
-      "thermalState": thermalState,
+    [
+      "thermalState": thermalStateName(ProcessInfo.processInfo.thermalState),
       "lowPowerMode": ProcessInfo.processInfo.isLowPowerModeEnabled,
     ]
   }
@@ -170,6 +217,7 @@ enum Benchmark {
   static func report(_ result: [String: Any]) {
     var result = result
     result["runtime"] = runtime
+    result["protocol"] = protocolVersion
     let data = try! JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
     print("BENCHMARK \(String(decoding: data, as: UTF8.self))")
   }
@@ -179,10 +227,24 @@ enum Benchmark {
     return Double(seconds) * 1000 + Double(attoseconds) / 1e15
   }
 
-  static func median(_ values: [Double]) -> Double {
+  // Linear interpolation between the closest ranks, as in measure.ts
+  static func quantile(_ values: [Double], _ q: Double) -> Double {
     let sorted = values.sorted()
-    let middle = sorted.count / 2
-    return sorted.count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+    let position = Double(sorted.count - 1) * q
+    let lower = Int(position.rounded(.down))
+    let upper = Int(position.rounded(.up))
+    return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - Double(lower))
+  }
+
+  static func median(_ values: [Double]) -> Double {
+    quantile(values, 0.5)
+  }
+
+  static func summarize(_ values: [Double]) -> [String: Double] {
+    [
+      "median": median(values), "p25": quantile(values, 0.25), "p75": quantile(values, 0.75),
+      "min": values.min()!, "max": values.max()!,
+    ]
   }
 }
 
@@ -208,15 +270,30 @@ enum Memory {
     private let queue = DispatchQueue(label: "com.callstack.ai.mlxbenchmark.memory")
     private var timer: DispatchSourceTimer?
     private var peak: UInt64 = 0
+    private var worstThermal = ProcessInfo.ThermalState.nominal
+
+    private func recordThermalState() {
+      let state = ProcessInfo.processInfo.thermalState
+      if state.rawValue > worstThermal.rawValue {
+        worstThermal = state
+      }
+    }
+
+    // The worst thermal state between start and stop
+    var worstThermalState: String {
+      queue.sync { Benchmark.thermalStateName(worstThermal) }
+    }
 
     func start() {
       queue.sync {
         peak = footprint()
+        worstThermal = ProcessInfo.processInfo.thermalState
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(10))
         timer.setEventHandler { [weak self] in
           guard let self else { return }
           self.peak = max(self.peak, footprint())
+          self.recordThermalState()
         }
         timer.resume()
         self.timer = timer
@@ -229,6 +306,7 @@ enum Memory {
         timer?.cancel()
         timer = nil
         peak = max(peak, footprint())
+        recordThermalState()
         return Double(peak) / 1_048_576
       }
     }
