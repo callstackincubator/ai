@@ -118,8 +118,9 @@ Not published to npm yet. Run models exported with
 [`apple/coreai-models`](https://github.com/apple/coreai-models), such as Qwen3
 or FLUX.2, on iOS 27 with Apple's Core AI framework. Every task has a
 [hosted export](https://react-native-ai.dev/docs/core-ai/models) to start
-from: text, image and video generation, transcription, embeddings, and vision
-tasks such as segmentation and object detection.
+from: text generation with tool calling and image prompts, image and video
+generation, transcription, embeddings, and vision tasks such as segmentation
+and object detection.
 
 ```ts
 import { coreAI } from '@react-native-ai/core-ai'

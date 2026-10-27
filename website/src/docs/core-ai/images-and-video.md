@@ -10,7 +10,7 @@ import { generateImage } from 'ai'
 
 const model = coreAI.imageModel({
   id: 'flux2-klein-4b',
-  source: { type: 'file', uri: fluxDirectory },
+  source: fluxDirectory,
 })
 
 const { image } = await generateImage({
@@ -39,7 +39,7 @@ import { experimental_generateVideo as generateVideo } from 'ai'
 const { video, providerMetadata } = await generateVideo({
   model: coreAI.videoModel({
     id: 'wan2.1-t2v-1.3b',
-    source: { type: 'file', uri: wanDirectory },
+    source: wanDirectory,
   }),
   prompt: 'a red ball rolling across a wooden table',
   seed: 1,

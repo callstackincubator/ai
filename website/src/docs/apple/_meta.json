@@ -1,9 +1,12 @@
 [
   { "type": "file", "name": "getting-started", "label": "Getting Started" },
-  { "type": "file", "name": "ios-versions", "label": "iOS Versions" },
   { "type": "file", "name": "generating", "label": "Generating" },
+  { "type": "file", "name": "tools", "label": "Tools" },
+  { "type": "file", "name": "models", "label": "Models & Availability" },
+  { "type": "file", "name": "errors", "label": "Error Handling" },
   { "type": "file", "name": "embeddings", "label": "Embeddings" },
   { "type": "file", "name": "transcription", "label": "Transcription" },
   { "type": "file", "name": "speech", "label": "Speech" },
+  { "type": "file", "name": "ios-versions", "label": "iOS Versions" },
   { "type": "file", "name": "running-on-simulator", "label": "Running on Simulator" }
 ]

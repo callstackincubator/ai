@@ -94,7 +94,7 @@ const exists = await isModelDownloaded('owner/repo/model.gguf')
 | Language  | `llama.languageModel()`  | Text generation, chat                   | https://www.react-native-ai.dev/docs/llama/generating                                |
 | Embedding | `llama.embeddingModel()` | RAG, similarity, prompt size estimation | https://www.react-native-ai.dev/docs/llama/embeddings                                |
 | Rerank    | `llama.rerankingModel()` | Document ranking, RAG                   | https://www.react-native-ai.dev/docs/llama/reranking                                 |
-| Speech    | `llama.speechModel()`    | Requires `vocoderPath` in opts          | https://www.react-native-ai.dev/docs/llama/model-management#creating-model-instances |
+| Speech    | `llama.speechModel()`    | Requires `vocoderPath` in opts          | https://www.react-native-ai.dev/docs/llama/speech                                    |
 
 ### 6. Lifecycle
 

@@ -1,29 +1,19 @@
 # Reranking
 
-Rank documents based on their relevance to a query using the Llama provider. This is useful for improving search results and implementing retrieval-augmented generation (RAG) systems.
-
-## Requirements
-
-- A reranker GGUF model (models trained for ranking)
-- Models must be downloaded and prepared before use
-
-## Basic Usage
+Rank documents by how relevant they are to a query, for example to reorder
+search results before passing the best ones to a language model. Use a GGUF
+model trained for reranking:
 
 ```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
+import { downloadModel, llama } from '@react-native-ai/llama'
 import { rerank } from 'ai'
 
-// Download reranker model - returns the file path
 const modelPath = await downloadModel(
-  'jinaai/jina-reranker-v2-base-multilingual-GGUF/jina-reranker-v2-base-multilingual-Q4_K_M.gguf',
+  'gpustack/bge-reranker-v2-m3-GGUF/bge-reranker-v2-m3-Q4_K_M.gguf'
 )
-
-// Create rerank model with the path
 const model = llama.rerankingModel(modelPath)
-
 await model.prepare()
 
-// Rerank documents based on relevance to query
 const { ranking } = await rerank({
   model,
   query: 'What is artificial intelligence?',
@@ -33,65 +23,27 @@ const { ranking } = await rerank({
     'Machine learning is a subset of AI.',
     'I like pizza.',
   ],
+  topN: 2,
 })
 
-// Results are sorted by relevance (highest first)
-ranking.forEach((result, rank) => {
-  console.log(`Rank ${rank + 1}:`, {
-    relevanceScore: result.relevanceScore,
-    index: result.index, // Original index in the documents array
-  })
-})
+// Sorted by relevance, highest first
+for (const { index, relevanceScore } of ranking) {
+  console.log(index, relevanceScore)
+}
 ```
 
-## Limiting Results
+Each result has the `index` of the document in `documents` and its
+`relevanceScore`, where higher is more relevant. `topN` limits how many results
+are returned.
 
-Use `topN` to limit the number of returned documents:
-
-```typescript
-const { ranking } = await rerank({
-  model,
-  query: 'What is artificial intelligence?',
-  documents: ['doc1', 'doc2', 'doc3', 'doc4', 'doc5'],
-  topN: 3,
-})
-```
-
-## Model Configuration
-
-Configure the rerank model with specific options:
+## Options
 
 ```typescript
 const model = llama.rerankingModel(modelPath, {
-  normalize: 1, // Score normalization (default: from model config)
-  contextParams: {
-    n_ctx: 2048, // Context size (default: 2048)
-    n_gpu_layers: 99, // GPU layers (default: 99)
-  },
+  normalize: 1,
+  contextParams: { n_ctx: 2048 },
 })
 ```
 
-### Options
-
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `normalize` | number | model default | Score normalization mode |
-| `contextParams.n_ctx` | number | 2048 | Context window size |
-| `contextParams.n_gpu_layers` | number | 99 | GPU layers for acceleration |
-
-## Result Format
-
-Each result in the ranking array contains:
-
-| Property | Type | Description |
-| --- | --- | --- |
-| `relevanceScore` | number | Relevance score (higher = more relevant) |
-| `index` | number | Index of the document in the original input array |
-
-## Cleanup
-
-Release resources when done:
-
-```typescript
-await model.unload() // Release from memory
-```
+See the [API reference](./model-management#llamarerankingmodelmodelpath-options)
+for every option. Call `model.unload()` to free the memory when you are done.

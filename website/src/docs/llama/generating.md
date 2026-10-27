@@ -1,23 +1,23 @@
 # Generating
 
-You can generate responses using Llama models with the Vercel AI SDK's `generateText` or `streamText` functions.
+Use a llama language model with the AI SDK's `generateText` and `streamText`.
+The examples start from a prepared model, see
+[Getting Started](./getting-started#usage):
 
-## Requirements
+```typescript
+import { downloadModel, llama } from '@react-native-ai/llama'
 
-- Models must be downloaded and prepared before use
-- Sufficient device storage for model files (typically 1-4GB per model depending on quantization)
+const modelPath = await downloadModel(
+  'bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf'
+)
+const model = llama.languageModel(modelPath)
+await model.prepare()
+```
 
 ## Text Generation
 
 ```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
 import { generateText } from 'ai'
-
-// Download model - returns the file path
-const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
-
-const model = llama.languageModel(modelPath)
-await model.prepare()
 
 const result = await generateText({
   model,
@@ -29,17 +29,8 @@ console.log(result.text)
 
 ## Streaming
 
-Stream responses for real-time output:
-
 ```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
 import { streamText } from 'ai'
-
-// Download model - returns the file path
-const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
-
-const model = llama.languageModel(modelPath)
-await model.prepare()
 
 const { textStream } = streamText({
   model,
@@ -51,55 +42,127 @@ for await (const delta of textStream) {
 }
 ```
 
-## Tool Calling
+## Options
 
-You can enable tool calling for both `generateText` and `streamText` by passing tools to the AI SDK.
-
-### Setup
-
-Define tools using the AI SDK `tool` helper:
+The standard AI SDK generation options are passed to llama.rn:
 
 ```typescript
-import { tool } from 'ai'
-import { z } from 'zod'
-
-const getWeather = tool({
-  description: 'Get current weather information',
-  inputSchema: z.object({
-    city: z.string(),
-  }),
-  execute: async ({ city }) => {
-    return `Weather in ${city}: Sunny, 25°C`
-  },
+const result = await generateText({
+  model,
+  prompt: 'Write a creative story',
+  temperature: 0.8,
+  maxOutputTokens: 500,
+  topP: 0.9,
+  topK: 40,
+  presencePenalty: 0.5,
+  frequencyPenalty: 0.5,
+  stopSequences: ['THE END'],
+  seed: 42,
 })
 ```
 
-### Basic Tool Usage
+`providerOptions.llama` passes any other llama.rn completion parameter, such as
+`min_p` or `penalty_repeat`, and takes precedence over the options above.
+
+## Tool Calling
+
+Pass tools as usual. The AI SDK runs them and sends the results back to the
+model:
 
 ```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
-import { generateText } from 'ai'
-
-const modelPath = await downloadModel('Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q3_k_m.gguf')
-
-const model = llama.languageModel(modelPath)
-await model.prepare()
+import { generateText, tool } from 'ai'
+import { z } from 'zod'
 
 const result = await generateText({
   model,
   prompt: 'What is the weather in Paris?',
   tools: {
-    getWeather,
+    getWeather: tool({
+      description: 'Get current weather information',
+      inputSchema: z.object({ city: z.string() }),
+      execute: async ({ city }) => `Weather in ${city}: Sunny, 25°C`,
+    }),
   },
 })
 ```
 
-## Multimodal (Vision & Audio)
+Tool calling depends on the model's chat template, so use a model trained for
+it, such as Qwen3.5 or Gemma 4.
 
-Multimodal models take images and, for some models, audio. They ship as two files: the model and a multimodal projector (`mmproj`). Pass the projector as `projectorPath`:
+## Structured Output
+
+Generate JSON that matches a schema with `Output.object`. The schema is
+compiled into a grammar, so the model can only produce valid JSON:
 
 ```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
+import { generateText, Output } from 'ai'
+import { z } from 'zod'
+
+const { output } = await generateText({
+  model,
+  output: Output.object({
+    schema: z.object({
+      name: z.string(),
+      age: z.number(),
+      hobbies: z.array(z.string()),
+    }),
+  }),
+  prompt: 'Generate a fictional person profile',
+})
+
+console.log(output)
+// { name: 'Alice', age: 28, hobbies: ['reading', 'hiking'] }
+```
+
+Thinking is turned off for structured output, since llama.rn cannot combine a
+grammar with it, and an explicit `reasoning` level returns an `unsupported`
+warning.
+
+## Reasoning
+
+Reasoning models, such as Qwen3.5, Gemma 4, and DeepSeek-R1, return their
+thinking separately from the answer:
+
+```typescript
+const result = await generateText({
+  model,
+  prompt: 'Solve this math problem step by step: 2x + 5 = 13',
+})
+
+console.log(result.text) // the answer
+console.log(result.reasoningText) // the thinking, if the model produced any
+```
+
+When streaming, reasoning is emitted as `reasoning-start`, `reasoning-delta`
+and `reasoning-end` parts.
+
+Use the AI SDK `reasoning` option to control how much the model thinks:
+
+| `reasoning`                    | Effect                                                                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `'provider-default'` (default) | The chat template decides, most reasoning models think                                                                                                       |
+| `'none'`                       | Thinking is turned off (`enable_thinking: false`)                                                                                                            |
+| `'minimal'` to `'max'`         | Thinking is on, capped at a token budget: 2% to 95% of `maxOutputTokens`, or of the context size when `maxOutputTokens` is not set, and at least 1024 tokens |
+
+```typescript
+const result = await generateText({
+  model,
+  prompt: 'What is the capital of France?',
+  reasoning: 'none',
+})
+```
+
+To set llama.rn's `enable_thinking` or `thinking_budget_tokens` directly, pass
+them in `providerOptions.llama`, which takes precedence.
+
+## Images and Audio
+
+Multimodal models take images and, for some models, audio. They ship as two
+files: the model and a multimodal projector (`mmproj`). Download both and pass
+the projector as `projectorPath`:
+
+```typescript
+import { downloadModel, llama } from '@react-native-ai/llama'
 import { generateText } from 'ai'
 
 // Gemma 4 E2B reads images and audio, and supports reasoning and tool calling
@@ -127,152 +190,25 @@ const result = await generateText({
 })
 ```
 
-Images can also be passed as a `Uint8Array` or a base64 string with a `mediaType`. Audio goes in a `file` part:
+Images can also be a `Uint8Array` or a base64 string with a `mediaType`. Audio
+goes in a `file` part:
 
 ```typescript
 { type: 'file', mediaType: 'audio/wav', data: new URL('file:///path/to/clip.wav') }
 ```
 
-Smaller vision models with reasoning, such as `bartowski/Qwen_Qwen3.5-2B-GGUF` (with `mmproj-Qwen_Qwen3.5-2B-f16.gguf`), work the same way.
+- **Formats.** Images can be JPEG, PNG, BMP, GIF, TGA, HDR, PIC, or PNM, and
+  audio WAV or MP3. Other files, such as PDFs, throw
+  `UnsupportedFunctionalityError`.
+- **Sources.** Local `file://` URLs and in-memory data are read on device.
+  The AI SDK downloads remote `http(s)` URLs before the call.
+- **Context.** Multimodal models default to a 4096-token context, and a large
+  image can take a quarter of it. See `projectorImageMaxTokens` in the
+  [model options](./model-management#llamalanguagemodelmodelpath-options).
 
-### Supported Formats
+## Long Conversations
 
-- **Images**: JPEG, PNG, BMP, GIF, TGA, HDR, PIC, PNM
-- **Audio**: WAV, MP3
-
-Local `file://` URLs and in-memory data are read on device. Remote `http(s)` URLs are downloaded by the AI SDK before the call. Other file types (for example PDFs) throw an `UnsupportedFunctionalityError`.
-
-## Reasoning
-
-Reasoning models (Qwen3.5, Gemma 4, DeepSeek-R1 and others) return their thinking separately from the answer:
-
-```typescript
-const result = await generateText({
-  model,
-  prompt: 'Solve this math problem step by step: 2x + 5 = 13',
-})
-
-console.log(result.text) // the answer
-console.log(result.reasoningText) // the thinking, if the model produced any
-```
-
-When streaming, reasoning is emitted as `reasoning-start`, `reasoning-delta` and `reasoning-end` parts.
-
-Use the AI SDK `reasoning` option to control how much the model thinks:
-
-| `reasoning` | Effect |
-| --- | --- |
-| `'provider-default'` (default) | The chat template decides, most reasoning models think |
-| `'none'` | Thinking is turned off (`enable_thinking: false`) |
-| `'minimal'` to `'max'` | Thinking is on, capped at a token budget: 2% to 95% of `maxOutputTokens`, or of the context size when `maxOutputTokens` is not set, and at least 1024 tokens |
-
-```typescript
-const result = await generateText({
-  model,
-  prompt: 'What is the capital of France?',
-  reasoning: 'none',
-})
-```
-
-`providerOptions.llama` takes precedence, so you can set llama.rn params such as `enable_thinking` or `thinking_budget_tokens` directly.
-
-## Structured Output
-
-Generate JSON that matches a schema with `Output.object`. The schema is compiled into a grammar, so the model can only produce valid JSON:
-
-```typescript
-import { generateText, Output } from 'ai'
-import { z } from 'zod'
-
-const { output } = await generateText({
-  model,
-  output: Output.object({
-    schema: z.object({
-      name: z.string(),
-      age: z.number(),
-      hobbies: z.array(z.string()),
-    }),
-  }),
-  prompt: 'Generate a fictional person profile',
-})
-
-console.log(output)
-// { name: 'Alice', age: 28, hobbies: ['reading', 'hiking'] }
-```
-
-Thinking is turned off for structured output, since llama.rn cannot combine a
-grammar with it, and an explicit `reasoning` level returns an `unsupported`
-warning.
-
-## Available Options
-
-Configure model behavior with generation options:
-
-| Option | Type | Description |
-| --- | --- | --- |
-| `temperature` | number (0-1) | Controls randomness. Higher = more creative |
-| `maxOutputTokens` | number | Maximum tokens to generate |
-| `topP` | number (0-1) | Nucleus sampling threshold |
-| `topK` | number | Top-K sampling parameter |
-| `presencePenalty` | number | Penalize tokens based on presence |
-| `frequencyPenalty` | number | Penalize tokens based on frequency |
-| `stopSequences` | string[] | Stop generation at these sequences |
-| `seed` | number | Random seed for reproducibility |
-
-Example with all options:
-
-```typescript
-import { llama, downloadModel } from '@react-native-ai/llama'
-import { generateText } from 'ai'
-
-const modelPath = await downloadModel('bartowski/Qwen_Qwen3.5-2B-GGUF/Qwen_Qwen3.5-2B-Q4_K_M.gguf')
-
-const model = llama.languageModel(modelPath)
-await model.prepare()
-
-const result = await generateText({
-  model,
-  prompt: 'Write a creative story',
-  temperature: 0.8,
-  maxOutputTokens: 500,
-  topP: 0.9,
-  topK: 40,
-  presencePenalty: 0.5,
-  frequencyPenalty: 0.5,
-  stopSequences: ['THE END'],
-  seed: 42,
-})
-```
-
-## Model Configuration Options
-
-When creating a model instance, you can configure llama.rn specific options via `contextParams`:
-
-```typescript
-const model = llama.languageModel(modelPath, {
-  contextParams: {
-    n_ctx: 4096, // Context size (default: 2048, or 4096 for multimodal)
-    n_gpu_layers: 99, // Number of GPU layers (default: 99)
-  },
-})
-```
-
-:::tip Long conversations
-The whole chat must fit in `n_ctx`. To keep a rolling window and summarize
-older messages, wrap the model with `wrapLanguageModelWithHistory`, which
-counts tokens with the model's tokenizer. See
-[Conversation History](../history.md).
-:::
-
-For multimodal models:
-
-```typescript
-const model = llama.languageModel(modelPath, {
-  projectorPath: '/path/to/mmproj.gguf', // Required for multimodal
-  projectorUseGpu: true, // Use GPU for multimodal (default: true)
-  contextParams: {
-    n_ctx: 4096,
-    n_gpu_layers: 99,
-  },
-})
-```
+The whole chat must fit in the context, 2048 tokens by default. Raise `n_ctx`
+in the [model options](./model-management#llamalanguagemodelmodelpath-options),
+or wrap the model with `wrapLanguageModelWithHistory` to keep a rolling window
+and summarize older messages. See [Conversation History](../history.md).
