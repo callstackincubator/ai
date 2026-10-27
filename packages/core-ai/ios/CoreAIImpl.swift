@@ -1094,23 +1094,25 @@ public class CoreAIImpl: NSObject {
 #endif
   }
 
+  // A path, a file:// URL, or bundle:// and a path in the app bundle
   private func resolveSourceURL(_ config: [String: Any]) throws -> URL {
-    if let sourceUri = config["sourceUri"] as? String {
-      if sourceUri.hasPrefix("file://") {
-        return URL(string: sourceUri) ?? URL(fileURLWithPath: sourceUri.replacingOccurrences(of: "file://", with: ""))
-      }
-      return URL(fileURLWithPath: sourceUri)
+    guard let source = config["source"] as? String, !source.isEmpty else {
+      throw CoreAIError.missingSource("The model config has no source.")
     }
 
-    if let bundleName = config["bundleName"] as? String {
-      let ext = config["bundleExtension"] as? String
-      let subdirectory = config["bundleSubdirectory"] as? String
-      if let url = Bundle.main.url(forResource: bundleName, withExtension: ext, subdirectory: subdirectory) {
-        return url
+    if source.hasPrefix("bundle://") {
+      let path = String(source.dropFirst("bundle://".count))
+      guard let url = Bundle.main.resourceURL?.appendingPathComponent(path),
+            FileManager.default.fileExists(atPath: url.path) else {
+        throw CoreAIError.missingSource("The app bundle has no \(path).")
       }
+      return url
     }
 
-    throw CoreAIError.missingSource
+    if source.hasPrefix("file://") {
+      return URL(string: source) ?? URL(fileURLWithPath: source.replacingOccurrences(of: "file://", with: ""))
+    }
+    return URL(fileURLWithPath: source)
   }
 
   private func modelInfo(
@@ -1119,8 +1121,7 @@ public class CoreAIImpl: NSObject {
     size: NSNumber? = nil
   ) -> [String: Any] {
     var info: [String: Any] = [
-      "id": config["id"] as? String ?? "unknown",
-      "family": config["family"] as? String ?? "",
+      "id": config["id"] as? String ?? Self.modelName(of: config["source"] as? String ?? ""),
       "task": config["task"] as? String ?? "unknown",
       "platforms": ["iOS", "macOS"],
       "functions": [],
@@ -1130,6 +1131,24 @@ public class CoreAIImpl: NSObject {
       info["modelSizeBytes"] = size
     }
     return info
+  }
+
+  // The folder or .aimodel name, like getModelId in JS
+  private static func modelName(of source: String) -> String {
+    var name = source
+    while name.hasSuffix("/") {
+      name.removeLast()
+    }
+    name = name.components(separatedBy: "/").last ?? name
+    // file:// URLs are percent-encoded, unlike paths
+    if source.hasPrefix("file://") {
+      name = name.removingPercentEncoding ?? name
+    }
+    for suffix in [".aimodelc", ".aimodel"] where name.hasSuffix(suffix) {
+      name.removeLast(suffix.count)
+      break
+    }
+    return name.isEmpty ? source : name
   }
 
   private func makeHandle(_ prefix: String) -> String {

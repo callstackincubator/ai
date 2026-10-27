@@ -24,28 +24,12 @@ using namespace JS::NativeCoreAI;
 
 static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
   NSMutableDictionary *dict = [NSMutableDictionary new];
-  dict[@"id"] = config.id_();
-  dict[@"sourceType"] = config.sourceType();
-  if (config.sourceUri()) {
-    dict[@"sourceUri"] = config.sourceUri();
+  if (config.id_()) {
+    dict[@"id"] = config.id_();
   }
-  if (config.bundleName()) {
-    dict[@"bundleName"] = config.bundleName();
-  }
-  if (config.bundleExtension()) {
-    dict[@"bundleExtension"] = config.bundleExtension();
-  }
-  if (config.bundleSubdirectory()) {
-    dict[@"bundleSubdirectory"] = config.bundleSubdirectory();
-  }
+  dict[@"source"] = config.source();
   if (config.task()) {
     dict[@"task"] = config.task();
-  }
-  if (config.family()) {
-    dict[@"family"] = config.family();
-  }
-  if (config.variant()) {
-    dict[@"variant"] = config.variant();
   }
   return dict;
 }

@@ -16,8 +16,7 @@ import { generateText } from 'ai'
 
 const model = coreAI.languageModel({
   id: 'qwen3-0.6b',
-  source: { type: 'file', uri: qwen3ModelDirectory },
-  variant: 'iOS',
+  source: qwen3ModelDirectory,
 })
 await model.prepare()
 const { text } = await generateText({ model, prompt: 'Hello' })
@@ -82,7 +81,7 @@ Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`.
 uv run coreai.llm.export Qwen/Qwen3-0.6B --platform iOS --output-dir ./models
 ```
 
-Download or bundle the exported directory into app storage, and pass it as `source: { type: 'file', uri }`. There is no built-in downloader yet.
+Download the exported directory into app storage, or bundle it with the app, and pass it as `source`: a path in app storage, or `bundle://` and its path in the app bundle. `id` is optional and defaults to the folder name. There is no built-in downloader yet.
 
 ### 4. Use It
 

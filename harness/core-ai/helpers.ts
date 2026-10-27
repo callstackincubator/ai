@@ -27,8 +27,7 @@ export function setupLanguageModel() {
     }
     model = coreAI.languageModel({
       id: LANGUAGE_MODEL.id,
-      source: { type: 'file', uri: path },
-      variant: 'iOS',
+      source: path,
     })
     await model.prepare()
   })
@@ -62,8 +61,7 @@ export function setupVisionModel(name: keyof typeof VISION_MODELS) {
 
   return {
     id: name,
-    sourceType: 'file',
-    sourceUri: path,
+    source: path,
   }
 }
 
@@ -86,7 +84,7 @@ export function setupImageModel() {
 
   return coreAI.imageModel({
     id: IMAGE_MODEL.id,
-    source: { type: 'file', uri: path },
+    source: path,
   })
 }
 
@@ -109,7 +107,7 @@ export function setupSpeechModel() {
 
   return coreAI.transcriptionModel({
     id: SPEECH_MODEL.id,
-    source: { type: 'file', uri: path },
+    source: path,
   })
 }
 
@@ -135,7 +133,7 @@ export function setupEmbeddingModel() {
 
   return coreAI.embeddingModel({
     id: EMBEDDING_MODEL.id,
-    source: { type: 'file', uri: path },
+    source: path,
   })
 }
 
@@ -158,7 +156,7 @@ export function setupVideoModel() {
 
   return coreAI.videoModel({
     id: VIDEO_MODEL.id,
-    source: { type: 'file', uri: path },
+    source: path,
   })
 }
 
@@ -199,7 +197,6 @@ export function setupVideoSegmentationModel() {
 
   return {
     id: VIDEO_SEGMENTATION_MODEL.id,
-    sourceType: 'file',
-    sourceUri: path,
+    source: path,
   }
 }
