@@ -7,6 +7,7 @@
 #   DEVICE=<udid> HARNESS_IOS_DEVICE="<device name>" harness/benchmarks/run.sh [config...]
 #
 # Configurations: core-ai core-ai-gpu llama executorch-mlx executorch-xnnpack
+# core-ai-cold-start (last by default, since the compile heats the device)
 
 set -euo pipefail
 
@@ -14,7 +15,7 @@ set -euo pipefail
 : "${HARNESS_IOS_DEVICE:?Set HARNESS_IOS_DEVICE to the device name}"
 
 BENCHMARKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIGS=("${@:-core-ai core-ai-gpu llama executorch-mlx executorch-xnnpack}")
+CONFIGS=("${@:-core-ai core-ai-gpu llama executorch-mlx executorch-xnnpack core-ai-cold-start}")
 # Lets the phone cool down between runtimes, so one doesn't throttle the next
 COOLDOWN="${COOLDOWN:-60}"
 

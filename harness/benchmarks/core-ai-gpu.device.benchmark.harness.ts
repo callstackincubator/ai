@@ -1,11 +1,4 @@
 import { benchmarkCoreAI } from './core-ai'
+import { CORE_AI_GPU_MODEL } from './core-ai-models'
 
-// Qwen3 0.6B exported for macOS with the coreai-models recipe: dynamic shapes,
-// 4-bit, the size of MLX's 4-bit weights. Core AI runs dynamic-shape language
-// models on the GPU
-benchmarkCoreAI('core-ai-gpu', {
-  id: 'qwen3-0.6b-dynamic',
-  repo: 'mlboydaisuke/qwen3-0.6b-CoreAI-official',
-  folder: 'macos',
-  contextLength: 8192,
-})
+benchmarkCoreAI('core-ai-gpu', CORE_AI_GPU_MODEL)
