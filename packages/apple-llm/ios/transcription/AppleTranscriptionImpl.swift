@@ -766,6 +766,10 @@ final class VoiceProcessingRecorder: @unchecked Sendable {
   private let mode: AVAudioSession.Mode
   private let options: AVAudioSession.CategoryOptions
   private var configurationObserver: NSObjectProtocol?
+  // Serializes starting and stopping the engine, so a route change that is
+  // handled while stopping does not start it again
+  private let engineLock = NSLock()
+  private var isStopped = false
   // Guards the converter, which the tap uses and a route change replaces
   private let lock = NSLock()
   private var converter: AVAudioConverter?
@@ -801,12 +805,15 @@ final class VoiceProcessingRecorder: @unchecked Sendable {
     ) { [weak self] _ in
       guard let self else { return }
       do {
-        try self.startEngine()
+        try self.engineLock.withLock {
+          guard !self.isStopped else { return }
+          try self.startEngine()
+        }
       } catch {
         self.onError(error)
       }
     }
-    try startEngine()
+    try engineLock.withLock { try startEngine() }
   }
 
   /// Taps the input in its current format, which a route change can change
@@ -857,9 +864,12 @@ final class VoiceProcessingRecorder: @unchecked Sendable {
     if let configurationObserver {
       NotificationCenter.default.removeObserver(configurationObserver)
     }
-    engine.inputNode.removeTap(onBus: 0)
-    engine.stop()
-    try? engine.inputNode.setVoiceProcessingEnabled(false)
+    engineLock.withLock {
+      isStopped = true
+      engine.inputNode.removeTap(onBus: 0)
+      engine.stop()
+      try? engine.inputNode.setVoiceProcessingEnabled(false)
+    }
     input.finish()
     // The session stays active, so the app's playback is not interrupted
     try? AVAudioSession.sharedInstance().setCategory(category, mode: mode, options: options)
