@@ -1,6 +1,10 @@
-// Turns the BENCHMARK lines of benchmark logs into Markdown tables
+// Turns the BENCHMARK lines of benchmark logs into Markdown tables. A
+// configuration measured in several launches shows the median of the
+// launches, with the range of decode speeds and the number of launches.
+// Generation runs that started or ended with the device throttled (thermal
+// state other than nominal) are left out, unless --all is passed
 //
-//   bun harness/benchmarks/collect.ts <log>...
+//   bun harness/benchmarks/collect.ts [--all] <log>...
 
 import { readFileSync } from 'node:fs'
 
@@ -9,39 +13,102 @@ type Result = Record<string, number | string> & {
   stage: 'load' | 'cold-start' | 'generate'
 }
 
-const results: Result[] = process.argv
-  .slice(2)
-  .flatMap((file) => readFileSync(file, 'utf8').split('\n'))
-  .map((line) => line.match(/BENCHMARK (\{.*\})/)?.[1])
-  .filter((json): json is string => Boolean(json))
-  .map((json) => JSON.parse(json))
-  // Later runs of a configuration replace earlier ones
-  .reverse()
-  .filter(
-    (result, index, all) =>
-      all.findIndex(
-        (other) =>
-          other.runtime === result.runtime &&
-          other.stage === result.stage &&
-          other.prompt === result.prompt
-      ) === index
-  )
-  .reverse()
-
-const format = (value: unknown, digits = 0) =>
-  typeof value === 'number' ? value.toFixed(digits) : '–'
-
 type DeviceState = { thermalState: string; lowPowerMode: boolean }
 
-// Before → after the runs, flagged when Low Power Mode was on
-function thermalState(result: Result) {
+const args = process.argv.slice(2)
+const includeThrottled = args.includes('--all')
+
+function isThrottled(result: Result) {
   const { before, after } = result as unknown as {
     before?: DeviceState
     after?: DeviceState
   }
-  if (!before || !after) return '–'
-  const lowPower = before.lowPowerMode || after.lowPowerMode
-  return `${before.thermalState} → ${after.thermalState}${lowPower ? ' (Low Power Mode)' : ''}`
+  return [before, after].some(
+    (state) => state && state.thermalState !== 'nominal'
+  )
+}
+
+const launches: Result[] = args
+  .filter((arg) => arg !== '--all')
+  .flatMap((file) => readFileSync(file, 'utf8').split('\n'))
+  .map((line) => line.match(/BENCHMARK (\{.*\})/)?.[1])
+  .filter((json): json is string => Boolean(json))
+  .map((json) => JSON.parse(json))
+  .filter((result) => includeThrottled || !isThrottled(result))
+
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2
+    ? sorted[middle]!
+    : (sorted[middle - 1]! + sorted[middle]!) / 2
+}
+
+// One result per configuration, stage and prompt: the median of each number
+// over its launches
+const groups = new Map<string, Result[]>()
+for (const launch of launches) {
+  const key = `${launch.runtime}|${launch.stage}|${launch.prompt ?? ''}`
+  groups.set(key, [...(groups.get(key) ?? []), launch])
+}
+const results: Result[] = [...groups.values()].map((group) => {
+  const result: Record<string, unknown> = { ...group.at(-1)!, launches: group }
+  for (const [key, value] of Object.entries(group[0]!)) {
+    const values = group.map((launch) => launch[key])
+    if (
+      typeof value === 'number' &&
+      values.every((v) => typeof v === 'number')
+    ) {
+      result[key] = median(values as number[])
+    }
+  }
+  const firsts = group
+    .map((launch) => (launch.first as unknown as { ttftMs?: number })?.ttftMs)
+    .filter((ttft): ttft is number => typeof ttft === 'number')
+  result.first = firsts.length ? { ttftMs: median(firsts) } : undefined
+  return result as Result
+})
+
+// The median decode speed, with the range over launches when there are several
+function decode(result: Result) {
+  const group = result.launches as unknown as Result[]
+  const speeds = group.map((launch) => Number(launch.decodeTokensPerSecond))
+  const value = format(result.decodeTokensPerSecond, 1)
+  return speeds.length > 1
+    ? `${value} (${format(Math.min(...speeds), 1)}–${format(Math.max(...speeds), 1)})`
+    : value
+}
+
+// The peak footprint above the app's footprint before the model loaded, which
+// is about 200 MB for the example app and 10 MB for the MLX app
+function peakAboveBaseline(result: Result) {
+  const load = results.find(
+    (other) => other.runtime === result.runtime && other.stage === 'load'
+  )
+  return Number(result.peakMemoryMB) - Number(load?.baselineMB)
+}
+
+function launchCount(result: Result) {
+  return String((result.launches as unknown as Result[]).length)
+}
+
+const format = (value: unknown, digits = 0) =>
+  typeof value === 'number' ? value.toFixed(digits) : '–'
+
+// The thermal states seen before and after the runs of every launch, flagged
+// when Low Power Mode was on
+function thermalState(result: Result) {
+  const states = (result.launches as unknown as Result[]).flatMap((launch) => {
+    const { before, after } = launch as unknown as {
+      before?: DeviceState
+      after?: DeviceState
+    }
+    return before && after ? [before, after] : []
+  })
+  if (!states.length) return '–'
+  const names = [...new Set(states.map((state) => state.thermalState))]
+  const lowPower = states.some((state) => state.lowPowerMode)
+  return `${names.join(', ')}${lowPower ? ' (Low Power Mode)' : ''}`
 }
 
 function table(header: string[], rows: string[][]) {
@@ -72,7 +139,7 @@ console.log(
       'First load in a process (ms)',
       'Warm load (ms)',
       'First token after load (ms)',
-      'Footprint after load (MB)',
+      'App baseline (MB)',
       'Context',
     ],
     loads.map((result) => [
@@ -80,7 +147,7 @@ console.log(
       format(result.coldLoadMs),
       format(result.warmLoadMs),
       format(result.warmFirstTokenMs ?? firstShortRunTtft(result.runtime)),
-      format(Number(result.loadedMB) - Number(result.baselineMB)),
+      format(result.baselineMB),
       format(result.contextLength),
     ])
   )
@@ -122,6 +189,7 @@ for (const prompt of ['short', 'long']) {
     table(
       [
         'Runtime',
+        'Launches',
         'Prompt tokens',
         'Output tokens',
         'TTFT (ms)',
@@ -129,17 +197,20 @@ for (const prompt of ['short', 'long']) {
         'Prefill (tok/s)',
         'Decode (tok/s)',
         'Peak footprint (MB)',
+        'Peak above app baseline (MB)',
         'Thermal state',
       ],
       generations.map((result) => [
         result.runtime,
+        launchCount(result),
         format(result.promptTokens),
         format(result.outputTokens),
         format(result.ttftMs),
         format((result.first as unknown as { ttftMs?: number })?.ttftMs),
         format(result.prefillTokensPerSecond),
-        format(result.decodeTokensPerSecond, 1),
+        decode(result),
         format(result.peakMemoryMB),
+        format(peakAboveBaseline(result)),
         thermalState(result),
       ])
     )
