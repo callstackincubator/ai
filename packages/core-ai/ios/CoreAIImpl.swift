@@ -1626,9 +1626,18 @@ private actor TranscriptionStream {
         sampleCount += tail.count
         try await model.append(pcm: tail)
       }
+    } catch {
+      // The tail failed before the finalizer ran, so it runs once here
+      _ = try? await model.finishStream()
+      collector.cancel()
+      end()
+      throw error
+    }
+    do {
       try await model.finishStream()
     } catch {
-      // The session already ran its finalizer, so it isn't finalized again
+      // The finalizer already ran and isn't repeated. If it left the session
+      // open, the model's next startStream reports that
       collector.cancel()
       end()
       throw error
