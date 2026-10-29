@@ -10,7 +10,8 @@ state, for software that runs where it lives (on the device).
 
 **Scope.** This file governs every brand visual: the website (`website/`), the social card,
 the README banner, slides, diagrams and videos. It does not govern the example app in
-`apps/expo-example`, which follows iOS system design (`PlatformColor`, SF Symbols).
+`apps/example`, which follows iOS system design (`PlatformColor`, SF Symbols) and uses
+Forest only as its accent and app icon.
 
 ## Colour
 

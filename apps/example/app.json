@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "React Native AI",
+    "slug": "rn-ai-example",
+    "scheme": "rnai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.callstack.ai.example",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.callstack.ai.example"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      [
+        "react-native-audio-api",
+        {
+          "iosMicrophonePermission": "Voice uses the microphone to hear what you say."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Chat can attach photos to your messages.",
+          "cameraPermission": "Chat can take photos to attach to your messages.",
+          "microphonePermission": false
+        }
+      ],
+      "llama.rn"
+    ],
+    "primaryColor": "#3fae6a"
+  }
+}
