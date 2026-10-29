@@ -25,6 +25,7 @@ const { text } = await generateText({
 
 - ✅ On-device Gemini Nano through ML Kit GenAI, with model selection
 - ✅ Availability, download progress and token counting
+- ✅ On-device transcription with ML Kit GenAI speech recognition
 - ✅ Streaming
 - ✅ Image prompts
 - ✅ Token usage

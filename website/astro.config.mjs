@@ -98,6 +98,7 @@ export default defineConfig({
           ['getting-started', 'Getting started'],
           ['generating', 'Generating'],
           ['models', 'Models and availability'],
+          ['transcription', 'Transcription'],
         ]),
         group('Core AI', 'core-ai', [
           ['getting-started', 'Getting started'],
