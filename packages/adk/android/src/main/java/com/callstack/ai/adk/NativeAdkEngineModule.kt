@@ -242,7 +242,6 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         promise.resolve(
           Arguments.createMap().apply {
             putString("text", result.text)
-            putDouble("durationInSeconds", result.durationInSeconds)
           },
         )
       } catch (error: Exception) {

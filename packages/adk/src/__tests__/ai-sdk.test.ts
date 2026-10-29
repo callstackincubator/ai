@@ -54,7 +54,6 @@ const getModelInfo = mock(async (_nano?: unknown) => ({
 const transcribe = mock(
   async (_requestId: string, _audio: string, _config?: unknown) => ({
     text: 'Hello world',
-    durationInSeconds: 2.5,
   })
 )
 const prepareTranscription = mock(async (_config?: unknown) => {})
@@ -523,7 +522,7 @@ describe('transcription', () => {
       text: 'Hello world',
       segments: [],
       language: 'en-US',
-      durationInSeconds: 2.5,
+      durationInSeconds: undefined,
       warnings: [],
       response: { modelId: 'genai-speech-recognition' },
     })

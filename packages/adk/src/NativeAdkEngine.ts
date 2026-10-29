@@ -97,7 +97,6 @@ export interface AdkTranscriptionConfig {
 
 export interface AdkTranscriptionResult {
   text: string
-  durationInSeconds: number
 }
 
 export interface Spec extends TurboModule {

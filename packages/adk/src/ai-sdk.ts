@@ -780,7 +780,7 @@ class AdkSpeechTranscriptionModel implements AdkTranscriptionModel {
         // ML Kit speech recognition does not report timestamps
         segments: [],
         language: this.config.language,
-        durationInSeconds: result.durationInSeconds,
+        durationInSeconds: undefined,
         warnings: [],
         response: {
           timestamp: new Date(),
