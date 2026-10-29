@@ -10,6 +10,7 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.util.UUID
@@ -30,10 +31,18 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
 
   override val name: String get() = delegate.name
 
-  override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> =
-    delegate.generateContent(prepareRequest(request), stream).map { response ->
-      if (response.partial) response else parseToolCodeBlocks(response)
+  override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> {
+    val parameterNames = parameterNames(request)
+    return delegate.generateContent(prepareRequest(request), stream).map { response ->
+      if (response.partial) response else parseToolCodeBlocks(response, parameterNames)
     }
+  }
+
+  /** Parameter names of each tool, in declaration order, to map positional arguments */
+  private fun parameterNames(request: LlmRequest): Map<String, List<String>> =
+    request.config?.tools.orEmpty()
+      .flatMap { it.functionDeclarations.orEmpty() }
+      .associate { it.name to it.parameters?.properties?.keys?.toList().orEmpty() }
 
   /**
    * Request preparation: convert FunctionCall/FunctionResponse parts to text
@@ -72,7 +81,10 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
   /**
    * Response post-processing: convert ```tool_code blocks to FunctionCall parts
    */
-  private fun parseToolCodeBlocks(response: LlmResponse): LlmResponse {
+  private fun parseToolCodeBlocks(
+    response: LlmResponse,
+    parameterNames: Map<String, List<String>>,
+  ): LlmResponse {
     val content = response.content ?: return response
     val newParts = mutableListOf<Part>()
     var hasToolCalls = false
@@ -84,7 +96,7 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
         continue
       }
 
-      val calls = extractToolCalls(text)
+      val calls = extractToolCalls(text, parameterNames)
       if (calls.isEmpty()) {
         newParts.add(part)
         continue
@@ -104,7 +116,10 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
     return response.copy(content = Content(role = Role.MODEL, parts = newParts))
   }
 
-  private fun extractToolCalls(text: String): List<FunctionCall> {
+  private fun extractToolCalls(
+    text: String,
+    parameterNames: Map<String, List<String>>,
+  ): List<FunctionCall> {
     val calls = mutableListOf<FunctionCall>()
     val blockRegex = Regex("```tool_code\\s*\\n([\\s\\S]*?)\\n?```")
     for (block in blockRegex.findAll(text)) {
@@ -112,7 +127,7 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
       for (line in code.lines()) {
         val trimmed = line.trim()
         if (trimmed.isNotEmpty()) {
-          parseFunctionCall(trimmed)?.let { calls.add(it) }
+          parseFunctionCall(trimmed, parameterNames)?.let { calls.add(it) }
         }
       }
     }
@@ -126,9 +141,13 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
    * Parses a single call line such as:
    *   - `functionName()`
    *   - `functionName({"key": "value"})`
+   *   - `functionName("value")` (positional, in the order the tool declares its parameters)
    *   - `print(functionName(...))` (some models wrap in print)
    */
-  private fun parseFunctionCall(code: String): FunctionCall? {
+  private fun parseFunctionCall(
+    code: String,
+    parameterNames: Map<String, List<String>>,
+  ): FunctionCall? {
     // Regex: outer function name + everything between the outermost parens (greedy)
     val callRegex = Regex("""^([A-Za-z_][A-Za-z0-9_]*)\s*\(([\s\S]*)\)\s*$""")
     val outer = callRegex.find(code) ?: return null
@@ -145,19 +164,25 @@ internal class NanoFunctionCallingModel(private val delegate: GenaiPrompt) : Mod
 
     if (name.isBlank()) return null
 
-    val args: Map<String, Any> =
-      if (argsStr.isBlank()) {
-        emptyMap()
-      } else {
-        val jsonStr = argsStr.trim().let { if (it.startsWith("{")) it else "{$it}" }
-        try {
-          val jsonObj = JSONObject(jsonStr)
-          jsonObj.keys().asSequence().associateWith { key -> jsonObj.get(key) as Any }
-        } catch (_: JSONException) {
-          emptyMap()
-        }
-      }
-
+    val args = parseArguments(argsStr.trim(), parameterNames[name].orEmpty())
     return FunctionCall(name = name, args = args, id = UUID.randomUUID().toString())
+  }
+
+  private fun parseArguments(argsStr: String, parameterNames: List<String>): Map<String, Any> {
+    if (argsStr.isEmpty()) return emptyMap()
+
+    val jsonStr = if (argsStr.startsWith("{")) argsStr else "{$argsStr}"
+    try {
+      val jsonObj = JSONObject(jsonStr)
+      return jsonObj.keys().asSequence().associateWith { key -> jsonObj.get(key) as Any }
+    } catch (_: JSONException) {}
+
+    // Gemini Nano often passes the arguments positionally
+    return try {
+      val values = JSONArray("[$argsStr]")
+      parameterNames.zip((0 until values.length()).map { values.get(it) }).toMap()
+    } catch (_: JSONException) {
+      emptyMap()
+    }
   }
 }

@@ -489,7 +489,11 @@ class AdkAgentRunner(
 
     val toolGuidance =
       "You have access to the following tools. Use them when they help answer the user:\n" +
-        tools.joinToString("\n") { it.promptDescription() }
+        tools.joinToString("\n") { it.promptDescription() } +
+        "\n\nTo call a tool, reply with only a tool_code block with one call per line. " +
+        "Pass the arguments as a JSON object, and call a tool without parameters with " +
+        "empty parentheses. For example:\n" +
+        "```tool_code\ntool_name({\"parameter\": \"value\"})\n```"
 
     return if (baseInstruction.isNullOrBlank()) {
       toolGuidance
