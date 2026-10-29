@@ -492,6 +492,18 @@ describe('doGenerate', () => {
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(cancel).toHaveBeenCalledTimes(1)
   })
+  test('stops when aborted while preparing', async () => {
+    const controller = new AbortController()
+    prepare.mockImplementationOnce(async () => controller.abort())
+    generateText.mockClear()
+
+    await expect(
+      createAndroidProvider()().doGenerate(
+        createCallOptions({ abortSignal: controller.signal })
+      )
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(generateText).not.toHaveBeenCalled()
+  })
 })
 
 describe('doStream', () => {

@@ -20,6 +20,7 @@ data class EmbeddingModelInfo(
 /** Embeds text with ML Kit's on-device embedding model. */
 class Embeddings(private val downloads: Downloads) {
   private val mutex = Mutex()
+  private val prepareMutex = Mutex()
   private var model: EmbeddingModel? = null
   private var prepared = false
 
@@ -49,20 +50,22 @@ class Embeddings(private val downloads: Downloads) {
         AndroidAIErrors.MODEL_UNAVAILABLE,
         "This device has no on-device embedding model",
       )
-    if (prepared) return model
+    prepareMutex.withLock {
+      if (prepared) return model
 
-    when (val status = model.checkStatus()) {
-      FeatureStatus.UNAVAILABLE ->
-        throw AndroidAIErrors.CodedException(
-          AndroidAIErrors.MODEL_UNAVAILABLE,
-          "The embedding model is not available on this device",
-        )
-      FeatureStatus.DOWNLOADABLE, FeatureStatus.DOWNLOADING ->
-        downloads.collect("embedding", "The embedding model", status, model.download())
+      when (val status = model.checkStatus()) {
+        FeatureStatus.UNAVAILABLE ->
+          throw AndroidAIErrors.CodedException(
+            AndroidAIErrors.MODEL_UNAVAILABLE,
+            "The embedding model is not available on this device",
+          )
+        FeatureStatus.DOWNLOADABLE, FeatureStatus.DOWNLOADING ->
+          downloads.collect("embedding", "The embedding model", status, model.download())
+      }
+      model.warmup()
+      prepared = true
+      return model
     }
-    model.warmup()
-    prepared = true
-    return model
   }
 
   suspend fun embed(values: List<String>, taskType: String?): List<FloatArray> {

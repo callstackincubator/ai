@@ -642,10 +642,15 @@ class AndroidChatLanguageModel implements AndroidLanguageModel {
     abortSignal?.addEventListener('abort', onAbort, { once: true })
 
     try {
+      const features = await this.ensurePrepared()
+      // Preparing can take minutes, before there is a native run to cancel
+      if (abortSignal?.aborted) {
+        throw getAbortReason(abortSignal)
+      }
       const { request, warnings } = prepareRequest(
         options,
         this.model,
-        await this.ensurePrepared()
+        features
       )
       const response = await native.generateText(runId, request)
 
@@ -693,11 +698,12 @@ class AndroidChatLanguageModel implements AndroidLanguageModel {
       throw getAbortReason(abortSignal)
     }
 
-    const { request, warnings } = prepareRequest(
-      options,
-      this.model,
-      await this.ensurePrepared()
-    )
+    const features = await this.ensurePrepared()
+    // Preparing can take minutes, before there is a native stream to cancel
+    if (abortSignal?.aborted) {
+      throw getAbortReason(abortSignal)
+    }
+    const { request, warnings } = prepareRequest(options, this.model, features)
 
     let listener: { remove(): void } | undefined
     let onAbort = () => {}
