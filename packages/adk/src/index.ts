@@ -1,6 +1,7 @@
 export type {
   AdkDownloadProgress,
   AdkLanguageModel,
+  AdkLanguageModelId,
   AdkLanguageModelOptions,
   AdkModelAvailability,
   AdkModelInfo,

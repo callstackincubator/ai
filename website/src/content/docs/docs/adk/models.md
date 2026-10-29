@@ -112,3 +112,7 @@ const adk = createAdkProvider({
 | `nano`        | `object` | Gemini Nano [model selection](#model-selection)    |
 | `name`        | `string` | ADK agent name (default: `react_native_adk_agent`) |
 | `description` | `string` | ADK agent description                              |
+
+`adk()` also takes the model id, `adk('gemini-nano')`, as AI SDK providers do.
+Any other id throws the AI SDK's `NoSuchModelError`, since ADK only runs Gemini
+Nano.

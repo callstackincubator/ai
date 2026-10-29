@@ -1,13 +1,14 @@
-import type {
-  LanguageModelV4,
-  LanguageModelV4CallOptions,
-  LanguageModelV4Content,
-  LanguageModelV4FilePart,
-  LanguageModelV4FinishReason,
-  LanguageModelV4Prompt,
-  LanguageModelV4StreamPart,
-  LanguageModelV4Usage,
-  SharedV4Warning,
+import {
+  type LanguageModelV4,
+  type LanguageModelV4CallOptions,
+  type LanguageModelV4Content,
+  type LanguageModelV4FilePart,
+  type LanguageModelV4FinishReason,
+  type LanguageModelV4Prompt,
+  type LanguageModelV4StreamPart,
+  type LanguageModelV4Usage,
+  NoSuchModelError,
+  type SharedV4Warning,
 } from '@ai-sdk/provider'
 import { generateId, resolveFullMediaType } from '@ai-sdk/provider-utils'
 import { Platform } from 'react-native'
@@ -26,7 +27,12 @@ import {
 
 const MODEL_ID = 'gemini-nano'
 
+/** ADK runs Gemini Nano, the one model ML Kit provides on the device */
+export type AdkLanguageModelId = typeof MODEL_ID
+
 export interface AdkLanguageModelOptions {
+  /** The model to run, `gemini-nano` */
+  model?: AdkLanguageModelId
   /** ADK agent name */
   name?: string
   /** ADK agent description */
@@ -76,9 +82,11 @@ export interface AdkLanguageModel extends LanguageModelV4 {
 }
 
 export interface AdkProvider {
-  (options?: AdkLanguageModelOptions): AdkLanguageModel
+  (options?: AdkLanguageModelId | AdkLanguageModelOptions): AdkLanguageModel
   readonly specificationVersion: 'v4'
-  languageModel: (options?: AdkLanguageModelOptions) => AdkLanguageModel
+  languageModel: (
+    options?: AdkLanguageModelId | AdkLanguageModelOptions
+  ) => AdkLanguageModel
   /** Whether Gemini Nano can be used now: it is `available` or `downloadable` */
   isAvailable: () => Promise<boolean>
   /** Gemini Nano's availability, for the provider's model selection or `nano` */
@@ -136,10 +144,26 @@ async function getModelInfo(
 export function createAdkProvider(
   defaults: AdkLanguageModelOptions = {}
 ): AdkProvider {
-  const createLanguageModel = (options?: AdkLanguageModelOptions) =>
-    new AdkChatLanguageModel({ ...defaults, ...options })
+  const createLanguageModel = (
+    options: AdkLanguageModelId | AdkLanguageModelOptions = {}
+  ) => {
+    const modelOptions =
+      typeof options === 'string' ? { model: options } : options
+    const model = modelOptions.model ?? defaults.model ?? MODEL_ID
+    // The AI SDK passes any id, such as from a provider registry
+    if (model !== MODEL_ID) {
+      throw new NoSuchModelError({
+        modelId: model,
+        modelType: 'languageModel',
+        message: `ADK only runs ${MODEL_ID} on the device, not ${model}.`,
+      })
+    }
+    return new AdkChatLanguageModel({ ...defaults, ...modelOptions })
+  }
 
-  const provider = function (options?: AdkLanguageModelOptions) {
+  const provider = function (
+    options?: AdkLanguageModelId | AdkLanguageModelOptions
+  ) {
     return createLanguageModel(options)
   }
   provider.specificationVersion = 'v4' as const

@@ -68,6 +68,7 @@ mock.module('react-native', () => ({
 }))
 
 const { createAdkProvider } = await import('../ai-sdk')
+const { NoSuchModelError } = await import('@ai-sdk/provider')
 
 const nano = createAdkProvider()()
 
@@ -123,6 +124,24 @@ describe('provider', () => {
   test('creates Gemini Nano models', () => {
     expect(nano.modelId).toBe('gemini-nano')
     expect(nano.provider).toBe('adk')
+  })
+
+  test('takes the gemini-nano model id', () => {
+    expect(createAdkProvider()('gemini-nano').modelId).toBe('gemini-nano')
+    expect(
+      createAdkProvider().languageModel({ model: 'gemini-nano' }).modelId
+    ).toBe('gemini-nano')
+  })
+
+  test('rejects other model ids', () => {
+    const provider = createAdkProvider()
+
+    expect(() => provider.languageModel('gemini-3.8-flash' as never)).toThrow(
+      NoSuchModelError
+    )
+    expect(() => provider({ model: 'gemini-3.8-flash' as never })).toThrow(
+      NoSuchModelError
+    )
   })
 
   test('reports Gemini Nano availability', async () => {
