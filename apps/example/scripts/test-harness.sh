@@ -41,10 +41,24 @@ case "$TARGET" in
       echo 'Set HARNESS_ANDROID_DEVICE to the device model, as `adb shell getprop ro.product.model` shows it' >&2
       exit 1
     fi
-    # Installs on the connected device, or the one ANDROID_SERIAL names when
-    # more than one is connected
+    # Harness runs the tests on the device of that model, so the build is
+    # installed on that same device: the one ANDROID_SERIAL names, or the only
+    # connected one
+    if [[ -z "${ANDROID_SERIAL:-}" ]]; then
+      serials="$(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')"
+      if [[ "$(grep -c . <<< "$serials")" != 1 ]]; then
+        echo 'Connect one device, or set ANDROID_SERIAL to the one to test on' >&2
+        exit 1
+      fi
+      export ANDROID_SERIAL="$serials"
+    fi
+    model="$(adb -s "$ANDROID_SERIAL" shell getprop ro.product.model | tr -d '\r')"
+    if [[ "$model" != "$HARNESS_ANDROID_DEVICE" ]]; then
+      echo "$ANDROID_SERIAL is a $model, not a $HARNESS_ANDROID_DEVICE" >&2
+      exit 1
+    fi
     npx expo prebuild --clean --platform android
-    npx expo run:android --no-bundler ${ANDROID_SERIAL:+--device "$ANDROID_SERIAL"}
+    npx expo run:android --no-bundler --device "$ANDROID_SERIAL"
     HARNESS_PLATFORM=android npx react-native-harness --harnessRunner android "$@"
     ;;
   *)
