@@ -37,7 +37,11 @@ import {
   type StreamToolCallEvent,
   type ToolCallEvent,
 } from './NativeAdkEngine'
-import { StreamTextFilter, stripJsonFences } from './streamText'
+import {
+  StreamTextFilter,
+  stripJsonFences,
+  stripRoleMarkers,
+} from './streamText'
 
 const DEFAULT_NANO_MODEL = 'gemini-nano'
 const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
@@ -872,12 +876,15 @@ class AdkChatLanguageModel implements AdkLanguageModel {
           result: parseToolResult(toolResult.output),
         })
       }
+      const text = this.isNano
+        ? stripRoleMarkers(response.content)
+        : response.content
       content.push({
         type: 'text',
         text:
           options.responseFormat?.type === 'json'
-            ? stripJsonFences(response.content)
-            : response.content,
+            ? stripJsonFences(text)
+            : text,
       })
 
       return {
@@ -956,6 +963,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         const textFilter = new StreamTextFilter({
           json: isJson,
           toolCode: this.isNano,
+          roleMarkers: this.isNano,
         })
 
         const addListener = (listener: { remove(): void }) => {

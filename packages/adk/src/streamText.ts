@@ -9,6 +9,21 @@ const partialJsonFence = /^\s*`{0,3}(j(s(o(n)?)?)?)?$/
 export const stripJsonFences = (text: string) =>
   text.replace(jsonFencePrefix, '').replace(/\s*```\s*$/, '')
 
+// ADK labels the turns of Gemini Nano's history with role markers. Nano can
+// start its reply with one, or go on to write the user's next turn
+const modelMarkerPrefix = /^\s*\[model\]:\s*/
+// Text that could still grow into the model marker
+const partialModelMarker = /^\s*(\[(m(o(d(e(l(\](:)?)?)?)?)?)?)?)?$/
+const userMarker = '\n[user]:'
+
+export const stripRoleMarkers = (text: string) => {
+  const userIndex = text.indexOf(userMarker)
+  return (userIndex === -1 ? text : text.slice(0, userIndex)).replace(
+    modelMarkerPrefix,
+    ''
+  )
+}
+
 // Length of the end of `text` that could be the start of `marker`
 function pendingPrefixLength(text: string, marker: string) {
   for (
@@ -24,14 +39,21 @@ function pendingPrefixLength(text: string, marker: string) {
 }
 
 /**
- * Filters streamed model text. It hides Gemini Nano `tool_code` blocks and, in
- * JSON mode, Markdown code fences, holding back text until it cannot become one.
+ * Filters streamed model text. It hides Gemini Nano `tool_code` blocks and
+ * role markers and, in JSON mode, Markdown code fences, holding back text
+ * until it cannot become one.
  */
 export class StreamTextFilter {
   private turnText = ''
   private emitted = ''
 
-  constructor(private readonly options: { json: boolean; toolCode: boolean }) {}
+  constructor(
+    private readonly options: {
+      json: boolean
+      toolCode: boolean
+      roleMarkers?: boolean
+    }
+  ) {}
 
   /** Adds a text delta and returns the text that is now safe to show */
   push(delta: string) {
@@ -69,6 +91,14 @@ export class StreamTextFilter {
       text = text.slice(0, markerIndex)
     }
 
+    const userIndex = this.options.roleMarkers ? text.indexOf(userMarker) : -1
+    if (this.options.roleMarkers) {
+      if (!final && partialModelMarker.test(text)) {
+        return undefined
+      }
+      text = stripRoleMarkers(text)
+    }
+
     if (this.options.json) {
       if (final) {
         return stripJsonFences(text)
@@ -86,6 +116,14 @@ export class StreamTextFilter {
         0,
         text.length - pendingPrefixLength(text, toolCodeMarker)
       )
+    }
+    if (
+      this.options.roleMarkers &&
+      markerIndex === -1 &&
+      userIndex === -1 &&
+      !final
+    ) {
+      text = text.slice(0, text.length - pendingPrefixLength(text, userMarker))
     }
     return text
   }
