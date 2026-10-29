@@ -2,11 +2,8 @@ import { coreAI, type CoreAILanguageModel } from '@react-native-ai/core-ai'
 import RNBlobUtil from 'react-native-blob-util'
 import { afterAll, beforeAll } from 'react-native-harness'
 
-import {
-  CORE_AI_STORAGE_PATH,
-  downloadHubFolder,
-} from '../../apps/expo-example/src/utils/coreAIStorageUtils'
 import { cats, catsVideo } from '../fixtures'
+import { CORE_AI_STORAGE_PATH, downloadHubFolder } from './storage'
 
 // Qwen3 0.6B exported for iOS with the coreai-models recipe, as in the example
 // app. The model is downloaded on the first run

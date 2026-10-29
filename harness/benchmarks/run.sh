@@ -30,7 +30,7 @@ LAUNCHES="${LAUNCHES:-3}"
 # Lets the phone cool down between runtimes, so one doesn't throttle the next
 COOLDOWN="${COOLDOWN:-60}"
 
-cd "$BENCHMARKS_DIR/../../apps/expo-example"
+cd "$BENCHMARKS_DIR/../../apps/example"
 
 run() {
   echo "Running $1 with $EXPO_PUBLIC_BENCHMARK_MODEL"

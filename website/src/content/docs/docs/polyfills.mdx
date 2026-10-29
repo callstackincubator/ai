@@ -1,0 +1,106 @@
+---
+title: "Polyfills"
+---
+
+import PackageManagerTabs from '../../../components/starlight/PackageManagerTabs.astro'
+
+The AI SDK uses a few web APIs that React Native doesn't have, such as text encoding streams and `structuredClone`. Add them once, before anything else in your app runs.
+
+## Expo
+
+First, install the following packages:
+
+<PackageManagerTabs command="install @ungap/structured-clone @stardazed/streams-text-encoding" />
+
+Then create a `polyfills.js` file in the root of your project:
+
+```js title="polyfills.js"
+import { Platform } from 'react-native'
+import structuredClone from '@ungap/structured-clone'
+
+if (Platform.OS !== 'web') {
+  // require, not import: it runs synchronously, before the rest of the app,
+  // and keeps React Native internals out of the web build.
+  const {
+    polyfillGlobal,
+  } = require('react-native/Libraries/Utilities/PolyfillFunctions')
+  const {
+    TextEncoderStream,
+    TextDecoderStream,
+  } = require('@stardazed/streams-text-encoding')
+
+  if (!('structuredClone' in global)) {
+    polyfillGlobal('structuredClone', () => structuredClone)
+  }
+
+  polyfillGlobal('TextEncoderStream', () => TextEncoderStream)
+  polyfillGlobal('TextDecoderStream', () => TextDecoderStream)
+}
+
+export {}
+```
+
+Import it first in your app's entry point, such as `index.js` or `App.tsx`:
+
+```js
+import './polyfills'
+```
+
+## Bare React Native
+
+Without Expo, you also need web streams, which Expo provides.
+
+First, install the following packages:
+
+<PackageManagerTabs command="install @ungap/structured-clone @stardazed/streams-text-encoding web-streams-polyfill" />
+
+Then create a `polyfills.js` file in the root of your project:
+
+```js title="polyfills.js"
+import { Platform } from 'react-native'
+import structuredClone from '@ungap/structured-clone'
+import {
+  TransformStream,
+  ReadableStream,
+  WritableStream,
+} from 'web-streams-polyfill'
+
+if (Platform.OS !== 'web') {
+  // require, not import: it runs synchronously, before the rest of the app,
+  // and keeps React Native internals out of the web build.
+  const {
+    polyfillGlobal,
+  } = require('react-native/Libraries/Utilities/PolyfillFunctions')
+  const {
+    TextEncoderStream,
+    TextDecoderStream,
+  } = require('@stardazed/streams-text-encoding')
+
+  if (!('structuredClone' in global)) {
+    polyfillGlobal('structuredClone', () => structuredClone)
+  }
+
+  if (!('TransformStream' in global)) {
+    polyfillGlobal('TransformStream', () => TransformStream)
+  }
+
+  if (!('ReadableStream' in global)) {
+    polyfillGlobal('ReadableStream', () => ReadableStream)
+  }
+
+  if (!('WritableStream' in global)) {
+    polyfillGlobal('WritableStream', () => WritableStream)
+  }
+
+  polyfillGlobal('TextEncoderStream', () => TextEncoderStream)
+  polyfillGlobal('TextDecoderStream', () => TextDecoderStream)
+}
+
+export {}
+```
+
+Import it first in your app's entry point, such as `index.js` or `App.tsx`:
+
+```js
+import './polyfills'
+```

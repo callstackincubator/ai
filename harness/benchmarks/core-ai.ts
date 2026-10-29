@@ -3,10 +3,7 @@ import { streamText } from 'ai'
 import RNBlobUtil from 'react-native-blob-util'
 import { describe, it } from 'react-native-harness'
 
-import {
-  CORE_AI_STORAGE_PATH,
-  downloadHubFolder,
-} from '../../apps/expo-example/src/utils/coreAIStorageUtils'
+import { CORE_AI_STORAGE_PATH, downloadHubFolder } from '../core-ai/storage'
 import {
   benchmarkPrompt,
   decodeTokensPerSecond,

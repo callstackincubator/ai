@@ -8,7 +8,7 @@ import { describe, expect, it } from 'react-native-harness'
 import { prompt, readAll } from './helpers'
 
 // Private Cloud Compute needs its entitlement, so these pass only when the app
-// was built with PCC=1 (see apps/expo-example/app.config.js)
+// was built with PCC=1 (see apps/example/app.config.js)
 
 describe('apple private cloud compute', () => {
   it('is available', async () => {

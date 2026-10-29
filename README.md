@@ -21,7 +21,7 @@ A collection of on-device AI primitives for React Native with first-class Vercel
 
 ## DevTools
 
-![AI SDK Profiler preview](website/src/public/dev-tools-preview.png)
+![AI SDK Profiler preview](website/public/dev-tools-preview.png)
 
 The AI SDK Profiler plugin captures OpenTelemetry spans from Vercel AI SDK
 requests and surfaces them in Rozenite DevTools. DevTools are runtime
@@ -33,11 +33,6 @@ npm install @react-native-ai/dev-tools
 
 Rozenite must be installed and enabled in your app. See the
 [Rozenite getting started guide](https://www.rozenite.dev/docs/getting-started).
-
-The Expo demo app in [apps/expo-example](./apps/expo-example)
-includes native-development Rozenite wiring for this plugin. Run the example
-app, open React Native DevTools, and select `AI SDK Profiler` to inspect chat
-spans emitted by the Vercel AI SDK.
 
 If the `AI SDK Profiler` panel stays empty after you send a message, close the
 React Native DevTools window and open a new one. A stale debugger session can

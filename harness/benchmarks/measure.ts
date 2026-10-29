@@ -4,7 +4,7 @@ import RNBlobUtil from 'react-native-blob-util'
 
 import DeviceStats, {
   type ThermalState,
-} from '../../apps/expo-example/modules/device-stats'
+} from '../../apps/example/modules/device-stats'
 import { MODEL_NAME } from './models'
 import { LONG_PROMPT, SHORT_PROMPT } from './prompts'
 

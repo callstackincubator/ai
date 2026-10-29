@@ -4,9 +4,9 @@
 
 - Conventional Commits format `type(scope): description`
 - Types: `feat`, `fix`, `refactor`, `chore`, `docs`
-- Scope optional, use package name when relevant (e.g., `expo-example`, `llama`)
+- Scope optional, use package name when relevant (e.g., `example`, `llama`)
 - Lowercase, no period, imperative mood
-- Example: `feat(expo-example): add maxSteps setting for tool iterations`
+- Example: `feat(example): add maxSteps setting for tool iterations`
 
 ## Branch Naming
 
@@ -33,7 +33,9 @@
 
 - Monorepo with `packages/` (libraries) and `apps/` (example apps)
 - Libraries live in `packages/`, each published as `@react-native-ai/<name>` (see its `package.json`)
-- Example app: Expo SDK 58 in `apps/expo-example/`
+- Example app: Expo SDK 58 in `apps/example/` (expo-router, native tabs); it also hosts the harness tests in `harness/`
+- Website and docs: Astro + Starlight in `website/` (its own `bun.lock`, not a workspace)
+- For anything visual (the website, social cards, slides, diagrams, videos), follow [docs/DESIGN.md](docs/DESIGN.md)
 
 ## Tech Stack
 

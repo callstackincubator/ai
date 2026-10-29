@@ -248,7 +248,7 @@ enum Benchmark {
   }
 }
 
-// The process footprint, as in apps/expo-example/modules/device-stats
+// The process footprint, as in apps/example/modules/device-stats
 enum Memory {
   static func footprint() -> UInt64 {
     var info = task_vm_info_data_t()

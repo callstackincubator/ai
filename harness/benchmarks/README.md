@@ -59,7 +59,7 @@ every result). `collect.ts` only combines results of one version.
   slower decode looks from JS. The MLX app has no JS.
 - **Memory**: the process footprint (`phys_footprint`, what jetsam limits),
   sampled every 10 ms on a native thread, through the `device-stats` module in
-  `apps/expo-example/modules`; the MLX app reads it the same way. Peak is over
+  `apps/example/modules`; the MLX app reads it the same way. Peak is over
   all runs of a prompt and is shown above the footprint before the model
   loaded. After the model is unloaded, the benchmark records what it kept
   above that baseline (`retainedMB`). The footprint may not count all of the
@@ -81,14 +81,14 @@ node node_modules/react-native-executorch/scripts/download-libs.js
 ```
 
 ```bash
-cd apps/expo-example
+cd apps/example
 CORE_AI=1 EXECUTORCH=1 npx expo prebuild --clean --platform ios
-xcodebuild -workspace ios/reactnativeaiexample.xcworkspace -scheme reactnativeaiexample \
+xcodebuild -workspace ios/ReactNativeAI.xcworkspace -scheme ReactNativeAI \
   -configuration Debug -destination "id=$DEVICE" -derivedDataPath ios/build \
   -allowProvisioningUpdates DEVELOPMENT_TEAM=$TEAM \
   SWIFT_OPTIMIZATION_LEVEL=-O GCC_OPTIMIZATION_LEVEL=s build
 xcrun devicectl device install app --device "$DEVICE" \
-  ios/build/Build/Products/Debug-iphoneos/reactnativeaiexample.app
+  ios/build/Build/Products/Debug-iphoneos/ReactNativeAI.app
 ```
 
 Then the configurations, one at a time, so they don't share a process.
