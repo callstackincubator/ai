@@ -71,7 +71,7 @@ the mark, then the wordmark `REACT NATIVE AI` (`on-accent` on an `accent` block)
 Both fonts are free and self-hosted in `website/src/fonts/`. Headlines run in two beats with
 the second in the accent: "On-device AI for your mobile app. *Every platform’s models, one API.*" That is the motto. Mono
 is for labels only, never full sentences. Platforms are always in the order iOS, Android, and
-runtimes in the order Apple, Core AI, ADK, Llama.
+runtimes in the order Apple, Core AI, Android, Llama.
 
 ## Layout
 
@@ -95,7 +95,7 @@ type sizes scaled from the hero headline.
   the steps. Inside: a mono status row (`9:41`, `✈ AIRPLANE MODE`), the user's bubble on an
   accent fill, the reply in a hairline box, and an accent square marking `apple() · on device`.
 - **Runtime cells:** one per runtime, labelled `NATIVE · BY CALLSTACK` (accent) for Apple, Core AI
-  and ADK, or `THIRD-PARTY BINDING` (muted) for Llama, which wraps llama.rn.
+  and Android, or `THIRD-PARTY BINDING` (muted) for Llama, which wraps llama.rn.
 - **Closing:** a full-width accent CTA bar, the giant accent wordmark, then one footer row.
 
 ## Pixel imagery
@@ -127,7 +127,7 @@ about 12 fps for dither, and cuts rather than cross-fades.
 ## Words
 
 Plain and specific. Say what becomes possible: on-device AI in a mobile app, using the models
-each platform provides, through one drop-in AI SDK API, with no server and no API key. Keep API names out of headlines and ledes. Apple, Core AI and ADK are native (`NATIVE · BY CALLSTACK`): they run on the AI stack the
+each platform provides, through one drop-in AI SDK API, with no server and no API key. Keep API names out of headlines and ledes. Apple, Core AI and Android are native (`NATIVE · BY CALLSTACK`): they run on the AI stack the
 platform provides. Llama is a `THIRD-PARTY BINDING`: a provider over llama.rn. Page titles are `React Native AI: On-device AI for React Native apps` on
 the home page and `Page title | React Native AI` elsewhere. Facts come only from the docs: no
 invented benchmarks, adopters or testimonials. Mark JSON UI as experimental.
