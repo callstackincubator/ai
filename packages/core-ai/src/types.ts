@@ -122,6 +122,8 @@ export interface CoreAIUsage {
   cachedInputTokens: number
   outputTokens: number
   reasoningTokens: number
+  // Measured natively, in ms from the start of a streamed generation
+  timings?: { firstTokenMs: number; totalMs: number }
 }
 
 export interface CoreAIGenerationResult {

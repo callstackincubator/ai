@@ -272,16 +272,20 @@ export class CoreAILanguageModel implements LanguageModelV4 {
         const completeListener = NativeCoreAI.onStreamComplete(
           (event: CoreAIStreamCompleteEvent) => {
             if (event.streamId === streamId) {
+              const usage = event.usage as CoreAIUsage | undefined
               snapshots.end()
               toolCalls.forEach((part) => controller.enqueue(part))
               controller.enqueue({
                 type: 'finish',
                 finishReason: toFinishReason(
-                  event.usage as CoreAIUsage | undefined,
+                  usage,
                   options.maxOutputTokens,
                   toolCalls.length > 0
                 ),
-                usage: toUsage(event.usage as CoreAIUsage | undefined),
+                usage: toUsage(usage),
+                providerMetadata: usage?.timings
+                  ? { 'core-ai': { timings: usage.timings } }
+                  : undefined,
               })
               cleanup()
               controller.close()

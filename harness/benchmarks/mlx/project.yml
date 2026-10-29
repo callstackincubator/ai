@@ -1,0 +1,39 @@
+# Generates MLXBenchmark.xcodeproj with XcodeGen. run.sh does it before each
+# build, so the project is not checked in
+name: MLXBenchmark
+options:
+  bundleIdPrefix: com.callstack.ai
+  deploymentTarget:
+    iOS: '18.0'
+packages:
+  mlx-swift-lm:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    exactVersion: 3.32.3
+  swift-huggingface:
+    url: https://github.com/huggingface/swift-huggingface
+    from: 0.9.0
+  swift-transformers:
+    url: https://github.com/huggingface/swift-transformers
+    from: 1.3.0
+targets:
+  MLXBenchmark:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - path: prompts.json
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.callstack.ai.mlxbenchmark
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        SWIFT_VERSION: '5.0'
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - package: mlx-swift-lm
+        products: [MLXLLM, MLXLMCommon]
+      - package: swift-huggingface
+        product: HuggingFace
+      - package: swift-transformers
+        product: Tokenizers
