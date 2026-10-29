@@ -18,7 +18,12 @@ describe('adk availability', () => {
     const info = await adk.getModelInfo()
     expect(info.availability).toBe('available')
     expect(info.contextSize).toBeGreaterThan(0)
-    expect(await adk.isAvailable()).toBe(true)
+    expect(adk.isAvailable()).toBe(true)
+  })
+
+  it('checks availability synchronously', () => {
+    expect(typeof adk.isAvailable()).toBe('boolean')
+    expect(adk().isAvailable()).toBe(adk.isAvailable())
   })
 
   it('counts tokens with the Gemini Nano tokenizer', async () => {
