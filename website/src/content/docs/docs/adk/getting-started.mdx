@@ -6,9 +6,7 @@ import PackageManagerTabs from '../../../../components/starlight/PackageManagerT
 
 Run Gemini Nano on Android, on the device, with the Vercel AI SDK. Android
 provides the model through AICore, so there's no model to bundle and no API key.
-When you need a larger model or support for every device, the same provider
-runs cloud Gemini. It's built on
-[Google's Agent Development Kit](https://developer.android.com/ai/adk).
+It's built on [Google's Agent Development Kit](https://developer.android.com/ai/adk).
 
 ## Installation
 
@@ -20,10 +18,9 @@ The AI SDK needs its [polyfills](/docs/polyfills).
 
 - Android with `minSdkVersion` 26 or higher
 - React Native 0.76 or newer, with the New Architecture
-- For Gemini Nano, a physical device with AICore support, running Android 14
-  or newer. See the
+- A physical device with AICore support, running Android 14 or newer. See the
   [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device)
-  for the supported devices. Cloud Gemini works on any device.
+  for the supported devices.
 
 ## Native Setup
 
@@ -79,7 +76,7 @@ Pass `adk()` to the AI SDK. Check that Gemini Nano can run on the device first:
 import { adk } from '@react-native-ai/adk'
 import { generateText } from 'ai'
 
-if (await adk.isAvailable('genai-nano')) {
+if (await adk.isAvailable()) {
   const { text } = await generateText({
     model: adk(),
     prompt: 'Summarize on-device AI in one sentence.',
@@ -87,9 +84,9 @@ if (await adk.isAvailable('genai-nano')) {
 }
 ```
 
-[Models & Availability](/docs/adk/models) covers the availability checks and cloud Gemini.
+[Models & Availability](/docs/adk/models) covers the availability checks.
 
 ## Next Steps
 
-- [Generating](/docs/adk/generating): streaming, tool calling, image input and JSON output
-- [Models & Availability](/docs/adk/models): checking for Gemini Nano, cloud Gemini and provider options
+- [Generating](/docs/adk/generating): streaming, image input, token usage and errors
+- [Models & Availability](/docs/adk/models): checking for Gemini Nano, preparing it and provider options

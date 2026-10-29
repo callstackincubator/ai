@@ -3,10 +3,7 @@ title: "Generating"
 ---
 
 Generate text on Android with Gemini Nano: pass `adk()` to the AI SDK's
-`generateText` or `streamText`. The examples on this page run on device. For
-cloud Gemini, create the model as shown in
-[Models & Availability](/docs/adk/models#cloud-gemini); everything else stays
-the same.
+`generateText` or `streamText`.
 
 ## Text Generation
 
@@ -20,9 +17,11 @@ const { text } = await generateText({
 })
 ```
 
-The first call prepares Gemini Nano. To avoid the wait, call `adk.prepareNano()`
-ahead of time, once [the availability check](/docs/adk/models#availability-check)
-passes.
+The first call prepares Gemini Nano. To avoid the wait, call
+[`prepare()`](/docs/adk/models#preparing) ahead of time.
+
+System messages and the provider's `instruction` become the ADK agent's
+instruction.
 
 ## Streaming
 
@@ -55,50 +54,12 @@ const { usage } = await generateText({
 
 console.log(usage.inputTokens)
 console.log(usage.outputTokens)
-console.log(usage.raw?.totalTokenCount)
 ```
-
-## Tool Calling
-
-Let the model call your JavaScript functions, on device or in the cloud. ADK
-runs the tool loop natively, so register each tool with the provider in
-`availableTools`, and pass the ones a request may use in `tools` as usual:
-
-```typescript
-import { createAdkProvider } from '@react-native-ai/adk'
-import { generateText, tool } from 'ai'
-import { z } from 'zod'
-
-const getCurrentTime = tool({
-  description: 'Get the current time for a city',
-  inputSchema: z.object({ city: z.string() }),
-  execute: async ({ city }) => ({
-    city,
-    time: new Date().toLocaleTimeString(),
-  }),
-})
-
-const adk = createAdkProvider({
-  availableTools: { getCurrentTime },
-})
-
-const { text } = await generateText({
-  model: adk(),
-  tools: { getCurrentTime },
-  prompt: 'What time is it in Warsaw?',
-})
-```
-
-Because ADK runs the loop:
-
-- AI SDK step controls, such as `stopWhen`, don't limit it.
-- Streamed tool calls are marked `providerExecuted: true`.
-- A `required` `toolChoice` is ignored with a warning.
 
 ## Image Input
 
-Ask about an image by passing it as a file part, as base64, a data URL or a
-`Uint8Array`:
+Ask about an image by passing it as a file part, as base64, a data URL, a
+`Uint8Array`, or a `file://` or `content://` URL:
 
 ```typescript
 const { text } = await generateText({
@@ -115,28 +76,14 @@ const { text } = await generateText({
 })
 ```
 
-File and HTTP URLs aren't supported yet, so read the image first.
-
-## JSON Output
-
-Ask for JSON with `Output.json()`:
-
-```typescript
-import { generateText, Output } from 'ai'
-
-const { output } = await generateText({
-  model: adk(),
-  prompt: 'Return a JSON object with name and age fields.',
-  output: Output.json(),
-})
-```
-
-ADK can't constrain the output to a schema or stream JSON yet, so validate
-`output` in your app, for example with zod.
+HTTP URLs aren't supported, so download the image first.
 
 ## Options
 
-`temperature`, `maxOutputTokens`, `topP` and `topK` work as usual:
+`temperature`, `maxOutputTokens` and `topK` work as usual. Gemini Nano ignores
+`topP`, `seed`, `stopSequences`, `presencePenalty` and `frequencyPenalty` with an
+`unsupported` warning. Tools and JSON output return the same warning: ADK's ML
+Kit model has no tool calling or structured output yet.
 
 ```typescript
 const { text } = await generateText({
@@ -144,10 +91,37 @@ const { text } = await generateText({
   prompt: 'Write a creative story',
   temperature: 0.8,
   maxOutputTokens: 500,
-  topP: 0.9,
   topK: 40,
 })
 ```
+
+## Errors
+
+Errors from the provider have a `code`:
+
+```typescript
+import { AdkErrorCodes } from '@react-native-ai/adk'
+
+try {
+  await generateText({ model: adk(), prompt: 'Hello' })
+} catch (error) {
+  if (error.code === AdkErrorCodes.ModelDownloading) {
+    // Try again once Android has downloaded Gemini Nano
+  }
+}
+```
+
+| `code`                    | Meaning                                                  |
+| ------------------------- | -------------------------------------------------------- |
+| `UNSUPPORTED_PLATFORM`    | Not running on Android                                   |
+| `MODEL_UNAVAILABLE`       | This device can't run Gemini Nano                        |
+| `MODEL_DOWNLOADING`       | Android is still downloading Gemini Nano                 |
+| `DOWNLOAD_FAILED`         | Downloading Gemini Nano failed                           |
+| `CONTEXT_WINDOW_EXCEEDED` | The request is longer than the model's context           |
+| `RATE_LIMITED`            | Too many requests, or AICore's per-app quota was reached |
+| `BACKGROUND_USE_BLOCKED`  | Gemini Nano only runs while the app is in the foreground |
+| `INVALID_MESSAGE`         | The prompt has a part the provider can't send            |
+| `GENERATION_ERROR`        | Any other failure                                        |
 
 :::tip[Long conversations]
 Gemini Nano has a small context window and every request sends the whole chat.

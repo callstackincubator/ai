@@ -1,12 +1,11 @@
 # ADK Provider for Vercel AI SDK
 
-A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk), enabling on-device Gemini Nano and cloud Gemini in React Native applications on Android.
+A Vercel AI SDK provider for [Google's Agent Development Kit (ADK)](https://developer.android.com/ai/adk), running Gemini Nano on device in React Native apps on Android.
 
 **Requirements:**
 
 - Android only, with `minSdkVersion` 26+ set in your app
-- A device that supports Gemini Nano through AICore for on-device inference (see [ML Kit GenAI device support](https://developers.google.com/ml-kit/genai#feature-device))
-- A Google AI API key for cloud Gemini
+- A device that supports Gemini Nano through AICore (see [ML Kit GenAI device support](https://developers.google.com/ml-kit/genai#feature-device))
 - Vercel AI SDK v7
 - React Native New Architecture
 
@@ -25,15 +24,13 @@ const { text } = await generateText({
 ## Features
 
 - ✅ On-device Gemini Nano through ML Kit GenAI, with model selection
-- ✅ Cloud Gemini through ADK `LlmAgent`
-- ✅ Availability, download progress and token counting for Gemini Nano
+- ✅ Availability, download progress and token counting
 - ✅ Streaming
-- ✅ Tool calling, with the agent loop run natively by ADK
-- ✅ Structured outputs
-- ✅ Reasoning
 - ✅ Image prompts
 - ✅ Token usage
 - ✅ Error codes
+
+ADK's ML Kit model has no tool calling or structured output for Gemini Nano yet, so tools and JSON output return `unsupported` warnings.
 
 ## Documentation
 
