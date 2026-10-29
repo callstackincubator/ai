@@ -1,0 +1,33 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "moduleSuffixes": [
+      ".android",
+      ".ios",
+      ""
+    ],
+    "paths": {
+      "@react-native-ai/apple": [
+        "../../packages/apple-llm/src"
+      ],
+      "@react-native-ai/llama": [
+        "../../packages/llama/src"
+      ],
+      "@react-native-ai/core-ai": [
+        "../../packages/core-ai/src"
+      ],
+      "@react-native-ai/json-ui": [
+        "../../packages/json-ui/src"
+      ],
+      "@react-native-ai/utils": [
+        "../../packages/utils/src"
+      ]
+    }
+  },
+  "include": [
+    "app/**/*",
+    "src/**/*",
+    "../../harness/**/*"
+  ]
+}

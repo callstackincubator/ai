@@ -24,7 +24,7 @@ Tested on an iPhone 17 Pro with iOS 27 (Wan 2.1 on macOS) and hosted on Hugging 
 | Depth estimation   | [Depth Anything 3 small](https://huggingface.co/depth-anything/da3-small)   | [`grabbou/depth-anything-3-small-CoreAI`](https://huggingface.co/grabbou/depth-anything-3-small-CoreAI) | `da3-small.aimodel/`     | 106 MB | iOS, macOS                                                          | `CoreAI.runTask('depth', ...)`                                    |
 | Any `.aimodel`     | —                                                                           | —                                                                                                       | —                        | —      | —                                                                   | `CoreAI.loadModel({ ..., task: 'raw' })`, `CoreAI.runRawFunction` |
 
-The weights keep their original licenses (Apache-2.0, MIT, CC BY 4.0, and the SAM License for SAM 3), which each card lists. The example app's [`downloadHubFolder`](https://github.com/callstackincubator/ai/blob/main/apps/expo-example/src/utils/coreAIStorageUtils.ts) downloads one of these folders, and the [harness tests](https://github.com/callstackincubator/ai/tree/main/harness/core-ai) show each model in use.
+The weights keep their original licenses (Apache-2.0, MIT, CC BY 4.0, and the SAM License for SAM 3), which each card lists. The harness's [`downloadHubFolder`](https://github.com/callstackincubator/ai/blob/main/harness/core-ai/storage.ts) downloads one of these folders, and the [harness tests](https://github.com/callstackincubator/ai/tree/main/harness/core-ai) show each model in use.
 
 ## Community Exports
 
