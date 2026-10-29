@@ -39,6 +39,7 @@
         "@expo/ui": "~58.0.23",
         "@expo/vector-icons": "^15.0.3",
         "@legendapp/list": "^3.7.0",
+        "@react-native-ai/adk": "workspace:*",
         "@react-native-ai/apple": "workspace:*",
         "@react-native-ai/core-ai": "workspace:*",
         "@react-native-ai/json-ui": "workspace:*",
@@ -78,6 +79,7 @@
       },
       "devDependencies": {
         "@babel/core": "^7.20.0",
+        "@react-native-harness/platform-android": "1.6.0",
         "@react-native-harness/platform-apple": "1.6.0",
         "@types/react": "~19.3.0",
         "@types/ungap__structured-clone": "^1.2.0",
@@ -971,6 +973,8 @@
     "@react-native-harness/jest": ["@react-native-harness/jest@1.6.0", "", { "dependencies": { "@jest/test-result": "^30.2.0", "@react-native-harness/bridge": "1.6.0", "@react-native-harness/bundler-metro": "1.6.0", "@react-native-harness/cache": "1.6.0", "@react-native-harness/config": "1.6.0", "@react-native-harness/platforms": "1.6.0", "@react-native-harness/plugins": "1.6.0", "@react-native-harness/tools": "1.6.0", "chalk": "^4.1.2", "jest-message-util": "^30.2.0", "jest-util": "^30.2.0", "tslib": "^2.3.0", "yargs": "^17.7.2" } }, "sha512-BkoMCx2qgz3vqPvQUB3Kp2nS15GwRgImv5B02X5LhK3sv1eajRYgCSJC9JplVyO87X9LY4nIXU3EVHumsiSgYA=="],
 
     "@react-native-harness/metro": ["@react-native-harness/metro@1.6.0", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "metro": "*" } }, "sha512-FbV/eAMQZkzPv3kZF/vlHM5AFY898vyRxLzSQiwjLeWiX0pa56wH/H/3FAjOfxlo3MSxeeUxaSGYNO6ZCt5wOA=="],
+
+    "@react-native-harness/platform-android": ["@react-native-harness/platform-android@1.6.0", "", { "dependencies": { "@react-native-harness/config": "1.6.0", "@react-native-harness/platforms": "1.6.0", "@react-native-harness/tools": "1.6.0", "tslib": "^2.3.0", "vite": "^7.2.2", "zod": "^3.25.67" } }, "sha512-Wfv3GrJLAMdHtlHd5pGgIZlmc2Aj1NSphAprKLL5GAhFxQJld4mYw5QdruwT5Kn92Vj31BAeKuKAqBq1vU7BPg=="],
 
     "@react-native-harness/platform-apple": ["@react-native-harness/platform-apple@1.6.0", "", { "dependencies": { "@react-native-harness/config": "1.6.0", "@react-native-harness/platforms": "1.6.0", "@react-native-harness/tools": "1.6.0", "tslib": "^2.3.0", "yargs": "^17.7.2", "zod": "^3.25.67" } }, "sha512-2LanhJpnke56A6A2tMakBV58PyaXvOIZzlLI7eJFGSTCFdkCvN8nzE2H0MpzW6pqpfzlSfpw3iIxhydFJhRcLg=="],
 
@@ -3397,6 +3401,8 @@
     "@react-native-harness/config/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "@react-native-harness/jest/yargs": ["yargs@17.7.2", "", { "dependencies": { "cliui": "^8.0.1", "escalade": "^3.1.1", "get-caller-file": "^2.0.5", "require-directory": "^2.1.1", "string-width": "^4.2.3", "y18n": "^5.0.5", "yargs-parser": "^21.1.1" } }, "sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w=="],
+
+    "@react-native-harness/platform-android/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "@react-native-harness/platform-apple/yargs": ["yargs@17.7.2", "", { "dependencies": { "cliui": "^8.0.1", "escalade": "^3.1.1", "get-caller-file": "^2.0.5", "require-directory": "^2.1.1", "string-width": "^4.2.3", "y18n": "^5.0.5", "yargs-parser": "^21.1.1" } }, "sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w=="],
 

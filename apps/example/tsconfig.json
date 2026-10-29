@@ -8,6 +8,9 @@
       ""
     ],
     "paths": {
+      "@react-native-ai/adk": [
+        "../../packages/adk/src"
+      ],
       "@react-native-ai/apple": [
         "../../packages/apple-llm/src"
       ],

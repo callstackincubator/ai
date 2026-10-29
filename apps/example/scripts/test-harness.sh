@@ -5,6 +5,7 @@
 #
 #   bun run test:harness:simulator [test path]
 #   HARNESS_IOS_DEVICE="My iPhone" bun run test:harness:device [test path]
+#   HARNESS_ANDROID_DEVICE="Pixel 9 Pro" bun run test:harness:android [test path]
 
 set -euo pipefail
 
@@ -35,8 +36,19 @@ case "$TARGET" in
     npx expo run:ios --device "$HARNESS_IOS_DEVICE" --no-bundler
     npx react-native-harness --harnessRunner ios "$@"
     ;;
+  android)
+    if [[ -z "${HARNESS_ANDROID_DEVICE:-}" ]]; then
+      echo 'Set HARNESS_ANDROID_DEVICE to the device model, as `adb shell getprop ro.product.model` shows it' >&2
+      exit 1
+    fi
+    # Installs on the connected device, or the one ANDROID_SERIAL names when
+    # more than one is connected
+    npx expo prebuild --clean --platform android
+    npx expo run:android --no-bundler ${ANDROID_SERIAL:+--device "$ANDROID_SERIAL"}
+    HARNESS_PLATFORM=android npx react-native-harness --harnessRunner android "$@"
+    ;;
   *)
-    echo "Usage: $0 simulator|device [test path]" >&2
+    echo "Usage: $0 simulator|device|android [test path]" >&2
     exit 1
     ;;
 esac
