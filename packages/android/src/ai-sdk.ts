@@ -577,8 +577,9 @@ const getAbortReason = (signal: AbortSignal) => {
 
 class AndroidChatLanguageModel implements AndroidLanguageModel {
   readonly specificationVersion = 'v4'
+  // expo-file-system and Android's Uri.fromFile write file:/path, with one slash
   readonly supportedUrls = {
-    'image/*': [/^file:\/\//, /^content:\/\//],
+    'image/*': [/^file:/, /^content:/],
   }
 
   readonly provider = 'android'
@@ -842,6 +843,12 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
     } catch (error) {
       throw toAndroidAIError(error)
     }
+  }
+
+  /** Whether the recognizer for this language and mode is available or downloadable */
+  async isAvailable(): Promise<boolean> {
+    const { availability } = await this.getModelInfo()
+    return availability === 'available' || availability === 'downloadable'
   }
 
   /** Downloads the recognizer's model when needed, reporting download progress */

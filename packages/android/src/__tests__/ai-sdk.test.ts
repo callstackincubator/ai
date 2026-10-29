@@ -44,6 +44,11 @@ const getModelInfo = mock(
 const transcribe = mock(
   async (_runId: string, _audio: string, _options: unknown) => 'hello world'
 )
+const getTranscriptionModelInfo = mock(
+  async (_options?: unknown): Promise<Record<string, unknown>> => ({
+    availability: 'downloadable',
+  })
+)
 const embed = mock(async (values: string[], _taskType?: string) =>
   values.map(() => [0.1, 0.2])
 )
@@ -59,6 +64,7 @@ mock.module('react-native', () => ({
       isAvailable,
       getModelInfo,
       transcribe,
+      getTranscriptionModelInfo,
       embed,
       onStreamEvent,
       onDownloadProgress,
@@ -566,6 +572,16 @@ describe('other models', () => {
     ])
     expect(result.text).toBe('hello world')
     expect(result.language).toBe('en')
+  })
+
+  test('derives transcription availability from the model info', async () => {
+    const model = createAndroidProvider().transcriptionModel()
+    getTranscriptionModelInfo.mockImplementationOnce(async () => ({
+      availability: 'downloading',
+    }))
+
+    expect(await model.isAvailable()).toBe(false)
+    expect(await model.isAvailable()).toBe(true)
   })
 
   test('embeds values with the task type', async () => {

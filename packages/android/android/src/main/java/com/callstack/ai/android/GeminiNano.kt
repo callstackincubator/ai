@@ -89,6 +89,7 @@ class GeminiNano(
   private val prepareMutex = Mutex()
   // The last status seen per model selection, for the synchronous check
   private val statuses = ConcurrentHashMap<NanoConfig, Int>()
+  private val systemPromptSupport = ConcurrentHashMap<NanoConfig, Boolean>()
 
   private fun client(config: NanoConfig): GenerativeModel =
     clients.getOrPut(config) {
@@ -190,7 +191,8 @@ class GeminiNano(
 
   suspend fun generate(request: ReadableMap): GenerateResult {
     val config = NanoConfig.from(request.getMap("model"))
-    val response = preparedClient(config).generateContent(buildRequest(request))
+    val model = preparedClient(config)
+    val response = model.generateContent(buildRequest(request, model, config))
     return result(response, response.candidates.firstOrNull()?.functionCalls.orEmpty())
   }
 
@@ -207,7 +209,8 @@ class GeminiNano(
         listener.onFunctionCall(functionCall)
       }
     }
-    val response = preparedClient(config).generateContent(buildRequest(request), callback)
+    val model = preparedClient(config)
+    val response = model.generateContent(buildRequest(request, model, config), callback)
     // Calls arrive through the callback or with the final response
     val finalCalls = response.candidates.firstOrNull()?.functionCalls.orEmpty()
       .filter { call -> streamedCalls.none { it.id == call.id && it.name == call.name } }
@@ -232,11 +235,38 @@ class GeminiNano(
       else -> "OTHER"
     }
 
-  private fun buildRequest(request: ReadableMap): GenerateContentRequest {
-    val contents = request.getArray("messages")?.let(::contents).orEmpty()
+  private suspend fun supportsSystemPrompt(model: GenerativeModel, config: NanoConfig): Boolean =
+    systemPromptSupport.getOrPut(config) { runCatching { model.isSystemPromptAvailable() }.getOrDefault(false) }
+
+  private suspend fun buildRequest(
+    request: ReadableMap,
+    model: GenerativeModel,
+    config: NanoConfig,
+  ): GenerateContentRequest {
+    var contents = request.getArray("messages")?.let(::contents).orEmpty()
     if (contents.isEmpty()) {
       throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "The prompt has no messages")
     }
+    var systemInstruction = request.optString("systemInstruction")
+
+    // Gemini Nano without system prompt support, such as nano-v2, reads only the first text part
+    // of a request, so it would answer the system instruction or the first turn and never see the
+    // rest. Like ADK's NanoSingleTextPrompt, the system instruction and every turn's text become one
+    // part, after the images. Remove once ML Kit handles this (issue #364).
+    val parts = contents.flatMap { it.parts }
+    if ((parts.size > 1 || systemInstruction != null) && !supportsSystemPrompt(model, config)) {
+      val text = (listOfNotNull(systemInstruction) + parts.filterIsInstance<TextPart>().map { it.textString })
+        .joinToString("\n\n")
+      val images = parts.filterIsInstance<ImagePart>()
+      contents = listOf(
+        Content.builder()
+          .role(Content.Role.USER)
+          .apply { (images + TextPart(text)).forEach(::addPart) }
+          .build(),
+      )
+      systemInstruction = null
+    }
+
     val tools = request.getArray("tools")?.let { tools ->
       List(tools.size()) { index ->
         val tool = tools.getMap(index)!!
@@ -250,7 +280,7 @@ class GeminiNano(
 
     return GenerateContentRequest.Builder(contents)
       .apply {
-        request.optString("systemInstruction")?.let { systemInstruction = SystemInstruction(it) }
+        systemInstruction?.let { this.systemInstruction = SystemInstruction(it) }
         if (request.hasKey("temperature")) temperature = request.getDouble("temperature").toFloat()
         if (request.hasKey("topK")) topK = request.getInt("topK")
         if (request.hasKey("seed")) seed = request.getInt("seed")
@@ -271,12 +301,17 @@ class GeminiNano(
         .build()
     }
 
+  // ML Kit's ImagePart(Uri) refuses files in the app's own data directory, such as its cache, so
+  // the app reads the URI it was given, as ADK did
+  private fun readUri(uri: String): ByteArray =
+    context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
+      ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Cannot read image: $uri")
+
   private fun part(part: ReadableMap) =
     when (val type = part.getString("type")) {
       "text" -> TextPart(part.getString("text").orEmpty())
       "image" ->
-        part.optString("uri")?.let { ImagePart(Uri.parse(it)) }
-          ?: ImagePart(Base64.decode(part.getString("data"), Base64.DEFAULT))
+        ImagePart(part.optString("uri")?.let(::readUri) ?: Base64.decode(part.getString("data"), Base64.DEFAULT))
       "functionCall" ->
         FunctionCallPart(
           FunctionCall(
