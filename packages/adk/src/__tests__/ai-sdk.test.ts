@@ -467,20 +467,26 @@ describe('generation options', () => {
     })
   })
 
-  test('puts the response schema in the Gemini Nano instruction', async () => {
+  test('warns that Gemini Nano has no JSON mode', async () => {
     const schema = { type: 'object', properties: { name: { type: 'string' } } }
-    await nano.doGenerate(
+    const result = await nano.doGenerate(
       createCallOptions({ responseFormat: { type: 'json', schema } })
     )
 
     const [, , config, options] = lastGenerateCall() as [
       string,
       unknown,
-      { instruction: string },
-      { responseFormat: { schema?: unknown } },
+      { instruction?: string },
+      { responseFormat?: unknown },
     ]
-    expect(config.instruction).toContain(JSON.stringify(schema))
-    expect(options.responseFormat.schema).toBe(undefined)
+    expect(config.instruction).toBe(undefined)
+    expect(options.responseFormat).toBe(undefined)
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'unsupported',
+        feature: 'responseFormat',
+      })
+    )
   })
 
   test('warns about settings Gemini Nano ignores', async () => {
@@ -544,16 +550,6 @@ describe('doGenerate results', () => {
       text: 5,
       reasoning: 3,
     })
-  })
-
-  test('strips Markdown fences from JSON output', async () => {
-    generateTextResult = { content: '```json\n{"a":1}\n```' }
-
-    const result = await nano.doGenerate(
-      createCallOptions({ responseFormat: { type: 'json' } })
-    )
-
-    expect(result.content).toEqual([{ type: 'text', text: '{"a":1}' }])
   })
 
   test('maps safety finish reasons to content-filter', async () => {
@@ -644,47 +640,24 @@ describe('doStream', () => {
     })
   })
 
-  test('streams JSON without Markdown fences', async () => {
-    const parts = await runStream(
-      createCallOptions({ responseFormat: { type: 'json' } }),
-      (streamId) => {
-        for (const delta of ['``', '`json\n{"a"', ':1}', '\n`', '``']) {
-          onStreamUpdate.emit({ streamId, delta })
-        }
-        onStreamComplete.emit({ streamId })
-      },
-      nano
+  test('warns that Gemini Nano has no tool calling', async () => {
+    const result = await nano.doGenerate(
+      createCallOptions({
+        tools: [
+          {
+            type: 'function',
+            name: 'getWeather',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+      })
     )
 
-    const text = parts
-      .flatMap((part) => (part.type === 'text-delta' ? [part.delta] : []))
-      .join('')
-    expect(text).toBe('{"a":1}')
-  })
-
-  test('hides Gemini Nano tool_code text and streams the next turn', async () => {
-    const parts = await runStream(
-      createCallOptions(),
-      (streamId) => {
-        for (const delta of ['Checking.\n``', '`tool_code\nf()\n```']) {
-          onStreamUpdate.emit({ streamId, delta })
-        }
-        onStreamToolCall.emit({
-          streamId,
-          phase: 'start',
-          toolCallId: '1',
-          toolName: 'f',
-        })
-        onStreamUpdate.emit({ streamId, delta: 'Done.' })
-        onStreamComplete.emit({ streamId })
-      },
-      nano
+    const [, , , , tools] = lastGenerateCall() as unknown[]
+    expect(tools).toEqual([])
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ type: 'unsupported', feature: 'tools' })
     )
-
-    const text = parts
-      .flatMap((part) => (part.type === 'text-delta' ? [part.delta] : []))
-      .join('')
-    expect(text).toBe('Checking.\nDone.')
   })
 
   test('surfaces native stream errors with their code', async () => {

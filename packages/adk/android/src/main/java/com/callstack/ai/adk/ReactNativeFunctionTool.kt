@@ -29,28 +29,6 @@ class ReactNativeFunctionTool(
       parameters = parameterSchema ?: Schema(type = Type.OBJECT),
     )
 
-  /** Describes the tool for models without native function calling. */
-  fun promptDescription(): String {
-    val parameters = declaration().parameters
-    val parameterLines =
-      parameters?.properties?.entries?.joinToString("\n") { (paramName, paramSchema) ->
-        val paramType = paramSchema.type?.name?.lowercase() ?: "string"
-        val paramDescription = paramSchema.description?.let { " — $it" } ?: ""
-        val required = parameters.required?.contains(paramName) == true
-        "    - $paramName ($paramType, required=$required)$paramDescription"
-      } ?: ""
-
-    return buildString {
-      append("- $name")
-      if (description.isNotBlank()) {
-        append(": $description")
-      }
-      if (parameterLines.isNotBlank()) {
-        append("\n  Parameters:\n$parameterLines")
-      }
-    }
-  }
-
   override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
     // Use ADK's id so JS sees the same id as the reported tool call
     val toolCallId = context.functionCallId ?: UUID.randomUUID().toString()

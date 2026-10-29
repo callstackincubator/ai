@@ -171,7 +171,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         var partialUsage: UsageMetadata? = null
         // ADK may deliver text cumulatively (each event repeats the turn so far) or as
         // deltas, so the turn text is rebuilt here and only the new part is sent to JS.
-        // JS hides Gemini Nano tool_code blocks. Reasoning is tracked the same way.
+        // Reasoning is tracked the same way.
         var currentTurnText = ""
         var emittedText = ""
         var currentTurnReasoning = ""

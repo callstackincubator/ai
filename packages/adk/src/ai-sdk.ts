@@ -37,7 +37,6 @@ import {
   type StreamToolCallEvent,
   type ToolCallEvent,
 } from './NativeAdkEngine'
-import { StreamTextFilter, stripJsonFences } from './streamText'
 
 const DEFAULT_NANO_MODEL = 'gemini-nano'
 const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
@@ -466,11 +465,6 @@ const parseToolResult = (output: string): NonNullable<JSONValue> => {
   }
 }
 
-const createNanoJsonInstruction = (schema: unknown) =>
-  schema
-    ? `Respond only with JSON that matches this JSON schema, without Markdown or other text:\n${JSON.stringify(schema)}`
-    : 'Respond only with valid JSON, without Markdown or other text.'
-
 class AdkChatLanguageModel implements AdkLanguageModel {
   readonly specificationVersion = 'v4'
   readonly supportedUrls = {
@@ -642,21 +636,11 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     const systemPrompts = options.prompt.flatMap((message) =>
       message.role === 'system' ? [message.content] : []
     )
-    // Gemini Nano has no response schema, so the schema goes in the instruction
-    const jsonInstruction =
-      this.isNano && options.responseFormat?.type === 'json'
-        ? createNanoJsonInstruction(options.responseFormat.schema)
-        : undefined
-
-    if (systemPrompts.length === 0 && !jsonInstruction) {
+    if (systemPrompts.length === 0) {
       return this.agentConfig
     }
 
-    const instruction = [
-      this.agentConfig.instruction,
-      ...systemPrompts,
-      jsonInstruction,
-    ]
+    const instruction = [this.agentConfig.instruction, ...systemPrompts]
       .filter(Boolean)
       .join('\n\n')
 
@@ -678,6 +662,9 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         stopSequences: options.stopSequences,
         presencePenalty: options.presencePenalty,
         frequencyPenalty: options.frequencyPenalty,
+        // ADK's ML Kit model has no response schema or JSON mode
+        responseFormat:
+          options.responseFormat?.type === 'json' ? 'json' : undefined,
       }
       for (const [feature, value] of Object.entries(unsupported)) {
         if (value !== undefined) {
@@ -700,11 +687,11 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       presencePenalty: options.presencePenalty,
       frequencyPenalty: options.frequencyPenalty,
       responseFormat:
-        options.responseFormat?.type === 'json'
+        options.responseFormat?.type === 'json' && !this.isNano
           ? {
               type: 'json',
               mimeType: 'application/json',
-              schema: this.isNano ? undefined : options.responseFormat.schema,
+              schema: options.responseFormat.schema,
             }
           : undefined,
       thinking: prepareThinking(options.reasoning, adkOptions),
@@ -712,6 +699,15 @@ class AdkChatLanguageModel implements AdkLanguageModel {
   }
 
   private prepareTools(tools: Tool[], warnings: SharedV4Warning[]) {
+    if (this.isNano && tools.length > 0) {
+      warnings.push({
+        type: 'unsupported',
+        feature: 'tools',
+        details: "ADK's ML Kit model has no tool calling for Gemini Nano.",
+      })
+      return []
+    }
+
     const functionTools = tools.filter(
       (tool): tool is LanguageModelV4FunctionTool => {
         if (tool.type === 'function') {
@@ -872,13 +868,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
           result: parseToolResult(toolResult.output),
         })
       }
-      content.push({
-        type: 'text',
-        text:
-          options.responseFormat?.type === 'json'
-            ? stripJsonFences(response.content)
-            : response.content,
-      })
+      content.push({ type: 'text', text: response.content })
 
       return {
         content,
@@ -909,7 +899,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     const streamId = generateId()
     const native = getNativeAdkEngine()
     const abortSignal = options.abortSignal
-    const isJson = options.responseFormat?.type === 'json'
 
     if (typeof ReadableStream === 'undefined') {
       throw new Error(
@@ -953,10 +942,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         let textOpen = false
         let reasoningId: string | undefined
         let reasoningCount = 0
-        const textFilter = new StreamTextFilter({
-          json: isJson,
-          toolCode: this.isNano,
-        })
 
         const addListener = (listener: { remove(): void }) => {
           listeners.push(listener)
@@ -1009,7 +994,7 @@ class AdkChatLanguageModel implements AdkLanguageModel {
               return
             }
 
-            emitText(textFilter.push(data.delta))
+            emitText(data.delta)
           })
         )
 
@@ -1021,7 +1006,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
 
             if (data.phase === 'start' && data.toolName) {
               closeReasoning()
-              textFilter.endTurn()
               toolNames.set(data.toolCallId, data.toolName)
               controller.enqueue({
                 type: 'tool-input-start',
@@ -1073,7 +1057,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
             if (data.streamId !== streamId) {
               return
             }
-            emitText(textFilter.flush())
             closeReasoning()
             if (textOpen) {
               controller.enqueue({ type: 'text-end', id: textId })

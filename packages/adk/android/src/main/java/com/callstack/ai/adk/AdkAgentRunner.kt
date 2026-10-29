@@ -277,18 +277,11 @@ class AdkAgentRunner(
     val agentTools = parseTools(tools, runId)
     val model = createModel(agentConfig)
     val generateContentConfig = parseGenerationConfig(options)
-    val instructionText =
-      if (agentConfig.modelType == "genai-nano") {
-        buildInstruction(agentConfig.instruction, agentTools)
-      } else {
-        agentConfig.instruction
-      }
-
     val agent = LlmAgent(
       name = agentConfig.name,
       description = agentConfig.description,
       model = model,
-      instruction = instructionText?.let { Instruction(it) },
+      instruction = agentConfig.instruction?.let { Instruction(it) },
       tools = agentTools,
       generateContentConfig = generateContentConfig,
     )
@@ -331,9 +324,7 @@ class AdkAgentRunner(
   private suspend fun createModel(config: AgentConfig): Model {
     return when (config.modelType) {
       "genai-nano" ->
-        NanoFunctionCallingModel(
-          GenaiPrompt.create(NanoSingleTextPrompt(preparedNano(config.nano)), config.modelName),
-        )
+        GenaiPrompt.create(NanoSingleTextPrompt(preparedNano(config.nano)), config.modelName)
       else -> Gemini(name = config.modelName, apiKey = config.apiKey)
     }
   }
@@ -476,26 +467,6 @@ class AdkAgentRunner(
     }
 
     return parsed
-  }
-
-  /** Gemini Nano has no native function calling, so its tools are described in the instruction. */
-  private fun buildInstruction(
-    baseInstruction: String?,
-    tools: List<ReactNativeFunctionTool>,
-  ): String? {
-    if (tools.isEmpty()) {
-      return baseInstruction
-    }
-
-    val toolGuidance =
-      "You have access to the following tools. Use them when they help answer the user:\n" +
-        tools.joinToString("\n") { it.promptDescription() }
-
-    return if (baseInstruction.isNullOrBlank()) {
-      toolGuidance
-    } else {
-      "$baseInstruction\n\n$toolGuidance"
-    }
   }
 
   // JS always sends the name and model, with defaults applied
