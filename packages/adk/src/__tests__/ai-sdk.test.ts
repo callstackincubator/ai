@@ -46,6 +46,7 @@ const streamText = mock(
 )
 const prepareNano = mock(async (_nano?: unknown) => {})
 const cancelStream = mock(async (_id: string) => {})
+const isAvailable = mock((_nano?: unknown) => true)
 const getModelInfo = mock(async (_nano?: unknown) => ({
   availability: 'downloadable',
 }))
@@ -59,6 +60,7 @@ mock.module('react-native', () => ({
       prepareNano,
       cancelStream,
       getModelInfo,
+      isAvailable,
       onStreamUpdate,
       onStreamComplete,
       onStreamError,
@@ -145,14 +147,14 @@ describe('provider', () => {
     expect(getModelInfo.mock.calls.at(-1)![0]).toEqual({ preference: 'fast' })
   })
 
-  test('derives isAvailable from the model info', async () => {
-    const provider = createAdkProvider()
-    expect(await provider.isAvailable()).toBe(true)
+  test('checks availability synchronously', () => {
+    const provider = createAdkProvider({ nano: { preference: 'fast' } })
 
-    getModelInfo.mockImplementationOnce(async () => ({
-      availability: 'downloading',
-    }))
-    expect(await provider.isAvailable()).toBe(false)
+    expect(provider.isAvailable()).toBe(true)
+    expect(isAvailable.mock.calls.at(-1)).toEqual([{ preference: 'fast' }])
+
+    isAvailable.mockImplementationOnce(() => false)
+    expect(provider().isAvailable()).toBe(false)
   })
 })
 

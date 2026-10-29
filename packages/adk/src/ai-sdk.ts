@@ -69,6 +69,8 @@ export interface AdkPrepareOptions {
 }
 
 export interface AdkLanguageModel extends LanguageModelV4 {
+  /** Quick synchronous check, see `AdkProvider.isAvailable` */
+  isAvailable: () => boolean
   /** Downloads Gemini Nano when needed and loads it, reporting download progress */
   prepare: (options?: AdkPrepareOptions) => Promise<void>
   /** Counts tokens with the Gemini Nano tokenizer */
@@ -79,8 +81,12 @@ export interface AdkProvider {
   (options?: AdkLanguageModelOptions): AdkLanguageModel
   readonly specificationVersion: 'v4'
   languageModel: (options?: AdkLanguageModelOptions) => AdkLanguageModel
-  /** Whether Gemini Nano can be used now: it is `available` or `downloadable` */
-  isAvailable: () => Promise<boolean>
+  /**
+   * Quick synchronous check whether Gemini Nano can be used. It reflects the
+   * last status `getModelInfo()` or `prepare()` saw, or else whether AICore is
+   * installed. Use `getModelInfo()` for the exact availability
+   */
+  isAvailable: () => boolean
   /** Gemini Nano's availability, for the provider's model selection or `nano` */
   getModelInfo: (options?: {
     nano?: AdkNanoModelConfig
@@ -114,6 +120,10 @@ const listenForDownloadProgress = (
       )
     : null
 
+function isAvailable(nano: AdkNanoModelConfig | undefined) {
+  return Platform.OS === 'android' && getNativeAdkEngine().isAvailable(nano)
+}
+
 async function getModelInfo(
   nano: AdkNanoModelConfig | undefined
 ): Promise<AdkModelInfo> {
@@ -144,10 +154,7 @@ export function createAdkProvider(
   }
   provider.specificationVersion = 'v4' as const
   provider.languageModel = createLanguageModel
-  provider.isAvailable = async () => {
-    const { availability } = await getModelInfo(defaults.nano)
-    return availability === 'available' || availability === 'downloadable'
-  }
+  provider.isAvailable = () => isAvailable(defaults.nano)
   provider.getModelInfo = (options: { nano?: AdkNanoModelConfig } = {}) =>
     getModelInfo(options.nano ?? defaults.nano)
   return provider
@@ -315,6 +322,10 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       instruction: options.instruction,
       nano: options.nano,
     }
+  }
+
+  isAvailable(): boolean {
+    return isAvailable(this.agentConfig.nano)
   }
 
   async prepare(options: AdkPrepareOptions = {}): Promise<void> {

@@ -44,6 +44,9 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     reject(AdkErrors.codeFor(error), error.message ?: "Unknown ADK error", error)
   }
 
+  override fun isAvailable(nano: ReadableMap?): Boolean =
+    runner.isNanoAvailable(NanoConfig.from(nano))
+
   override fun getModelInfo(nano: ReadableMap?, promise: Promise) {
     scope.launch {
       try {
