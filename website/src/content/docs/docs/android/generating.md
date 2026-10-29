@@ -45,11 +45,13 @@ Gemini Nano on every call, as user and model turns, so it keeps no session of
 its own. Keep the history within the context window, which
 [`getModelInfo()`](/docs/android/models) reports as `contextSize`.
 
-:::caution
-Older Gemini Nano versions may only answer the first turn of a conversation.
-On a Pixel 9 Pro with `nano-v2`, the model replies to the first user message
-and ignores the rest. The provider sends the history as ML Kit takes it and
-doesn't merge turns into one prompt.
+:::note
+Gemini Nano versions without system prompt support (the `systemPrompt`
+feature), such as `nano-v2` on a Pixel 9 Pro, read only the first text part of
+a request. On those, the provider merges the system instruction and the text
+of every turn into one prompt, with the images first, so the model sees the
+whole conversation. Models with system prompt support get the instruction and
+the turns separately.
 :::
 
 ```typescript

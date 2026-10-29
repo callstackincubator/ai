@@ -32,6 +32,10 @@ empty.
 ## Availability and Download
 
 ```typescript
+if (await model.isAvailable()) {
+  // available or downloadable
+}
+
 const info = await model.getModelInfo()
 // { availability: 'available' | 'downloadable' | 'downloading' | 'unavailable' }
 

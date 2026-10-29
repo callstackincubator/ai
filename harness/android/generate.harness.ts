@@ -1,5 +1,6 @@
 import { android } from '@react-native-ai/android'
 import { generateText, streamText } from 'ai'
+import { File, Paths } from 'expo-file-system'
 import {
   beforeAll,
   beforeEach,
@@ -91,6 +92,68 @@ describe('android gemini nano', () => {
     })
 
     expect(text).toMatch(/red/i)
+  })
+
+  it('reads a local file image', async () => {
+    const file = new File(Paths.cache, 'harness-red.png')
+    file.write(base64ToBytes(redSquare))
+
+    const { text } = await generateText({
+      model: android(),
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', image: new URL(file.uri) },
+            {
+              type: 'text',
+              text: 'What colour is this image? Answer with one word.',
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(text).toMatch(/red/i)
+  })
+
+  it('reads a data URL image', async () => {
+    const { text } = await generateText({
+      model: android(),
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', image: `data:image/png;base64,${redSquare}` },
+            {
+              type: 'text',
+              text: 'What colour is this image? Answer with one word.',
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(text).toMatch(/red/i)
+  })
+
+  it('remembers earlier turns after a system message', async () => {
+    const { text } = await generateText({
+      model: android(),
+      system: 'You are a helpful assistant. Answer briefly.',
+      messages: [
+        { role: 'user', content: 'My dog is called Biscuit. Just say OK.' },
+        { role: 'assistant', content: 'OK' },
+        {
+          role: 'user',
+          content: 'What is my dog called? Answer with one word.',
+        },
+      ],
+    })
+
+    expect(text).toMatch(/biscuit/i)
+    // A merged prompt has no role labels, which Nano should not echo
+    expect(text).not.toMatch(/^(user|model|assistant):/im)
   })
 
   it('stops at the output token limit', async () => {
