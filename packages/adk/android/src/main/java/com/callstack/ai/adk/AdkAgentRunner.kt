@@ -331,7 +331,9 @@ class AdkAgentRunner(
   private suspend fun createModel(config: AgentConfig): Model {
     return when (config.modelType) {
       "genai-nano" ->
-        NanoFunctionCallingModel(GenaiPrompt.create(preparedNano(config.nano), config.modelName))
+        NanoFunctionCallingModel(
+          GenaiPrompt.create(NanoSingleTextPrompt(preparedNano(config.nano)), config.modelName),
+        )
       else -> Gemini(name = config.modelName, apiKey = config.apiKey)
     }
   }
