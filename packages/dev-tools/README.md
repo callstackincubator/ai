@@ -7,7 +7,7 @@ is a [Rozenite](https://www.rozenite.dev) DevTools plugin that captures the
 OpenTelemetry spans the AI SDK emits and shows their inputs, outputs, tool
 calls, provider metadata and latency.
 
-![AI SDK Profiler preview](../../website/src/public/dev-tools-preview.png)
+![AI SDK Profiler preview](../../website/public/dev-tools-preview.png)
 
 DevTools are runtime agnostic, so they work with on-device and remote runtimes.
 

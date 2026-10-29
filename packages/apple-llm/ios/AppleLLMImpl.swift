@@ -749,7 +749,7 @@ public class AppleLLMImpl: NSObject {
         from: providerOptions,
         includeSchemaInPrompt: generationSchema == nil ? nil : true
       )
-      let preparedAttachments = try createImageAttachments(from: promptAttachments)
+      let preparedAttachments = try Self.createImageAttachments(from: promptAttachments)
       defer {
         Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
       }
@@ -891,7 +891,7 @@ public class AppleLLMImpl: NSObject {
         from: providerOptions,
         includeSchemaInPrompt: generationSchema == nil ? nil : true
       )
-      let preparedAttachments = try createImageAttachments(from: promptAttachments)
+      let preparedAttachments = try Self.createImageAttachments(from: promptAttachments)
       defer {
         Self.removeTemporaryFiles(preparedAttachments.temporaryFileURLs)
       }
@@ -1380,7 +1380,7 @@ public class AppleLLMImpl: NSObject {
 
 #if compiler(>=6.4)
   @available(iOS 27, *)
-  private func createImageAttachments(
+  @_spi(CoreAI) public static func createImageAttachments(
     from attachments: [[String: Any]]
   ) throws -> (values: [Attachment<ImageAttachmentContent>], temporaryFileURLs: [URL]) {
     var imageAttachments: [Attachment<ImageAttachmentContent>] = []
@@ -1450,7 +1450,7 @@ public class AppleLLMImpl: NSObject {
     return ImageURL(url: fileURL, needsCleanup: true)
   }
 
-  private static func removeTemporaryFiles(_ urls: [URL]) {
+  @_spi(CoreAI) public static func removeTemporaryFiles(_ urls: [URL]) {
     for url in urls {
       try? FileManager.default.removeItem(at: url)
     }

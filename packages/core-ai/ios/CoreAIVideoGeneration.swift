@@ -131,8 +131,15 @@ enum VideoGeneration {
     }
 
     let fps = (options["fps"] as? NSNumber)?.intValue ?? 16
+    guard fps > 0 else {
+      throw CoreAIError.invalidInput("Video fps must be greater than 0, got \(fps).")
+    }
     var frameCount = (options["frameCount"] as? NSNumber)?.intValue ?? shape.frameCount ?? pipeline.defaultFrameCount
     if options["frameCount"] == nil, let duration = (options["duration"] as? NSNumber)?.doubleValue {
+      // Int() traps on NaN, infinity and values out of its range
+      guard duration.isFinite, duration > 0, duration <= 3600 else {
+        throw CoreAIError.invalidInput("Video duration must be between 0 and 3600 seconds, got \(duration).")
+      }
       // The nearest 4n + 1 frames to the duration
       frameCount = max(Int((duration * Double(fps) / 4).rounded()), 1) * 4 + 1
     }

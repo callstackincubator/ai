@@ -1,0 +1,138 @@
+---
+title: "Getting Started"
+---
+
+import PackageManagerTabs from '../../../../components/starlight/PackageManagerTabs.astro'
+
+Run models you ship with your app on iOS 27, through Apple's Core AI runtime: language and vision models, image and video generation, transcription, embeddings, and vision tasks such as object detection and segmentation. Most of them work with the Vercel AI SDK calls you already know.
+
+You don't have to export anything to start: we host [ready-to-use models](/docs/core-ai/models#hosted-exports) for every task. Download one into your app and point the provider at it.
+
+For Apple's built-in system models (Foundation Models, SpeechAnalyzer and others), use the [Apple provider](/docs/apple/getting-started) instead.
+
+## Installation
+
+<PackageManagerTabs command="install @react-native-ai/core-ai @react-native-ai/apple ai" />
+
+`@react-native-ai/apple` is a peer dependency, since Core AI language models run through Foundation Models. The AI SDK needs its [polyfills](/docs/polyfills).
+
+## Requirements
+
+- **React Native New Architecture**
+- **Xcode 27** or newer, and an **iOS 27** deployment target
+- **A physical device**: the iOS Simulator SDK has no `CoreAI` framework, so apps with this package build for devices only
+
+## Native Setup
+
+There's no Xcode step: `pod install` links Apple's `coreai-models` package. You only need to raise the deployment target to iOS 27.
+
+### Expo
+
+Add the config plugin to `app.json`, then run `npx expo prebuild`:
+
+```json
+{
+  "expo": {
+    "plugins": ["@react-native-ai/core-ai"]
+  }
+}
+```
+
+The plugin sets the iOS deployment target to 27.0 in the Podfile and the Xcode project. If you also set `ios.deploymentTarget` in `expo-build-properties`, make it `27.0` or higher.
+
+### Bare React Native
+
+Set `platform :ios, '27.0'` in `ios/Podfile` and the deployment target of the app target in Xcode to 27.0, then run `npx pod-install`.
+
+## Loading Models
+
+Core AI loads models from local files. Download a model folder into app storage, or bundle it with the app, and pass its path as `source`:
+
+```typescript
+import { coreAI } from '@react-native-ai/core-ai'
+
+const model = coreAI.languageModel({
+  id: 'qwen3-0.6b',
+  source: `${documentDirectory}/coreai-models/qwen3-0.6b`,
+})
+```
+
+For a model shipped with the app, use `bundle://` and its path in the app bundle, such as `source: 'bundle://models/qwen3-0.6b'`. `id` is optional: it names the model in AI SDK results and telemetry, and defaults to the folder or `.aimodel` name. The [Models](/docs/core-ai/models) page lists exports hosted on Hugging Face for every task, and how to export your own.
+
+## Basic Usage
+
+```typescript
+import { streamText } from 'ai'
+
+const result = streamText({
+  model,
+  prompt: 'Explain Core AI in one sentence.',
+})
+
+for await (const delta of result.textStream) {
+  console.log(delta)
+}
+```
+
+## Advanced Setup
+
+### Choosing Tasks
+
+The pod links one `coreai-models` product per task, and links all of them by default:
+
+| Task                 | Used by                                     | Linked product            |
+| -------------------- | ------------------------------------------- | ------------------------- |
+| `language`           | `coreAI.languageModel(...)` and sessions    | `CoreAILM`                |
+| `diffusion`          | `coreAI.imageModel(...)`                    | `CoreAIDiffusion`         |
+| `video-diffusion`    | `coreAI.videoModel(...)`                    | `CoreAIVideoDiffusion`    |
+| `asr`                | `coreAI.transcriptionModel(...)`            | `CoreAISpeech`            |
+| `segmentation`       | `CoreAI.runTask('segmentation', ...)`       | `CoreAISegmentation`      |
+| `video-segmentation` | `CoreAI.runTask('video-segmentation', ...)` | `CoreAIVideoSegmentation` |
+| `object-detection`   | `CoreAI.runTask('object-detection', ...)`   | `CoreAIObjectDetection`   |
+
+Embeddings, super-resolution, classification, depth estimation and raw function calls run on the Core AI runtime itself, and need no product of their own.
+
+To link fewer, list the tasks you use. With Expo, pass them to the plugin:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "tasks": ["language"] }]]
+  }
+}
+```
+
+In a bare app, set `CORE_AI_TASKS` (comma-separated) on every `pod install`:
+
+```bash
+CORE_AI_TASKS=language npx pod-install
+```
+
+Calls for a task that isn't linked reject with `CORE_AI_MISSING_SPM_PRODUCT`, and `CoreAI.getCapabilities()` reports which products are linked.
+
+### Memory Limit
+
+iOS stops an app that uses more memory than its limit, about 3.4 GB on an iPhone 17 Pro. Larger models, such as the [Qwen3-VL 2B](/docs/core-ai/models#hosted-exports) vision language model, need the [increased memory limit](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.kernel.increased-memory-limit) entitlement, which raises it to about 6 GB. With Expo, the plugin adds it:
+
+```json
+{
+  "expo": {
+    "plugins": [["@react-native-ai/core-ai", { "increasedMemoryLimit": true }]]
+  }
+}
+```
+
+The App ID needs the Increased Memory Limit capability, so sign with an explicit App ID: a wildcard profile can't carry it. In a bare app, add the capability to the app target in Xcode.
+
+Wan 2.1 doesn't finish on an iPhone even with it, because its VAE decoder needs more GPU memory than the raised limit ([#306](https://github.com/callstackincubator/ai/issues/306)).
+
+## Next Steps
+
+- [Generating](/docs/core-ai/generating): text, structured output, tool calling, image prompts, reasoning and native sessions
+- [Images and Video](/docs/core-ai/images-and-video): image and video generation
+- [Transcription](/docs/core-ai/transcription): files and live audio
+- [Embeddings](/docs/core-ai/embeddings): text and image embeddings
+- [Vision](/docs/core-ai/vision): detection, segmentation, video segmentation, super-resolution, classification and depth
+- [Raw Function Calls](/docs/core-ai/raw-functions): any `.aimodel`, with tensors
+- [Error Handling](/docs/core-ai/errors): error codes, and models that stop loading
+- [Models](/docs/core-ai/models): hosted exports and how to make your own
