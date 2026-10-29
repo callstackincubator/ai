@@ -11,8 +11,6 @@ import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.agents.StreamingMode
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.mlkit.GenaiPrompt
-import com.google.adk.kt.models.Gemini
-import com.google.adk.kt.models.Model
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
@@ -41,15 +39,9 @@ import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-data class AdkToolCallRecord(val toolCallId: String, val toolName: String, val input: String)
-
-data class AdkToolResultRecord(val toolCallId: String, val toolName: String, val output: String)
-
 data class AdkRunResult(
   val content: String,
   val reasoning: String?,
-  val toolCalls: List<AdkToolCallRecord>,
-  val toolResults: List<AdkToolResultRecord>,
   val finishReason: String?,
   val usage: UsageMetadata?,
 )
@@ -82,12 +74,6 @@ fun Event.textParts(thoughts: Boolean): String =
 
 class AdkAgentRunner(
   private val context: Context,
-  private val onToolCall: (
-    runId: String,
-    toolCallId: String,
-    toolName: String,
-    arguments: String,
-  ) -> Unit,
   private val onDownloadProgress: (
     phase: String,
     bytesDownloaded: Long?,
@@ -171,11 +157,7 @@ class AdkAgentRunner(
     return nanoModels.getValue(config)
   }
 
-  suspend fun getModelInfo(modelType: String, config: NanoConfig): AdkModelInfo {
-    if (modelType != "genai-nano") {
-      return AdkModelInfo(availability = "available")
-    }
-
+  suspend fun getModelInfo(config: NanoConfig): AdkModelInfo {
     val model = nanoClient(config)
     val status =
       try {
@@ -205,10 +187,8 @@ class AdkAgentRunner(
     messages: ReadableArray,
     config: ReadableMap,
     options: ReadableMap?,
-    tools: ReadableArray?,
-    runId: String,
   ): AdkRunResult {
-    val events = runAgent(messages, config, options, tools, stream = false, runId = runId).toList()
+    val events = runAgent(messages, config, options, stream = false).toList()
     val completeEvents = events.filterNot { it.partial }
     val text =
       completeEvents
@@ -223,32 +203,9 @@ class AdkAgentRunner(
         .joinToString("\n\n")
         .ifEmpty { null }
 
-    val toolCalls =
-      completeEvents.flatMap { event ->
-        event.functionCalls().map { call ->
-          AdkToolCallRecord(
-            toolCallId = call.id ?: UUID.randomUUID().toString(),
-            toolName = call.name,
-            input = AdkJson.encode(call.args),
-          )
-        }
-      }
-    val toolResults =
-      completeEvents.flatMap { event ->
-        event.functionResponses().map { response ->
-          AdkToolResultRecord(
-            toolCallId = response.id ?: "",
-            toolName = response.name,
-            output = AdkJson.encode(response.response),
-          )
-        }
-      }
-
     return AdkRunResult(
       content = text,
       reasoning = reasoning,
-      toolCalls = toolCalls,
-      toolResults = toolResults,
       finishReason = events.lastOrNull()?.finishReason?.name,
       usage = AdkUsage.fromEvents(events),
     )
@@ -258,32 +215,24 @@ class AdkAgentRunner(
     messages: ReadableArray,
     config: ReadableMap,
     options: ReadableMap?,
-    tools: ReadableArray?,
-    runId: String,
   ): Flow<Event> {
-    return runAgent(messages, config, options, tools, stream = true, runId = runId)
+    return runAgent(messages, config, options, stream = true)
   }
 
   private suspend fun runAgent(
     messages: ReadableArray,
     config: ReadableMap,
     options: ReadableMap?,
-    tools: ReadableArray?,
     stream: Boolean,
-    runId: String,
   ): Flow<Event> {
     val parsedMessages = parseMessages(messages)
     val agentConfig = parseAgentConfig(config)
-    val agentTools = parseTools(tools, runId)
-    val model = createModel(agentConfig)
-    val generateContentConfig = parseGenerationConfig(options)
     val agent = LlmAgent(
       name = agentConfig.name,
       description = agentConfig.description,
-      model = model,
+      model = GenaiPrompt.create(NanoSingleTextPrompt(preparedNano(agentConfig.nano))),
       instruction = agentConfig.instruction?.let { Instruction(it) },
-      tools = agentTools,
-      generateContentConfig = generateContentConfig,
+      generateContentConfig = parseGenerationConfig(options),
     )
 
     val sessionService = InMemorySessionService()
@@ -321,36 +270,9 @@ class AdkAgentRunner(
     )
   }
 
-  private suspend fun createModel(config: AgentConfig): Model {
-    return when (config.modelType) {
-      "genai-nano" ->
-        GenaiPrompt.create(NanoSingleTextPrompt(preparedNano(config.nano)), config.modelName)
-      else -> Gemini(name = config.modelName, apiKey = config.apiKey)
-    }
-  }
-
+  /** ADK's ML Kit model passes on temperature, topK, maxOutputTokens and thinking. */
   private fun parseGenerationConfig(options: ReadableMap?): GenerateContentConfig? {
     if (options == null) return null
-
-    val responseFormat = options.getMap("responseFormat")
-    val responseSchema =
-      responseFormat?.getMap("schema")?.let { schema ->
-        try {
-          AdkSchema.fromReadableMap(schema)
-        } catch (error: Exception) {
-          throw AdkErrors.AdkException(
-            AdkErrors.INVALID_SCHEMA,
-            "Unsupported response schema: ${error.message}",
-            error,
-          )
-        }
-      }
-
-    val responseMimeType = when {
-      responseFormat?.hasKey("mimeType") == true -> responseFormat.getString("mimeType")
-      responseFormat?.getString("type") == "json" -> "application/json"
-      else -> null
-    }
 
     val thinkingConfig =
       options.getMap("thinking")?.let { thinking ->
@@ -363,19 +285,7 @@ class AdkAgentRunner(
     return GenerateContentConfig(
       temperature = options.takeIf { it.hasKey("temperature") }?.getDouble("temperature")?.toFloat(),
       maxOutputTokens = options.takeIf { it.hasKey("maxTokens") }?.getInt("maxTokens"),
-      topP = options.takeIf { it.hasKey("topP") }?.getDouble("topP")?.toFloat(),
       topK = options.takeIf { it.hasKey("topK") }?.getDouble("topK")?.toFloat()?.toInt(),
-      seed = options.takeIf { it.hasKey("seed") }?.getDouble("seed")?.toInt(),
-      stopSequences =
-        options.getArray("stopSequences")?.let { array ->
-          (0 until array.size()).mapNotNull { index -> array.getString(index) }
-        },
-      presencePenalty =
-        options.takeIf { it.hasKey("presencePenalty") }?.getDouble("presencePenalty")?.toFloat(),
-      frequencyPenalty =
-        options.takeIf { it.hasKey("frequencyPenalty") }?.getDouble("frequencyPenalty")?.toFloat(),
-      responseMimeType = responseMimeType,
-      responseSchema = responseSchema,
       thinkingConfig = thinkingConfig,
     )
   }
@@ -435,67 +345,21 @@ class AdkAgentRunner(
     context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
       ?: throw IllegalArgumentException("Cannot read file: $uri")
 
-  private fun parseTools(tools: ReadableArray?, runId: String): List<ReactNativeFunctionTool> {
-    if (tools == null) return emptyList()
-
-    val parsed = mutableListOf<ReactNativeFunctionTool>()
-    for (index in 0 until tools.size()) {
-      val tool = tools.getMap(index) ?: continue
-      val name = tool.getString("name") ?: continue
-      val parameterSchema =
-        tool.getMap("inputSchema")?.let { schemaMap ->
-          try {
-            AdkSchema.fromReadableMap(schemaMap)
-          } catch (error: Exception) {
-            throw AdkErrors.AdkException(
-              AdkErrors.INVALID_SCHEMA,
-              "Unsupported input schema for tool $name: ${error.message}",
-              error,
-            )
-          }
-        }
-
-      parsed.add(
-        ReactNativeFunctionTool(
-          name = name,
-          description = tool.getString("description") ?: "",
-          parameterSchema = parameterSchema,
-          runId = runId,
-          onToolCall = onToolCall,
-        )
-      )
-    }
-
-    return parsed
-  }
-
-  // JS always sends the name and model, with defaults applied
-  private fun parseAgentConfig(config: ReadableMap): AgentConfig {
-    fun ReadableMap.require(key: String) =
-      getString(key) ?: throw IllegalArgumentException("Agent config requires $key")
-
-    val model = config.getMap("model")
-      ?: throw IllegalArgumentException("Agent config requires a model")
-
-    return AgentConfig(
-      name = config.require("name"),
+  // JS always sends the name, with defaults applied
+  private fun parseAgentConfig(config: ReadableMap): AgentConfig =
+    AgentConfig(
+      name = config.getString("name")
+        ?: throw IllegalArgumentException("Agent config requires a name"),
       description = config.getString("description") ?: "",
       instruction = config.getString("instruction"),
-      modelType = model.require("type"),
-      modelName = model.require("name"),
-      apiKey = model.getString("apiKey"),
-      nano = NanoConfig.from(model.getMap("nano")),
+      nano = NanoConfig.from(config.getMap("nano")),
     )
-  }
 }
 
 data class AgentConfig(
   val name: String,
   val description: String,
   val instruction: String?,
-  val modelType: String,
-  val modelName: String,
-  val apiKey: String?,
   val nano: NanoConfig,
 )
 

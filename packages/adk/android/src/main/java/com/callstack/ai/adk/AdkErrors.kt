@@ -10,7 +10,6 @@ object AdkErrors {
   const val DOWNLOAD_FAILED = "DOWNLOAD_FAILED"
   const val GENERATION_ERROR = "GENERATION_ERROR"
   const val INVALID_MESSAGE = "INVALID_MESSAGE"
-  const val INVALID_SCHEMA = "INVALID_SCHEMA"
   const val CONTEXT_WINDOW_EXCEEDED = "CONTEXT_WINDOW_EXCEEDED"
   const val RATE_LIMITED = "RATE_LIMITED"
   const val BACKGROUND_USE_BLOCKED = "BACKGROUND_USE_BLOCKED"
@@ -29,14 +28,7 @@ object AdkErrors {
       }
       current = current.cause
     }
-
-    // Cloud Gemini surfaces HTTP status codes in the message
-    val message = error.message.orEmpty()
-    return when {
-      message.contains("RESOURCE_EXHAUSTED") || message.contains("429") -> RATE_LIMITED
-      message.contains("exceeds the maximum number of tokens") -> CONTEXT_WINDOW_EXCEEDED
-      else -> GENERATION_ERROR
-    }
+    return GENERATION_ERROR
   }
 
   private fun codeFor(error: GenAiException): String =

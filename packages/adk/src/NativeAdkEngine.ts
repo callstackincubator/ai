@@ -15,8 +15,6 @@ export interface AdkMessage {
   parts?: AdkMessagePart[]
 }
 
-export type AdkModelType = 'gemini' | 'genai-nano'
-
 export interface AdkNanoModelConfig {
   /** `stable` (default) or `preview`, which needs the AICore developer preview */
   releaseStage?: 'stable' | 'preview'
@@ -28,36 +26,13 @@ export interface AdkAgentConfig {
   name: string
   description?: string
   instruction?: string
-  model: {
-    type: AdkModelType
-    name: string
-    apiKey?: string
-    nano?: AdkNanoModelConfig
-  }
-}
-
-export interface AdkTool {
-  name: string
-  description: string
-  inputSchema?: CodegenTypes.UnsafeObject
-}
-
-export interface AdkResponseFormat {
-  type: 'json'
-  mimeType?: string
-  schema?: CodegenTypes.UnsafeObject
+  nano?: AdkNanoModelConfig
 }
 
 export interface AdkGenerationOptions {
   temperature?: number
   maxTokens?: number
-  topP?: number
   topK?: number
-  seed?: number
-  stopSequences?: string[]
-  presencePenalty?: number
-  frequencyPenalty?: number
-  responseFormat?: AdkResponseFormat
   /** Thinking on/off with an optional budget. Gemini Nano only supports on/off */
   thinking?: {
     includeThoughts: boolean
@@ -73,24 +48,10 @@ export interface AdkUsageMetadata {
   cachedContentTokenCount?: number
 }
 
-export interface AdkToolCallRecord {
-  toolCallId: string
-  toolName: string
-  input: string
-}
-
-export interface AdkToolResultRecord {
-  toolCallId: string
-  toolName: string
-  output: string
-}
-
 export interface AdkGeneratedMessage {
   role: AdkMessageRole
   content: string
   reasoning?: string
-  toolCalls?: AdkToolCallRecord[]
-  toolResults?: AdkToolResultRecord[]
   finishReason?: string
   usage?: AdkUsageMetadata
 }
@@ -120,24 +81,6 @@ export interface StreamErrorEvent {
   code?: string
 }
 
-export interface StreamToolCallEvent {
-  streamId: string
-  phase: 'start' | 'delta' | 'end' | 'result'
-  toolCallId: string
-  toolName?: string
-  inputDelta?: string
-  input?: string
-  output?: string
-}
-
-export interface ToolCallEvent {
-  /** The `generateText` or `streamText` run that called the tool */
-  runId: string
-  toolCallId: string
-  toolName: string
-  arguments: string
-}
-
 export interface NanoDownloadProgressEvent {
   /** `started`, `progress` or `completed` */
   phase: string
@@ -146,10 +89,7 @@ export interface NanoDownloadProgressEvent {
 }
 
 export interface Spec extends TurboModule {
-  getModelInfo(
-    modelType: AdkModelType,
-    nano?: AdkNanoModelConfig
-  ): Promise<AdkNativeModelInfo>
+  getModelInfo(nano?: AdkNanoModelConfig): Promise<AdkNativeModelInfo>
   prepareNano(nano?: AdkNanoModelConfig): Promise<void>
   countTokens(text: string, nano?: AdkNanoModelConfig): Promise<number>
 
@@ -157,28 +97,22 @@ export interface Spec extends TurboModule {
     runId: string,
     messages: AdkMessage[],
     config: AdkAgentConfig,
-    options?: AdkGenerationOptions,
-    tools?: AdkTool[]
+    options?: AdkGenerationOptions
   ): Promise<AdkGeneratedMessage>
 
   streamText(
     streamId: string,
     messages: AdkMessage[],
     config: AdkAgentConfig,
-    options?: AdkGenerationOptions,
-    tools?: AdkTool[]
+    options?: AdkGenerationOptions
   ): Promise<void>
 
   /** Cancels a `streamText` or `generateText` run by its id */
   cancelStream(streamId: string): Promise<void>
-  /** `result` is JSON */
-  submitToolResult(runId: string, toolCallId: string, result: string): void
 
   onStreamUpdate: CodegenTypes.EventEmitter<StreamUpdateEvent>
   onStreamComplete: CodegenTypes.EventEmitter<StreamCompleteEvent>
   onStreamError: CodegenTypes.EventEmitter<StreamErrorEvent>
-  onStreamToolCall: CodegenTypes.EventEmitter<StreamToolCallEvent>
-  onToolCall: CodegenTypes.EventEmitter<ToolCallEvent>
   onNanoDownloadProgress: CodegenTypes.EventEmitter<NanoDownloadProgressEvent>
 }
 

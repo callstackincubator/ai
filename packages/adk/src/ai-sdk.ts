@@ -1,25 +1,15 @@
 import type {
-  JSONValue,
   LanguageModelV4,
   LanguageModelV4CallOptions,
   LanguageModelV4Content,
   LanguageModelV4FilePart,
   LanguageModelV4FinishReason,
-  LanguageModelV4FunctionTool,
   LanguageModelV4Prompt,
-  LanguageModelV4ProviderTool,
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
   SharedV4Warning,
 } from '@ai-sdk/provider'
-import {
-  generateId,
-  jsonSchema,
-  parseJSON,
-  resolveFullMediaType,
-  type Tool as FullToolDefinition,
-  type ToolExecutionOptions,
-} from '@ai-sdk/provider-utils'
+import { generateId, resolveFullMediaType } from '@ai-sdk/provider-utils'
 import { Platform } from 'react-native'
 
 import { AdkErrorCodes, createAdkError, toAdkError } from './errors'
@@ -28,49 +18,27 @@ import {
   type AdkGenerationOptions,
   type AdkMessage,
   type AdkMessagePart,
-  type AdkModelType,
   type AdkNanoModelConfig,
-  type AdkTool,
   type AdkUsageMetadata,
   getNativeAdkEngine,
   type NanoDownloadProgressEvent,
-  type StreamToolCallEvent,
-  type ToolCallEvent,
 } from './NativeAdkEngine'
 
-const DEFAULT_NANO_MODEL = 'gemini-nano'
-const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
-
-export type AdkToolDefinitionSet = Record<string, FullToolDefinition>
-
-/** `gemini-nano` runs on device, any other name is a cloud Gemini model */
-export type AdkLanguageModelId = 'gemini-nano' | (string & {})
+const MODEL_ID = 'gemini-nano'
 
 export interface AdkLanguageModelOptions {
-  /** `gemini-nano` (default) runs on device, any other id is a cloud Gemini model */
-  model?: AdkLanguageModelId
-  /** @deprecated Use `model`. Without a model, `gemini` uses `gemini-3.8-flash` */
-  modelType?: AdkModelType
-  /** @deprecated Use `model` */
-  modelName?: AdkLanguageModelId
   /** ADK agent name */
   name?: string
   /** ADK agent description */
   description?: string
   /** System instruction for the agent */
   instruction?: string
-  /** Gemini API key, required for `gemini` */
-  apiKey?: string
-  /** Tools whose `execute` handlers ADK can call */
-  availableTools?: AdkToolDefinitionSet
   /** Gemini Nano model selection */
   nano?: AdkNanoModelConfig
 }
 
 /** Per-call options passed as `providerOptions.adk` */
 export interface AdkProviderOptions {
-  /** Thinking token budget for cloud Gemini. `0` disables thinking */
-  thinkingBudget?: number
   /** Whether the model's thoughts come back as reasoning parts */
   includeThoughts?: boolean
 }
@@ -83,11 +51,7 @@ export type AdkModelAvailability =
   | 'unknown'
 
 export interface AdkModelInfo {
-  model: AdkLanguageModelId
-  modelType: AdkModelType
   availability: AdkModelAvailability
-  /** Whether `countTokens` works, which only Gemini Nano supports */
-  supportsTokenCounting: boolean
   /** Name of the Gemini Nano base model, when ML Kit reports it */
   baseModelName?: string
   /** Gemini Nano input token limit, when ML Kit reports it */
@@ -105,67 +69,22 @@ export interface AdkPrepareOptions {
 }
 
 export interface AdkLanguageModel extends LanguageModelV4 {
-  /** Downloads and initializes Gemini Nano, reporting progress. No-op for cloud models */
+  /** Downloads Gemini Nano when needed and loads it, reporting download progress */
   prepare: (options?: AdkPrepareOptions) => Promise<void>
-  updateTools: (tools: AdkToolDefinitionSet) => void
-  /** Counts tokens with the Gemini Nano tokenizer. Not available for cloud models */
+  /** Counts tokens with the Gemini Nano tokenizer */
   countTokens: (text: string) => Promise<number>
 }
 
 export interface AdkProvider {
-  (options?: AdkLanguageModelId | AdkLanguageModelOptions): AdkLanguageModel
+  (options?: AdkLanguageModelOptions): AdkLanguageModel
   readonly specificationVersion: 'v4'
-  languageModel: (
-    options?: AdkLanguageModelId | AdkLanguageModelOptions
-  ) => AdkLanguageModel
-  /**
-   * Whether the provider's model, or the default model of `modelType`, can be
-   * used now: its availability is `available` or `downloadable`
-   */
-  isAvailable: (modelType?: AdkModelType) => Promise<boolean>
-  /** Availability details for the provider's model, or for `model` */
+  languageModel: (options?: AdkLanguageModelOptions) => AdkLanguageModel
+  /** Whether Gemini Nano can be used now: it is `available` or `downloadable` */
+  isAvailable: () => Promise<boolean>
+  /** Gemini Nano's availability, for the provider's model selection or `nano` */
   getModelInfo: (options?: {
-    model?: AdkLanguageModelId
     nano?: AdkNanoModelConfig
   }) => Promise<AdkModelInfo>
-  /** @deprecated Check `(await getModelInfo()).availability` instead */
-  isNanoSupported: () => Promise<boolean>
-  /** @deprecated Use `prepare()` on a Gemini Nano model */
-  prepareNano: (options?: AdkPrepareOptions) => Promise<void>
-}
-
-type ResolvedModelOptions = Omit<
-  AdkLanguageModelOptions,
-  'model' | 'modelType' | 'modelName'
-> & {
-  model: string
-  modelType: AdkModelType
-}
-
-function resolveModelOptions(
-  defaults: AdkLanguageModelOptions,
-  options: AdkLanguageModelId | AdkLanguageModelOptions = {}
-): ResolvedModelOptions {
-  const overrides = typeof options === 'string' ? { model: options } : options
-  const {
-    model: defaultModel,
-    modelName: defaultModelName,
-    ...defaultRest
-  } = defaults
-  const { model, modelName, ...rest } = overrides
-  const merged = { ...defaultRest, ...rest }
-  const id = model ?? modelName ?? defaultModel ?? defaultModelName
-  const modelType =
-    merged.modelType ??
-    (id && id !== DEFAULT_NANO_MODEL ? 'gemini' : 'genai-nano')
-
-  return {
-    ...merged,
-    modelType,
-    model:
-      id ??
-      (modelType === 'gemini' ? DEFAULT_GEMINI_MODEL : DEFAULT_NANO_MODEL),
-  }
 }
 
 const toModelAvailability = (value: string): AdkModelAvailability => {
@@ -196,30 +115,19 @@ const listenForDownloadProgress = (
     : null
 
 async function getModelInfo(
-  { model, modelType }: ResolvedModelOptions,
   nano: AdkNanoModelConfig | undefined
 ): Promise<AdkModelInfo> {
-  const supportsTokenCounting = modelType === 'genai-nano'
-
   if (Platform.OS !== 'android') {
-    return {
-      model,
-      modelType,
-      availability: 'unavailable',
-      supportsTokenCounting,
-    }
+    return { availability: 'unavailable' }
   }
 
   const info = await getNativeAdkEngine()
-    .getModelInfo(modelType, nano)
+    .getModelInfo(nano)
     .catch((error: unknown) => {
       throw toAdkError(error)
     })
   return {
-    model,
-    modelType,
     availability: toModelAvailability(info.availability),
-    supportsTokenCounting,
     baseModelName: info.baseModelName,
     contextSize: info.contextSize,
   }
@@ -228,77 +136,24 @@ async function getModelInfo(
 export function createAdkProvider(
   defaults: AdkLanguageModelOptions = {}
 ): AdkProvider {
-  const createLanguageModel = (
-    options?: AdkLanguageModelId | AdkLanguageModelOptions
-  ): AdkLanguageModel =>
-    new AdkChatLanguageModel(resolveModelOptions(defaults, options))
+  const createLanguageModel = (options?: AdkLanguageModelOptions) =>
+    new AdkChatLanguageModel({ ...defaults, ...options })
 
-  const provider = function (
-    options?: AdkLanguageModelId | AdkLanguageModelOptions
-  ) {
+  const provider = function (options?: AdkLanguageModelOptions) {
     return createLanguageModel(options)
   }
   provider.specificationVersion = 'v4' as const
   provider.languageModel = createLanguageModel
-  provider.isAvailable = async (modelType?: AdkModelType) => {
-    const resolved = modelType
-      ? resolveModelOptions({}, { modelType })
-      : resolveModelOptions(defaults)
-    const { availability } = await getModelInfo(resolved, defaults.nano)
+  provider.isAvailable = async () => {
+    const { availability } = await getModelInfo(defaults.nano)
     return availability === 'available' || availability === 'downloadable'
   }
-  provider.getModelInfo = (
-    options: { model?: AdkLanguageModelId; nano?: AdkNanoModelConfig } = {}
-  ) =>
-    getModelInfo(
-      options.model
-        ? resolveModelOptions({}, options.model)
-        : resolveModelOptions(defaults),
-      options.nano ?? defaults.nano
-    )
-  provider.isNanoSupported = async () => {
-    const { availability } = await getModelInfo(
-      resolveModelOptions({}, DEFAULT_NANO_MODEL),
-      defaults.nano
-    )
-    return availability !== 'unavailable' && availability !== 'unknown'
-  }
-  provider.prepareNano = (options?: AdkPrepareOptions) =>
-    createLanguageModel({
-      model: DEFAULT_NANO_MODEL,
-      modelType: 'genai-nano',
-    }).prepare(options)
+  provider.getModelInfo = (options: { nano?: AdkNanoModelConfig } = {}) =>
+    getModelInfo(options.nano ?? defaults.nano)
   return provider
 }
 
 export const adk = createAdkProvider()
-
-type Tool = LanguageModelV4FunctionTool | LanguageModelV4ProviderTool
-
-const toolChoiceWarning: SharedV4Warning = {
-  type: 'unsupported',
-  feature: 'toolChoice',
-  details: 'ADK runs tools natively and cannot be required to call a tool.',
-}
-
-function prepareToolChoice(
-  tools: Tool[] = [],
-  toolChoice: LanguageModelV4CallOptions['toolChoice']
-): { tools: Tool[]; warnings: SharedV4Warning[] } {
-  switch (toolChoice?.type) {
-    case 'none':
-      return { tools: [], warnings: [] }
-    case 'required':
-      return { tools, warnings: [toolChoiceWarning] }
-    case 'tool':
-      return {
-        tools: tools.filter((tool) => tool.name === toolChoice.toolName),
-        warnings: [toolChoiceWarning],
-      }
-    default:
-      return { tools, warnings: [] }
-  }
-}
 
 // Gemini thinking budgets for the AI SDK reasoning levels
 const thinkingBudgets = {
@@ -314,14 +169,6 @@ function prepareThinking(
   reasoning: LanguageModelV4CallOptions['reasoning'],
   adkOptions: AdkProviderOptions
 ): AdkGenerationOptions['thinking'] {
-  if (adkOptions.thinkingBudget !== undefined) {
-    return {
-      includeThoughts:
-        adkOptions.includeThoughts ?? adkOptions.thinkingBudget !== 0,
-      budget: adkOptions.thinkingBudget,
-    }
-  }
-
   switch (reasoning) {
     case undefined:
     case 'provider-default':
@@ -389,11 +236,6 @@ const convertFinishReason = (
     unified = 'length'
   } else if (contentFilterReasons.has(finishReason)) {
     unified = 'content-filter'
-  } else if (
-    finishReason === 'MALFORMED_FUNCTION_CALL' ||
-    finishReason === 'UNEXPECTED_TOOL_CALL'
-  ) {
-    unified = 'error'
   }
 
   return {
@@ -454,17 +296,6 @@ const getAbortReason = (signal: AbortSignal) => {
   return error
 }
 
-const stringifyToolOutput = (value: unknown) =>
-  typeof value === 'string' ? value : JSON.stringify(value ?? null)
-
-const parseToolResult = (output: string): NonNullable<JSONValue> => {
-  try {
-    return (JSON.parse(output) as JSONValue) ?? {}
-  } catch {
-    return output
-  }
-}
-
 class AdkChatLanguageModel implements AdkLanguageModel {
   readonly specificationVersion = 'v4'
   readonly supportedUrls = {
@@ -472,82 +303,48 @@ class AdkChatLanguageModel implements AdkLanguageModel {
   }
 
   readonly provider = 'adk'
-  readonly modelId: string
+  readonly modelId = MODEL_ID
 
   private readonly agentConfig: AdkAgentConfig
-  private tools: AdkToolDefinitionSet = {}
-  private nanoPreparePromise: Promise<void> | null = null
+  private preparePromise: Promise<void> | null = null
 
-  constructor(options: ResolvedModelOptions) {
-    this.modelId = options.model
+  constructor(options: AdkLanguageModelOptions) {
     this.agentConfig = {
       name: options.name ?? 'react_native_adk_agent',
       description: options.description ?? 'React Native ADK agent',
       instruction: options.instruction,
-      model: {
-        type: options.modelType,
-        name: options.model,
-        apiKey: options.apiKey,
-        nano: options.nano,
-      },
+      nano: options.nano,
     }
-    this.updateTools(options.availableTools ?? {})
-  }
-
-  private get isNano() {
-    return this.agentConfig.model.type === 'genai-nano'
-  }
-
-  updateTools(tools: AdkToolDefinitionSet) {
-    this.tools = tools
   }
 
   async prepare(options: AdkPrepareOptions = {}): Promise<void> {
-    if (!this.isNano) {
-      return
-    }
-
     const listener = listenForDownloadProgress(options.onProgress)
     try {
-      await this.ensureNanoPrepared()
+      await this.ensurePrepared()
     } finally {
       listener?.remove()
     }
   }
 
   async countTokens(text: string): Promise<number> {
-    if (!this.isNano) {
-      throw createAdkError(
-        'Token counting is only available for Gemini Nano.',
-        AdkErrorCodes.ModelUnavailable
-      )
-    }
-
     try {
-      return await getNativeAdkEngine().countTokens(
-        text,
-        this.agentConfig.model.nano
-      )
+      return await getNativeAdkEngine().countTokens(text, this.agentConfig.nano)
     } catch (error) {
       throw toAdkError(error)
     }
   }
 
-  private ensureNanoPrepared(): Promise<void> {
-    if (!this.isNano) {
-      return Promise.resolve()
-    }
-
-    if (!this.nanoPreparePromise) {
-      this.nanoPreparePromise = getNativeAdkEngine()
-        .prepareNano(this.agentConfig.model.nano)
+  private ensurePrepared(): Promise<void> {
+    if (!this.preparePromise) {
+      this.preparePromise = getNativeAdkEngine()
+        .prepareNano(this.agentConfig.nano)
         .catch((error: unknown) => {
-          this.nanoPreparePromise = null
+          this.preparePromise = null
           throw toAdkError(error)
         })
     }
 
-    return this.nanoPreparePromise
+    return this.preparePromise
   }
 
   private prepareMessages(
@@ -576,29 +373,18 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       }
 
       if (message.role === 'assistant') {
-        // ADK replays history as text, so earlier tool steps become text too
         const content = message.content
           .flatMap((part) => {
             switch (part.type) {
               case 'text':
                 return [part.text]
-              case 'tool-call':
-                return [
-                  `[Tool call: ${part.toolName}(${stringifyToolOutput(part.input)})]`,
-                ]
-              case 'tool-result':
-                return [
-                  `[Tool result for ${part.toolName}: ${stringifyToolOutput(
-                    'value' in part.output ? part.output.value : part.output
-                  )}]`,
-                ]
               case 'reasoning':
                 return []
               default:
                 warnings.push({
                   type: 'unsupported',
                   feature: `assistant ${part.type} parts`,
-                  details: 'ADK replays assistant messages as text only.',
+                  details: 'Gemini Nano only takes text history.',
                 })
                 return []
             }
@@ -608,24 +394,12 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         return [{ role: 'assistant', content }]
       }
 
-      if (message.role === 'tool') {
-        const content = message.content
-          .filter((part) => part.type === 'tool-result')
-          .map((part) => {
-            if (part.output.type === 'execution-denied') {
-              return part.output.reason ?? 'Execution denied'
-            }
-            return stringifyToolOutput(part.output.value)
-          })
-          .join('\n')
-
-        return [{ role: 'user', content }]
-      }
-
-      throw createAdkError(
-        'Unsupported message role for ADK provider',
-        AdkErrorCodes.InvalidMessage
-      )
+      warnings.push({
+        type: 'unsupported',
+        feature: 'tool messages',
+        details: "ADK's ML Kit model has no tool calling for Gemini Nano.",
+      })
+      return []
     })
   }
 
@@ -654,171 +428,52 @@ class AdkChatLanguageModel implements AdkLanguageModel {
     const adkOptions = (options.providerOptions?.adk ??
       {}) as AdkProviderOptions
 
-    if (this.isNano) {
-      // ADK's ML Kit model only passes on temperature, topK and maxOutputTokens
-      const unsupported = {
-        topP: options.topP,
-        seed: options.seed,
-        stopSequences: options.stopSequences,
-        presencePenalty: options.presencePenalty,
-        frequencyPenalty: options.frequencyPenalty,
-        // ADK's ML Kit model has no response schema or JSON mode
-        responseFormat:
-          options.responseFormat?.type === 'json' ? 'json' : undefined,
-      }
-      for (const [feature, value] of Object.entries(unsupported)) {
-        if (value !== undefined) {
-          warnings.push({
-            type: 'unsupported',
-            feature,
-            details: 'Gemini Nano does not support this setting.',
-          })
-        }
+    // ADK's ML Kit model only passes on temperature, topK, maxOutputTokens
+    // and thinking, and has no tool calling or JSON mode
+    const unsupported = {
+      topP: options.topP,
+      seed: options.seed,
+      stopSequences: options.stopSequences,
+      presencePenalty: options.presencePenalty,
+      frequencyPenalty: options.frequencyPenalty,
+      responseFormat:
+        options.responseFormat?.type === 'json' ? 'json' : undefined,
+      tools: options.tools?.length ? options.tools : undefined,
+    }
+    for (const [feature, value] of Object.entries(unsupported)) {
+      if (value !== undefined) {
+        warnings.push({
+          type: 'unsupported',
+          feature,
+          details: 'Gemini Nano does not support this setting.',
+        })
       }
     }
 
     return {
       temperature: options.temperature,
       maxTokens: options.maxOutputTokens,
-      topP: options.topP,
       topK: options.topK,
-      seed: options.seed,
-      stopSequences: options.stopSequences,
-      presencePenalty: options.presencePenalty,
-      frequencyPenalty: options.frequencyPenalty,
-      responseFormat:
-        options.responseFormat?.type === 'json' && !this.isNano
-          ? {
-              type: 'json',
-              mimeType: 'application/json',
-              schema: options.responseFormat.schema,
-            }
-          : undefined,
       thinking: prepareThinking(options.reasoning, adkOptions),
     }
   }
 
-  private prepareTools(tools: Tool[], warnings: SharedV4Warning[]) {
-    if (this.isNano && tools.length > 0) {
-      warnings.push({
-        type: 'unsupported',
-        feature: 'tools',
-        details: "ADK's ML Kit model has no tool calling for Gemini Nano.",
-      })
-      return []
-    }
-
-    const functionTools = tools.filter(
-      (tool): tool is LanguageModelV4FunctionTool => {
-        if (tool.type === 'function') {
-          return true
-        }
-        warnings.push({
-          type: 'unsupported',
-          feature: `provider-defined tool ${tool.name}`,
-        })
-        return false
-      }
-    )
-
-    for (const tool of functionTools) {
-      if (!this.tools[tool.name]?.execute) {
-        warnings.push({
-          type: 'other',
-          message: `Tool "${tool.name}" has no executor. Pass it to createAdkProvider via availableTools so ADK can run it.`,
-        })
-      }
-    }
-
-    return functionTools.map(
-      (tool): AdkTool => ({
-        name: tool.name,
-        description: tool.description ?? '',
-        inputSchema: tool.inputSchema,
-      })
-    )
-  }
-
-  private async executeTool(
-    tool: LanguageModelV4FunctionTool,
-    event: ToolCallEvent
-  ) {
-    const execute = this.tools[tool.name]?.execute
-    if (!execute) {
-      return { error: `Tool "${tool.name}" is not available in this app.` }
-    }
-
-    const input = await parseJSON({
-      text: event.arguments,
-      schema: jsonSchema(tool.inputSchema),
-    })
-    const options: ToolExecutionOptions<unknown> = {
-      toolCallId: event.toolCallId,
-      messages: [],
-      context: undefined,
-    }
-    return execute(input, options)
-  }
-
   private prepareCall(options: LanguageModelV4CallOptions) {
-    const { tools, warnings } = prepareToolChoice(
-      options.tools,
-      options.toolChoice
-    )
+    const warnings: SharedV4Warning[] = []
     const messages = this.prepareMessages(options.prompt, warnings)
     const generationOptions = this.prepareGenerationOptions(options, warnings)
 
     return {
       messages,
       generationOptions,
-      tools,
-      nativeTools: this.prepareTools(tools, warnings),
       agentConfig: this.prepareAgentConfig(options),
       warnings,
     }
   }
 
-  // Runs the tools that native code calls during `runId`
-  private listenForToolCalls(runId: string, tools: Tool[]) {
-    const native = getNativeAdkEngine()
-
-    return native.onToolCall(async (event: ToolCallEvent) => {
-      if (event.runId !== runId) {
-        return
-      }
-
-      const tool = tools.find(
-        (candidate): candidate is LanguageModelV4FunctionTool =>
-          candidate.type === 'function' && candidate.name === event.toolName
-      )
-      let result: unknown
-      try {
-        result = tool
-          ? await this.executeTool(tool, event)
-          : { error: `Tool not found: ${event.toolName}` }
-      } catch (error) {
-        result = {
-          error: error instanceof Error ? error.message : String(error),
-        }
-      }
-      // Always JSON, so native code can tell strings from other values
-      native.submitToolResult(
-        runId,
-        event.toolCallId,
-        JSON.stringify(result ?? null)
-      )
-    })
-  }
-
   async doGenerate(options: LanguageModelV4CallOptions) {
-    const {
-      messages,
-      generationOptions,
-      tools,
-      nativeTools,
-      agentConfig,
-      warnings,
-    } = this.prepareCall(options)
+    const { messages, generationOptions, agentConfig, warnings } =
+      this.prepareCall(options)
     const runId = generateId()
     const native = getNativeAdkEngine()
     const abortSignal = options.abortSignal
@@ -832,41 +487,21 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         .cancelStream(runId)
         .catch((error) => console.warn('[adk] cancel failed:', error))
     }
-
-    const toolListener = this.listenForToolCalls(runId, tools)
     abortSignal?.addEventListener('abort', onAbort, { once: true })
 
     try {
-      await this.ensureNanoPrepared()
+      await this.ensurePrepared()
 
       const response = await native.generateText(
         runId,
         messages,
         agentConfig,
-        generationOptions,
-        nativeTools
+        generationOptions
       )
 
       const content: LanguageModelV4Content[] = []
       if (response.reasoning) {
         content.push({ type: 'reasoning', text: response.reasoning })
-      }
-      for (const toolCall of response.toolCalls ?? []) {
-        content.push({
-          type: 'tool-call',
-          toolCallId: toolCall.toolCallId,
-          toolName: toolCall.toolName,
-          input: toolCall.input,
-          providerExecuted: true,
-        })
-      }
-      for (const toolResult of response.toolResults ?? []) {
-        content.push({
-          type: 'tool-result',
-          toolCallId: toolResult.toolCallId,
-          toolName: toolResult.toolName,
-          result: parseToolResult(toolResult.output),
-        })
       }
       content.push({ type: 'text', text: response.content })
 
@@ -883,19 +518,12 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       throw toAdkError(error)
     } finally {
       abortSignal?.removeEventListener('abort', onAbort)
-      toolListener.remove()
     }
   }
 
   async doStream(options: LanguageModelV4CallOptions) {
-    const {
-      messages,
-      generationOptions,
-      tools,
-      nativeTools,
-      agentConfig,
-      warnings,
-    } = this.prepareCall(options)
+    const { messages, generationOptions, agentConfig, warnings } =
+      this.prepareCall(options)
     const streamId = generateId()
     const native = getNativeAdkEngine()
     const abortSignal = options.abortSignal
@@ -912,8 +540,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
 
     let listeners: { remove(): void }[] = []
     let cleanedUp = false
-    const toolListener = this.listenForToolCalls(streamId, tools)
-    const toolNames = new Map<string, string>()
 
     let onAbort = () => {}
 
@@ -927,7 +553,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
       })
       listeners = []
       abortSignal?.removeEventListener('abort', onAbort)
-      toolListener.remove()
     }
 
     const cancelNative = () => {
@@ -999,60 +624,6 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         )
 
         addListener(
-          native.onStreamToolCall((data: StreamToolCallEvent) => {
-            if (data.streamId !== streamId) {
-              return
-            }
-
-            if (data.phase === 'start' && data.toolName) {
-              closeReasoning()
-              toolNames.set(data.toolCallId, data.toolName)
-              controller.enqueue({
-                type: 'tool-input-start',
-                id: data.toolCallId,
-                toolName: data.toolName,
-                providerExecuted: true,
-              })
-              return
-            }
-
-            if (data.phase === 'delta' && data.inputDelta) {
-              controller.enqueue({
-                type: 'tool-input-delta',
-                id: data.toolCallId,
-                delta: data.inputDelta,
-              })
-              return
-            }
-
-            if (data.phase === 'end' && data.toolName && data.input) {
-              controller.enqueue({
-                type: 'tool-input-end',
-                id: data.toolCallId,
-              })
-              controller.enqueue({
-                type: 'tool-call',
-                toolCallId: data.toolCallId,
-                toolName: data.toolName,
-                input: data.input,
-                providerExecuted: true,
-              })
-              return
-            }
-
-            if (data.phase === 'result' && data.output !== undefined) {
-              controller.enqueue({
-                type: 'tool-result',
-                toolCallId: data.toolCallId,
-                toolName:
-                  data.toolName ?? toolNames.get(data.toolCallId) ?? 'unknown',
-                result: parseToolResult(data.output),
-              })
-            }
-          })
-        )
-
-        addListener(
           native.onStreamComplete((data) => {
             if (data.streamId !== streamId) {
               return
@@ -1085,14 +656,13 @@ class AdkChatLanguageModel implements AdkLanguageModel {
         )
 
         try {
-          await this.ensureNanoPrepared()
+          await this.ensurePrepared()
 
           await native.streamText(
             streamId,
             messages,
             agentConfig,
-            generationOptions,
-            nativeTools
+            generationOptions
           )
         } catch (error) {
           cleanup()

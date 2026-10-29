@@ -26,16 +26,6 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val runner = AdkAgentRunner(
     context = reactContext,
-    onToolCall = { runId, toolCallId, toolName, arguments ->
-      emitOnToolCall(
-        Arguments.createMap().apply {
-          putString("runId", runId)
-          putString("toolCallId", toolCallId)
-          putString("toolName", toolName)
-          putString("arguments", arguments)
-        },
-      )
-    },
     onDownloadProgress = { phase, bytesDownloaded, bytesToDownload ->
       emitOnNanoDownloadProgress(
         Arguments.createMap().apply {
@@ -54,10 +44,10 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     reject(AdkErrors.codeFor(error), error.message ?: "Unknown ADK error", error)
   }
 
-  override fun getModelInfo(modelType: String, nano: ReadableMap?, promise: Promise) {
+  override fun getModelInfo(nano: ReadableMap?, promise: Promise) {
     scope.launch {
       try {
-        val info = runner.getModelInfo(modelType, NanoConfig.from(nano))
+        val info = runner.getModelInfo(NanoConfig.from(nano))
         promise.resolve(
           Arguments.createMap().apply {
             putString("availability", info.availability)
@@ -97,45 +87,16 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     messages: ReadableArray,
     config: ReadableMap,
     options: ReadableMap?,
-    tools: ReadableArray?,
     promise: Promise,
   ) {
     // Started after it is tracked, so a run that ends at once is still removed
     val job = scope.launch(start = CoroutineStart.LAZY) {
       try {
-        val result = runner.generateText(messages, config, options, tools, runId)
+        val result = runner.generateText(messages, config, options)
         val response = Arguments.createMap().apply {
           putString("role", "assistant")
           putString("content", result.content)
           result.reasoning?.let { putString("reasoning", it) }
-          putArray(
-            "toolCalls",
-            Arguments.createArray().apply {
-              result.toolCalls.forEach { call ->
-                pushMap(
-                  Arguments.createMap().apply {
-                    putString("toolCallId", call.toolCallId)
-                    putString("toolName", call.toolName)
-                    putString("input", call.input)
-                  },
-                )
-              }
-            },
-          )
-          putArray(
-            "toolResults",
-            Arguments.createArray().apply {
-              result.toolResults.forEach { toolResult ->
-                pushMap(
-                  Arguments.createMap().apply {
-                    putString("toolCallId", toolResult.toolCallId)
-                    putString("toolName", toolResult.toolName)
-                    putString("output", toolResult.output)
-                  },
-                )
-              }
-            },
-          )
           result.finishReason?.let { putString("finishReason", it) }
           AdkUsage.toWritableMap(result.usage)?.let { putMap("usage", it) }
         }
@@ -144,7 +105,6 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         promise.rejectWithCode(error)
       } finally {
         activeRuns.remove(runId)
-        AdkToolBridge.cancel(runId)
       }
     }
     activeRuns[runId] = job
@@ -156,7 +116,6 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
     messages: ReadableArray,
     config: ReadableMap,
     options: ReadableMap?,
-    tools: ReadableArray?,
     promise: Promise,
   ) {
     if (activeRuns.containsKey(streamId)) {
@@ -176,17 +135,12 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         var emittedText = ""
         var currentTurnReasoning = ""
         var emittedReasoning = ""
-        val toolCallEmitter = AdkStreamToolCallEmitter(streamId) { args ->
-          emitOnStreamToolCall(args)
-        }
 
-        runner.streamText(messages, config, options, tools, streamId).collect { event ->
+        runner.streamText(messages, config, options).collect { event ->
           if (!isActive) return@collect
 
           totalUsage = AdkUsage.add(totalUsage, event)
           if (event.partial) event.usageMetadata?.let { partialUsage = it }
-          toolCallEmitter.handleEvent(event)
-          toolCallEmitter.handleResults(event)
 
           val reasoning = event.textParts(thoughts = true)
           if (reasoning.isNotEmpty()) {
@@ -207,13 +161,7 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
               if (text.startsWith(currentTurnText)) text else currentTurnText + text
           }
 
-          if (!event.partial && event.functionCalls().isNotEmpty()) {
-            // A tool call ends the turn, and the next turn starts with new text
-            currentTurnText = ""
-            emittedText = ""
-            currentTurnReasoning = ""
-            emittedReasoning = ""
-          } else if (currentTurnText.length > emittedText.length &&
+          if (currentTurnText.length > emittedText.length &&
             currentTurnText.startsWith(emittedText)
           ) {
             emitDelta(streamId, currentTurnText.substring(emittedText.length), "text")
@@ -233,7 +181,6 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
         emitOnStreamError(errorArgs)
       } finally {
         activeRuns.remove(streamId)
-        AdkToolBridge.cancel(streamId)
       }
     }
 
@@ -266,18 +213,12 @@ class NativeAdkEngineModule(reactContext: ReactApplicationContext) :
 
   override fun cancelStream(streamId: String, promise: Promise) {
     activeRuns.remove(streamId)?.cancel()
-    AdkToolBridge.cancel(streamId)
     promise.resolve(null)
-  }
-
-  override fun submitToolResult(runId: String, toolCallId: String, result: String) {
-    AdkToolBridge.submitResult(runId, toolCallId, result)
   }
 
   override fun invalidate() {
     activeRuns.values.forEach { it.cancel() }
     activeRuns.clear()
-    AdkToolBridge.cancelAll()
     scope.cancel()
     super.invalidate()
   }

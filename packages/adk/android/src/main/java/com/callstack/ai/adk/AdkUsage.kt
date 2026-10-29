@@ -18,10 +18,7 @@ object AdkUsage {
     }
   }
 
-  /**
-   * Usage of a whole run. A tool loop makes one model call per step, and each complete event
-   * carries the usage of its call, so the run's usage is their sum.
-   */
+  /** Usage of a whole run: the sum over its complete events, which carry their call's usage. */
   fun fromEvents(events: List<Event>): UsageMetadata? =
     events.filterNot { it.partial }.fold(null as UsageMetadata?) { total, event -> add(total, event) }
       ?: events.mapNotNull { it.usageMetadata }.lastOrNull()

@@ -9,7 +9,6 @@ export const AdkErrorCodes = {
   DownloadFailed: 'DOWNLOAD_FAILED',
   GenerationError: 'GENERATION_ERROR',
   InvalidMessage: 'INVALID_MESSAGE',
-  InvalidSchema: 'INVALID_SCHEMA',
   ContextWindowExceeded: 'CONTEXT_WINDOW_EXCEEDED',
   RateLimited: 'RATE_LIMITED',
   BackgroundUseBlocked: 'BACKGROUND_USE_BLOCKED',

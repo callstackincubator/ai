@@ -21,9 +21,7 @@ function createEmitter() {
 const onStreamUpdate = createEmitter()
 const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
-const onStreamToolCall = createEmitter()
 const onNanoDownloadProgress = createEmitter()
-const onToolCall = createEmitter()
 
 let generateTextResult: Record<string, unknown> = {
   content: 'ok',
@@ -35,8 +33,7 @@ const generateText = mock(
     _runId: string,
     _messages: unknown[],
     _config: unknown,
-    _options: unknown,
-    _tools: unknown
+    _options: unknown
   ): Promise<Record<string, unknown>> => generateTextResult
 )
 const streamText = mock(
@@ -44,16 +41,12 @@ const streamText = mock(
     _streamId: string,
     _messages: unknown[],
     _config: unknown,
-    _options: unknown,
-    _tools: unknown
+    _options: unknown
   ) => {}
 )
 const prepareNano = mock(async (_nano?: unknown) => {})
 const cancelStream = mock(async (_id: string) => {})
-const submitToolResult = mock(
-  (_runId: string, _toolCallId: string, _result: string) => {}
-)
-const getModelInfo = mock(async (_modelType: string, _nano?: unknown) => ({
+const getModelInfo = mock(async (_nano?: unknown) => ({
   availability: 'downloadable',
 }))
 
@@ -66,10 +59,7 @@ mock.module('react-native', () => ({
       prepareNano,
       cancelStream,
       getModelInfo,
-      onToolCall,
-      submitToolResult,
       onStreamUpdate,
-      onStreamToolCall,
       onStreamComplete,
       onStreamError,
       onNanoDownloadProgress,
@@ -79,7 +69,6 @@ mock.module('react-native', () => ({
 
 const { createAdkProvider } = await import('../ai-sdk')
 
-const gemini = createAdkProvider({ modelType: 'gemini' })()
 const nano = createAdkProvider()()
 
 // PNG signature followed by padding bytes
@@ -112,7 +101,7 @@ async function readAll(stream: ReadableStream<LanguageModelV4StreamPart>) {
 async function runStream(
   options: LanguageModelV4CallOptions,
   play: (streamId: string) => void,
-  model = gemini
+  model = nano
 ) {
   streamText.mockImplementationOnce(async (streamId: string) => {
     queueMicrotask(() => play(streamId))
@@ -126,56 +115,34 @@ beforeEach(() => {
   streamText.mockClear()
   prepareNano.mockClear()
   cancelStream.mockClear()
-  submitToolResult.mockClear()
+  getModelInfo.mockClear()
   generateTextResult = { content: 'ok', finishReason: 'STOP' }
 })
 
-describe('model resolution', () => {
-  test('defaults to on-device Gemini Nano', () => {
+describe('provider', () => {
+  test('creates Gemini Nano models', () => {
     expect(nano.modelId).toBe('gemini-nano')
+    expect(nano.provider).toBe('adk')
   })
 
-  test('defaults cloud Gemini to gemini-3.8-flash', () => {
-    expect(gemini.modelId).toBe('gemini-3.8-flash')
-  })
+  test('reports Gemini Nano availability', async () => {
+    getModelInfo.mockImplementationOnce(async () => ({
+      availability: 'available',
+      baseModelName: 'nano-v3',
+      contextSize: 4096,
+    }))
 
-  test('takes the model id as a model option', () => {
-    const provider = createAdkProvider({ model: 'gemini-3.5-flash-lite' })
-
-    expect(provider().modelId).toBe('gemini-3.5-flash-lite')
-    expect(provider({ modelName: 'gemini-nano' }).modelId).toBe('gemini-nano')
-  })
-
-  test('infers cloud Gemini from a model name', async () => {
-    const model = createAdkProvider()('gemini-4-argon')
-    await model.doGenerate(createCallOptions())
-
-    expect(lastGenerateCall()[2]).toMatchObject({
-      model: { type: 'gemini', name: 'gemini-4-argon' },
-    })
-  })
-
-  test('per-model options override provider defaults', () => {
-    const provider = createAdkProvider({ instruction: 'Be brief.' })
-    expect(provider({ model: 'gemini-4-argon' }).modelId).toBe('gemini-4-argon')
-    expect(provider.languageModel().modelId).toBe('gemini-nano')
-  })
-
-  test('reports model availability', async () => {
     expect(await createAdkProvider().getModelInfo()).toEqual({
-      model: 'gemini-nano',
-      modelType: 'genai-nano',
-      availability: 'downloadable',
-      supportsTokenCounting: true,
-      baseModelName: undefined,
-      contextSize: undefined,
+      availability: 'available',
+      baseModelName: 'nano-v3',
+      contextSize: 4096,
     })
   })
 
-  test('reports availability for another model', async () => {
-    await createAdkProvider().getModelInfo({ model: 'gemini-3.8-flash' })
+  test('passes the model selection to the availability check', async () => {
+    await createAdkProvider({ nano: { preference: 'fast' } }).getModelInfo()
 
-    expect(getModelInfo.mock.calls.at(-1)![0]).toBe('gemini')
+    expect(getModelInfo.mock.calls.at(-1)![0]).toEqual({ preference: 'fast' })
   })
 
   test('derives isAvailable from the model info', async () => {
@@ -191,10 +158,7 @@ describe('model resolution', () => {
 
 describe('prompt conversion', () => {
   test('moves system messages into the agent instruction', async () => {
-    const model = createAdkProvider({
-      modelType: 'gemini',
-      instruction: 'Be brief.',
-    })()
+    const model = createAdkProvider({ instruction: 'Be brief.' })()
     await model.doGenerate(
       createCallOptions({
         prompt: [
@@ -212,7 +176,7 @@ describe('prompt conversion', () => {
   })
 
   test('resolves top-level file media types to a full mime type', async () => {
-    await gemini.doGenerate(
+    await nano.doGenerate(
       createCallOptions({
         prompt: [
           {
@@ -246,7 +210,7 @@ describe('prompt conversion', () => {
   })
 
   test('passes local image URLs to native code', async () => {
-    await gemini.doGenerate(
+    await nano.doGenerate(
       createCallOptions({
         prompt: [
           {
@@ -273,8 +237,8 @@ describe('prompt conversion', () => {
     ])
   })
 
-  test('replays earlier tool steps as assistant text', async () => {
-    await gemini.doGenerate(
+  test('drops tool steps from the history with a warning', async () => {
+    const result = await nano.doGenerate(
       createCallOptions({
         prompt: [
           { role: 'user', content: [{ type: 'text', text: 'time?' }] },
@@ -285,13 +249,7 @@ describe('prompt conversion', () => {
                 type: 'tool-call',
                 toolCallId: '1',
                 toolName: 'getTime',
-                input: { city: 'Warsaw' },
-              },
-              {
-                type: 'tool-result',
-                toolCallId: '1',
-                toolName: 'getTime',
-                output: { type: 'json', value: { time: '10:00' } },
+                input: {},
               },
               { type: 'text', text: 'It is 10:00.' },
             ],
@@ -303,137 +261,17 @@ describe('prompt conversion', () => {
 
     expect(lastGenerateCall()[1][1]).toEqual({
       role: 'assistant',
-      content:
-        '[Tool call: getTime({"city":"Warsaw"})]\n[Tool result for getTime: {"time":"10:00"}]\nIt is 10:00.',
+      content: 'It is 10:00.',
     })
-  })
-})
-
-const weatherTool = {
-  type: 'function' as const,
-  name: 'getWeather',
-  inputSchema: {
-    type: 'object' as const,
-    properties: { city: { type: 'string' } },
-    required: ['city'],
-  },
-}
-
-describe('tool choice', () => {
-  test('sends no tools for toolChoice none', async () => {
-    await gemini.doGenerate(
-      createCallOptions({ tools: [weatherTool], toolChoice: { type: 'none' } })
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ feature: 'assistant tool-call parts' })
     )
-
-    expect(lastGenerateCall()[4]).toEqual([])
-  })
-
-  test('warns that required tool choice is unsupported', async () => {
-    const result = await gemini.doGenerate(
-      createCallOptions({ toolChoice: { type: 'required' } })
-    )
-
-    expect(result.warnings).toEqual([
-      {
-        type: 'unsupported',
-        feature: 'toolChoice',
-        details:
-          'ADK runs tools natively and cannot be required to call a tool.',
-      },
-    ])
-  })
-
-  test('limits tools to the chosen tool', async () => {
-    await gemini.doGenerate(
-      createCallOptions({
-        tools: [weatherTool, { ...weatherTool, name: 'getTime' }],
-        toolChoice: { type: 'tool', toolName: 'getTime' },
-      })
-    )
-
-    expect(
-      (lastGenerateCall()[4] as { name: string }[]).map((tool) => tool.name)
-    ).toEqual(['getTime'])
-  })
-
-  test('warns when a tool has no registered executor', async () => {
-    const result = await gemini.doGenerate(
-      createCallOptions({ tools: [weatherTool] })
-    )
-
-    expect(result.warnings).toContainEqual({
-      type: 'other',
-      message:
-        'Tool "getWeather" has no executor. Pass it to createAdkProvider via availableTools so ADK can run it.',
-    })
-  })
-})
-
-describe('tool execution', () => {
-  // Calls the tool from native code during the run, then waits for its result
-  async function callTool(
-    execute: (input: unknown, options: { toolCallId: string }) => unknown,
-    eventRunId = (runId: string) => runId
-  ) {
-    const model = createAdkProvider({
-      modelType: 'gemini',
-      availableTools: {
-        getWeather: { inputSchema: weatherTool.inputSchema, execute },
-      } as never,
-    })()
-    generateText.mockImplementationOnce(async (runId: string) => {
-      onToolCall.emit({
-        runId: eventRunId(runId),
-        toolCallId: 'adk-call-1',
-        toolName: 'getWeather',
-        arguments: '{"city":"Oslo"}',
-      })
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      return generateTextResult
-    })
-
-    await model.doGenerate(createCallOptions({ tools: [weatherTool] }))
-    return submitToolResult.mock.calls.at(-1)
-  }
-
-  test('runs the tool with the ADK tool call id', async () => {
-    const execute = mock(async () => ({ sky: 'clear' }))
-    const [, toolCallId, result] = (await callTool(execute))!
-
-    expect(execute.mock.calls[0]).toMatchObject([
-      { city: 'Oslo' },
-      { toolCallId: 'adk-call-1' },
-    ])
-    expect(toolCallId).toBe('adk-call-1')
-    expect(result).toBe('{"sky":"clear"}')
-  })
-
-  test('sends string results as JSON', async () => {
-    const [, , result] = (await callTool(async () => '42'))!
-
-    expect(result).toBe('"42"')
-  })
-
-  test('sends tool errors back to the model', async () => {
-    const [, , result] = (await callTool(async () => {
-      throw new Error('offline')
-    }))!
-
-    expect(result).toBe('{"error":"offline"}')
-  })
-
-  test('ignores tool calls from other runs', async () => {
-    const execute = mock(async () => 'ok')
-    await callTool(execute, () => 'other')
-
-    expect(execute).not.toHaveBeenCalled()
-    expect(submitToolResult).not.toHaveBeenCalled()
   })
 })
 
 describe('generation options', () => {
   test('maps reasoning levels to a thinking budget', async () => {
-    await gemini.doGenerate(createCallOptions({ reasoning: 'high' }))
+    await nano.doGenerate(createCallOptions({ reasoning: 'high' }))
 
     expect(lastGenerateCall()[3]).toMatchObject({
       thinking: { includeThoughts: true, budget: 24576 },
@@ -441,7 +279,7 @@ describe('generation options', () => {
   })
 
   test('disables thinking for reasoning none', async () => {
-    await gemini.doGenerate(createCallOptions({ reasoning: 'none' }))
+    await nano.doGenerate(createCallOptions({ reasoning: 'none' }))
 
     expect(lastGenerateCall()[3]).toMatchObject({
       thinking: { includeThoughts: false, budget: 0 },
@@ -449,44 +287,24 @@ describe('generation options', () => {
   })
 
   test('leaves thinking to the model by default', async () => {
-    await gemini.doGenerate(createCallOptions())
+    await nano.doGenerate(createCallOptions())
 
     expect((lastGenerateCall()[3] as { thinking?: unknown }).thinking).toBe(
       undefined
     )
   })
 
-  test('passes a response schema to cloud Gemini', async () => {
-    const schema = { type: 'object', properties: { name: { type: 'string' } } }
-    await gemini.doGenerate(
-      createCallOptions({ responseFormat: { type: 'json', schema } })
+  test('passes the settings Gemini Nano takes', async () => {
+    await nano.doGenerate(
+      createCallOptions({ temperature: 0.2, maxOutputTokens: 50, topK: 3 })
     )
 
-    expect(lastGenerateCall()[3]).toMatchObject({
-      responseFormat: { type: 'json', schema },
+    expect(lastGenerateCall()[3]).toEqual({
+      temperature: 0.2,
+      maxTokens: 50,
+      topK: 3,
+      thinking: undefined,
     })
-  })
-
-  test('warns that Gemini Nano has no JSON mode', async () => {
-    const schema = { type: 'object', properties: { name: { type: 'string' } } }
-    const result = await nano.doGenerate(
-      createCallOptions({ responseFormat: { type: 'json', schema } })
-    )
-
-    const [, , config, options] = lastGenerateCall() as [
-      string,
-      unknown,
-      { instruction?: string },
-      { responseFormat?: unknown },
-    ]
-    expect(config.instruction).toBe(undefined)
-    expect(options.responseFormat).toBe(undefined)
-    expect(result.warnings).toContainEqual(
-      expect.objectContaining({
-        type: 'unsupported',
-        feature: 'responseFormat',
-      })
-    )
   })
 
   test('warns about settings Gemini Nano ignores', async () => {
@@ -498,19 +316,45 @@ describe('generation options', () => {
       result.warnings.map((warning) => 'feature' in warning && warning.feature)
     ).toEqual(['topP', 'seed', 'stopSequences'])
   })
+
+  test('warns that JSON output is unsupported', async () => {
+    const result = await nano.doGenerate(
+      createCallOptions({ responseFormat: { type: 'json' } })
+    )
+
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'unsupported',
+        feature: 'responseFormat',
+      })
+    )
+  })
+
+  test('warns that tools are unsupported', async () => {
+    const result = await nano.doGenerate(
+      createCallOptions({
+        tools: [
+          {
+            type: 'function',
+            name: 'getWeather',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+      })
+    )
+
+    expect(lastGenerateCall()).toHaveLength(4)
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ type: 'unsupported', feature: 'tools' })
+    )
+  })
 })
 
 describe('doGenerate results', () => {
-  test('returns reasoning, provider-executed tool steps and text', async () => {
+  test('returns reasoning, text and usage', async () => {
     generateTextResult = {
       content: 'It is sunny.',
       reasoning: 'Check the weather.',
-      toolCalls: [
-        { toolCallId: '1', toolName: 'getWeather', input: '{"city":"Oslo"}' },
-      ],
-      toolResults: [
-        { toolCallId: '1', toolName: 'getWeather', output: '{"sky":"clear"}' },
-      ],
       finishReason: 'STOP',
       usage: {
         promptTokenCount: 10,
@@ -520,23 +364,10 @@ describe('doGenerate results', () => {
       },
     }
 
-    const result = await gemini.doGenerate(createCallOptions())
+    const result = await nano.doGenerate(createCallOptions())
 
     expect(result.content).toEqual([
       { type: 'reasoning', text: 'Check the weather.' },
-      {
-        type: 'tool-call',
-        toolCallId: '1',
-        toolName: 'getWeather',
-        input: '{"city":"Oslo"}',
-        providerExecuted: true,
-      },
-      {
-        type: 'tool-result',
-        toolCallId: '1',
-        toolName: 'getWeather',
-        result: { sky: 'clear' },
-      },
       { type: 'text', text: 'It is sunny.' },
     ])
     expect(result.usage.inputTokens).toEqual({
@@ -555,7 +386,7 @@ describe('doGenerate results', () => {
   test('maps safety finish reasons to content-filter', async () => {
     generateTextResult = { content: '', finishReason: 'SAFETY' }
 
-    const result = await gemini.doGenerate(createCallOptions())
+    const result = await nano.doGenerate(createCallOptions())
 
     expect(result.finishReason).toEqual({
       unified: 'content-filter',
@@ -568,7 +399,7 @@ describe('doGenerate results', () => {
       throw Object.assign(new Error('busy'), { code: 'RATE_LIMITED' })
     })
 
-    expect(gemini.doGenerate(createCallOptions())).rejects.toMatchObject({
+    expect(nano.doGenerate(createCallOptions())).rejects.toMatchObject({
       message: 'busy',
       code: 'RATE_LIMITED',
     })
@@ -581,7 +412,7 @@ describe('doGenerate results', () => {
       throw new Error('cancelled')
     })
 
-    const error = await gemini
+    const error = await nano
       .doGenerate(createCallOptions({ abortSignal: controller.signal }))
       .catch((caught: unknown) => caught)
 
@@ -591,29 +422,9 @@ describe('doGenerate results', () => {
 })
 
 describe('doStream', () => {
-  test('streams reasoning, tool steps and text', async () => {
+  test('streams reasoning and text', async () => {
     const parts = await runStream(createCallOptions(), (streamId) => {
       onStreamUpdate.emit({ streamId, delta: 'Thinking', kind: 'reasoning' })
-      onStreamToolCall.emit({
-        streamId,
-        phase: 'start',
-        toolCallId: '1',
-        toolName: 'getWeather',
-      })
-      onStreamToolCall.emit({
-        streamId,
-        phase: 'end',
-        toolCallId: '1',
-        toolName: 'getWeather',
-        input: '{}',
-      })
-      onStreamToolCall.emit({
-        streamId,
-        phase: 'result',
-        toolCallId: '1',
-        toolName: 'getWeather',
-        output: '{"sky":"clear"}',
-      })
       onStreamUpdate.emit({ streamId, delta: 'Sunny', kind: 'text' })
       onStreamComplete.emit({ streamId, finishReason: 'STOP' })
     })
@@ -623,41 +434,11 @@ describe('doStream', () => {
       'reasoning-start',
       'reasoning-delta',
       'reasoning-end',
-      'tool-input-start',
-      'tool-input-end',
-      'tool-call',
-      'tool-result',
       'text-start',
       'text-delta',
       'text-end',
       'finish',
     ])
-    expect(parts).toContainEqual({
-      type: 'tool-result',
-      toolCallId: '1',
-      toolName: 'getWeather',
-      result: { sky: 'clear' },
-    })
-  })
-
-  test('warns that Gemini Nano has no tool calling', async () => {
-    const result = await nano.doGenerate(
-      createCallOptions({
-        tools: [
-          {
-            type: 'function',
-            name: 'getWeather',
-            inputSchema: { type: 'object', properties: {} },
-          },
-        ],
-      })
-    )
-
-    const [, , , , tools] = lastGenerateCall() as unknown[]
-    expect(tools).toEqual([])
-    expect(result.warnings).toContainEqual(
-      expect.objectContaining({ type: 'unsupported', feature: 'tools' })
-    )
   })
 
   test('surfaces native stream errors with their code', async () => {
@@ -695,18 +476,6 @@ describe('Gemini Nano preparation', () => {
         bytesToDownload: undefined,
       },
     ])
-  })
-
-  test('keeps the deprecated prepareNano', async () => {
-    await createAdkProvider({ model: 'gemini-3.8-flash' }).prepareNano()
-
-    expect(prepareNano).toHaveBeenCalledTimes(1)
-  })
-
-  test('does not prepare cloud models', async () => {
-    await gemini.prepare()
-
-    expect(prepareNano).not.toHaveBeenCalled()
   })
 
   test('passes the model selection to native code', async () => {
