@@ -103,11 +103,6 @@ export default defineConfig({
           ['embeddings', 'Embeddings'],
           ['transcription', 'Transcription'],
         ]),
-        group('ADK', 'adk', [
-          ['getting-started', 'Getting started'],
-          ['generating', 'Generating'],
-          ['models', 'Models and availability'],
-        ]),
         group('Core AI', 'core-ai', [
           ['getting-started', 'Getting started'],
           ['generating', 'Generating'],
