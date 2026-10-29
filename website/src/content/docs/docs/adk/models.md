@@ -35,9 +35,21 @@ switch (info.availability) {
 When Gemini Nano is `available`, `getModelInfo()` also returns `baseModelName`
 and `contextSize`, its input token limit.
 
-`adk.isAvailable()` is the yes/no version: it's `true` when Gemini Nano is
-`available` or `downloadable`. Both are cheap, never download anything, and are
-safe to call at startup and again when the app resumes. See the
+`adk.isAvailable()` and `model.isAvailable()` are the yes/no version. Like
+`apple.isAvailable()`, they return a boolean synchronously, so UI code can call
+them directly:
+
+```typescript
+if (adk.isAvailable()) {
+  // Show Gemini Nano in the model picker
+}
+```
+
+ML Kit only reports Gemini Nano's status asynchronously, so the synchronous
+check uses the last status `getModelInfo()` or `prepare()` saw, or else whether
+AICore is installed. Call `getModelInfo()` for the exact state, such as whether
+Gemini Nano still needs a download. Neither call downloads anything, and both
+are safe at startup and again when the app resumes. See the
 [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device)
 for the supported devices.
 

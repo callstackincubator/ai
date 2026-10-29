@@ -76,7 +76,7 @@ Pass `adk()` to the AI SDK. Check that Gemini Nano can run on the device first:
 import { adk } from '@react-native-ai/adk'
 import { generateText } from 'ai'
 
-if (await adk.isAvailable()) {
+if (adk.isAvailable()) {
   const { text } = await generateText({
     model: adk(),
     prompt: 'Summarize on-device AI in one sentence.',
