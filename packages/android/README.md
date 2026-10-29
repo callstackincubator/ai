@@ -35,7 +35,7 @@ ML Kit only generates structured output for Kotlin classes compiled at build tim
 
 ## Documentation
 
-For complete installation instructions and API documentation, visit our [documentation site](https://react-native-ai.com/docs/android).
+For complete installation instructions and API documentation, visit our [documentation site](https://react-native-ai.com/docs/android/getting-started).
 
 ## License
 

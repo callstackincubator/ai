@@ -23,7 +23,8 @@ It covers:
 
 <PackageManagerTabs command="install @react-native-ai/android ai" />
 
-The AI SDK needs its [polyfills](/docs/polyfills).
+The AI SDK needs its [polyfills](/docs/polyfills). To define tools with zod
+schemas, as in the [tools](/docs/android/tools) examples, also install `zod`.
 
 ## Requirements
 
@@ -38,6 +39,12 @@ The AI SDK needs its [polyfills](/docs/polyfills).
 ## Native Setup
 
 ### Expo
+
+Install the config plugin:
+
+```bash
+npx expo install expo-build-properties
+```
 
 Set `minSdkVersion` and the Kotlin version with `expo-build-properties`:
 

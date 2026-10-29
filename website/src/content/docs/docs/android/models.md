@@ -70,5 +70,7 @@ const preview = createAndroidProvider({
   devices in the AICore developer preview
 - `preference`: `full` (default) favors quality, `fast` favors latency
 
-[Tool calling](/docs/android/tools) needs the preview release with `fast`.
+[Tool calling](/docs/android/tools) needs Gemini Nano 4: the preview release
+with `fast`, or the default model on devices that ship it, such as the Galaxy Z
+Flip 8 and Fold 8.
 `getModelInfo` and `isAvailable` take the same selection.

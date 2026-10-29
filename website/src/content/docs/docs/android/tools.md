@@ -9,7 +9,8 @@ Gemini Nano picks a function and its arguments, the AI SDK runs your tool's
 
 ## Requirements
 
-Function calling needs Gemini Nano 4, which ML Kit serves as the preview
+Function calling needs Gemini Nano 4. On the Samsung Galaxy Z Flip 8 and Fold 8,
+the default model is Gemini Nano 4. Elsewhere, ML Kit serves it as the preview
 release with the fast preference:
 
 - Select the model with `releaseStage: 'preview'` and `preference: 'fast'`.
