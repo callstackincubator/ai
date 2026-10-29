@@ -41,22 +41,21 @@ case "$TARGET" in
       echo 'Set HARNESS_ANDROID_DEVICE to the device model, as `adb shell getprop ro.product.model` shows it' >&2
       exit 1
     fi
-    # Harness runs the tests on the device of that model, so the build is
-    # installed on that same device: the one ANDROID_SERIAL names, or the only
-    # connected one
-    if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-      serials="$(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')"
-      if [[ "$(grep -c . <<< "$serials")" != 1 ]]; then
-        echo 'Connect one device, or set ANDROID_SERIAL to the one to test on' >&2
-        exit 1
+    # Harness runs the tests on the first connected device of that model and
+    # ignores ANDROID_SERIAL, so exactly one may be connected, and the build is
+    # installed on it
+    matching=()
+    for serial in $(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }'); do
+      model="$(adb -s "$serial" shell getprop ro.product.model | tr -d '\r')"
+      if [[ "$model" == "$HARNESS_ANDROID_DEVICE" ]]; then
+        matching+=("$serial")
       fi
-      export ANDROID_SERIAL="$serials"
-    fi
-    model="$(adb -s "$ANDROID_SERIAL" shell getprop ro.product.model | tr -d '\r')"
-    if [[ "$model" != "$HARNESS_ANDROID_DEVICE" ]]; then
-      echo "$ANDROID_SERIAL is a $model, not a $HARNESS_ANDROID_DEVICE" >&2
+    done
+    if [[ "${#matching[@]}" != 1 ]]; then
+      echo "Connect exactly one $HARNESS_ANDROID_DEVICE, found ${#matching[@]}" >&2
       exit 1
     fi
+    export ANDROID_SERIAL="${matching[0]}"
     npx expo prebuild --clean --platform android
     npx expo run:android --no-bundler --device "$ANDROID_SERIAL"
     HARNESS_PLATFORM=android npx react-native-harness --harnessRunner android "$@"
