@@ -252,11 +252,16 @@ class GeminiNano(
     // Gemini Nano without system prompt support, such as nano-v2, reads only the first text part
     // of a request, so it would answer the system instruction or the first turn and never see the
     // rest. Like ADK's NanoSingleTextPrompt, the system instruction and every turn's text become one
-    // part, after the images. Remove once ML Kit handles this (issue #364).
+    // part, after the images. Turns are labeled by role when there are several, so the model can
+    // tell its own earlier answers apart from the user's. Remove once ML Kit handles this (issue #364).
     val parts = contents.flatMap { it.parts }
     if ((parts.size > 1 || systemInstruction != null) && !supportsSystemPrompt(model, config)) {
-      val text = (listOfNotNull(systemInstruction) + parts.filterIsInstance<TextPart>().map { it.textString })
-        .joinToString("\n\n")
+      val turns = contents.mapNotNull { content ->
+        content.parts.filterIsInstance<TextPart>().joinToString("\n\n") { it.textString }
+          .takeIf { it.isNotEmpty() }
+          ?.let { if (contents.size > 1) "${if (content.role == Content.Role.MODEL) "Model" else "User"}: $it" else it }
+      }
+      val text = (listOfNotNull(systemInstruction) + turns).joinToString("\n\n")
       val images = parts.filterIsInstance<ImagePart>()
       contents = listOf(
         Content.builder()
