@@ -99,8 +99,9 @@ export default defineConfig({
           ['generating', 'Generating'],
           ['tools', 'Tools'],
           ['models', 'Models and availability'],
-          ['transcription', 'Transcription'],
+          ['errors', 'Error handling'],
           ['embeddings', 'Embeddings'],
+          ['transcription', 'Transcription'],
         ]),
         group('ADK', 'adk', [
           ['getting-started', 'Getting started'],

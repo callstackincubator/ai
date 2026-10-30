@@ -9,22 +9,20 @@ wraps Google's [ML Kit GenAI](https://developers.google.com/ml-kit/genai) librar
 directly. Android serves the models through AICore, so there's no model to
 bundle and no API key.
 
-It covers:
-
-- [Generating text](/docs/android/generating), streamed or not, with images,
-  system instructions and thinking mode (`genai-prompt`)
-- [Tool calling](/docs/android/tools) with your own AI SDK tools (`genai-prompt`
-  function calling, Gemini Nano 4)
-- [Transcription](/docs/android/transcription) of audio files
-  (`genai-speech-recognition`)
-- [Embeddings](/docs/android/embeddings) (`genai-embedding`)
+| Feature                                        | Model                          | ML Kit API                 |
+| ---------------------------------------------- | ------------------------------ | -------------------------- |
+| [Text generation](/docs/android/generating)    | `android()`                    | `genai-prompt`             |
+| [Tool calling](/docs/android/tools)            | `android()`, on Gemini Nano 4  | `genai-prompt`             |
+| [Embeddings](/docs/android/embeddings)         | `android.embeddingModel()`     | `genai-embedding`          |
+| [Transcription](/docs/android/transcription)   | `android.transcriptionModel()` | `genai-speech-recognition` |
 
 ## Installation
 
 <PackageManagerTabs command="install @react-native-ai/android ai" />
 
-The AI SDK needs its [polyfills](/docs/polyfills). To define tools with zod
-schemas, as in the [tools](/docs/android/tools) examples, also install `zod`.
+The provider works with AI SDK v7 and needs its [polyfills](/docs/polyfills).
+Examples with schemas, such as the [tools](/docs/android/tools) examples, also
+use `zod`.
 
 ## Requirements
 
@@ -93,21 +91,5 @@ if (android.isAvailable()) {
 }
 ```
 
-[Models and availability](/docs/android/models) covers the availability checks
+[Models & Availability](/docs/android/models) covers the availability checks
 and downloading Gemini Nano.
-
-## What's Not Supported
-
-The provider only wraps what ML Kit ships. These AI SDK features return an
-`unsupported` warning instead:
-
-- Structured output (`responseFormat: { type: 'json' }`, `Output.object`). ML
-  Kit only generates structured output for Kotlin classes compiled with its KSP
-  processor, not for a JSON Schema at runtime.
-- `topP`, `stopSequences`, `presencePenalty` and `frequencyPenalty`
-- `toolChoice: 'required'` and a specific tool. Gemini Nano decides whether to
-  call a function.
-
-ML Kit's agent library (`genai-agent`) only runs tools declared as Android
-App Functions at build time, so AI SDK tools go through the Prompt API's
-function calling instead.

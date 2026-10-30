@@ -1,5 +1,5 @@
 ---
-title: "Models and Availability"
+title: "Models & Availability"
 ---
 
 Gemini Nano comes with AICore, Android's system service for on-device models.

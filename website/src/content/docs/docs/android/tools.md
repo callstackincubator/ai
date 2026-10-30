@@ -7,6 +7,10 @@ AI SDK tools run through ML Kit's
 Gemini Nano picks a function and its arguments, the AI SDK runs your tool's
 `execute` in JavaScript, and sends the result back for the next step.
 
+ML Kit's agent library (`genai-agent`) only runs tools declared as Android App
+Functions at build time, so AI SDK tools go through the Prompt API's function
+calling instead.
+
 ## Requirements
 
 Function calling needs Gemini Nano 4. On the Samsung Galaxy Z Flip 8 and Fold 8,
