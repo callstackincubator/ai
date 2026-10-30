@@ -133,7 +133,7 @@ describe('provider', () => {
       availability: 'available',
       baseModelName: 'nano-v4',
       contextSize: 4000,
-      features: ['functionCalling'],
+      features: ['functionCalling', 'someFutureFeature'],
     }))
     const provider = createAndroidProvider({
       model: { releaseStage: 'preview', preference: 'fast' },
@@ -299,7 +299,7 @@ describe('doGenerate', () => {
   })
 
   test('sends tool calls and results as function parts', async () => {
-    await nano.doGenerate(
+    const { warnings } = await nano.doGenerate(
       createCallOptions({
         prompt: [
           { role: 'user', content: [{ type: 'text', text: 'Weather?' }] },
@@ -353,6 +353,13 @@ describe('doGenerate', () => {
         ],
       },
     ])
+    // The mocked model has no systemPrompt feature, so the history is merged
+    expect(warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'unsupported',
+        feature: 'tool call history',
+      })
+    )
   })
 
   test('sends tool call input given as a JSON string as is', async () => {

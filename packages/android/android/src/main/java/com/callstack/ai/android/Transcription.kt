@@ -31,13 +31,14 @@ class Transcription(
 ) {
   private val clients = ConcurrentHashMap<TranscriptionConfig, SpeechRecognizer>()
   private val prepared = ConcurrentHashMap.newKeySet<TranscriptionConfig>()
-  private val prepareMutex = Mutex()
+  // One lock per language and mode, so one download does not hold up another
+  private val prepareMutexes = ConcurrentHashMap<TranscriptionConfig, Mutex>()
 
   private fun client(config: TranscriptionConfig): SpeechRecognizer =
     clients.computeIfAbsent(config) {
       SpeechRecognition.getClient(
         speechRecognizerOptions {
-          locale = config.locale?.let(Locale::forLanguageTag) ?: Locale.getDefault()
+          locale = config.locale?.let(::locale) ?: Locale.getDefault()
           when (config.mode) {
             "basic" -> preferredMode = SpeechRecognizerOptions.Mode.MODE_BASIC
             "advanced" -> preferredMode = SpeechRecognizerOptions.Mode.MODE_ADVANCED
@@ -46,12 +47,21 @@ class Transcription(
       )
     }
 
+  // forLanguageTag returns an undefined locale for a tag it can't parse, such as en_US
+  private fun locale(tag: String): Locale =
+    Locale.forLanguageTag(tag).takeIf { it.language.isNotEmpty() }
+      ?: throw AndroidAIErrors.CodedException(
+        AndroidAIErrors.INVALID_MESSAGE,
+        "Not a BCP 47 language tag: $tag. Use a tag such as en-US",
+      )
+
   suspend fun getModelInfo(config: TranscriptionConfig): ModelInfo =
     ModelInfo(availability = availabilityOf(client(config).checkStatus()))
 
   /** Downloads the recognizer's model when needed, reporting progress, then warms it up. */
   suspend fun prepare(config: TranscriptionConfig) {
-    prepareMutex.withLock {
+    if (config in prepared) return
+    prepareMutexes.computeIfAbsent(config) { Mutex() }.withLock {
       if (config in prepared) return
 
       val recognizer = client(config)

@@ -55,7 +55,10 @@ export interface AndroidLanguageModelOptions {
 
 /** Per-call options passed as `providerOptions.android` */
 export interface AndroidProviderOptions {
-  /** Turns Gemini Nano's thinking mode on or off when `reasoning` is not set */
+  /**
+   * Turns Gemini Nano's thinking mode on or off when `reasoning` is not a
+   * level, that is when it is unset or `provider-default`
+   */
   enableThinking?: boolean
 }
 
@@ -147,11 +150,22 @@ const toModelAvailability = (value: string): AndroidModelAvailability => {
   }
 }
 
+const modelFeatures: readonly string[] = [
+  'systemPrompt',
+  'thinking',
+  'prefixCaching',
+  'structuredOutput',
+  'functionCalling',
+] satisfies AndroidModelFeature[]
+
+const isModelFeature = (value: string): value is AndroidModelFeature =>
+  modelFeatures.includes(value)
+
 const toModelInfo = (info: NativeModelInfo): AndroidModelInfo => ({
   availability: toModelAvailability(info.availability),
   baseModelName: info.baseModelName,
   contextSize: info.contextSize,
-  features: info.features as AndroidModelFeature[] | undefined,
+  features: info.features?.filter(isModelFeature),
 })
 
 const listenForDownloadProgress = (
@@ -543,6 +557,24 @@ function prepareRequest(
     options.prompt,
     warnings
   )
+  // Without system prompt support the native side merges the conversation
+  // into one text part, which leaves function parts out
+  if (
+    !features.includes('systemPrompt') &&
+    messages.some((message) =>
+      message.parts.some(
+        (part) =>
+          part.type === 'functionCall' || part.type === 'functionResponse'
+      )
+    )
+  ) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'tool call history',
+      details:
+        'This Gemini Nano model gets the conversation as one text prompt, so earlier tool calls and results are left out.',
+    })
+  }
 
   const request: NativeGenerateRequest = {
     messages,
@@ -613,6 +645,7 @@ class AndroidChatLanguageModel implements AndroidLanguageModel {
   }
 
   async countTokens(text: string): Promise<number> {
+    await this.ensurePrepared()
     try {
       return await getNativeAndroidAI().countTokens(text, this.model)
     } catch (error) {
@@ -852,12 +885,16 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
 
   /** Whether the recognizer for this language and mode is available, downloadable or downloading */
   async isAvailable(): Promise<boolean> {
-    const { availability } = await this.getModelInfo()
-    return (
-      availability === 'available' ||
-      availability === 'downloadable' ||
-      availability === 'downloading'
-    )
+    try {
+      const { availability } = await this.getModelInfo()
+      return (
+        availability === 'available' ||
+        availability === 'downloadable' ||
+        availability === 'downloading'
+      )
+    } catch {
+      return false
+    }
   }
 
   /** Downloads the recognizer's model when needed, reporting download progress */
