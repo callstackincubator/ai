@@ -845,10 +845,14 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
     }
   }
 
-  /** Whether the recognizer for this language and mode is available or downloadable */
+  /** Whether the recognizer for this language and mode is available, downloadable or downloading */
   async isAvailable(): Promise<boolean> {
     const { availability } = await this.getModelInfo()
-    return availability === 'available' || availability === 'downloadable'
+    return (
+      availability === 'available' ||
+      availability === 'downloadable' ||
+      availability === 'downloading'
+    )
   }
 
   /** Downloads the recognizer's model when needed, reporting download progress */

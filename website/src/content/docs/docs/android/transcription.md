@@ -33,7 +33,7 @@ empty.
 
 ```typescript
 if (await model.isAvailable()) {
-  // available or downloadable
+  // available, downloadable or downloading
 }
 
 const info = await model.getModelInfo()

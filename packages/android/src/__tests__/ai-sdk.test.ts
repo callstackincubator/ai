@@ -579,7 +579,11 @@ describe('other models', () => {
     getTranscriptionModelInfo.mockImplementationOnce(async () => ({
       availability: 'downloading',
     }))
+    getTranscriptionModelInfo.mockImplementationOnce(async () => ({
+      availability: 'unavailable',
+    }))
 
+    expect(await model.isAvailable()).toBe(true)
     expect(await model.isAvailable()).toBe(false)
     expect(await model.isAvailable()).toBe(true)
   })

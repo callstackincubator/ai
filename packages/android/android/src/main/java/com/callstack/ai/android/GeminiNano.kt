@@ -112,12 +112,12 @@ class GeminiNano(
     }
 
   /**
-   * Whether Gemini Nano is available or downloadable, answered without async work: from the last
+   * Whether Gemini Nano is available, downloadable or downloading, answered without async work: from the last
    * status this process saw, or else from whether AICore is installed.
    */
   fun isAvailable(config: NanoConfig): Boolean {
     statuses[config]?.let {
-      return it == FeatureStatus.AVAILABLE || it == FeatureStatus.DOWNLOADABLE
+      return it == FeatureStatus.AVAILABLE || it == FeatureStatus.DOWNLOADABLE || it == FeatureStatus.DOWNLOADING
     }
     return try {
       context.packageManager.getPackageInfo(AICORE_PACKAGE, 0)
