@@ -267,9 +267,11 @@ const convertFinishReason = (
 }
 
 const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
+  // One String.fromCharCode per byte stalls the JS thread on large images and audio
+  const chunkSize = 0x8000
   let binary = ''
-  for (let index = 0; index < bytes.length; index++) {
-    binary += String.fromCharCode(bytes[index])
+  for (let start = 0; start < bytes.length; start += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(start, start + chunkSize))
   }
   return btoa(binary)
 }
@@ -383,7 +385,10 @@ function prepareMessages(
                     type: 'functionCall',
                     id: part.toolCallId,
                     name: part.toolName,
-                    json: JSON.stringify(part.input ?? {}),
+                    json:
+                      typeof part.input === 'string'
+                        ? part.input
+                        : JSON.stringify(part.input ?? {}),
                   },
                 ]
               default:
@@ -934,14 +939,23 @@ class AndroidEmbeddingModel implements EmbeddingModelV4 {
   async doEmbed(
     options: EmbeddingModelV4CallOptions
   ): Promise<EmbeddingModelV4Result> {
+    const abortSignal = options.abortSignal
+    // ML Kit cannot stop an embedding once it starts, so abort is checked around the call
+    if (abortSignal?.aborted) {
+      throw getAbortReason(abortSignal)
+    }
+    let embeddings: number[][]
     try {
-      const embeddings = await getNativeAndroidAI().embed(
+      embeddings = await getNativeAndroidAI().embed(
         options.values,
         this.taskType
       )
-      return { embeddings, warnings: [] }
     } catch (error) {
       throw toAndroidAIError(error)
     }
+    if (abortSignal?.aborted) {
+      throw getAbortReason(abortSignal)
+    }
+    return { embeddings, warnings: [] }
   }
 }

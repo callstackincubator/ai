@@ -5,6 +5,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableMap
 import com.google.mlkit.genai.common.FunctionCall
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
@@ -42,8 +44,12 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
     reject(AndroidAIErrors.codeFor(error), error.message ?: "Unknown ML Kit error", error)
   }
 
+  private fun invalidated() = IllegalStateException("The AndroidAI module was invalidated")
+
   /** Resolves [promise] with what [block] returns, or rejects it with an error code. */
   private fun launch(promise: Promise, block: suspend () -> Any?) {
+    // A cancelled scope never runs the block, which would leave the promise pending
+    if (!scope.isActive) return promise.rejectWithCode(invalidated())
     scope.launch {
       try {
         promise.resolve(block().takeUnless { it is Unit })
@@ -55,6 +61,7 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
 
   /** Like [launch], tracked by [runId] so [cancel] can stop it. */
   private fun launchRun(runId: String, onError: (Exception) -> Unit, block: suspend () -> Unit) {
+    if (!scope.isActive) return onError(invalidated())
     // Started after it is tracked, so a run that ends at once is still removed
     val job = scope.launch(start = CoroutineStart.LAZY) {
       try {
@@ -180,7 +187,11 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
 
   override fun embed(values: ReadableArray, taskType: String?, promise: Promise) =
     launch(promise) {
-      val vectors = embeddings.embed(List(values.size()) { values.getString(it)!! }, taskType)
+      val strings = List(values.size()) { index ->
+        values.takeIf { it.getType(index) == ReadableType.String }?.getString(index)
+          ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Every value to embed must be a string")
+      }
+      val vectors = embeddings.embed(strings, taskType)
       Arguments.createArray().apply {
         vectors.forEach { vector ->
           pushArray(Arguments.createArray().apply { vector.forEach { pushDouble(it.toDouble()) } })

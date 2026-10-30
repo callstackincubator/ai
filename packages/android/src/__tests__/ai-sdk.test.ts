@@ -355,6 +355,29 @@ describe('doGenerate', () => {
     ])
   })
 
+  test('sends tool call input given as a JSON string as is', async () => {
+    await nano.doGenerate(
+      createCallOptions({
+        prompt: [
+          { role: 'user', content: [{ type: 'text', text: 'Weather?' }] },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'call-1',
+                toolName: 'getWeather',
+                input: '{"city":"Paris"}',
+              },
+            ],
+          },
+        ],
+      })
+    )
+
+    expect(lastRequest().messages[1].parts[0].json).toBe('{"city":"Paris"}')
+  })
+
   test('sends denied tool calls as errors', async () => {
     await nano.doGenerate(
       createCallOptions({

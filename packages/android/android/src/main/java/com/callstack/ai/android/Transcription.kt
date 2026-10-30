@@ -34,7 +34,7 @@ class Transcription(
   private val prepareMutex = Mutex()
 
   private fun client(config: TranscriptionConfig): SpeechRecognizer =
-    clients.getOrPut(config) {
+    clients.computeIfAbsent(config) {
       SpeechRecognition.getClient(
         speechRecognizerOptions {
           locale = config.locale?.let(Locale::forLanguageTag) ?: Locale.getDefault()

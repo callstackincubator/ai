@@ -68,7 +68,10 @@ interface StreamListener {
   fun onFunctionCall(call: FunctionCall)
 }
 
-fun ReadableMap.optString(key: String): String? = if (hasKey(key) && !isNull(key)) getString(key) else null
+/** Whether [key] holds a value, since the bridge can send a key with an explicit null. */
+fun ReadableMap.isSet(key: String): Boolean = hasKey(key) && !isNull(key)
+
+fun ReadableMap.optString(key: String): String? = if (isSet(key)) getString(key) else null
 
 fun availabilityOf(status: Int): String =
   when (status) {
@@ -86,13 +89,14 @@ class GeminiNano(
 ) {
   private val clients = ConcurrentHashMap<NanoConfig, GenerativeModel>()
   private val prepared = ConcurrentHashMap.newKeySet<NanoConfig>()
-  private val prepareMutex = Mutex()
+  // One lock per model selection, so one download does not hold up another selection
+  private val prepareMutexes = ConcurrentHashMap<NanoConfig, Mutex>()
   // The last status seen per model selection, for the synchronous check
   private val statuses = ConcurrentHashMap<NanoConfig, Int>()
   private val systemPromptSupport = ConcurrentHashMap<NanoConfig, Boolean>()
 
   private fun client(config: NanoConfig): GenerativeModel =
-    clients.getOrPut(config) {
+    clients.computeIfAbsent(config) {
       if (config.releaseStage == null && config.preference == null) {
         Generation.getClient()
       } else {
@@ -160,7 +164,8 @@ class GeminiNano(
 
   /** Downloads Gemini Nano when needed, reporting progress, then warms it up. */
   suspend fun prepare(config: NanoConfig) {
-    prepareMutex.withLock {
+    if (config in prepared) return
+    prepareMutexes.computeIfAbsent(config) { Mutex() }.withLock {
       if (config in prepared) return
 
       val model = client(config)
@@ -259,7 +264,10 @@ class GeminiNano(
       val turns = contents.mapNotNull { content ->
         content.parts.filterIsInstance<TextPart>().joinToString("\n\n") { it.textString }
           .takeIf { it.isNotEmpty() }
-          ?.let { if (contents.size > 1) "${if (content.role == Content.Role.MODEL) "Model" else "User"}: $it" else it }
+          ?.let { text ->
+            val label = if (content.role == Content.Role.MODEL) "Model" else "User"
+            if (contents.size > 1) "$label: $text" else text
+          }
       }
       val text = (listOfNotNull(systemInstruction) + turns).joinToString("\n\n")
       val images = parts.filterIsInstance<ImagePart>()
@@ -286,11 +294,11 @@ class GeminiNano(
     return GenerateContentRequest.Builder(contents)
       .apply {
         systemInstruction?.let { this.systemInstruction = SystemInstruction(it) }
-        if (request.hasKey("temperature")) temperature = request.getDouble("temperature").toFloat()
-        if (request.hasKey("topK")) topK = request.getInt("topK")
-        if (request.hasKey("seed")) seed = request.getInt("seed")
-        if (request.hasKey("maxOutputTokens")) maxOutputTokens = request.getInt("maxOutputTokens")
-        if (request.hasKey("enableThinking")) enableThinking = request.getBoolean("enableThinking")
+        if (request.isSet("temperature")) temperature = request.getDouble("temperature").toFloat()
+        if (request.isSet("topK")) topK = request.getInt("topK")
+        if (request.isSet("seed")) seed = request.getInt("seed")
+        if (request.isSet("maxOutputTokens")) maxOutputTokens = request.getInt("maxOutputTokens")
+        if (request.isSet("enableThinking")) enableThinking = request.getBoolean("enableThinking")
         if (!tools.isNullOrEmpty()) setTools(tools)
       }
       .build()

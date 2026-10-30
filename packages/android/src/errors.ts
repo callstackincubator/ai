@@ -30,9 +30,10 @@ export function isAndroidAIErrorCode(
 
 export function createAndroidAIError(
   message: string,
-  code: AndroidAIErrorCode
+  code: AndroidAIErrorCode,
+  cause?: unknown
 ): AndroidAIError {
-  const error = new Error(message) as AndroidAIError
+  const error = new Error(message, { cause }) as AndroidAIError
   error.code = code
   return error
 }
@@ -56,6 +57,7 @@ export function toAndroidAIError(
     message,
     isAndroidAIErrorCode(nativeCode)
       ? nativeCode
-      : AndroidAIErrorCodes.GenerationError
+      : AndroidAIErrorCodes.GenerationError,
+    error
   )
 }
