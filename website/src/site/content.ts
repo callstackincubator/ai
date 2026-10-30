@@ -70,7 +70,7 @@ export const docs = {
   polyfills: '/docs/polyfills',
   apple: '/docs/apple/getting-started',
   coreAi: '/docs/core-ai/getting-started',
-  adk: '/docs/adk/getting-started',
+  android: '/docs/android/getting-started',
   llama: '/docs/llama/getting-started',
   llms: '/llms.txt',
 };
@@ -128,7 +128,7 @@ export const faq = [
   },
   {
     q: 'Does anything leave the device?',
-    a: 'No, unless you opt in. Inference runs locally. Apple’s Private Cloud Compute model and ADK’s cloud Gemini are cloud models you choose explicitly.',
+    a: 'No, unless you opt in. Inference runs locally. Apple’s Private Cloud Compute model is a cloud model you choose explicitly.',
   },
   {
     q: 'Which AI SDK version do I need?',
@@ -174,11 +174,11 @@ const result = streamText({
   }),
   prompt: 'Summarize my notes',
 })`,
-  adk: `import { adk } from '@react-native-ai/adk'
+  android: `import { android } from '@react-native-ai/android'
 import { streamText } from 'ai'
 
 const result = streamText({
-  model: adk(),
+  model: android(),
   prompt: 'Summarize my notes',
 })`,
   llama: `import { downloadModel, llama } from '@react-native-ai/llama'
@@ -232,17 +232,17 @@ export const runtimes = [
     code: code.coreAi,
   },
   {
-    id: 'adk',
-    name: 'ADK',
+    id: 'android',
+    name: 'Android',
     runtime: 'Gemini Nano via AICore',
     platforms: 'Android 14+',
-    pkg: '@react-native-ai/adk',
+    pkg: '@react-native-ai/android',
     models: 'Built in: Gemini Nano',
     owner: 'native' as const,
-    body: 'Google’s on-device Gemini through the Agent Development Kit, with tool calling and an opt-in cloud Gemini.',
-    href: docs.adk,
-    file: 'adk.ts',
-    code: code.adk,
+    body: 'Google’s on-device Gemini Nano through ML Kit GenAI, with tool calling, transcription and embeddings.',
+    href: docs.android,
+    file: 'android.ts',
+    code: code.android,
   },
   {
     id: 'llama',
@@ -280,7 +280,7 @@ export const home = {
     headline: ['Swap the model.', 'Keep the code.'],
     steps: [
       { title: 'Install the providers', body: 'Add the provider for each platform you ship to, next to the AI SDK.', cmd: site.install },
-      { title: 'Pick a model per platform', body: 'Use `apple()` on iOS and `adk()` on Android, or a model you ship with Core AI or Llama.', cmd: 'npm install @react-native-ai/adk' },
+      { title: 'Pick a model per platform', body: 'Use `apple()` on iOS and `android()` on Android, or a model you ship with Core AI or Llama.', cmd: 'npm install @react-native-ai/android' },
       { title: 'Call the AI SDK', body: 'Pass the model to `generateText`, `streamText`, `embed` or any other AI SDK function. The rest of your code stays the same, on iOS and Android.', cmd: 'npx expo run:android' },
     ],
     /** One tab per runtime, each with its real setup snippet. */
@@ -299,7 +299,7 @@ export const home = {
   runtimes: {
     label: 'Runtimes',
     headline: ['The fastest runtime on each platform.', 'One API over all of them.'],
-    lede: 'Apple, Core AI and ADK run on the AI stack the platform provides: native, hardware-accelerated and with its system models. Llama runs GGUF models sized for phones on iOS and Android through llama.rn, a third-party binding.',
+    lede: 'Apple, Core AI and Android run on the AI stack the platform provides: native, hardware-accelerated and with its system models. Llama runs GGUF models sized for phones on iOS and Android through llama.rn, a third-party binding.',
   },
 
   feature: {
@@ -318,7 +318,7 @@ export const home = {
     items: [
       { icon: 'code', title: 'Text and streaming', body: '`generateText` and `streamText` with every provider, token by token.', href: '/docs/apple/generating' },
       { icon: 'form', title: 'Structured output', body: 'Pass a zod schema and get typed objects back from on-device models.', href: '/docs/apple/generating' },
-      { icon: 'signpost', title: 'Tool calling', body: 'Models call your JavaScript functions, with Apple and ADK running the loop natively.', href: '/docs/apple/tools' },
+      { icon: 'signpost', title: 'Tool calling', body: 'Models call your JavaScript functions, with Apple running the loop natively.', href: '/docs/apple/tools' },
       { icon: 'search', title: 'Embeddings and reranking', body: 'Semantic search on device with `embed`, `embedMany` and `rerank`.', href: '/docs/apple/embeddings' },
       { icon: 'flag', title: 'Transcription and speech', body: 'Speech to text with SpeechAnalyzer, and text to speech with system or GGUF voices.', href: '/docs/apple/transcription' },
       { icon: 'grid', title: 'Image generation', body: 'Generate images on iPhone with Core AI diffusion models through `generateImage`.', href: '/docs/core-ai/images-and-video' },

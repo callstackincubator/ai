@@ -43,7 +43,7 @@ keep the panel mounted without receiving telemetry.
 | Provider            | Built-in | Platforms    | Runtime                                                             | Description                                                |
 | ------------------- | -------- | ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
 | [Apple](#apple)     | ✅ Yes   | iOS          | [Apple](https://developer.apple.com/documentation/FoundationModels) | Apple Foundation Models, embeddings, transcription, speech |
-| [ADK](#google-adk)  | ✅ Yes   | Android      | [Google ADK](https://developer.android.com/ai/adk)                  | On-device Gemini Nano, with optional cloud Gemini          |
+| [Android](#android) | ✅ Yes   | Android      | [ML Kit GenAI](https://developers.google.com/ml-kit/genai)          | On-device Gemini Nano, transcription and embeddings        |
 | [Core AI](#core-ai) | ❌ No    | iOS          | [Core AI](https://github.com/apple/coreai-models)                   | Text, image, video, speech, embedding and vision models    |
 | [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
 
@@ -115,42 +115,39 @@ See the [Apple documentation](https://react-native-ai.dev/docs/apple/getting-sta
 
 ---
 
-### Google ADK
+### Android
 
-Run Gemini Nano on-device on Android through Google's [Agent Development Kit](https://developer.android.com/ai/adk). **Built-in** - Gemini Nano is provisioned by the system via AICore, so there are no model files to bundle and no API key. Cloud Gemini is available as an option.
+Run Gemini Nano on-device on Android through Google's [ML Kit GenAI](https://developers.google.com/ml-kit/genai) libraries. **Built-in** - Gemini Nano is provided by the system through AICore, so there are no model files to bundle and no API key.
 
-- **Text Generation** - `generateText` and `streamText` with on-device Gemini Nano
-- **Tool Calling** - Native ADK agent loop with JavaScript tool executors
-- **Cloud Gemini** - Optional cloud inference via ADK `LlmAgent` when you need a larger model
+- **Text Generation** - `generateText` and `streamText` with on-device Gemini Nano, with images and thinking
+- **Tool Calling** - AI SDK tools with Gemini Nano 4's function calling
+- **Transcription** - Speech to text with ML Kit speech recognition
+- **Embeddings** - On-device text embeddings
 
 #### Installation
 
 ```bash
-npm install @react-native-ai/adk
+npm install @react-native-ai/android
 ```
 
 > [!IMPORTANT]
-> Requires Android `minSdkVersion` 26 and a physical device with AICore support (Android 14+) for Gemini Nano. Your app also needs packaging excludes for duplicate `META-INF` files, see the [getting started guide](https://react-native-ai.dev/docs/adk/getting-started).
+> Requires Android `minSdkVersion` 26, Kotlin 2.4 and a physical device with AICore support. See the [getting started guide](https://react-native-ai.dev/docs/android/getting-started).
 
 #### Usage
 
 ```typescript
-import { adk } from '@react-native-ai/adk'
+import { android } from '@react-native-ai/android'
 import { generateText } from 'ai'
 
-if (!(await adk.isAvailable())) {
-  throw new Error('Gemini Nano is not available on this device')
+if (android.isAvailable()) {
+  const { text } = await generateText({
+    model: android(),
+    prompt: 'Explain quantum computing',
+  })
 }
-
-await adk.prepareNano()
-
-const { text } = await generateText({
-  model: adk(),
-  prompt: 'Explain quantum computing',
-})
 ```
 
-See the [ADK documentation](https://react-native-ai.dev/docs/adk/getting-started) for device checks, cloud Gemini, and tool calling.
+See the [Android documentation](https://react-native-ai.dev/docs/android/getting-started) for device checks, tool calling, transcription and embeddings.
 
 ---
 
