@@ -22,7 +22,6 @@ describe('android availability', () => {
     expect(info.availability).toBe('available')
     expect(info.contextSize).toBeGreaterThan(0)
     expect(info.features).toBeDefined()
-    expect(android.isAvailable()).toBe(true)
   })
 
   it('reports Gemini Nano 4 preview details', async () => {

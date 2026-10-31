@@ -31,15 +31,7 @@ empty.
 
 ## Availability and Download
 
-`isAvailable()` answers synchronously, from the last status `getModelInfo()`
-or `prepare()` saw. Before either has run, it checks what the mode needs:
-Android 12 for `basic`, AICore for `advanced`.
-
 ```typescript
-if (model.isAvailable()) {
-  // available, downloadable or downloading
-}
-
 const info = await model.getModelInfo()
 // { availability: 'available' | 'downloadable' | 'downloading' | 'unavailable' }
 
