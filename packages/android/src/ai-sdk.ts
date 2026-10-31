@@ -69,12 +69,15 @@ export type AndroidModelAvailability =
   | 'unavailable'
   | 'unknown'
 
-export type AndroidModelFeature =
-  | 'systemPrompt'
-  | 'thinking'
-  | 'prefixCaching'
-  | 'structuredOutput'
-  | 'functionCalling'
+const modelFeatures = [
+  'systemPrompt',
+  'thinking',
+  'prefixCaching',
+  'structuredOutput',
+  'functionCalling',
+] as const
+
+export type AndroidModelFeature = (typeof modelFeatures)[number]
 
 export interface AndroidModelInfo {
   availability: AndroidModelAvailability
@@ -150,16 +153,8 @@ const toModelAvailability = (value: string): AndroidModelAvailability => {
   }
 }
 
-const modelFeatures: readonly string[] = [
-  'systemPrompt',
-  'thinking',
-  'prefixCaching',
-  'structuredOutput',
-  'functionCalling',
-] satisfies AndroidModelFeature[]
-
 const isModelFeature = (value: string): value is AndroidModelFeature =>
-  modelFeatures.includes(value)
+  (modelFeatures as readonly string[]).includes(value)
 
 const toModelInfo = (info: NativeModelInfo): AndroidModelInfo => ({
   availability: toModelAvailability(info.availability),
@@ -452,17 +447,6 @@ function prepareTools(
     return undefined
   }
 
-  // Without it, ML Kit fails the whole request
-  if (!features.includes('functionCalling')) {
-    warnings.push({
-      type: 'unsupported',
-      feature: 'tools',
-      details:
-        "This device's Gemini Nano has no function calling. It needs Gemini Nano 4, the preview release with the fast preference.",
-    })
-    return undefined
-  }
-
   if (
     options.toolChoice?.type === 'required' ||
     options.toolChoice?.type === 'tool'
@@ -472,6 +456,17 @@ function prepareTools(
       feature: 'toolChoice',
       details: 'Gemini Nano decides itself whether to call a function.',
     })
+  }
+
+  // Without it, ML Kit fails the whole request
+  if (!features.includes('functionCalling')) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'tools',
+      details:
+        "This device's Gemini Nano has no function calling. It needs Gemini Nano 4, the preview release with the fast preference.",
+    })
+    return undefined
   }
 
   return options.tools.flatMap((tool) => {
@@ -859,7 +854,9 @@ class AndroidChatLanguageModel implements AndroidLanguageModel {
 }
 
 const toAudioBase64 = (audio: TranscriptionModelV4CallOptions['audio']) =>
-  typeof audio === 'string' ? audio : uint8ArrayToBase64(audio)
+  typeof audio === 'string'
+    ? audio.replace(/^data:[^;]+;base64,/, '')
+    : uint8ArrayToBase64(audio)
 
 class AndroidTranscriptionModel implements TranscriptionModelV4 {
   readonly specificationVersion = 'v4'
@@ -874,6 +871,9 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
 
   /** Recognizer availability for the model's language and mode */
   async getModelInfo(): Promise<AndroidModelInfo> {
+    if (Platform.OS !== 'android') {
+      return { availability: 'unavailable' }
+    }
     try {
       return toModelInfo(
         await getNativeAndroidAI().getTranscriptionModelInfo(this.options)
@@ -958,6 +958,9 @@ class AndroidEmbeddingModel implements EmbeddingModelV4 {
 
   /** Embedding model availability, dimension and signature */
   async getModelInfo(): Promise<AndroidEmbeddingModelInfo> {
+    if (Platform.OS !== 'android') {
+      return { availability: 'unavailable' }
+    }
     try {
       const info = await getNativeAndroidAI().getEmbeddingModelInfo()
       return { ...info, availability: toModelAvailability(info.availability) }

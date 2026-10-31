@@ -241,7 +241,11 @@ class GeminiNano(
     }
 
   private suspend fun supportsSystemPrompt(model: GenerativeModel, config: NanoConfig): Boolean =
-    systemPromptSupport.getOrPut(config) { runCatching { model.isSystemPromptAvailable() }.getOrDefault(false) }
+    systemPromptSupport[config]
+      // A failed check is not cached, so a transient AICore error doesn't stick for the session
+      ?: runCatching { model.isSystemPromptAvailable() }
+        .onSuccess { systemPromptSupport[config] = it }
+        .getOrDefault(false)
 
   private suspend fun buildRequest(
     request: ReadableMap,
