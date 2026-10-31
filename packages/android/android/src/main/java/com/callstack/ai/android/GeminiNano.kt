@@ -1,7 +1,6 @@
 package com.callstack.ai.android
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Base64
 import com.facebook.react.bridge.ReadableArray
@@ -30,16 +29,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
-
-private const val AICORE_PACKAGE = "com.google.android.aicore"
-
-fun isAICoreInstalled(context: Context): Boolean =
-  try {
-    context.packageManager.getPackageInfo(AICORE_PACKAGE, 0)
-    true
-  } catch (_: PackageManager.NameNotFoundException) {
-    false
-  }
 
 /** Gemini Nano model selection, see ML Kit `ModelConfig`. */
 data class NanoConfig(
@@ -99,8 +88,6 @@ class GeminiNano(
   private val prepared = ConcurrentHashMap.newKeySet<NanoConfig>()
   // One lock per model selection, so one download does not hold up another selection
   private val prepareMutexes = ConcurrentHashMap<NanoConfig, Mutex>()
-  // The last status seen per model selection, for the synchronous check
-  private val statuses = ConcurrentHashMap<NanoConfig, Int>()
   private val systemPromptSupport = ConcurrentHashMap<NanoConfig, Boolean>()
 
   private fun client(config: NanoConfig): GenerativeModel =
@@ -123,17 +110,6 @@ class GeminiNano(
       }
     }
 
-  /**
-   * Whether Gemini Nano is available, downloadable or downloading, answered without async work: from the last
-   * status this process saw, or else from whether AICore is installed.
-   */
-  fun isAvailable(config: NanoConfig): Boolean {
-    statuses[config]?.let {
-      return it == FeatureStatus.AVAILABLE || it == FeatureStatus.DOWNLOADABLE || it == FeatureStatus.DOWNLOADING
-    }
-    return isAICoreInstalled(context)
-  }
-
   suspend fun getModelInfo(config: NanoConfig): ModelInfo {
     val model = client(config)
     val status =
@@ -142,7 +118,6 @@ class GeminiNano(
       } catch (_: Exception) {
         return ModelInfo(availability = "unknown")
       }
-    statuses[config] = status
     if (status != FeatureStatus.AVAILABLE) {
       return ModelInfo(availability = availabilityOf(status))
     }
@@ -172,9 +147,7 @@ class GeminiNano(
       if (config in prepared) return
 
       val model = client(config)
-      val status = model.checkStatus()
-      statuses[config] = status
-      when (status) {
+      when (val status = model.checkStatus()) {
         FeatureStatus.UNAVAILABLE ->
           throw AndroidAIErrors.CodedException(
             AndroidAIErrors.MODEL_UNAVAILABLE,
@@ -185,7 +158,6 @@ class GeminiNano(
       }
       model.warmup()
       prepared.add(config)
-      statuses[config] = FeatureStatus.AVAILABLE
     }
   }
 

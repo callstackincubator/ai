@@ -1,7 +1,3 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.callstack.ai.android">
-  <!-- Lets isAvailable() check whether AICore, which runs Gemini Nano, is installed -->
-  <queries>
-    <package android:name="com.google.android.aicore" />
-  </queries>
 </manifest>

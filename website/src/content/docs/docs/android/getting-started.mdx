@@ -83,7 +83,8 @@ Pass `android()` to the AI SDK. Check that Gemini Nano can run on the device fir
 import { android } from '@react-native-ai/android'
 import { generateText } from 'ai'
 
-if (android.isAvailable()) {
+const { availability } = await android.getModelInfo()
+if (availability === 'available' || availability === 'downloadable') {
   const { text } = await generateText({
     model: android(),
     prompt: 'Summarize on-device AI in one sentence.',
