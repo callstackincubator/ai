@@ -33,6 +33,14 @@ import java.util.concurrent.ConcurrentHashMap
 
 private const val AICORE_PACKAGE = "com.google.android.aicore"
 
+fun isAICoreInstalled(context: Context): Boolean =
+  try {
+    context.packageManager.getPackageInfo(AICORE_PACKAGE, 0)
+    true
+  } catch (_: PackageManager.NameNotFoundException) {
+    false
+  }
+
 /** Gemini Nano model selection, see ML Kit `ModelConfig`. */
 data class NanoConfig(
   val releaseStage: String? = null,
@@ -123,12 +131,7 @@ class GeminiNano(
     statuses[config]?.let {
       return it == FeatureStatus.AVAILABLE || it == FeatureStatus.DOWNLOADABLE || it == FeatureStatus.DOWNLOADING
     }
-    return try {
-      context.packageManager.getPackageInfo(AICORE_PACKAGE, 0)
-      true
-    } catch (_: PackageManager.NameNotFoundException) {
-      false
-    }
+    return isAICoreInstalled(context)
   }
 
   suspend fun getModelInfo(config: NanoConfig): ModelInfo {

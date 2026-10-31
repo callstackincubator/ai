@@ -44,7 +44,7 @@ available.
 ## Preparing
 
 `prepare()` downloads Gemini Nano when needed and loads it into memory, so the
-first request answers sooner. Generating prepares on its own when you don't.
+first request answers sooner. Generating prepares on its own when you don't, and logs a warning.
 
 ```typescript
 await android().prepare({

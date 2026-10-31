@@ -2,7 +2,7 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4StreamPart,
 } from '@ai-sdk/provider'
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
 type Listener = (event: any) => void
 
@@ -35,6 +35,9 @@ const streamText = mock(async (_streamId: string, _request: any) => {})
 const prepare = mock(async (_model?: unknown) => {})
 const cancel = mock((_id: string) => {})
 const isAvailable = mock((_model?: unknown) => true)
+const isTranscriptionAvailable = mock((_options?: unknown) => true)
+const prepareTranscription = mock(async (_options?: unknown) => {})
+const prepareEmbedding = mock(async () => {})
 const getModelInfo = mock(
   async (_model?: unknown): Promise<Record<string, unknown>> => ({
     availability: 'available',
@@ -64,7 +67,10 @@ mock.module('react-native', () => ({
       isAvailable,
       getModelInfo,
       transcribe,
+      isTranscriptionAvailable,
       getTranscriptionModelInfo,
+      prepareTranscription,
+      prepareEmbedding,
       embed,
       onStreamEvent,
       onDownloadProgress,
@@ -604,18 +610,30 @@ describe('other models', () => {
     expect(result.language).toBe('en')
   })
 
-  test('derives transcription availability from the model info', async () => {
-    const model = createAndroidProvider().transcriptionModel()
-    getTranscriptionModelInfo.mockImplementationOnce(async () => ({
-      availability: 'downloading',
-    }))
-    getTranscriptionModelInfo.mockImplementationOnce(async () => ({
-      availability: 'unavailable',
-    }))
+  test('checks transcription availability synchronously', () => {
+    const model = createAndroidProvider().transcriptionModel({
+      language: 'en-US',
+    })
+    expect(model.isAvailable()).toBe(true)
+    isTranscriptionAvailable.mockImplementationOnce(() => false)
+    expect(model.isAvailable()).toBe(false)
+    expect(isTranscriptionAvailable.mock.calls.at(-1)![0]).toEqual({
+      locale: 'en-US',
+      mode: undefined,
+    })
+  })
 
-    expect(await model.isAvailable()).toBe(true)
-    expect(await model.isAvailable()).toBe(false)
-    expect(await model.isAvailable()).toBe(true)
+  test('warns and prepares when a model is used before prepare', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    const model = createAndroidProvider().embeddingModel()
+
+    await model.doEmbed({ values: ['a'] })
+    await model.doEmbed({ values: ['b'] })
+
+    expect(prepareEmbedding).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).toContain('Model not prepared')
+    warn.mockRestore()
   })
 
   test('embeds values with the task type', async () => {

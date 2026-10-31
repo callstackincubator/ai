@@ -153,6 +153,9 @@ const toModelAvailability = (value: string): AndroidModelAvailability => {
   }
 }
 
+const notPreparedWarning =
+  '[android] Model not prepared. Call prepare() ahead of time to optimize performance.'
+
 const isModelFeature = (value: string): value is AndroidModelFeature =>
   (modelFeatures as readonly string[]).includes(value)
 
@@ -676,6 +679,9 @@ class AndroidChatLanguageModel implements AndroidLanguageModel {
     abortSignal?.addEventListener('abort', onAbort, { once: true })
 
     try {
+      if (!this.preparePromise) {
+        console.warn(notPreparedWarning)
+      }
       const features = await this.ensurePrepared()
       // Preparing can take minutes, before there is a native run to cancel
       if (abortSignal?.aborted) {
@@ -732,6 +738,9 @@ class AndroidChatLanguageModel implements AndroidLanguageModel {
       throw getAbortReason(abortSignal)
     }
 
+    if (!this.preparePromise) {
+      console.warn(notPreparedWarning)
+    }
     const features = await this.ensurePrepared()
     // Preparing can take minutes, before there is a native stream to cancel
     if (abortSignal?.aborted) {
@@ -864,6 +873,7 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
   readonly modelId = 'speech-recognition'
 
   private readonly options: NativeTranscriptionOptions
+  private prepared = false
 
   constructor(options: AndroidTranscriptionOptions) {
     this.options = { locale: options.language, mode: options.mode }
@@ -883,25 +893,25 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
     }
   }
 
-  /** Whether the recognizer for this language and mode is available, downloadable or downloading */
-  async isAvailable(): Promise<boolean> {
-    try {
-      const { availability } = await this.getModelInfo()
-      return (
-        availability === 'available' ||
-        availability === 'downloadable' ||
-        availability === 'downloading'
-      )
-    } catch {
-      return false
-    }
+  /**
+   * Whether the recognizer for this language and mode is available,
+   * downloadable or downloading, answered synchronously from the last status
+   * `getModelInfo()` or `prepare()` saw. Before either runs, it checks what the
+   * mode needs: Android 12 for basic, AICore for advanced
+   */
+  isAvailable(): boolean {
+    return (
+      Platform.OS === 'android' &&
+      getNativeAndroidAI().isTranscriptionAvailable(this.options)
+    )
   }
 
   /** Downloads the recognizer's model when needed, reporting download progress */
-  prepare(options: AndroidPrepareOptions = {}): Promise<void> {
-    return withProgress('transcription', options, () =>
+  async prepare(options: AndroidPrepareOptions = {}): Promise<void> {
+    await withProgress('transcription', options, () =>
       getNativeAndroidAI().prepareTranscription(this.options)
     )
+    this.prepared = true
   }
 
   async doGenerate(options: TranscriptionModelV4CallOptions) {
@@ -911,6 +921,11 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
 
     if (abortSignal?.aborted) {
       throw getAbortReason(abortSignal)
+    }
+
+    if (!this.prepared) {
+      console.warn(notPreparedWarning)
+      await this.prepare()
     }
 
     const onAbort = () => native.cancel(runId)
@@ -951,6 +966,7 @@ class AndroidEmbeddingModel implements EmbeddingModelV4 {
   readonly supportsParallelCalls = false
 
   private readonly taskType: AndroidEmbeddingTaskType | undefined
+  private prepared = false
 
   constructor(options: AndroidEmbeddingOptions) {
     this.taskType = options.taskType
@@ -970,10 +986,11 @@ class AndroidEmbeddingModel implements EmbeddingModelV4 {
   }
 
   /** Downloads the embedding model when needed, reporting download progress */
-  prepare(options: AndroidPrepareOptions = {}): Promise<void> {
-    return withProgress('embedding', options, () =>
+  async prepare(options: AndroidPrepareOptions = {}): Promise<void> {
+    await withProgress('embedding', options, () =>
       getNativeAndroidAI().prepareEmbedding()
     )
+    this.prepared = true
   }
 
   async doEmbed(
@@ -983,6 +1000,10 @@ class AndroidEmbeddingModel implements EmbeddingModelV4 {
     // ML Kit cannot stop an embedding once it starts, so abort is checked around the call
     if (abortSignal?.aborted) {
       throw getAbortReason(abortSignal)
+    }
+    if (!this.prepared) {
+      console.warn(notPreparedWarning)
+      await this.prepare()
     }
     let embeddings: number[][]
     try {

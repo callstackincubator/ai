@@ -162,6 +162,9 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
     activeRuns.remove(runId)?.cancel()
   }
 
+  override fun isTranscriptionAvailable(options: ReadableMap): Boolean =
+    transcription.isAvailable(TranscriptionConfig.from(options))
+
   override fun getTranscriptionModelInfo(options: ReadableMap, promise: Promise) =
     launch(promise) { transcription.getModelInfo(TranscriptionConfig.from(options)).toWritableMap() }
 

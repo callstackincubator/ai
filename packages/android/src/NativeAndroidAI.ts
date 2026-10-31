@@ -126,6 +126,8 @@ export interface Spec extends TurboModule {
   /** Cancels a `generateText`, `streamText` or `transcribe` run by its id */
   cancel(runId: string): void
 
+  /** Quick synchronous check, see `AndroidTranscriptionModel.isAvailable` */
+  isTranscriptionAvailable(options: NativeTranscriptionOptions): boolean
   getTranscriptionModelInfo(
     options: NativeTranscriptionOptions
   ): Promise<NativeModelInfo>

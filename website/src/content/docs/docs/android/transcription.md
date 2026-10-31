@@ -31,8 +31,12 @@ empty.
 
 ## Availability and Download
 
+`isAvailable()` answers synchronously, from the last status `getModelInfo()`
+or `prepare()` saw. Before either has run, it checks what the mode needs:
+Android 12 for `basic`, AICore for `advanced`.
+
 ```typescript
-if (await model.isAvailable()) {
+if (model.isAvailable()) {
   // available, downloadable or downloading
 }
 
@@ -42,4 +46,4 @@ const info = await model.getModelInfo()
 await model.prepare({ onProgress: (progress) => console.log(progress) })
 ```
 
-Transcribing prepares the model on its own when you don't.
+Transcribing prepares the model on its own when you don't, and logs a warning.

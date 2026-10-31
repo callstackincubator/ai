@@ -34,4 +34,4 @@ await model.prepare({ onProgress: (progress) => console.log(progress) })
 ```
 
 `availability` is `unavailable` when the device has no embedding model.
-Embedding prepares the model on its own when you don't.
+Embedding prepares the model on its own when you don't, and logs a warning.
