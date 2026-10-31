@@ -42,13 +42,13 @@ npm add @react-native-ai/apple
 ```ts
 import { apple } from '@react-native-ai/apple'
 
-if (apple.isAvailable()) {
+const { availability } = await apple.getModelInfo()
+if (availability === 'available') {
   // Use Apple provider
 }
 ```
 
-When it is unavailable, `(await apple.getModelInfo()).availability` gives the
-reason: `'deviceNotEligible' | 'appleIntelligenceNotEnabled' | 'modelNotReady'
+Otherwise `availability` gives the reason: `'deviceNotEligible' | 'appleIntelligenceNotEnabled' | 'modelNotReady'
 | 'systemNotReady' | 'unknown'`. `'appleIntelligenceNotEnabled'` is fixable by
 the user in Settings.
 

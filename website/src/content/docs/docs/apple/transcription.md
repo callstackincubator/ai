@@ -117,18 +117,18 @@ such as `fr` resolve to a supported locale:
 const model = apple.transcriptionModel({ language: 'fr' })
 ```
 
-`isAvailable()` is a quick synchronous check that the device can transcribe at
-all. `getModelInfo()` reports whether it supports the language, which locale it
-resolves to, and whether its assets are on the device:
+`getModelInfo()` reports whether the device can transcribe at all, whether it
+supports the language, which locale it resolves to, and whether its assets are
+on the device:
 
 ```tsx
-if (model.isAvailable()) {
-  const info = await model.getModelInfo()
-  // { isAvailable: true, supportsLocale: true, locale: 'fr-FR',
-  //   assets: 'installed' | 'downloading' | 'supported' | 'unsupported',
-  //   supportedLocales: [...] }
-}
+const info = await model.getModelInfo()
+// { isAvailable: true, supportsLocale: true, locale: 'fr-FR',
+//   assets: 'installed' | 'downloading' | 'supported' | 'unsupported',
+//   supportedLocales: [...] }
 ```
+
+Before iOS 26, it rejects with `UNSUPPORTED_OS`.
 
 `assets` is `supported` when the locale can be used once `prepare()` downloads
 it.
@@ -157,7 +157,6 @@ import { AppleTranscription } from '@react-native-ai/apple'
 
 const language = 'fr'
 
-const isAvailable = AppleTranscription.isAvailable(language)
 const info = await AppleTranscription.getModelInfo(language)
 await AppleTranscription.prepare(language)
 

@@ -134,10 +134,6 @@ using namespace react;
   return std::make_shared<react::NativeAppleTranscriptionSpecJSI>(params);
 }
 
-- (nonnull NSNumber *)isAvailable:(nonnull NSString *)language { 
-  return @([_transcription isAvailable:language]);
-}
-
 - (void)getModelInfo:(nonnull NSString *)language resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
   [_transcription getModelInfo:language resolve:resolve reject:reject];
 }

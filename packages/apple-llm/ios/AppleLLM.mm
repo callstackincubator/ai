@@ -239,9 +239,5 @@ static NSString *AppleLLMToolRejectionMessage(jsi::Runtime &rt, const jsi::Value
   
 }
 
-- (nonnull NSNumber *)isAvailable {
-  return @([_llm isAvailable]);
-}
-
 
 @end

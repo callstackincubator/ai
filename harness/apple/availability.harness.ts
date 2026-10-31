@@ -2,10 +2,6 @@ import { apple, AppleUtils } from '@react-native-ai/apple'
 import { describe, expect, it } from 'react-native-harness'
 
 describe('apple availability', () => {
-  it('is available', () => {
-    expect(apple.isAvailable()).toBe(true)
-  })
-
   it('describes the on-device model', async () => {
     const info = await apple.getModelInfo()
 

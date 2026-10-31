@@ -24,7 +24,7 @@ export interface SetupAdapter<TModel> {
   // Whether the model accepts images, omitted means text only
   imageInput?: boolean
   // Check if model is ready, unavailable, or downloadable
-  isAvailable: () => Availability
+  isAvailable: () => Promise<Availability>
   // Download the model with progress callback
   download: (onProgress: (percentage: number) => void) => Promise<void>
   // Remove the downloaded model from storage

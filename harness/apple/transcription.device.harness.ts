@@ -15,12 +15,6 @@ beforeAll(async () => {
 })
 
 describe('apple transcription', () => {
-  it('is available for english', () => {
-    expect(apple.transcriptionModel({ language: 'en-US' }).isAvailable()).toBe(
-      true
-    )
-  })
-
   it('describes the locale a language resolves to', async () => {
     const model = apple.transcriptionModel({ language: 'en' })
     await model.prepare()

@@ -140,7 +140,7 @@ export const faq = [
   },
   {
     q: 'Can I mix on-device and cloud models?',
-    a: 'Yes. They are all AI SDK models, so you can pick one per call, and fall back to a cloud provider when `apple.isAvailable()` is false.',
+    a: 'Yes. They are all AI SDK models, so you can pick one per call, and fall back to a cloud provider when `apple.getModelInfo()` reports the model is not available.',
   },
 ];
 
