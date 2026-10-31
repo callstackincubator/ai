@@ -84,6 +84,7 @@ import { android } from '@react-native-ai/android'
 import { generateText } from 'ai'
 
 const { availability } = await android.getModelInfo()
+// When downloadable, the first request downloads Gemini Nano on its own
 if (availability === 'available' || availability === 'downloadable') {
   const { text } = await generateText({
     model: android(),
