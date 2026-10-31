@@ -34,8 +34,6 @@ const generateText = mock(
 const streamText = mock(async (_streamId: string, _request: any) => {})
 const prepare = mock(async (_model?: unknown) => {})
 const cancel = mock((_id: string) => {})
-const isAvailable = mock((_model?: unknown) => true)
-const isTranscriptionAvailable = mock((_options?: unknown) => true)
 const prepareTranscription = mock(async (_options?: unknown) => {})
 const prepareEmbedding = mock(async () => {})
 const getModelInfo = mock(
@@ -64,10 +62,8 @@ mock.module('react-native', () => ({
       streamText,
       prepare,
       cancel,
-      isAvailable,
       getModelInfo,
       transcribe,
-      isTranscriptionAvailable,
       getTranscriptionModelInfo,
       prepareTranscription,
       prepareEmbedding,
@@ -155,12 +151,6 @@ describe('provider', () => {
       releaseStage: 'preview',
       preference: 'fast',
     })
-  })
-
-  test('checks availability synchronously', () => {
-    expect(createAndroidProvider().isAvailable()).toBe(true)
-    isAvailable.mockImplementationOnce(() => false)
-    expect(nano.isAvailable()).toBe(false)
   })
 
   test('reports download progress while preparing', async () => {
@@ -608,19 +598,6 @@ describe('other models', () => {
     ])
     expect(result.text).toBe('hello world')
     expect(result.language).toBe('en')
-  })
-
-  test('checks transcription availability synchronously', () => {
-    const model = createAndroidProvider().transcriptionModel({
-      language: 'en-US',
-    })
-    expect(model.isAvailable()).toBe(true)
-    isTranscriptionAvailable.mockImplementationOnce(() => false)
-    expect(model.isAvailable()).toBe(false)
-    expect(isTranscriptionAvailable.mock.calls.at(-1)![0]).toEqual({
-      locale: 'en-US',
-      mode: undefined,
-    })
   })
 
   test('warns and prepares when a model is used before prepare', async () => {

@@ -100,8 +100,6 @@ export interface AndroidPrepareOptions {
 }
 
 export interface AndroidLanguageModel extends LanguageModelV4 {
-  /** Quick synchronous check, see `AndroidProvider.isAvailable` */
-  isAvailable: () => boolean
   /** Gemini Nano's availability and features for this model selection */
   getModelInfo: () => Promise<AndroidModelInfo>
   /** Downloads Gemini Nano when needed and loads it, reporting download progress */
@@ -198,10 +196,6 @@ async function withProgress<T>(
   }
 }
 
-function isAvailable(model: NanoModelConfig | undefined) {
-  return Platform.OS === 'android' && getNativeAndroidAI().isAvailable(model)
-}
-
 async function getModelInfo(
   model: NanoModelConfig | undefined
 ): Promise<AndroidModelInfo> {
@@ -229,12 +223,6 @@ export function createAndroidProvider(
   }
   provider.specificationVersion = 'v4' as const
   provider.languageModel = createLanguageModel
-  /**
-   * Quick synchronous check whether Gemini Nano can be used. It reflects the
-   * last status `getModelInfo()` or `prepare()` saw, or else whether AICore is
-   * installed. Use `getModelInfo()` for the exact availability
-   */
-  provider.isAvailable = () => isAvailable(defaults.model)
   /** Gemini Nano's availability, for the provider's model selection or `model` */
   provider.getModelInfo = (options: { model?: AndroidNanoModel } = {}) =>
     getModelInfo(options.model ?? defaults.model)
@@ -628,10 +616,6 @@ class AndroidChatLanguageModel implements AndroidLanguageModel {
     this.model = options.model
   }
 
-  isAvailable(): boolean {
-    return isAvailable(this.model)
-  }
-
   getModelInfo(): Promise<AndroidModelInfo> {
     return getModelInfo(this.model)
   }
@@ -891,19 +875,6 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
     } catch (error) {
       throw toAndroidAIError(error)
     }
-  }
-
-  /**
-   * Whether the recognizer for this language and mode is available,
-   * downloadable or downloading, answered synchronously from the last status
-   * `getModelInfo()` or `prepare()` saw. Before either runs, it checks what the
-   * mode needs: Android 12 for basic, AICore for advanced
-   */
-  isAvailable(): boolean {
-    return (
-      Platform.OS === 'android' &&
-      getNativeAndroidAI().isTranscriptionAvailable(this.options)
-    )
   }
 
   /** Downloads the recognizer's model when needed, reporting download progress */
