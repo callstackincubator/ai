@@ -28,6 +28,7 @@ const result = streamText({
 | ---------------------------------------------- | --------------- | ------------------------------------------------------ | ------------------------------------------ |
 | [Apple](/docs/apple/getting-started)           | iOS             | Built in: Apple Intelligence, speech and embeddings    | Native, provided by the platform           |
 | [Core AI](/docs/core-ai/getting-started)       | iOS 27          | Yours: language, image, speech and vision models       | Native, provided by the platform           |
+| [Android](/docs/android/getting-started)       | Android         | Built in: Gemini Nano, speech recognition, embeddings  | Native, provided by the platform           |
 | [ADK](/docs/adk/getting-started)               | Android         | Built in: Gemini Nano, or cloud Gemini                 | Native, provided by the platform           |
 | [Llama](/docs/llama/getting-started)           | iOS and Android | Yours: GGUF models from Hugging Face                   | Third-party binding, llama.rn              |
 

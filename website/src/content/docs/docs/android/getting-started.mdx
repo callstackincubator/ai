@@ -1,0 +1,95 @@
+---
+title: "Getting Started"
+---
+
+import PackageManagerTabs from '../../../../components/starlight/PackageManagerTabs.astro'
+
+Run Gemini Nano on Android, on the device, with the Vercel AI SDK. The provider
+wraps Google's [ML Kit GenAI](https://developers.google.com/ml-kit/genai) libraries
+directly. Android serves the models through AICore, so there's no model to
+bundle and no API key.
+
+| Feature                                        | Model                          | ML Kit API                 |
+| ---------------------------------------------- | ------------------------------ | -------------------------- |
+| [Text generation](/docs/android/generating)    | `android()`                    | `genai-prompt`             |
+| [Tool calling](/docs/android/tools)            | `android()`, on Gemini Nano 4  | `genai-prompt`             |
+| [Embeddings](/docs/android/embeddings)         | `android.embeddingModel()`     | `genai-embedding`          |
+| [Transcription](/docs/android/transcription)   | `android.transcriptionModel()` | `genai-speech-recognition` |
+
+## Installation
+
+<PackageManagerTabs command="install @react-native-ai/android ai" />
+
+The provider works with AI SDK v7 and needs its [polyfills](/docs/polyfills).
+Examples with schemas, such as the [tools](/docs/android/tools) examples, also
+use `zod`.
+
+## Requirements
+
+- Android with `minSdkVersion` 26 or higher
+- Kotlin 2.4 or newer, which the current ML Kit GenAI libraries are built with
+- React Native 0.76 or newer, with the New Architecture
+- A physical device with AICore support and a locked bootloader. See the
+  [ML Kit GenAI documentation](https://developers.google.com/ml-kit/genai#feature-device)
+  for the supported devices. Emulators and device clouds such as Firebase Test
+  Lab have no Gemini Nano.
+
+## Native Setup
+
+### Expo
+
+Install the config plugin:
+
+```bash
+npx expo install expo-build-properties
+```
+
+Set `minSdkVersion` and the Kotlin version with `expo-build-properties`:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "kotlinVersion": "2.4.0"
+          }
+        }
+      ]
+    ]
+  }
+}
+```
+
+Then regenerate the native project:
+
+```bash
+npx expo prebuild --clean
+```
+
+### Bare React Native
+
+Set `minSdkVersion = 26` and `kotlinVersion = "2.4.0"` in the `ext` block of
+`android/build.gradle`.
+
+## Basic Usage
+
+Pass `android()` to the AI SDK. Check that Gemini Nano can run on the device first:
+
+```typescript
+import { android } from '@react-native-ai/android'
+import { generateText } from 'ai'
+
+if (android.isAvailable()) {
+  const { text } = await generateText({
+    model: android(),
+    prompt: 'Summarize on-device AI in one sentence.',
+  })
+}
+```
+
+[Models & Availability](/docs/android/models) covers the availability checks
+and downloading Gemini Nano.
