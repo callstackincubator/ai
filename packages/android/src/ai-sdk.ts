@@ -1172,14 +1172,14 @@ export class AndroidImageDescriber extends AndroidTaskModel {
     super('imageDescription', {})
   }
 
-  /** Describes an image, given as bytes, base64, or a file:// or content:// URI */
+  /** Describes an image, given as bytes, base64 or a base64 data URI, or a file:// or content:// URI */
   async describe(
     image: Uint8Array | string,
     options: AndroidTaskCallOptions = {}
   ): Promise<string> {
     const input =
       typeof image === 'string'
-        ? image.replace(/^data:[^;]+;base64,/, '')
+        ? image.replace(/^data:[^,]*;base64,/, '')
         : uint8ArrayToBase64(image)
     const [description = ''] = await this.run(input, options)
     return description

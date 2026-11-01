@@ -703,6 +703,14 @@ describe('task models', () => {
     ])
   })
 
+  test('strips a data URI prefix from a base64 image', async () => {
+    const describer = provider.imageDescriber()
+    await describer.prepare()
+
+    await describer.describe('data:image/png;charset=utf-8;base64,AQID')
+    expect(runTask.mock.calls.at(-1)![2]).toBe('AQID')
+  })
+
   test('cancels the native run on abort', async () => {
     const controller = new AbortController()
     runTask.mockImplementationOnce(async (runId) => {
