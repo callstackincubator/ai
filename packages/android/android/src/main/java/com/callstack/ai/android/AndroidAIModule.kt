@@ -180,7 +180,8 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
 
   override fun cancel(runId: String) {
     activeRuns.remove(runId)?.cancel()
-    transcriptionStreams.remove(runId)?.close()
+    // Only the write end: ML Kit may still be reading the other, which the run closes as it ends
+    transcriptionStreams.remove(runId)?.let { runCatching { it.audio.close() } }
   }
 
   override fun getTranscriptionModelInfo(options: ReadableMap, promise: Promise) =
@@ -194,66 +195,66 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
       promise.resolve(transcription.transcribe(audio, TranscriptionConfig.from(options)))
     }
 
-  override fun startTranscriptionStream(streamId: String, options: ReadableMap, promise: Promise) {
-    if (transcriptionStreams.containsKey(streamId)) {
-      promise.reject(AndroidAIErrors.GENERATION_ERROR, "Stream ID already in use: $streamId")
-      return
-    }
-    val (read, write) = ParcelFileDescriptor.createPipe()
-    val stream = TranscriptionStream(read, ParcelFileDescriptor.AutoCloseOutputStream(write), CompletableDeferred())
-    transcriptionStreams[streamId] = stream
+  override fun startTranscriptionStream(streamId: String, options: ReadableMap, promise: Promise) =
+    launch(promise) {
+      if (transcriptionStreams.containsKey(streamId)) {
+        throw AndroidAIErrors.CodedException(AndroidAIErrors.GENERATION_ERROR, "Stream ID already in use: $streamId")
+      }
+      val (read, write) = ParcelFileDescriptor.createPipe()
+      val stream = TranscriptionStream(read, ParcelFileDescriptor.AutoCloseOutputStream(write), CompletableDeferred())
+      transcriptionStreams[streamId] = stream
 
-    // The collector calls back one response at a time, so the count needs no lock
-    var segmentIndex = 0
-    // A failure is reported by the next append, or by finish, which removes the stream
-    launchRun(streamId, { error ->
-      stream.result.completeExceptionally(error)
-      stream.close()
-    }) {
-      val config = TranscriptionConfig.from(options)
-      val text = transcription.transcribeStream(read, config) { response ->
-        emitOnTranscriptionEvent(
+      // The collector calls back one response at a time, so the count needs no lock
+      var segmentIndex = 0
+      // A failure is reported by the next append, or by finish, which removes the stream
+      launchRun(streamId, { error ->
+        stream.result.completeExceptionally(error)
+        stream.close()
+      }) {
+        val config = TranscriptionConfig.from(options)
+        val text = transcription.transcribeStream(read, config) { response ->
+          emitOnTranscriptionEvent(
+            Arguments.createMap().apply {
+              putString("streamId", streamId)
+              putInt("segmentIndex", segmentIndex)
+              when (response) {
+                is SpeechRecognizerResponse.PartialTextResponse -> {
+                  putString("type", "partial")
+                  putString("text", response.text)
+                }
+                is SpeechRecognizerResponse.FinalTextResponse -> {
+                  putString("type", "final")
+                  putString("text", response.text)
+                  putArray(
+                    "words",
+                    Arguments.createArray().apply {
+                      response.wordTimings.forEach { word ->
+                        pushMap(
+                          Arguments.createMap().apply {
+                            putString("text", word.text)
+                            putDouble("startMs", word.timestampMs.toDouble())
+                          },
+                        )
+                      }
+                    },
+                  )
+                  segmentIndex++
+                }
+                else -> {}
+              }
+            },
+          )
+        }
+        stream.close()
+        stream.result.complete(
           Arguments.createMap().apply {
-            putString("streamId", streamId)
-            putInt("segmentIndex", segmentIndex)
-            when (response) {
-              is SpeechRecognizerResponse.PartialTextResponse -> {
-                putString("type", "partial")
-                putString("text", response.text)
-              }
-              is SpeechRecognizerResponse.FinalTextResponse -> {
-                putString("type", "final")
-                putString("text", response.text)
-                putArray(
-                  "words",
-                  Arguments.createArray().apply {
-                    response.wordTimings.forEach { word ->
-                      pushMap(
-                        Arguments.createMap().apply {
-                          putString("text", word.text)
-                          putDouble("startMs", word.timestampMs.toDouble())
-                        },
-                      )
-                    }
-                  },
-                )
-                segmentIndex++
-              }
-              else -> {}
-            }
+            putString("text", text)
+            putString("language", transcription.languageOf(config))
           },
         )
       }
-      stream.close()
-      stream.result.complete(
-        Arguments.createMap().apply {
-          putString("text", text)
-          putString("language", transcription.languageOf(config))
-        },
-      )
+      null
     }
-    promise.resolve(null)
-  }
 
   override fun appendTranscriptionAudio(streamId: String, pcmBase64: String, promise: Promise) =
     launch(promise) {

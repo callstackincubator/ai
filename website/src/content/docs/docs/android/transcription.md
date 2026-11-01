@@ -36,7 +36,7 @@ const result = streamTranscribe({
 
 for await (const part of result.fullStream) {
   if (part.type === 'transcript-delta') {
-    process(part.delta)
+    setTranscript((transcript) => transcript + part.delta)
   }
   if (part.type === 'transcript-final') {
     console.log(part.text, part.startSecond, part.endSecond)
