@@ -98,6 +98,10 @@ dependencies {
   implementation "com.google.mlkit:genai-schema:1.0.0-alpha2"
   implementation "com.google.mlkit:genai-speech-recognition:1.0.0-alpha2"
   implementation "com.google.mlkit:genai-embedding:1.0.0-alpha1"
+  implementation "com.google.mlkit:genai-summarization:1.0.0-beta1"
+  implementation "com.google.mlkit:genai-proofreading:1.0.0-beta1"
+  implementation "com.google.mlkit:genai-rewriting:1.0.0-beta1"
+  implementation "com.google.mlkit:genai-image-description:1.0.0-beta1"
 }
 
 react {

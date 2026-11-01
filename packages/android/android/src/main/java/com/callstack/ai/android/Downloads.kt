@@ -1,5 +1,7 @@
 package com.callstack.ai.android
 
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.mlkit.genai.common.DownloadCallback
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.common.GenAiException
@@ -35,6 +37,32 @@ class Downloads(
         )
       }
       throw error
+    }
+  }
+
+  /** Like [collect], for ML Kit's task APIs, which report downloads to a [DownloadCallback]. */
+  suspend fun collect(
+    model: String,
+    displayName: String,
+    status: Int,
+    download: (DownloadCallback) -> ListenableFuture<Void>,
+  ) {
+    val callback = object : DownloadCallback {
+      override fun onDownloadStarted(bytesToDownload: Long) = onProgress(model, "started", 0, bytesToDownload)
+
+      override fun onDownloadProgress(totalBytesDownloaded: Long) =
+        onProgress(model, "progress", totalBytesDownloaded, null)
+
+      override fun onDownloadCompleted() = onProgress(model, "completed", null, null)
+    }
+    try {
+      download(callback).await()
+    } catch (error: GenAiException) {
+      throw AndroidAIErrors.CodedException(
+        if (status == FeatureStatus.DOWNLOADING) AndroidAIErrors.MODEL_DOWNLOADING else AndroidAIErrors.DOWNLOAD_FAILED,
+        "$displayName download failed: ${error.message}",
+        error,
+      )
     }
   }
 }
