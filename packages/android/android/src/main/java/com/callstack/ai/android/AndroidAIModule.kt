@@ -46,8 +46,19 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
   // Generations and transcriptions, by id, so they can be cancelled
   private val activeRuns = ConcurrentHashMap<String, Job>()
 
-  // Streamed transcriptions: the pipe audio is written to, and the text once the stream ends
-  private class TranscriptionStream(val audio: OutputStream, val text: CompletableDeferred<String>)
+  // Streamed transcriptions: both ends of the pipe audio is written to, and the result once the
+  // stream ends. Both ends close when recognition ends, so a stream JS never finishes holds no
+  // file descriptors
+  private class TranscriptionStream(
+    val read: ParcelFileDescriptor,
+    val audio: OutputStream,
+    val result: CompletableDeferred<WritableMap>,
+  ) {
+    fun close() {
+      runCatching { audio.close() }
+      runCatching { read.close() }
+    }
+  }
 
   private val transcriptionStreams = ConcurrentHashMap<String, TranscriptionStream>()
 
@@ -169,7 +180,7 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
 
   override fun cancel(runId: String) {
     activeRuns.remove(runId)?.cancel()
-    transcriptionStreams.remove(runId)?.audio?.close()
+    transcriptionStreams.remove(runId)?.close()
   }
 
   override fun getTranscriptionModelInfo(options: ReadableMap, promise: Promise) =
@@ -189,16 +200,18 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
       return
     }
     val (read, write) = ParcelFileDescriptor.createPipe()
-    val stream = TranscriptionStream(ParcelFileDescriptor.AutoCloseOutputStream(write), CompletableDeferred())
+    val stream = TranscriptionStream(read, ParcelFileDescriptor.AutoCloseOutputStream(write), CompletableDeferred())
     transcriptionStreams[streamId] = stream
 
+    // The collector calls back one response at a time, so the count needs no lock
     var segmentIndex = 0
     // A failure is reported by the next append, or by finish, which removes the stream
     launchRun(streamId, { error ->
-      stream.text.completeExceptionally(error)
-      stream.audio.close()
+      stream.result.completeExceptionally(error)
+      stream.close()
     }) {
-      val text = transcription.transcribeStream(read, TranscriptionConfig.from(options)) { response ->
+      val config = TranscriptionConfig.from(options)
+      val text = transcription.transcribeStream(read, config) { response ->
         emitOnTranscriptionEvent(
           Arguments.createMap().apply {
             putString("streamId", streamId)
@@ -231,7 +244,13 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
           },
         )
       }
-      stream.text.complete(text)
+      stream.close()
+      stream.result.complete(
+        Arguments.createMap().apply {
+          putString("text", text)
+          putString("language", transcription.languageOf(config))
+        },
+      )
     }
     promise.resolve(null)
   }
@@ -240,8 +259,11 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
     launch(promise) {
       val stream = transcriptionStreams[streamId]
         ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Unknown transcription stream: $streamId")
-      // Recognition ended early, so rethrow why
-      if (stream.text.isCompleted) stream.text.await()
+      // Recognition ended early: rethrow why, or drop audio it can no longer hear
+      if (stream.result.isCompleted) {
+        stream.result.await()
+        return@launch null
+      }
       stream.audio.write(Base64.decode(pcmBase64, Base64.DEFAULT))
     }
 
@@ -250,8 +272,8 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
       val stream = transcriptionStreams.remove(streamId)
         ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Unknown transcription stream: $streamId")
       // Closing the pipe ends the audio, so recognition finishes what it has heard
-      stream.audio.close()
-      stream.text.await()
+      runCatching { stream.audio.close() }
+      stream.result.await()
     }
 
   override fun getEmbeddingModelInfo(promise: Promise) =
@@ -299,6 +321,11 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
     }
 
   override fun invalidate() {
+    transcriptionStreams.values.forEach { stream ->
+      stream.close()
+      stream.result.cancel()
+    }
+    transcriptionStreams.clear()
     activeRuns.values.forEach { it.cancel() }
     activeRuns.clear()
     scope.cancel()

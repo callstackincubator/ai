@@ -57,6 +57,10 @@ class Transcription(
         "Not a BCP 47 language tag: $tag. Use a tag such as en-US",
       )
 
+  /** The language the recognizer transcribes, as a BCP 47 tag. */
+  fun languageOf(config: TranscriptionConfig): String =
+    (config.locale?.let(::locale) ?: Locale.getDefault()).toLanguageTag()
+
   suspend fun getModelInfo(config: TranscriptionConfig): ModelInfo =
     ModelInfo(availability = availabilityOf(client(config).checkStatus()))
 

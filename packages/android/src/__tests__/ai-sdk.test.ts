@@ -57,9 +57,10 @@ const startTranscriptionStream = mock(
 const appendTranscriptionAudio = mock(
   async (_streamId: string, _pcmBase64: string) => {}
 )
-const finishTranscriptionStream = mock(
-  async (_streamId: string) => 'hello world'
-)
+const finishTranscriptionStream = mock(async (_streamId: string) => ({
+  text: 'hello world',
+  language: 'en-US',
+}))
 const prepareTask = mock(async (_task: string, _options: unknown) => {})
 const getTaskModelInfo = mock(
   async (
@@ -808,7 +809,11 @@ describe('streaming transcription', () => {
       startSecond: 0.1,
       endSecond: 0.6,
     })
-    expect(parts.at(-1)).toMatchObject({ type: 'finish', text: 'hello world' })
+    expect(parts.at(-1)).toMatchObject({
+      type: 'finish',
+      text: 'hello world',
+      language: 'en',
+    })
   })
 
   test('rejects audio ML Kit cannot stream', async () => {
@@ -818,5 +823,58 @@ describe('streaming transcription', () => {
         inputAudioFormat: { type: 'audio/pcm', rate: 48000 },
       } as any)
     ).rejects.toThrow('16 kHz')
+  })
+
+  test('sends a final without word timings without times', async () => {
+    appendTranscriptionAudio.mockImplementationOnce(async (streamId) => {
+      onTranscriptionEvent.emit({
+        streamId,
+        type: 'final',
+        segmentIndex: 0,
+        text: 'hi',
+        words: [],
+      })
+    })
+
+    const { stream } = await model.doStream({
+      audio: audioStream([new Uint8Array([1, 2])]),
+      inputAudioFormat: { type: 'audio/pcm', rate: 16000 },
+    } as any)
+    const parts: any[] = []
+    const reader = stream.getReader()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      parts.push(value)
+    }
+
+    expect(parts.find((part) => part.type === 'transcript-final')).toEqual({
+      type: 'transcript-final',
+      id: 'segment-0',
+      text: 'hi',
+    })
+    expect(parts.at(-1)).toMatchObject({ type: 'finish', segments: [] })
+  })
+
+  test('ends a cancelled live stream without finishing it', async () => {
+    finishTranscriptionStream.mockClear()
+    // A microphone stream never closes on its own
+    const audio = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2]))
+      },
+    })
+
+    const { stream } = await model.doStream({
+      audio,
+      inputAudioFormat: { type: 'audio/pcm', rate: 16000 },
+    } as any)
+    const reader = stream.getReader()
+    await reader.read()
+    await reader.cancel()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(cancel).toHaveBeenCalled()
+    expect(finishTranscriptionStream).not.toHaveBeenCalled()
   })
 })

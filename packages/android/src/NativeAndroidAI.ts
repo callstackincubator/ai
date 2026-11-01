@@ -115,6 +115,12 @@ export interface TranscriptionEvent {
   words?: { text: string; startMs: number }[]
 }
 
+export interface NativeStreamTranscriptionResult {
+  text: string
+  /** BCP 47 locale the recognizer transcribed, such as en-US */
+  language: string
+}
+
 export interface NativeEmbeddingModelInfo {
   availability: string
   dimension?: number
@@ -168,7 +174,9 @@ export interface Spec extends TurboModule {
   ): Promise<void>
   appendTranscriptionAudio(streamId: string, pcmBase64: string): Promise<void>
   /** Ends the audio and resolves with the whole text */
-  finishTranscriptionStream(streamId: string): Promise<string>
+  finishTranscriptionStream(
+    streamId: string
+  ): Promise<NativeStreamTranscriptionResult>
 
   getEmbeddingModelInfo(): Promise<NativeEmbeddingModelInfo>
   prepareEmbedding(): Promise<void>

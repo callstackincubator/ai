@@ -1016,6 +1016,8 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
     const transcriptionOptions = this.options
     const audio = options.audio.getReader()
     let listener: { remove(): void } | undefined
+    // Set when the consumer cancels the stream, which ends it without a result
+    let cancelled = false
     const cleanup = () => {
       listener?.remove()
       abortSignal?.removeEventListener('abort', onAbort)
@@ -1027,57 +1029,64 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
 
     const stream = new ReadableStream<TranscriptionModelV4StreamPart>({
       async start(controller) {
-        controller.enqueue({ type: 'stream-start', warnings: [] })
-        controller.enqueue({
-          type: 'response-metadata',
-          timestamp: new Date(),
-          modelId,
-        })
-
-        const segments: {
-          text: string
-          startSecond: number
-          endSecond: number
-        }[] = []
-        // Text sent so far of each segment, to send what the next result adds
-        const sentText = new Map<number, string>()
-        listener = native.onTranscriptionEvent((event) => {
-          if (event.streamId !== streamId) {
-            return
-          }
-          const id = `segment-${event.segmentIndex}`
-          const sent = sentText.get(event.segmentIndex) ?? ''
-          const text = event.text.trim()
-          if (text.startsWith(sent) && text.length > sent.length) {
-            const separator = sent === '' && event.segmentIndex > 0 ? ' ' : ''
-            controller.enqueue({
-              type: 'transcript-delta',
-              id,
-              delta: separator + text.slice(sent.length),
-            })
-            sentText.set(event.segmentIndex, text)
-          }
-          if (event.type === 'final' && text) {
-            // ML Kit times when each word starts, so a segment ends as its last word starts
-            const words = event.words ?? []
-            const segment = {
-              text,
-              startSecond: (words[0]?.startMs ?? 0) / 1000,
-              endSecond: (words.at(-1)?.startMs ?? 0) / 1000,
-            }
-            segments.push(segment)
-            controller.enqueue({ type: 'transcript-final', id, ...segment })
-          }
-        })
-        abortSignal?.addEventListener('abort', onAbort)
-
         try {
+          controller.enqueue({ type: 'stream-start', warnings: [] })
+          controller.enqueue({
+            type: 'response-metadata',
+            timestamp: new Date(),
+            modelId,
+          })
+
+          const segments: {
+            text: string
+            startSecond: number
+            endSecond: number
+          }[] = []
+          // Text sent so far of each segment, to send what the next result adds.
+          // Deltas only append, so a final text that rewrites the partial comes
+          // in its transcript-final part only
+          const sentText = new Map<number, string>()
+          listener = native.onTranscriptionEvent((event) => {
+            if (event.streamId !== streamId) {
+              return
+            }
+            const id = `segment-${event.segmentIndex}`
+            const sent = sentText.get(event.segmentIndex) ?? ''
+            const text = event.text.trim()
+            if (text.startsWith(sent) && text.length > sent.length) {
+              const separator = sent === '' && event.segmentIndex > 0 ? ' ' : ''
+              controller.enqueue({
+                type: 'transcript-delta',
+                id,
+                delta: separator + text.slice(sent.length),
+              })
+              sentText.set(event.segmentIndex, text)
+            }
+            if (event.type === 'final' && text) {
+              // ML Kit times when each word starts, so a segment ends as its
+              // last word starts. Without word timings it has no times
+              const words = event.words ?? []
+              if (words.length === 0) {
+                controller.enqueue({ type: 'transcript-final', id, text })
+                return
+              }
+              const segment = {
+                text,
+                startSecond: words[0]!.startMs / 1000,
+                endSecond: words.at(-1)!.startMs / 1000,
+              }
+              segments.push(segment)
+              controller.enqueue({ type: 'transcript-final', id, ...segment })
+            }
+          })
+          abortSignal?.addEventListener('abort', onAbort, { once: true })
+
           await native.startTranscriptionStream(streamId, transcriptionOptions)
           // A sample can be split across chunks
           let carry: number | undefined
           while (true) {
             const { done, value } = await audio.read()
-            if (done || abortSignal?.aborted) {
+            if (done || cancelled || abortSignal?.aborted) {
               break
             }
             let chunk =
@@ -1102,16 +1111,19 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
               )
             }
           }
+          if (cancelled) {
+            return
+          }
           if (abortSignal?.aborted) {
             throw getAbortReason(abortSignal)
           }
 
-          const text = await native.finishTranscriptionStream(streamId)
+          const result = await native.finishTranscriptionStream(streamId)
           controller.enqueue({
             type: 'finish',
-            text,
+            text: result.text,
             segments,
-            language: transcriptionOptions.locale?.split(/[-_]/)[0],
+            language: result.language.split(/[-_]/)[0],
             durationInSeconds: undefined,
           })
           controller.close()
@@ -1119,17 +1131,22 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
           native.cancel(streamId)
           // Stops a live source, such as a microphone, from capturing on
           audio.cancel(error).catch(() => {})
-          controller.error(
-            abortSignal?.aborted
-              ? getAbortReason(abortSignal)
-              : toAndroidAIError(error)
-          )
+          // A cancelled stream takes no more parts
+          if (!cancelled) {
+            controller.error(
+              abortSignal?.aborted
+                ? getAbortReason(abortSignal)
+                : toAndroidAIError(error)
+            )
+          }
         } finally {
           cleanup()
           audio.releaseLock()
         }
       },
+      // Ends the audio too, so a live source such as a microphone stops
       cancel() {
+        cancelled = true
         onAbort()
         cleanup()
       },
