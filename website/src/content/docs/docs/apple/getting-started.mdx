@@ -37,7 +37,8 @@ Examples with schemas also use `zod`.
 import { apple } from '@react-native-ai/apple'
 import { generateText } from 'ai'
 
-if (apple.isAvailable()) {
+const { availability } = await apple.getModelInfo()
+if (availability === 'available') {
   const { text } = await generateText({
     model: apple(),
     prompt: 'Explain quantum computing in simple terms.',
@@ -45,10 +46,9 @@ if (apple.isAvailable()) {
 }
 ```
 
-`isAvailable()` is `false` when the device is not eligible, Apple Intelligence
-is off, or the model is still downloading. [`getModelInfo()`](/docs/apple/models#availability-and-model-info)
-tells you which. Before iOS 26, `isAvailable()` is `false` and `getModelInfo()`
-rejects with `UNSUPPORTED_OS`.
+When the device is not eligible, Apple Intelligence is off, or the model is
+still downloading, [`availability`](/docs/apple/models#availability-and-model-info)
+tells you which. Before iOS 26, `getModelInfo()` rejects with `UNSUPPORTED_OS`.
 
 To test in the iOS Simulator, turn on Apple Intelligence on your Mac first, see
 [Running on Simulator](/docs/apple/running-on-simulator).

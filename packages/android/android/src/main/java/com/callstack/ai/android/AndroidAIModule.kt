@@ -91,8 +91,6 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
       putString("arguments", FunctionJson.argumentsToJson(arguments).toString())
     }
 
-  override fun isAvailable(model: ReadableMap?): Boolean = nano.isAvailable(NanoConfig.from(model))
-
   override fun getModelInfo(model: ReadableMap?, promise: Promise) =
     launch(promise) { nano.getModelInfo(NanoConfig.from(model)).toWritableMap() }
 
@@ -161,9 +159,6 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
   override fun cancel(runId: String) {
     activeRuns.remove(runId)?.cancel()
   }
-
-  override fun isTranscriptionAvailable(options: ReadableMap): Boolean =
-    transcription.isAvailable(TranscriptionConfig.from(options))
 
   override fun getTranscriptionModelInfo(options: ReadableMap, promise: Promise) =
     launch(promise) { transcription.getModelInfo(TranscriptionConfig.from(options)).toWritableMap() }

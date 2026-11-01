@@ -55,19 +55,6 @@ public class AppleLLMImpl: NSObject {
   }
   
   @objc
-  public func isAvailable() -> Bool {
-#if canImport(FoundationModels)
-    if #available(iOS 26, *) {
-      return SystemLanguageModel.default.availability == .available
-    } else {
-      return false
-    }
-#else
-    return false
-#endif
-  }
-
-  @objc
   public func countTokens(
     _ text: String,
     resolve: @escaping (Any?) -> Void,

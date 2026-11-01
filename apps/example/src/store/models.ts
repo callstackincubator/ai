@@ -1,6 +1,6 @@
 import type { LanguageModelV4 } from '@ai-sdk/provider'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomWithRefresh } from 'jotai/utils'
+import { atomWithRefresh, unwrap } from 'jotai/utils'
 
 import { createAppleLanguageSetupAdapter } from '../adapters/apple'
 import { createLlamaLanguageSetupAdapter } from '../adapters/llama'
@@ -44,10 +44,21 @@ export function formatSize(bytes: number) {
 }
 
 const availabilityAtom = atomWithRefresh(
-  () =>
+  async () =>
     new Map<string, Availability>(
-      chatModels.map((adapter) => [adapter.modelId, adapter.isAvailable()])
+      await Promise.all(
+        chatModels.map(
+          async (adapter) =>
+            [adapter.modelId, await adapter.isAvailable()] as const
+        )
+      )
     )
+)
+
+// Keeps the last result while a refresh is in flight
+const availabilityValueAtom = unwrap(
+  availabilityAtom,
+  (prev) => prev ?? new Map<string, Availability>()
 )
 
 const downloadProgressAtom = atom<Record<string, number>>({})
@@ -63,7 +74,7 @@ let modelTransition = Promise.resolve()
 let activeModel: SetupAdapter<LanguageModelV4> | undefined
 
 export function useModels() {
-  const availability = useAtomValue(availabilityAtom)
+  const availability = useAtomValue(availabilityValueAtom)
   const refreshAvailability = useSetAtom(availabilityAtom)
   const setDownloadProgress = useSetAtom(downloadProgressAtom)
   const [selectedModelId, setSelectedModelId] = useAtom(selectedModelIdAtom)

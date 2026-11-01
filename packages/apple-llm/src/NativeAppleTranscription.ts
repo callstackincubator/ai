@@ -44,7 +44,6 @@ export interface AppleTranscriptionModelInfo {
 }
 
 export interface Spec extends TurboModule {
-  isAvailable(language: string): boolean
   getModelInfo(language: string): Promise<CodegenTypes.UnsafeObject>
   prepare(language: string): Promise<void>
   startLiveTranscription(sessionId: string, language: string): Promise<void>
@@ -205,8 +204,6 @@ export default {
       },
     }
   },
-  // Whether the device can transcribe. getModelInfo reports locale support
-  isAvailable: NativeAppleTranscription.isAvailable,
   getModelInfo: (language: string) =>
     NativeAppleTranscription.getModelInfo(
       language

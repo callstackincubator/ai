@@ -48,17 +48,6 @@ public class AppleTranscriptionImpl: NSObject {
     }
   }
 
-  /// Whether the device can transcribe. Locale support is only known
-  /// asynchronously, so getModelInfo reports it
-  @objc
-  public func isAvailable(_ language: String) -> Bool {
-    if #available(iOS 26, *) {
-      return SpeechTranscriber.isAvailable
-    } else {
-      return false
-    }
-  }
-
   @objc
   public func getModelInfo(_ language: String, resolve: @escaping (Any?) -> Void, reject: @escaping (String, String, Error?) -> Void) {
     guard #available(iOS 26, *) else {

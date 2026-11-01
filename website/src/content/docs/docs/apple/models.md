@@ -8,22 +8,20 @@ Private Cloud Compute.
 
 ## Availability And Model Info
 
-`apple.isAvailable()` is a quick synchronous check that Apple Intelligence can
-run on the device:
+`getModelInfo()` reports whether Apple Intelligence can run on the device, and
+what it supports:
 
 ```typescript
 import { apple } from '@react-native-ai/apple'
 
-if (!apple.isAvailable()) {
+const info = await apple.getModelInfo({ locale: 'en-US' })
+
+if (info.availability !== 'available') {
   // Show fallback UI or use another provider.
 }
 ```
 
-`getModelInfo()` tells you more:
-
-```typescript
-const info = await apple.getModelInfo({ locale: 'en-US' })
-```
+Before iOS 26, it rejects with `UNSUPPORTED_OS`.
 
 It returns `availability`, locale support (`supportsLocale`,
 `supportedLanguages`), `contextSize` when Apple exposes it, the Private Cloud

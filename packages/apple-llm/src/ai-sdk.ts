@@ -958,7 +958,6 @@ export function createAppleProvider({
     return createLanguageModel(options)
   }
   provider.specificationVersion = 'v4' as const
-  provider.isAvailable = () => NativeAppleLLM.isAvailable()
   provider.getModelInfo = (
     options: { locale?: string; model?: AppleLanguageModelId } = {}
   ) =>
@@ -1065,12 +1064,7 @@ class AppleTranscriptionModel implements TranscriptionModelV4 {
     this.language = options.language ?? NativeAppleUtils.getCurrentLocale()
   }
 
-  /** Whether the device can transcribe. See getModelInfo for locale support */
-  isAvailable(): boolean {
-    return NativeAppleTranscription.isAvailable(this.language)
-  }
-
-  /** Locale support and asset status for the model's language */
+  /** Whether the device can transcribe, locale support and asset status for the model's language */
   getModelInfo() {
     return NativeAppleTranscription.getModelInfo(this.language)
   }

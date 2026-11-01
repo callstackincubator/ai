@@ -50,7 +50,6 @@ export type StreamErrorEvent = {
 }
 
 export interface Spec extends TurboModule {
-  isAvailable(): boolean
   getModelInfo(
     locale?: string,
     model?: string

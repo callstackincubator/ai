@@ -17,8 +17,14 @@ export function createAppleLanguageSetupAdapter(): SetupAdapter<LanguageModelV4>
     // Image prompts need iOS 27
     imageInput:
       Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 27,
-    isAvailable() {
-      return Platform.OS === 'ios' && apple.isAvailable() ? 'yes' : 'no'
+    async isAvailable() {
+      if (Platform.OS !== 'ios') return 'no'
+      try {
+        const { availability } = await apple.getModelInfo()
+        return availability === 'available' ? 'yes' : 'no'
+      } catch {
+        return 'no'
+      }
     },
     async download() {},
     async delete() {},

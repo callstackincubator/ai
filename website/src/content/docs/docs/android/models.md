@@ -7,20 +7,11 @@ AICore downloads it on first use and updates it on its own.
 
 ## Checking Availability
 
-`isAvailable()` answers synchronously, from the last status `getModelInfo()` or
-`prepare()` saw, or else from whether AICore is installed:
+`getModelInfo()` checks with AICore:
 
 ```typescript
 import { android } from '@react-native-ai/android'
 
-if (android.isAvailable()) {
-  // Offer on-device features
-}
-```
-
-`getModelInfo()` checks with AICore:
-
-```typescript
 const info = await android.getModelInfo()
 // {
 //   availability: 'available',
@@ -73,4 +64,4 @@ const preview = createAndroidProvider({
 [Tool calling](/docs/android/tools) needs Gemini Nano 4: the preview release
 with `fast`, or the default model on devices that ship it, such as the Galaxy Z
 Flip 8 and Fold 8.
-`getModelInfo` and `isAvailable` take the same selection.
+`getModelInfo` takes the same selection.

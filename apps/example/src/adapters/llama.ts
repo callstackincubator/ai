@@ -57,7 +57,7 @@ export function createLlamaLanguageSetupAdapter({
     sizeBytes,
     builtIn: false,
     imageInput: Boolean(projectorId),
-    isAvailable(): Availability {
+    async isAvailable(): Promise<Availability> {
       return files.every(isDownloaded) ? 'yes' : 'availableForDownload'
     },
     async download(onProgress) {

@@ -1,7 +1,6 @@
 package com.callstack.ai.android
 
 import android.content.Context
-import android.os.Build
 import android.util.Base64
 import com.facebook.react.bridge.ReadableMap
 import com.google.mlkit.genai.common.FeatureStatus
@@ -32,8 +31,6 @@ class Transcription(
 ) {
   private val clients = ConcurrentHashMap<TranscriptionConfig, SpeechRecognizer>()
   private val prepared = ConcurrentHashMap.newKeySet<TranscriptionConfig>()
-  // The last status seen per language and mode, for the synchronous check
-  private val statuses = ConcurrentHashMap<TranscriptionConfig, Int>()
   // One lock per language and mode, so one download does not hold up another
   private val prepareMutexes = ConcurrentHashMap<TranscriptionConfig, Mutex>()
 
@@ -58,23 +55,8 @@ class Transcription(
         "Not a BCP 47 language tag: $tag. Use a tag such as en-US",
       )
 
-  /**
-   * Whether the recognizer is available, downloadable or downloading, answered without async work: from the last
-   * status this process saw, or else from what the mode needs (Android 12 for basic, AICore for advanced).
-   */
-  fun isAvailable(config: TranscriptionConfig): Boolean {
-    statuses[config]?.let {
-      return it == FeatureStatus.AVAILABLE || it == FeatureStatus.DOWNLOADABLE || it == FeatureStatus.DOWNLOADING
-    }
-    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-      (config.mode != "advanced" || isAICoreInstalled(context))
-  }
-
-  suspend fun getModelInfo(config: TranscriptionConfig): ModelInfo {
-    val status = client(config).checkStatus()
-    statuses[config] = status
-    return ModelInfo(availability = availabilityOf(status))
-  }
+  suspend fun getModelInfo(config: TranscriptionConfig): ModelInfo =
+    ModelInfo(availability = availabilityOf(client(config).checkStatus()))
 
   /** Downloads the recognizer's model when needed, reporting progress, then warms it up. */
   suspend fun prepare(config: TranscriptionConfig) {
@@ -83,9 +65,7 @@ class Transcription(
       if (config in prepared) return
 
       val recognizer = client(config)
-      val status = recognizer.checkStatus()
-      statuses[config] = status
-      when (status) {
+      when (val status = recognizer.checkStatus()) {
         FeatureStatus.UNAVAILABLE ->
           throw AndroidAIErrors.CodedException(
             AndroidAIErrors.MODEL_UNAVAILABLE,
@@ -96,7 +76,6 @@ class Transcription(
       }
       recognizer.warmup()
       prepared.add(config)
-      statuses[config] = FeatureStatus.AVAILABLE
     }
   }
 

@@ -1,7 +1,7 @@
 import { apple, AppleEmbeddings, AppleUtils } from '@react-native-ai/apple'
 import type { SFSymbol } from 'expo-symbols'
-import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomWithRefresh, loadable } from 'jotai/utils'
+import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { atomWithRefresh, loadable, unwrap } from 'jotai/utils'
 import { Platform } from 'react-native'
 
 import { isSimulator } from '../simulator'
@@ -88,9 +88,21 @@ function deviceLanguage() {
   return Platform.OS === 'ios' ? AppleUtils.getCurrentLocale() : 'en-US'
 }
 
-export function isTranscriptionAvailable() {
-  if (isSimulator) return true
-  return Platform.OS === 'ios' && apple.transcriptionModel().isAvailable()
+const transcriptionAvailableAtom = unwrap(
+  atom(async () => {
+    if (isSimulator) return true
+    if (Platform.OS !== 'ios') return false
+    try {
+      return (await apple.transcriptionModel().getModelInfo()).isAvailable
+    } catch {
+      return false
+    }
+  }),
+  () => false
+)
+
+export function useTranscriptionAvailable() {
+  return useAtomValue(transcriptionAvailableAtom)
 }
 
 // Apple's embedding assets ship separately and download on first prepare

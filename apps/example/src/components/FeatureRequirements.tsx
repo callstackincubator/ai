@@ -5,9 +5,9 @@ import type { Capability, Runtime } from '../adapters/types'
 import { isSimulator } from '../simulator'
 import type { FeatureId } from '../store/features'
 import {
-  isTranscriptionAvailable,
   useEmbeddingsStatus,
   useEnabledFeatures,
+  useTranscriptionAvailable,
 } from '../store/features'
 import {
   chatModels,
@@ -128,6 +128,7 @@ function EmbeddingsRow() {
 // What a feature needs, with a way to get each missing piece
 export function FeatureRequirements({ feature }: { feature: FeatureId }) {
   const { isEnabled } = useEnabledFeatures()
+  const transcriptionAvailable = useTranscriptionAvailable()
   switch (feature) {
     case 'chat':
       return (
@@ -145,11 +146,11 @@ export function FeatureRequirements({ feature }: { feature: FeatureId }) {
             subtitle={
               isSimulator
                 ? 'Simulator preview: hears a scripted question'
-                : isTranscriptionAvailable()
+                : transcriptionAvailable
                   ? 'Transcribes on device as you speak'
                   : 'Not available for your language'
             }
-            state={isTranscriptionAvailable() ? 'ready' : 'unavailable'}
+            state={transcriptionAvailable ? 'ready' : 'unavailable'}
           />
           <RequirementRow
             symbol="speaker.wave.2"
