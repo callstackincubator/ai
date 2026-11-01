@@ -475,8 +475,8 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
         aspectRatio: options.aspectRatio,
         seed: options.seed,
         ...(options.files?.[0] ? await toImageInput(options.files[0]) : {}),
-        onProgress: this.onProgress,
         ...(options.providerOptions?.['core-ai'] ?? {}),
+        onProgress: this.onProgress,
       },
       options.abortSignal
     )
@@ -623,8 +623,8 @@ export class CoreAIVideoModel implements VideoModelV4 {
         duration: options.duration,
         fps: options.fps,
         seed: options.seed,
-        onProgress: this.onProgress,
         ...(options.providerOptions?.['core-ai'] ?? {}),
+        onProgress: this.onProgress,
       },
       options.abortSignal
     )

@@ -649,7 +649,7 @@ public class CoreAIImpl: NSObject {
     config: [String: Any],
     prompt: String,
     options: [String: Any]?,
-    onProgress: @escaping ([String: Any]) -> Void,
+    onProgress: @escaping @Sendable ([String: Any]) -> Void,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
@@ -683,7 +683,7 @@ public class CoreAIImpl: NSObject {
     config: [String: Any],
     prompt: String,
     options: [String: Any]?,
-    onProgress: @escaping ([String: Any]) -> Void,
+    onProgress: @escaping @Sendable ([String: Any]) -> Void,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
@@ -706,13 +706,15 @@ public class CoreAIImpl: NSObject {
             startingImage: editsImage ? startingImage : nil
           )
           let result = try await pipeline.generateImages(configuration: configuration) { progress in
+            // Steps after a cancel aren't reported, since generation stops
+            guard !Task.isCancelled else { return false }
             onProgress([
               "requestId": requestId,
               "phase": "denoising",
               "step": progress.step,
               "totalSteps": progress.totalSteps
             ])
-            return !Task.isCancelled
+            return true
           }
           try Task.checkCancellation()
           let images = try result.images.map(Self.pngBase64)

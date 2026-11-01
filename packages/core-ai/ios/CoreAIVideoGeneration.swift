@@ -24,12 +24,14 @@ enum VideoGeneration {
     let (pipeline, shape) = try await self.pipeline(at: sourceURL, options: options)
     let configuration = try makeConfiguration(prompt: prompt, pipeline: pipeline, shape: shape, options: options)
     let result = try await pipeline.generateVideo(configuration: configuration) { progress in
+      // Phases after a cancel aren't reported, since generation stops
+      guard !Task.isCancelled else { return false }
       onProgress([
         "phase": phaseName(progress.phase),
         "step": progress.step,
         "totalSteps": progress.totalSteps
       ])
-      return !Task.isCancelled
+      return true
     }
     try Task.checkCancellation()
 
