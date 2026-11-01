@@ -68,6 +68,24 @@ const generateVideo = mock(
     seed: 1,
   })
 )
+const generateImage = mock(
+  async (
+    _config: Record<string, unknown>,
+    _prompt: string,
+    options: Record<string, unknown>
+  ): Promise<Record<string, unknown>> => ({
+    images: ['AAAA'],
+    metadata: {
+      count: 1,
+      imageFormat: 'image/png',
+      width: 512,
+      height: 512,
+      ...(options.imageUri || options.imageBase64
+        ? { imageToImage: true }
+        : {}),
+    },
+  })
+)
 const embed = mock(
   async (
     _config: Record<string, unknown>,
@@ -122,6 +140,7 @@ mock.module('react-native', () => ({
       streamText,
       cancelStream,
       generateVideo,
+      generateImage,
       embed,
       runTask,
       createLanguageSession,
@@ -1201,5 +1220,97 @@ describe('core ai video generation', () => {
     await expect(videoModel().doGenerate(callOptions())).rejects.toThrow(
       'out of memory'
     )
+  })
+})
+
+describe('core ai image editing', () => {
+  const imageModel = () => coreAI.imageModel({ id: 'flux', source: '/flux' })
+
+  const callOptions = (overrides: object = {}) => ({
+    prompt: 'make it blue',
+    n: 1,
+    size: undefined,
+    aspectRatio: undefined,
+    seed: undefined,
+    files: undefined,
+    mask: undefined,
+    providerOptions: {},
+    ...overrides,
+  })
+
+  const lastOptions = () => generateImage.mock.calls.at(-1)![2]
+
+  test('passes the first image as base64', async () => {
+    const { warnings } = await imageModel().doGenerate(
+      callOptions({
+        files: [
+          {
+            type: 'file',
+            mediaType: 'image/png',
+            data: new Uint8Array([1, 2, 3]),
+          },
+        ],
+        providerOptions: { 'core-ai': { referenceGrid: 'half' } },
+      })
+    )
+
+    expect(lastOptions()).toMatchObject({
+      imageBase64: 'AQID',
+      referenceGrid: 'half',
+    })
+    expect(warnings).toEqual([])
+  })
+
+  test('passes data urls as base64 and local urls as uris', async () => {
+    await imageModel().doGenerate(
+      callOptions({
+        files: [{ type: 'url', url: 'data:image/png;base64,AQID' }],
+      })
+    )
+    expect(lastOptions()).toMatchObject({ imageBase64: 'AQID' })
+
+    await imageModel().doGenerate(
+      callOptions({ files: [{ type: 'url', url: 'file:///tmp/a.png' }] })
+    )
+    expect(lastOptions()).toMatchObject({ imageUri: 'file:///tmp/a.png' })
+  })
+
+  test('warns about extra images and masks', async () => {
+    const file = { type: 'file', mediaType: 'image/png', data: 'AQID' }
+    const { warnings } = await imageModel().doGenerate(
+      callOptions({ files: [file, file], mask: file })
+    )
+
+    expect(warnings).toEqual([
+      expect.objectContaining({ type: 'unsupported', feature: 'files' }),
+      expect.objectContaining({ type: 'unsupported', feature: 'mask' }),
+    ])
+  })
+
+  test('warns when the export cannot edit images', async () => {
+    generateImage.mockImplementationOnce(async () => ({
+      images: ['AAAA'],
+      metadata: {
+        count: 1,
+        imageFormat: 'image/png',
+        width: 512,
+        height: 512,
+        imageToImage: false,
+      },
+    }))
+
+    const { warnings } = await imageModel().doGenerate(
+      callOptions({
+        files: [{ type: 'file', mediaType: 'image/png', data: 'AQID' }],
+      })
+    )
+
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        type: 'unsupported',
+        feature: 'files',
+        details: expect.stringContaining('no image-to-image components'),
+      }),
+    ])
   })
 })

@@ -686,19 +686,29 @@ public class CoreAIImpl: NSObject {
         let sourceURL = try resolveSourceURL(config)
         Task {
           do {
+            let startingImage = try Self.startingImage(from: options)
             let pipeline = try await self.makeDiffusionPipeline(at: sourceURL, options: options)
-            let configuration = try self.makePipelineConfiguration(prompt: prompt, pipeline: pipeline, options: options)
+            // Exports without a VAE encoder generate from the prompt alone,
+            // which the metadata reports so JS can warn
+            let editsImage = startingImage != nil && pipeline.supportsImageToImage
+            let configuration = try self.makePipelineConfiguration(
+              prompt: prompt,
+              pipeline: pipeline,
+              options: options,
+              startingImage: editsImage ? startingImage : nil
+            )
             let result = try await pipeline.generateImages(configuration: configuration) { _ in true }
             let images = try result.images.map(Self.pngBase64)
-            resolve([
-              "images": images,
-              "metadata": [
-                "count": images.count,
-                "imageFormat": "image/png",
-                "width": result.images.first?.width ?? 0,
-                "height": result.images.first?.height ?? 0
-              ]
-            ])
+            var metadata: [String: Any] = [
+              "count": images.count,
+              "imageFormat": "image/png",
+              "width": result.images.first?.width ?? 0,
+              "height": result.images.first?.height ?? 0
+            ]
+            if startingImage != nil {
+              metadata["imageToImage"] = editsImage
+            }
+            resolve(["images": images, "metadata": metadata])
           } catch {
             reject(errorCode(error), error.localizedDescription, error)
           }
@@ -1279,7 +1289,8 @@ extension CoreAIImpl {
   private func makePipelineConfiguration(
     prompt: String,
     pipeline: FlowTransformerPipeline,
-    options: [String: Any]?
+    options: [String: Any]?,
+    startingImage: CGImage? = nil
   ) throws -> PipelineConfiguration {
     let defaults = pipeline.config
     let scheduler = SchedulerType(rawValue: options?["schedulerType"] as? String ?? "") ?? .discreteFlow
@@ -1295,13 +1306,46 @@ extension CoreAIImpl {
       stepCount: stepCount,
       guidanceScale: guidanceScale,
       schedulerType: scheduler,
+      startingImage: startingImage,
       strength: Float(options?["strength"] as? Double ?? 1.0),
+      referenceGrid: try Self.referenceGrid(from: options?["referenceGrid"], pipeline: pipeline),
       encoderScaleFactor: defaults.encoderScaleFactor ?? DiffusionDefaults.Image.scaleFactor,
       decoderScaleFactor: defaults.decoderScaleFactor ?? DiffusionDefaults.Image.scaleFactor,
       decoderShiftFactor: defaults.decoderShiftFactor ?? DiffusionDefaults.Image.decoderShiftFactor,
       decodeResolution: decodeResolution,
       lazyModelLoading: options?["lazyModelLoading"] as? Bool ?? true
     )
+  }
+
+  /// The requested reference grid, or the finest one the export has. iOS
+  /// exports carry the half grid only
+  private static func referenceGrid(
+    from option: Any?,
+    pipeline: FlowTransformerPipeline
+  ) throws -> ReferenceGrid {
+    if let name = option as? String {
+      guard let grid = ReferenceGrid(rawValue: name) else {
+        throw CoreAIError.invalidInput("referenceGrid must be full, half or quarter, got \(name).")
+      }
+      return grid
+    }
+    return [.full, .half, .quarter].first { pipeline.img2imgRoutes[$0] != nil } ?? .full
+  }
+
+  /// The image to edit, decoded with its EXIF orientation applied. The
+  /// pipeline resizes it to the model's size
+  private static func startingImage(from options: [String: Any]?) throws -> CGImage? {
+    if let base64 = options?["imageBase64"] as? String {
+      guard let data = Data(base64Encoded: base64),
+            let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+        throw CoreAIError.invalidInput("Could not decode imageBase64.")
+      }
+      return try decodeCGImage(source, description: "imageBase64")
+    }
+    if let imageUri = options?["imageUri"] as? String {
+      return try loadCGImage(from: ["imageUri": imageUri])
+    }
+    return nil
   }
 }
 #endif
@@ -1804,11 +1848,17 @@ extension CoreAIImpl {
       url = URL(fileURLWithPath: imageUri)
     }
 
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-          let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+      throw CoreAIError.invalidInput("Could not load image at \(url.path).")
+    }
+    return try decodeCGImage(source, description: "image at \(url.path)")
+  }
+
+  static func decodeCGImage(_ source: CGImageSource, description: String) throws -> CGImage {
+    guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
           let width = properties[kCGImagePropertyPixelWidth] as? Int,
           let height = properties[kCGImagePropertyPixelHeight] as? Int else {
-      throw CoreAIError.invalidInput("Could not load image at \(url.path).")
+      throw CoreAIError.invalidInput("Could not load \(description).")
     }
     // Decode with the EXIF orientation applied, so pixel coordinates match
     // the image as it is displayed
@@ -1818,7 +1868,7 @@ extension CoreAIImpl {
       kCGImageSourceThumbnailMaxPixelSize: max(width, height)
     ]
     guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-      throw CoreAIError.invalidInput("Could not load image at \(url.path).")
+      throw CoreAIError.invalidInput("Could not load \(description).")
     }
     return image
   }

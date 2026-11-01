@@ -33,6 +33,25 @@ const { image } = await generateImage({
 - `providerOptions['core-ai']` tunes the pipeline: `stepCount`, `guidanceScale`, `negativePrompt`, `schedulerType`, `decodeResolution` (`auto`, `full`, `half` or `tiled`) and `strength`.
 - The pipeline loads one part at a time, so a 4 GB model fits in an iPhone app's memory. `lazyModelLoading: false` loads it all at once.
 
+## Image Editing
+
+Pass an image with the prompt to edit it. FLUX.2 starts from noise and attends to the image's tokens, so the result keeps its layout and follows the prompt:
+
+```typescript
+const { image } = await generateImage({
+  model,
+  prompt: { images: [photo], text: 'make the apple green' },
+  seed: 1,
+  providerOptions: { 'core-ai': { stepCount: 4 } },
+})
+```
+
+- `photo` is a `Uint8Array`, base64 string, `file://` URL or `https://` URL, which is downloaded first. Images are decoded with their EXIF orientation and resized to the model's size.
+- The export needs a VAE encoder and an image-to-image transformer: `vae_encoder_half` and `transformer_512_img2img_half` in the iOS recipe. Without them the image is left out with a warning, and the result comes from the prompt alone.
+- `providerOptions['core-ai'].referenceGrid` (`full`, `half` or `quarter`) sets how many of the image's tokens the model attends to: more follows the image more closely and runs slower. It defaults to the finest grid the export has. `strength` has no effect on FLUX.2.
+- One image is edited per call, and there's no inpainting: extra images and a `mask` are left out with a warning.
+- `coreAI.imageModel(config).generate(prompt, { imageUri })` (or `imageBase64`) edits outside the AI SDK.
+
 ## Video Generation
 
 Pass `coreAI.videoModel(config)` to `experimental_generateVideo` to get a short MP4 clip.
