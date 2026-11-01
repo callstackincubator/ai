@@ -21,7 +21,7 @@ describe('core-ai availability', () => {
 
   it('rejects a model that is not on disk', async () => {
     await expect(
-      CoreAI.generateImage({ source: '/missing' }, 'a cat', {})
+      CoreAI.generateImage('missing-model', { source: '/missing' }, 'a cat', {})
     ).rejects.toMatchObject({ code: expect.any(String) })
   })
 

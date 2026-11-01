@@ -18,6 +18,7 @@ export type {
   CoreAIEmbeddingResult,
   CoreAIGenerationOptions,
   CoreAIGenerationPart,
+  CoreAIGenerationProgress,
   CoreAIImageGenerationOptions,
   CoreAIImageGenerationResult,
   CoreAIImageInput,

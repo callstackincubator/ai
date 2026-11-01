@@ -60,6 +60,13 @@ export type CoreAITranscriptionUpdateEvent = {
   endSecond: number
 }
 
+export type CoreAIGenerationProgressEvent = {
+  requestId: string
+  phase: string
+  step: number
+  totalSteps: number
+}
+
 export interface Spec extends TurboModule {
   getCapabilities(): Promise<CodegenTypes.UnsafeObject>
 
@@ -138,7 +145,9 @@ export interface Spec extends TurboModule {
     prompt: string,
     options: CodegenTypes.UnsafeObject
   ): Promise<CodegenTypes.UnsafeObject>
+  // Cancel with cancelStream(requestId)
   generateImage(
+    requestId: string,
     config: NativeCoreAIModelConfig,
     prompt: string,
     options: CodegenTypes.UnsafeObject
@@ -161,6 +170,8 @@ export interface Spec extends TurboModule {
   onStreamComplete: CodegenTypes.EventEmitter<CoreAIStreamCompleteEvent>
   onStreamError: CodegenTypes.EventEmitter<CoreAIStreamErrorEvent>
   onTranscriptionUpdate: CodegenTypes.EventEmitter<CoreAITranscriptionUpdateEvent>
+  // Progress of generateImage and generateVideo requests
+  onGenerationProgress: CodegenTypes.EventEmitter<CoreAIGenerationProgressEvent>
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeCoreAI')

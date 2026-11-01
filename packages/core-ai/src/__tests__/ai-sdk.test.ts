@@ -70,6 +70,7 @@ const generateVideo = mock(
 )
 const generateImage = mock(
   async (
+    _requestId: string,
     _config: Record<string, unknown>,
     _prompt: string,
     options: Record<string, unknown>
@@ -108,6 +109,7 @@ const onStreamUpdate = createEmitter()
 const onStreamComplete = createEmitter()
 const onStreamError = createEmitter()
 const onTranscriptionUpdate = createEmitter()
+const onGenerationProgress = createEmitter()
 
 const transcriptionResult = {
   text: 'hello world',
@@ -151,6 +153,7 @@ mock.module('react-native', () => ({
       appendTranscriptionAudio,
       finishTranscriptionStream,
       onTranscriptionUpdate,
+      onGenerationProgress,
     }),
   },
 }))
@@ -1238,7 +1241,7 @@ describe('core ai image editing', () => {
     ...overrides,
   })
 
-  const lastOptions = () => generateImage.mock.calls.at(-1)![2]
+  const lastOptions = () => generateImage.mock.calls.at(-1)![3]
 
   test('passes the first image as base64', async () => {
     const { warnings } = await imageModel().doGenerate(
@@ -1312,5 +1315,86 @@ describe('core ai image editing', () => {
         details: expect.stringContaining('no image-to-image components'),
       }),
     ])
+  })
+})
+
+describe('core ai generation progress', () => {
+  const imageModel = () => coreAI.imageModel({ id: 'flux', source: '/flux' })
+  const videoModel = () => coreAI.videoModel({ id: 'wan', source: '/wan' })
+
+  test('reports progress of its own image request', async () => {
+    generateImage.mockImplementationOnce(async (requestId) => {
+      onGenerationProgress.emit({
+        requestId: 'other',
+        phase: 'denoising',
+        step: 1,
+        totalSteps: 2,
+      })
+      onGenerationProgress.emit({
+        requestId,
+        phase: 'denoising',
+        step: 1,
+        totalSteps: 2,
+      })
+      return { images: ['AAAA'] }
+    })
+    const onProgress = mock(() => {})
+
+    await imageModel().doGenerate({
+      prompt: 'a cat',
+      n: 1,
+      size: undefined,
+      aspectRatio: undefined,
+      seed: undefined,
+      files: undefined,
+      mask: undefined,
+      providerOptions: { 'core-ai': { onProgress: onProgress as any } },
+    })
+
+    expect(onProgress.mock.calls).toEqual([
+      [{ phase: 'denoising', step: 1, totalSteps: 2 }],
+    ])
+    // The callback stays in JS
+    expect(generateImage.mock.calls.at(-1)![3]).not.toHaveProperty('onProgress')
+  })
+
+  test('stops reporting video progress once the call finishes', async () => {
+    let requestId = ''
+    generateVideo.mockImplementationOnce(async (id) => {
+      requestId = id
+      onGenerationProgress.emit({
+        requestId,
+        phase: 'encoding',
+        step: 0,
+        totalSteps: 2,
+      })
+      return { video: 'AAAA', mediaType: 'video/mp4' }
+    })
+    const onProgress = mock(() => {})
+
+    await videoModel().generate('a cat', { onProgress })
+    onGenerationProgress.emit({
+      requestId,
+      phase: 'denoising',
+      step: 1,
+      totalSteps: 2,
+    })
+
+    expect(onProgress.mock.calls).toEqual([
+      [{ phase: 'encoding', step: 0, totalSteps: 2 }],
+    ])
+  })
+
+  test('cancels the native image request on abort', async () => {
+    const controller = new AbortController()
+    generateImage.mockImplementationOnce(async (requestId) => {
+      controller.abort()
+      expect(cancelStream).toHaveBeenCalledWith(requestId)
+      throw new Error('cancelled')
+    })
+
+    await expect(
+      imageModel().generate('a cat', {}, controller.signal)
+    ).rejects.toMatchObject({ name: 'AbortError' })
   })
 })

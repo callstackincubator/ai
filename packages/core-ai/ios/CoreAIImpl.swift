@@ -649,6 +649,7 @@ public class CoreAIImpl: NSObject {
     config: [String: Any],
     prompt: String,
     options: [String: Any]?,
+    onProgress: @escaping @Sendable ([String: Any]) -> Void,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
@@ -659,7 +660,9 @@ public class CoreAIImpl: NSObject {
         startTask(requestId, onError: { _, code, message in
           reject(code, message, nil)
         }) {
-          resolve(try await VideoGeneration.generate(prompt: prompt, sourceURL: sourceURL, options: options ?? [:]))
+          resolve(try await VideoGeneration.generate(prompt: prompt, sourceURL: sourceURL, options: options ?? [:]) {
+            onProgress($0.merging(["requestId": requestId]) { current, _ in current })
+          })
         }
       } catch {
         reject(errorCode(error), error.localizedDescription, error)
@@ -672,11 +675,15 @@ public class CoreAIImpl: NSObject {
 #endif
   }
 
+  /// Generates images, reporting each denoising step. cancelStream(requestId)
+  /// stops it after the current step
   @objc
   public func generateImage(
-    _ config: [String: Any],
+    _ requestId: String,
+    config: [String: Any],
     prompt: String,
     options: [String: Any]?,
+    onProgress: @escaping @Sendable ([String: Any]) -> Void,
     resolve: @escaping (Any?) -> Void,
     reject: @escaping (String, String, Error?) -> Void
   ) {
@@ -684,34 +691,43 @@ public class CoreAIImpl: NSObject {
     if #available(iOS 27, macOS 27, *) {
       do {
         let sourceURL = try resolveSourceURL(config)
-        Task {
-          do {
-            let startingImage = try Self.startingImage(from: options)
-            let pipeline = try await self.makeDiffusionPipeline(at: sourceURL, options: options)
-            // Exports without a VAE encoder generate from the prompt alone,
-            // which the metadata reports so JS can warn
-            let editsImage = startingImage != nil && pipeline.supportsImageToImage
-            let configuration = try self.makePipelineConfiguration(
-              prompt: prompt,
-              pipeline: pipeline,
-              options: options,
-              startingImage: editsImage ? startingImage : nil
-            )
-            let result = try await pipeline.generateImages(configuration: configuration) { _ in true }
-            let images = try result.images.map(Self.pngBase64)
-            var metadata: [String: Any] = [
-              "count": images.count,
-              "imageFormat": "image/png",
-              "width": result.images.first?.width ?? 0,
-              "height": result.images.first?.height ?? 0
-            ]
-            if startingImage != nil {
-              metadata["imageToImage"] = editsImage
-            }
-            resolve(["images": images, "metadata": metadata])
-          } catch {
-            reject(errorCode(error), error.localizedDescription, error)
+        startTask(requestId, onError: { _, code, message in
+          reject(code, message, nil)
+        }) {
+          let startingImage = try Self.startingImage(from: options)
+          let pipeline = try await self.makeDiffusionPipeline(at: sourceURL, options: options)
+          // Exports without a VAE encoder generate from the prompt alone,
+          // which the metadata reports so JS can warn
+          let editsImage = startingImage != nil && pipeline.supportsImageToImage
+          let configuration = try self.makePipelineConfiguration(
+            prompt: prompt,
+            pipeline: pipeline,
+            options: options,
+            startingImage: editsImage ? startingImage : nil
+          )
+          let result = try await pipeline.generateImages(configuration: configuration) { progress in
+            // Steps after a cancel aren't reported, since generation stops
+            guard !Task.isCancelled else { return false }
+            onProgress([
+              "requestId": requestId,
+              "phase": "denoising",
+              "step": progress.step,
+              "totalSteps": progress.totalSteps
+            ])
+            return true
           }
+          try Task.checkCancellation()
+          let images = try result.images.map(Self.pngBase64)
+          var metadata: [String: Any] = [
+            "count": images.count,
+            "imageFormat": "image/png",
+            "width": result.images.first?.width ?? 0,
+            "height": result.images.first?.height ?? 0
+          ]
+          if startingImage != nil {
+            metadata["imageToImage"] = editsImage
+          }
+          resolve(["images": images, "metadata": metadata])
         }
       } catch {
         reject(errorCode(error), error.localizedDescription, error)

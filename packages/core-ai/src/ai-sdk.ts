@@ -38,6 +38,7 @@ import type {
   CoreAIEmbeddingResult,
   CoreAIGenerationOptions,
   CoreAIGenerationPart,
+  CoreAIGenerationProgress,
   CoreAIGenerationResult,
   CoreAIImageGenerationOptions,
   CoreAIImageGenerationResult,
@@ -440,26 +441,33 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
     this.modelId = getModelId(config)
   }
 
+  // The abort signal stops generation after the current denoising step
   async generate(
     prompt: string,
-    options: CoreAIImageGenerationOptions = {}
+    { onProgress, ...options }: CoreAIImageGenerationOptions = {},
+    abortSignal?: AbortSignal
   ): Promise<CoreAIImageGenerationResult> {
-    return NativeCoreAI.generateImage(
-      this.config,
-      prompt,
-      options
-    ) as Promise<CoreAIImageGenerationResult>
+    return runGeneration(
+      (requestId) =>
+        NativeCoreAI.generateImage(requestId, this.config, prompt, options),
+      onProgress,
+      abortSignal
+    )
   }
 
   async doGenerate(options: ImageModelV4CallOptions) {
-    const result = await this.generate(options.prompt ?? '', {
-      n: options.n,
-      size: options.size,
-      aspectRatio: options.aspectRatio,
-      seed: options.seed,
-      ...(options.files?.[0] ? await toImageInput(options.files[0]) : {}),
-      ...(options.providerOptions?.['core-ai'] ?? {}),
-    })
+    const result = await this.generate(
+      options.prompt ?? '',
+      {
+        n: options.n,
+        size: options.size,
+        aspectRatio: options.aspectRatio,
+        seed: options.seed,
+        ...(options.files?.[0] ? await toImageInput(options.files[0]) : {}),
+        ...(options.providerOptions?.['core-ai'] ?? {}),
+      },
+      options.abortSignal
+    )
 
     return {
       images: result.images,
@@ -481,6 +489,40 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
           } as any)
         : undefined,
     }
+  }
+}
+
+// Runs a native image or video request, forwards its progress events, and
+// cancels it when the signal aborts
+async function runGeneration<Result>(
+  run: (requestId: string) => Promise<unknown>,
+  onProgress: ((progress: CoreAIGenerationProgress) => void) | undefined,
+  abortSignal: AbortSignal | undefined
+): Promise<Result> {
+  // React Native's AbortSignal has no throwIfAborted()
+  if (abortSignal?.aborted) {
+    throw toAbortError(abortSignal)
+  }
+  const requestId = generateId()
+  const onAbort = () => NativeCoreAI.cancelStream(requestId)
+  abortSignal?.addEventListener('abort', onAbort)
+  const subscription =
+    onProgress &&
+    NativeCoreAI.onGenerationProgress(({ requestId: id, ...progress }) => {
+      if (id === requestId) {
+        onProgress(progress as CoreAIGenerationProgress)
+      }
+    })
+  try {
+    return (await run(requestId)) as Result
+  } catch (error) {
+    if (abortSignal?.aborted) {
+      throw toAbortError(abortSignal)
+    }
+    throw error
+  } finally {
+    subscription?.remove()
+    abortSignal?.removeEventListener('abort', onAbort)
   }
 }
 
@@ -507,31 +549,15 @@ export class CoreAIVideoModel implements VideoModelV4 {
   // signal stops it after the current denoising step
   async generate(
     prompt: string,
-    options: CoreAIVideoGenerationOptions = {},
+    { onProgress, ...options }: CoreAIVideoGenerationOptions = {},
     abortSignal?: AbortSignal
   ): Promise<CoreAIVideoGenerationResult> {
-    // React Native's AbortSignal has no throwIfAborted()
-    if (abortSignal?.aborted) {
-      throw toAbortError(abortSignal)
-    }
-    const requestId = generateId()
-    const onAbort = () => NativeCoreAI.cancelStream(requestId)
-    abortSignal?.addEventListener('abort', onAbort)
-    try {
-      return (await NativeCoreAI.generateVideo(
-        requestId,
-        this.config,
-        prompt,
-        options
-      )) as CoreAIVideoGenerationResult
-    } catch (error) {
-      if (abortSignal?.aborted) {
-        throw toAbortError(abortSignal)
-      }
-      throw error
-    } finally {
-      abortSignal?.removeEventListener('abort', onAbort)
-    }
+    return runGeneration(
+      (requestId) =>
+        NativeCoreAI.generateVideo(requestId, this.config, prompt, options),
+      onProgress,
+      abortSignal
+    )
   }
 
   async doGenerate(

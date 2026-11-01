@@ -237,15 +237,32 @@ static NSDictionary *CoreAIConfigToDictionary(NativeCoreAIModelConfig &config) {
               options:(nonnull NSDictionary *)options
               resolve:(nonnull RCTPromiseResolveBlock)resolve
                reject:(nonnull RCTPromiseRejectBlock)reject {
-  [_coreAI generateVideo:requestId config:CoreAIConfigToDictionary(config) prompt:prompt options:options resolve:resolve reject:reject];
+  [_coreAI generateVideo:requestId
+                  config:CoreAIConfigToDictionary(config)
+                  prompt:prompt
+                 options:options
+              onProgress:^(NSDictionary *progress) {
+    [self emitOnGenerationProgress:progress];
+  }
+                 resolve:resolve
+                  reject:reject];
 }
 
-- (void)generateImage:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
+- (void)generateImage:(nonnull NSString *)requestId
+               config:(JS::NativeCoreAI::NativeCoreAIModelConfig &)config
                prompt:(nonnull NSString *)prompt
               options:(nonnull NSDictionary *)options
               resolve:(nonnull RCTPromiseResolveBlock)resolve
                reject:(nonnull RCTPromiseRejectBlock)reject {
-  [_coreAI generateImage:CoreAIConfigToDictionary(config) prompt:prompt options:options resolve:resolve reject:reject];
+  [_coreAI generateImage:requestId
+                  config:CoreAIConfigToDictionary(config)
+                  prompt:prompt
+                 options:options
+              onProgress:^(NSDictionary *progress) {
+    [self emitOnGenerationProgress:progress];
+  }
+                 resolve:resolve
+                  reject:reject];
 }
 
 - (void)runTask:(nonnull NSString *)task

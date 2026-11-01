@@ -52,6 +52,31 @@ const { image } = await generateImage({
 - One image is edited per call, and there's no inpainting: extra images and a `mask` are left out with a warning.
 - `coreAI.imageModel(config).generate(prompt, { imageUri })` (or `imageBase64`) edits outside the AI SDK.
 
+## Progress
+
+Generation takes seconds per image and minutes per video. Pass `onProgress` in `providerOptions['core-ai']` to follow it. The callback gets `{ phase, step, totalSteps }`:
+
+```typescript
+import type { CoreAIGenerationProgress } from '@react-native-ai/core-ai'
+
+const onProgress = ({ phase, step, totalSteps }: CoreAIGenerationProgress) =>
+  setStatus(`${phase} ${step}/${totalSteps}`)
+
+const { video } = await generateVideo({
+  model: coreAI.videoModel({ id: 'wan2.1-t2v-1.3b', source: wanDirectory }),
+  prompt: 'a red ball rolling across a wooden table',
+  providerOptions: {
+    // providerOptions is typed as JSON, so a callback needs a cast
+    'core-ai': { onProgress: onProgress as any },
+  },
+})
+```
+
+- Images report `denoising` after each step, from step 1.
+- Videos report `encoding` as the prompt is encoded, `denoising` as each step starts (from step 0), then `decoding` and `assembling` the frames.
+- The `generate(prompt, { onProgress })` methods of `coreAI.imageModel(...)` and `coreAI.videoModel(...)` take the callback without a cast.
+- An `abortSignal` stops image and video generation after the current step.
+
 ## Video Generation
 
 Pass `coreAI.videoModel(config)` to `experimental_generateVideo` to get a short MP4 clip.
