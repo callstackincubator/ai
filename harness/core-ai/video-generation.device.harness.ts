@@ -47,10 +47,18 @@ describe('core-ai video generation', () => {
   it('reports each phase and denoising step in order', async () => {
     const progress: CoreAIGenerationProgress[] = []
     await generateVideo({
-      model: model.withProgress((update) => progress.push(update)),
+      model,
       prompt: 'a red ball rolling across a wooden table',
       seed: 1,
-      providerOptions: { 'core-ai': { stepCount: 2, cfgCutoff: 1 } },
+      providerOptions: {
+        'core-ai': {
+          stepCount: 2,
+          cfgCutoff: 1,
+          // providerOptions is typed as JSON, so a callback needs a cast
+          onProgress: ((update: CoreAIGenerationProgress) =>
+            progress.push(update)) as any,
+        },
+      },
     })
 
     expect(progress.map(({ phase, step }) => `${phase} ${step}`)).toEqual([

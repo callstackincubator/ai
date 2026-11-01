@@ -435,21 +435,10 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
   readonly modelId: string
   readonly maxImagesPerCall = 1
   readonly config: CoreAIModelConfig
-  private readonly onProgress?: (progress: CoreAIGenerationProgress) => void
 
-  constructor(
-    config: CoreAIModelConfig,
-    onProgress?: (progress: CoreAIGenerationProgress) => void
-  ) {
+  constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'diffusion' }
     this.modelId = getModelId(config)
-    this.onProgress = onProgress
-  }
-
-  // The same model, reporting the progress of the calls it is passed to.
-  // providerOptions only takes JSON, so the AI SDK can't carry a callback
-  withProgress(onProgress: (progress: CoreAIGenerationProgress) => void) {
-    return new CoreAIImageGenerationModel(this.config, onProgress)
   }
 
   // The abort signal stops generation after the current denoising step
@@ -476,7 +465,6 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
         seed: options.seed,
         ...(options.files?.[0] ? await toImageInput(options.files[0]) : {}),
         ...(options.providerOptions?.['core-ai'] ?? {}),
-        onProgress: this.onProgress,
       },
       options.abortSignal
     )
@@ -551,20 +539,10 @@ export class CoreAIVideoModel implements VideoModelV4 {
   readonly modelId: string
   readonly maxVideosPerCall = 1
   readonly config: CoreAIModelConfig
-  private readonly onProgress?: (progress: CoreAIGenerationProgress) => void
 
-  constructor(
-    config: CoreAIModelConfig,
-    onProgress?: (progress: CoreAIGenerationProgress) => void
-  ) {
+  constructor(config: CoreAIModelConfig) {
     this.config = { ...config, task: 'video-diffusion' }
     this.modelId = getModelId(config)
-    this.onProgress = onProgress
-  }
-
-  // The same model, reporting the progress of the calls it is passed to
-  withProgress(onProgress: (progress: CoreAIGenerationProgress) => void) {
-    return new CoreAIVideoModel(this.config, onProgress)
   }
 
   // Generates an MP4 from the prompt. Takes minutes on device, and the abort
@@ -624,7 +602,6 @@ export class CoreAIVideoModel implements VideoModelV4 {
         fps: options.fps,
         seed: options.seed,
         ...(options.providerOptions?.['core-ai'] ?? {}),
-        onProgress: this.onProgress,
       },
       options.abortSignal
     )

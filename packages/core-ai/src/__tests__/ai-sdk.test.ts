@@ -1340,7 +1340,7 @@ describe('core ai generation progress', () => {
     })
     const onProgress = mock(() => {})
 
-    await imageModel().withProgress(onProgress).doGenerate({
+    await imageModel().doGenerate({
       prompt: 'a cat',
       n: 1,
       size: undefined,
@@ -1348,7 +1348,7 @@ describe('core ai generation progress', () => {
       seed: undefined,
       files: undefined,
       mask: undefined,
-      providerOptions: {},
+      providerOptions: { 'core-ai': { onProgress: onProgress as any } },
     })
 
     expect(onProgress.mock.calls).toEqual([

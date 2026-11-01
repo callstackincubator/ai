@@ -85,10 +85,17 @@ describe('core-ai image generation', () => {
   it('reports each denoising step in order', async () => {
     const progress: CoreAIGenerationProgress[] = []
     await generateImage({
-      model: model.withProgress((update) => progress.push(update)),
+      model,
       prompt,
       seed: 1,
-      providerOptions: { 'core-ai': { stepCount: 2 } },
+      providerOptions: {
+        'core-ai': {
+          stepCount: 2,
+          // providerOptions is typed as JSON, so a callback needs a cast
+          onProgress: ((update: CoreAIGenerationProgress) =>
+            progress.push(update)) as any,
+        },
+      },
     })
 
     expect(progress).toEqual([
@@ -101,13 +108,18 @@ describe('core-ai image generation', () => {
     const controller = new AbortController()
     const progress: CoreAIGenerationProgress[] = []
     const result = generateImage({
-      model: model.withProgress((update) => {
-        progress.push(update)
-        controller.abort()
-      }),
+      model,
       prompt,
       abortSignal: controller.signal,
-      providerOptions: { 'core-ai': { stepCount: 4 } },
+      providerOptions: {
+        'core-ai': {
+          stepCount: 4,
+          onProgress: ((update: CoreAIGenerationProgress) => {
+            progress.push(update)
+            controller.abort()
+          }) as any,
+        },
+      },
     })
 
     await expect(result).rejects.toThrow()
