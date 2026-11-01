@@ -33,6 +33,7 @@ import {
   type NativeMessage,
   type NativeMessagePart,
   type NativeModelInfo,
+  type NativeTaskOptions,
   type NativeTranscriptionOptions,
 } from './NativeAndroidAI'
 
@@ -139,6 +140,46 @@ export interface AndroidEmbeddingModelInfo {
   modelSignature?: string
 }
 
+/** Languages proofreading and rewriting take, as ISO 639-1 codes */
+export type AndroidTaskLanguage = 'en' | 'ja' | 'de' | 'fr' | 'it' | 'es' | 'ko'
+
+export interface AndroidSummarizerOptions {
+  /** `article` (default) or `conversation`, as `<name>: <message>` lines */
+  inputType?: 'article' | 'conversation'
+  /** How many bullets the summary has, `oneBullet` by default */
+  outputType?: 'oneBullet' | 'twoBullets' | 'threeBullets'
+  /** `en` (default), `ja` or `ko` */
+  language?: 'en' | 'ja' | 'ko'
+  /** Truncates input past the model's limit of about 4000 tokens, instead of failing */
+  autoTruncate?: boolean
+}
+
+export interface AndroidProofreaderOptions {
+  /** `keyboard` (default) or `voice`, for text transcribed from speech */
+  inputType?: 'keyboard' | 'voice'
+  /** `en` by default */
+  language?: AndroidTaskLanguage
+}
+
+export interface AndroidRewriterOptions {
+  /** `rephrase` by default */
+  style?:
+    | 'elaborate'
+    | 'emojify'
+    | 'shorten'
+    | 'friendly'
+    | 'professional'
+    | 'rephrase'
+  /** `en` by default */
+  language?: AndroidTaskLanguage
+}
+
+export interface AndroidTaskCallOptions {
+  /** Called with the text as it is generated */
+  onText?: (text: string) => void
+  abortSignal?: AbortSignal
+}
+
 const toModelAvailability = (value: string): AndroidModelAvailability => {
   switch (value) {
     case 'available':
@@ -230,6 +271,17 @@ export function createAndroidProvider(
     new AndroidTranscriptionModel(options)
   provider.embeddingModel = (options: AndroidEmbeddingOptions = {}) =>
     new AndroidEmbeddingModel(options)
+  /** Summarizes articles or conversations into one to three bullets */
+  provider.summarizer = (options: AndroidSummarizerOptions = {}) =>
+    new AndroidSummarizer(options)
+  /** Fixes grammar and spelling, with suggestions best first */
+  provider.proofreader = (options: AndroidProofreaderOptions = {}) =>
+    new AndroidProofreader(options)
+  /** Rewrites text in a style, with suggestions best first */
+  provider.rewriter = (options: AndroidRewriterOptions = {}) =>
+    new AndroidRewriter(options)
+  /** Describes images in a short English sentence */
+  provider.imageDescriber = () => new AndroidImageDescriber()
   return provider
 }
 
@@ -989,5 +1041,147 @@ class AndroidEmbeddingModel implements EmbeddingModelV4 {
       throw getAbortReason(abortSignal)
     }
     return { embeddings, warnings: [] }
+  }
+}
+
+/**
+ * One of ML Kit's task APIs, which run Gemini Nano with an adapter for the
+ * task. Each downloads its adapter on first use
+ */
+class AndroidTaskModel {
+  private prepared = false
+
+  constructor(
+    private readonly task: string,
+    private readonly options: NativeTaskOptions
+  ) {}
+
+  /** The task's availability on this device */
+  async getModelInfo(): Promise<{ availability: AndroidModelAvailability }> {
+    if (Platform.OS !== 'android') {
+      return { availability: 'unavailable' }
+    }
+    try {
+      const info = await getNativeAndroidAI().getTaskModelInfo(
+        this.task,
+        this.options
+      )
+      return { availability: toModelAvailability(info.availability) }
+    } catch (error) {
+      throw toAndroidAIError(error)
+    }
+  }
+
+  /** Downloads the task's model when needed and loads it, reporting download progress */
+  async prepare(options: AndroidPrepareOptions = {}): Promise<void> {
+    await withProgress(this.task, options, () =>
+      getNativeAndroidAI().prepareTask(this.task, this.options)
+    )
+    this.prepared = true
+  }
+
+  protected async run(
+    input: string,
+    { onText, abortSignal }: AndroidTaskCallOptions
+  ): Promise<string[]> {
+    const native = getNativeAndroidAI()
+    if (abortSignal?.aborted) {
+      throw getAbortReason(abortSignal)
+    }
+    if (!this.prepared) {
+      console.warn(notPreparedWarning)
+      await this.prepare()
+      // Preparing can take minutes, before there is a native run to cancel
+      if (abortSignal?.aborted) {
+        throw getAbortReason(abortSignal)
+      }
+    }
+
+    const runId = generateId()
+    const listener = onText
+      ? native.onStreamEvent((event) => {
+          if (event.streamId === runId && event.type === 'text') {
+            onText(event.delta ?? '')
+          }
+        })
+      : null
+    const onAbort = () => native.cancel(runId)
+    abortSignal?.addEventListener('abort', onAbort, { once: true })
+
+    try {
+      return await native.runTask(runId, this.task, input, {
+        ...this.options,
+        stream: Boolean(onText),
+      })
+    } catch (error) {
+      if (abortSignal?.aborted) {
+        throw getAbortReason(abortSignal)
+      }
+      throw toAndroidAIError(error)
+    } finally {
+      listener?.remove()
+      abortSignal?.removeEventListener('abort', onAbort)
+    }
+  }
+}
+
+export class AndroidSummarizer extends AndroidTaskModel {
+  constructor(options: AndroidSummarizerOptions = {}) {
+    super('summarization', options)
+  }
+
+  async summarize(
+    text: string,
+    options: AndroidTaskCallOptions = {}
+  ): Promise<string> {
+    const [summary = ''] = await this.run(text, options)
+    return summary
+  }
+}
+
+export class AndroidProofreader extends AndroidTaskModel {
+  constructor(options: AndroidProofreaderOptions = {}) {
+    super('proofreading', options)
+  }
+
+  /** Corrected versions of the text, best first. Takes up to about 256 tokens */
+  proofread(
+    text: string,
+    options: AndroidTaskCallOptions = {}
+  ): Promise<string[]> {
+    return this.run(text, options)
+  }
+}
+
+export class AndroidRewriter extends AndroidTaskModel {
+  constructor({ style, language }: AndroidRewriterOptions = {}) {
+    super('rewriting', { outputType: style, language })
+  }
+
+  /** Rewritten versions of the text, best first. Takes up to about 256 tokens */
+  rewrite(
+    text: string,
+    options: AndroidTaskCallOptions = {}
+  ): Promise<string[]> {
+    return this.run(text, options)
+  }
+}
+
+export class AndroidImageDescriber extends AndroidTaskModel {
+  constructor() {
+    super('imageDescription', {})
+  }
+
+  /** Describes an image, given as bytes, base64 or a base64 data URI, or a file:// or content:// URI */
+  async describe(
+    image: Uint8Array | string,
+    options: AndroidTaskCallOptions = {}
+  ): Promise<string> {
+    const input =
+      typeof image === 'string'
+        ? image.replace(/^data:[^,]*;base64,/, '')
+        : uint8ArrayToBase64(image)
+    const [description = ''] = await this.run(input, options)
+    return description
   }
 }

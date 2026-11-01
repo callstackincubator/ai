@@ -50,6 +50,23 @@ const getTranscriptionModelInfo = mock(
     availability: 'downloadable',
   })
 )
+const prepareTask = mock(async (_task: string, _options: unknown) => {})
+const getTaskModelInfo = mock(
+  async (
+    _task: string,
+    _options: unknown
+  ): Promise<Record<string, unknown>> => ({
+    availability: 'downloadable',
+  })
+)
+const runTask = mock(
+  async (
+    _runId: string,
+    _task: string,
+    _input: string,
+    _options: Record<string, unknown>
+  ): Promise<string[]> => ['first', 'second']
+)
 const embed = mock(async (values: string[], _taskType?: string) =>
   values.map(() => [0.1, 0.2])
 )
@@ -68,6 +85,9 @@ mock.module('react-native', () => ({
       prepareTranscription,
       prepareEmbedding,
       embed,
+      prepareTask,
+      getTaskModelInfo,
+      runTask,
       onStreamEvent,
       onDownloadProgress,
     }),
@@ -625,5 +645,90 @@ describe('other models', () => {
       [0.1, 0.2],
       [0.1, 0.2],
     ])
+  })
+})
+
+describe('task models', () => {
+  const provider = createAndroidProvider()
+
+  test('summarizes with the summarizer options and returns the summary', async () => {
+    const summarizer = provider.summarizer({ outputType: 'threeBullets' })
+    await summarizer.prepare()
+
+    expect(await summarizer.summarize('text')).toBe('first')
+    expect(prepareTask).toHaveBeenLastCalledWith('summarization', {
+      outputType: 'threeBullets',
+    })
+    expect(runTask.mock.calls.at(-1)!.slice(1)).toEqual([
+      'summarization',
+      'text',
+      { outputType: 'threeBullets', stream: false },
+    ])
+  })
+
+  test('returns every proofreading and rewriting suggestion', async () => {
+    const rewriter = provider.rewriter({ style: 'shorten', language: 'de' })
+    await rewriter.prepare()
+
+    expect(await rewriter.rewrite('text')).toEqual(['first', 'second'])
+    expect(runTask.mock.calls.at(-1)![3]).toEqual({
+      outputType: 'shorten',
+      language: 'de',
+      stream: false,
+    })
+
+    const proofreader = provider.proofreader()
+    await proofreader.prepare()
+    expect(await proofreader.proofread('text')).toEqual(['first', 'second'])
+  })
+
+  test('streams text of its own run', async () => {
+    runTask.mockImplementationOnce(async (runId) => {
+      onStreamEvent.emit({ streamId: 'other', type: 'text', delta: 'x' })
+      onStreamEvent.emit({ streamId: runId, type: 'text', delta: 'A cat' })
+      return ['A cat']
+    })
+    const describer = provider.imageDescriber()
+    await describer.prepare()
+    const onText = mock(() => {})
+
+    expect(
+      await describer.describe(new Uint8Array([1, 2, 3]), { onText })
+    ).toBe('A cat')
+    expect(onText.mock.calls).toEqual([['A cat']])
+    expect(runTask.mock.calls.at(-1)!.slice(1)).toEqual([
+      'imageDescription',
+      'AQID',
+      { stream: true },
+    ])
+  })
+
+  test('strips a data URI prefix from a base64 image', async () => {
+    const describer = provider.imageDescriber()
+    await describer.prepare()
+
+    await describer.describe('data:image/png;charset=utf-8;base64,AQID')
+    expect(runTask.mock.calls.at(-1)![2]).toBe('AQID')
+  })
+
+  test('cancels the native run on abort', async () => {
+    const controller = new AbortController()
+    runTask.mockImplementationOnce(async (runId) => {
+      controller.abort()
+      expect(cancel).toHaveBeenCalledWith(runId)
+      throw new Error('cancelled')
+    })
+    const summarizer = provider.summarizer()
+    await summarizer.prepare()
+
+    await expect(
+      summarizer.summarize('text', { abortSignal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  test('reports task availability', async () => {
+    expect(await provider.summarizer().getModelInfo()).toEqual({
+      availability: 'downloadable',
+    })
   })
 })

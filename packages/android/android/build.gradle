@@ -93,11 +93,17 @@ dependencies {
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0"
+  // ListenableFuture.await() for the ML Kit task clients
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.11.0"
   // genai-prompt beta5 and speech recognition alpha2 are built with Kotlin 2.4
   implementation "com.google.mlkit:genai-prompt:1.0.0-beta5"
   implementation "com.google.mlkit:genai-schema:1.0.0-alpha2"
   implementation "com.google.mlkit:genai-speech-recognition:1.0.0-alpha2"
   implementation "com.google.mlkit:genai-embedding:1.0.0-alpha1"
+  implementation "com.google.mlkit:genai-summarization:1.0.0-beta1"
+  implementation "com.google.mlkit:genai-proofreading:1.0.0-beta1"
+  implementation "com.google.mlkit:genai-rewriting:1.0.0-beta1"
+  implementation "com.google.mlkit:genai-image-description:1.0.0-beta1"
 }
 
 react {

@@ -90,7 +90,7 @@ export interface StreamEvent {
 }
 
 export interface DownloadProgressEvent {
-  /** `language`, `transcription` or `embedding` */
+  /** `language`, `transcription`, `embedding` or a task name */
   model: string
   /** `started`, `progress` or `completed` */
   phase: string
@@ -111,6 +111,19 @@ export interface NativeEmbeddingModelInfo {
   modelSignature?: string
 }
 
+export interface NativeTaskOptions {
+  /** Summarization: `article` or `conversation`. Proofreading: `keyboard` or `voice` */
+  inputType?: string
+  /** Summarization: `oneBullet`, `twoBullets` or `threeBullets`. Rewriting: the style */
+  outputType?: string
+  /** ISO 639-1 language code, such as en */
+  language?: string
+  /** Summarization: truncates input past the model's token limit */
+  autoTruncate?: boolean
+  /** Sends the text as it is generated as `text` stream events of the run */
+  stream?: boolean
+}
+
 export interface Spec extends TurboModule {
   getModelInfo(model?: NanoModelConfig): Promise<NativeModelInfo>
   prepare(model?: NanoModelConfig): Promise<void>
@@ -121,7 +134,7 @@ export interface Spec extends TurboModule {
     request: NativeGenerateRequest
   ): Promise<NativeGenerateResponse>
   streamText(streamId: string, request: NativeGenerateRequest): Promise<void>
-  /** Cancels a `generateText`, `streamText` or `transcribe` run by its id */
+  /** Cancels a `generateText`, `streamText`, `transcribe` or `runTask` run by its id */
   cancel(runId: string): void
 
   getTranscriptionModelInfo(
@@ -138,6 +151,23 @@ export interface Spec extends TurboModule {
   getEmbeddingModelInfo(): Promise<NativeEmbeddingModelInfo>
   prepareEmbedding(): Promise<void>
   embed(values: string[], taskType?: string): Promise<number[][]>
+
+  /** `summarization`, `proofreading`, `rewriting` or `imageDescription` */
+  getTaskModelInfo(
+    task: string,
+    options: NativeTaskOptions
+  ): Promise<NativeModelInfo>
+  prepareTask(task: string, options: NativeTaskOptions): Promise<void>
+  /**
+   * Runs a task on text, or for image description on a file://, content:// or
+   * base64 image. Resolves with its results, best first
+   */
+  runTask(
+    runId: string,
+    task: string,
+    input: string,
+    options: NativeTaskOptions
+  ): Promise<string[]>
 
   onStreamEvent: CodegenTypes.EventEmitter<StreamEvent>
   onDownloadProgress: CodegenTypes.EventEmitter<DownloadProgressEvent>

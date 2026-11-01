@@ -36,6 +36,7 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
   private val nano = GeminiNano(reactContext, downloads)
   private val transcription = Transcription(reactContext, downloads)
   private val embeddings = Embeddings(downloads)
+  private val tasks = Tasks(reactContext, downloads)
 
   // Generations and transcriptions, by id, so they can be cancelled
   private val activeRuns = ConcurrentHashMap<String, Job>()
@@ -195,6 +196,24 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
           pushArray(Arguments.createArray().apply { vector.forEach { pushDouble(it.toDouble()) } })
         }
       }
+    }
+
+  override fun getTaskModelInfo(task: String, options: ReadableMap, promise: Promise) =
+    launch(promise) { tasks.getModelInfo(TaskConfig.from(task, options)).toWritableMap() }
+
+  override fun prepareTask(task: String, options: ReadableMap, promise: Promise) =
+    launch(promise) { tasks.prepare(TaskConfig.from(task, options)) }
+
+  override fun runTask(runId: String, task: String, input: String, options: ReadableMap, promise: Promise) =
+    launchRun(runId, { promise.rejectWithCode(it) }) {
+      val onText =
+        if (options.isSet("stream") && options.getBoolean("stream")) {
+          { text: String -> emitStreamEvent(runId, "text") { putString("delta", text) } }
+        } else {
+          null
+        }
+      val results = tasks.run(TaskConfig.from(task, options), input, onText)
+      promise.resolve(Arguments.fromList(results))
     }
 
   override fun invalidate() {
