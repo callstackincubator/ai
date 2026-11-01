@@ -20,6 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
 
@@ -265,7 +266,14 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
         stream.result.await()
         return@launch null
       }
-      stream.audio.write(Base64.decode(pcmBase64, Base64.DEFAULT))
+      try {
+        stream.audio.write(Base64.decode(pcmBase64, Base64.DEFAULT))
+      } catch (error: IOException) {
+        // Recognition ended, and closed the pipe, while this append was writing
+        if (!stream.result.isCompleted) throw error
+        stream.result.await()
+      }
+      null
     }
 
   override fun finishTranscriptionStream(streamId: String, promise: Promise) =

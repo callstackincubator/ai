@@ -877,4 +877,29 @@ describe('streaming transcription', () => {
     expect(cancel).toHaveBeenCalled()
     expect(finishTranscriptionStream).not.toHaveBeenCalled()
   })
+
+  test('cancels a stream that native starts after the cancel', async () => {
+    let started!: () => void
+    startTranscriptionStream.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (started = resolve))
+    )
+    const audio = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2]))
+      },
+    })
+
+    const { stream } = await model.doStream({
+      audio,
+      inputAudioFormat: { type: 'audio/pcm', rate: 16000 },
+    } as any)
+    const reader = stream.getReader()
+    await reader.read()
+    await reader.cancel()
+    cancel.mockClear()
+    started()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(cancel).toHaveBeenCalled()
+  })
 })

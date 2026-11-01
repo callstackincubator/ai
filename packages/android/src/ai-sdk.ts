@@ -1112,6 +1112,9 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
             }
           }
           if (cancelled) {
+            // The cancel can land before native registers the stream, which
+            // then keeps listening
+            native.cancel(streamId)
             return
           }
           if (abortSignal?.aborted) {
