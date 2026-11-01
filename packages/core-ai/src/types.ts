@@ -184,6 +184,15 @@ export interface CoreAITranscriptionResult {
   metadata?: CodegenTypes.UnsafeObject
 }
 
+export interface CoreAIGenerationProgress {
+  // Images report each denoising step once it is done, from step 1. Videos
+  // report encoding the prompt, each denoising step as it starts, from step
+  // 0, then decoding and assembling the frames
+  phase: 'encoding' | 'denoising' | 'decoding' | 'assembling'
+  step: number
+  totalSteps: number
+}
+
 export interface CoreAIImageGenerationOptions {
   n?: number
   size?: `${number}x${number}`
@@ -203,6 +212,8 @@ export interface CoreAIImageGenerationOptions {
   // How many tokens of the input image FLUX.2 attends to: more follows the
   // image more closely and runs slower. Defaults to the finest grid the export has
   referenceGrid?: 'full' | 'half' | 'quarter'
+  // Called after each denoising step
+  onProgress?: (progress: CoreAIGenerationProgress) => void
 }
 
 export interface CoreAIImageGenerationResult {
@@ -369,6 +380,8 @@ export interface CoreAIVideoGenerationOptions {
   vaeTileSize?: number
   // Loads each component only while it runs, true by default
   lazyModelLoading?: boolean
+  // Called as each phase and denoising step starts
+  onProgress?: (progress: CoreAIGenerationProgress) => void
 }
 
 export interface CoreAIVideoGenerationResult {

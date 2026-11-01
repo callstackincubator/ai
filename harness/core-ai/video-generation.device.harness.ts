@@ -1,3 +1,4 @@
+import type { CoreAIGenerationProgress } from '@react-native-ai/core-ai'
 import { experimental_generateVideo as generateVideo } from 'ai'
 import { describe, expect, it } from 'react-native-harness'
 
@@ -41,6 +42,24 @@ describe('core-ai video generation', () => {
     await expect(generate({ frameCount: 17 })).rejects.toThrow(
       'exported for 81 frames only'
     )
+  })
+
+  it('reports each phase and denoising step in order', async () => {
+    const progress: CoreAIGenerationProgress[] = []
+    await generateVideo({
+      model: model.withProgress((update) => progress.push(update)),
+      prompt: 'a red ball rolling across a wooden table',
+      seed: 1,
+      providerOptions: { 'core-ai': { stepCount: 2, cfgCutoff: 1 } },
+    })
+
+    expect(progress.map(({ phase, step }) => `${phase} ${step}`)).toEqual([
+      'encoding 0',
+      'denoising 0',
+      'denoising 1',
+      'decoding 2',
+      'assembling 2',
+    ])
   })
 
   it('stops when aborted', async () => {

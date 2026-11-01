@@ -52,6 +52,26 @@ const { image } = await generateImage({
 - One image is edited per call, and there's no inpainting: extra images and a `mask` are left out with a warning.
 - `coreAI.imageModel(config).generate(prompt, { imageUri })` (or `imageBase64`) edits outside the AI SDK.
 
+## Progress
+
+Generation takes seconds per image and minutes per video. The AI SDK has no progress API, and `providerOptions` only takes JSON, so pass the model through `withProgress`. The callback gets `{ phase, step, totalSteps }`:
+
+```typescript
+const { video } = await generateVideo({
+  model: coreAI
+    .videoModel({ id: 'wan2.1-t2v-1.3b', source: wanDirectory })
+    .withProgress(({ phase, step, totalSteps }) => {
+      setStatus(`${phase} ${step}/${totalSteps}`)
+    }),
+  prompt: 'a red ball rolling across a wooden table',
+})
+```
+
+- Images report `denoising` after each step, from step 1.
+- Videos report `encoding` as the prompt is encoded, `denoising` as each step starts (from step 0), then `decoding` and `assembling` the frames.
+- `withProgress` returns a copy of the model, so make one per call. The `generate(prompt, { onProgress })` methods of `coreAI.imageModel(...)` and `coreAI.videoModel(...)` take the callback directly.
+- An `abortSignal` stops image and video generation after the current step.
+
 ## Video Generation
 
 Pass `coreAI.videoModel(config)` to `experimental_generateVideo` to get a short MP4 clip.

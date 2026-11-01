@@ -1,3 +1,4 @@
+import type { CoreAIGenerationProgress } from '@react-native-ai/core-ai'
 import { generateImage } from 'ai'
 import { describe, expect, it } from 'react-native-harness'
 
@@ -79,5 +80,37 @@ describe('core-ai image generation', () => {
     expect(warnings).toEqual([
       expect.objectContaining({ type: 'unsupported', feature: 'size' }),
     ])
+  })
+
+  it('reports each denoising step in order', async () => {
+    const progress: CoreAIGenerationProgress[] = []
+    await generateImage({
+      model: model.withProgress((update) => progress.push(update)),
+      prompt,
+      seed: 1,
+      providerOptions: { 'core-ai': { stepCount: 2 } },
+    })
+
+    expect(progress).toEqual([
+      { phase: 'denoising', step: 1, totalSteps: 2 },
+      { phase: 'denoising', step: 2, totalSteps: 2 },
+    ])
+  })
+
+  it('stops after the current step when aborted', async () => {
+    const controller = new AbortController()
+    const progress: CoreAIGenerationProgress[] = []
+    const result = generateImage({
+      model: model.withProgress((update) => {
+        progress.push(update)
+        controller.abort()
+      }),
+      prompt,
+      abortSignal: controller.signal,
+      providerOptions: { 'core-ai': { stepCount: 4 } },
+    })
+
+    await expect(result).rejects.toThrow()
+    expect(progress).toHaveLength(1)
   })
 })

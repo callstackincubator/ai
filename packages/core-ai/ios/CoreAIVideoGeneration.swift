@@ -15,11 +15,21 @@ enum VideoGeneration {
   // only while it runs
   nonisolated(unsafe) private static var loaded: (key: String, load: Task<(WanPipeline, ExportedShape), Error>)?
 
-  static func generate(prompt: String, sourceURL: URL, options: [String: Any]) async throws -> [String: Any] {
+  static func generate(
+    prompt: String,
+    sourceURL: URL,
+    options: [String: Any],
+    onProgress: @escaping @Sendable ([String: Any]) -> Void
+  ) async throws -> [String: Any] {
     let (pipeline, shape) = try await self.pipeline(at: sourceURL, options: options)
     let configuration = try makeConfiguration(prompt: prompt, pipeline: pipeline, shape: shape, options: options)
-    let result = try await pipeline.generateVideo(configuration: configuration) { _ in
-      !Task.isCancelled
+    let result = try await pipeline.generateVideo(configuration: configuration) { progress in
+      onProgress([
+        "phase": phaseName(progress.phase),
+        "step": progress.step,
+        "totalSteps": progress.totalSteps
+      ])
+      return !Task.isCancelled
     }
     try Task.checkCancellation()
 
@@ -39,6 +49,15 @@ enum VideoGeneration {
       "fps": result.fps,
       "seed": Int(result.seed)
     ]
+  }
+
+  private static func phaseName(_ phase: VideoProgress.Phase) -> String {
+    switch phase {
+    case .encoding: return "encoding"
+    case .denoising: return "denoising"
+    case .decoding: return "decoding"
+    case .assembling: return "assembling"
+    }
   }
 
   // Concurrent calls for the same bundle share one load
