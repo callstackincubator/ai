@@ -6,6 +6,7 @@ import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.common.GenAiException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.guava.await
 
 /** Collects ML Kit model downloads and reports their progress. */
 class Downloads(
@@ -58,8 +59,15 @@ class Downloads(
     try {
       download(callback).await()
     } catch (error: GenAiException) {
+      if (status == FeatureStatus.DOWNLOADING) {
+        throw AndroidAIErrors.CodedException(
+          AndroidAIErrors.MODEL_DOWNLOADING,
+          "$displayName is still downloading",
+          error,
+        )
+      }
       throw AndroidAIErrors.CodedException(
-        if (status == FeatureStatus.DOWNLOADING) AndroidAIErrors.MODEL_DOWNLOADING else AndroidAIErrors.DOWNLOAD_FAILED,
+        AndroidAIErrors.DOWNLOAD_FAILED,
         "$displayName download failed: ${error.message}",
         error,
       )

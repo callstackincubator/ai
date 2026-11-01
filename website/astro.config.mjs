@@ -102,7 +102,7 @@ export default defineConfig({
           ['errors', 'Error handling'],
           ['embeddings', 'Embeddings'],
           ['transcription', 'Transcription'],
-          ['tasks', 'Summarize and rewrite'],
+          ['tasks', 'Summarize, proofread, rewrite and describe'],
         ]),
         group('Core AI', 'core-ai', [
           ['getting-started', 'Getting started'],

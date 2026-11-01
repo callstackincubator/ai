@@ -18,7 +18,7 @@ const summary = await summarizer.summarize(article)
 - `android.summarizer(options)` summarizes an article, or a conversation of `<name>: <message>` lines, into one to three bullets. Options: `inputType` (`article` or `conversation`), `outputType` (`oneBullet`, `twoBullets` or `threeBullets`), `language` (`en`, `ja` or `ko`) and `autoTruncate`, which cuts input past about 4000 tokens instead of failing.
 - `android.proofreader(options).proofread(text)` fixes grammar and spelling. `inputType: 'voice'` is for text transcribed from speech.
 - `android.rewriter({ style }).rewrite(text)` rewrites in a `style`: `elaborate`, `emojify`, `shorten`, `friendly`, `professional` or `rephrase` (the default).
-- Proofreading and rewriting take up to about 256 tokens, and return their suggestions best first. They take `language`: `en`, `ja`, `de`, `fr`, `it`, `es` or `ko`.
+- `proofread` and `rewrite` take up to about 256 tokens, and return an array of suggestions, best first. Both take `language`: `en`, `ja`, `de`, `fr`, `it`, `es` or `ko`.
 - `android.imageDescriber().describe(image)` describes an image in a short English sentence. The image is a `Uint8Array`, base64, or a `file://` or `content://` URI.
 
 ## Streaming and Aborting

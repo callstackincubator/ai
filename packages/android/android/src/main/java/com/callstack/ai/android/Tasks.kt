@@ -22,13 +22,10 @@ import com.google.mlkit.genai.rewriting.RewritingRequest
 import com.google.mlkit.genai.summarization.Summarization
 import com.google.mlkit.genai.summarization.SummarizationRequest
 import com.google.mlkit.genai.summarization.SummarizerOptions
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutionException
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /** A task and its options, which pick the ML Kit client and its LoRA adapter. */
 data class TaskConfig(
@@ -208,10 +205,14 @@ class Tasks(
   // A file://, content:// URI or base64 image
   private fun bitmap(image: String): Bitmap {
     val bytes =
-      if (image.startsWith("file:") || image.startsWith("content:")) {
-        context.contentResolver.openInputStream(Uri.parse(image))?.use { it.readBytes() }
-      } else {
-        Base64.decode(image, Base64.DEFAULT)
+      try {
+        if (image.startsWith("file:") || image.startsWith("content:")) {
+          context.contentResolver.openInputStream(Uri.parse(image))?.use { it.readBytes() }
+        } else {
+          Base64.decode(image, Base64.DEFAULT)
+        }
+      } catch (error: Exception) {
+        null
       }
     return bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
       ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Cannot read image: ${image.take(64)}")
@@ -248,21 +249,3 @@ class Tasks(
     return client(config).run(input, callback)
   }
 }
-
-/** Waits for an ML Kit future, cancelling it with the coroutine. */
-suspend fun <T> ListenableFuture<T>.await(): T =
-  suspendCancellableCoroutine { continuation ->
-    addListener(
-      {
-        try {
-          continuation.resume(get())
-        } catch (error: ExecutionException) {
-          continuation.resumeWithException(error.cause ?: error)
-        } catch (error: Exception) {
-          continuation.resumeWithException(error)
-        }
-      },
-      Runnable::run,
-    )
-    continuation.invokeOnCancellation { cancel(true) }
-  }

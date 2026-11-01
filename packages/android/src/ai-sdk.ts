@@ -1091,6 +1091,10 @@ class AndroidTaskModel {
     if (!this.prepared) {
       console.warn(notPreparedWarning)
       await this.prepare()
+      // Preparing can take minutes, before there is a native run to cancel
+      if (abortSignal?.aborted) {
+        throw getAbortReason(abortSignal)
+      }
     }
 
     const runId = generateId()
