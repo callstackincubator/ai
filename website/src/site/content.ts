@@ -334,7 +334,7 @@ export const home = {
       { icon: 'lock', title: 'Data stays local', body: 'Inference runs on the device, so prompts and replies never reach a server.' },
       { icon: 'network', title: 'Works offline', body: 'No network round trip and nothing to wait for. It works in airplane mode.' },
       { icon: 'package', title: 'No keys, no bills', body: 'System models need no API key, and there is no per-token cost.' },
-      { icon: 'faders', title: 'Cloud is opt-in', body: 'Private Cloud Compute runs only when you ask for it.' },
+      { icon: 'faders', title: 'Cloud is opt-in', body: 'Apple’s Private Cloud Compute runs only when you ask for it.' },
     ] as { icon: IconName; title: string; body: string }[],
   },
 };
