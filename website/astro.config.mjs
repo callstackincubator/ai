@@ -94,6 +94,15 @@ export default defineConfig({
           ['ios-versions', 'iOS versions'],
           ['running-on-simulator', 'Running on Simulator'],
         ]),
+        group('Android', 'android', [
+          ['getting-started', 'Getting started'],
+          ['generating', 'Generating'],
+          ['tools', 'Tools'],
+          ['models', 'Models and availability'],
+          ['errors', 'Error handling'],
+          ['embeddings', 'Embeddings'],
+          ['transcription', 'Transcription'],
+        ]),
         group('ADK', 'adk', [
           ['getting-started', 'Getting started'],
           ['generating', 'Generating'],

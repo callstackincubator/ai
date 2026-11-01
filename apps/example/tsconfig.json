@@ -8,6 +8,9 @@
       ""
     ],
     "paths": {
+      "@react-native-ai/android": [
+        "../../packages/android/src"
+      ],
       "@react-native-ai/apple": [
         "../../packages/apple-llm/src"
       ],
