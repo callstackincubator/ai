@@ -66,11 +66,8 @@ class Downloads(
           error,
         )
       }
-      throw AndroidAIErrors.CodedException(
-        AndroidAIErrors.DOWNLOAD_FAILED,
-        "$displayName download failed: ${error.message}",
-        error,
-      )
+      // Its error code, such as not enough disk space, picks the error JS gets
+      throw error
     }
   }
 }

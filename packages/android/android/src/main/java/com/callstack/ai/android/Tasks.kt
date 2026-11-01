@@ -204,6 +204,9 @@ class Tasks(
 
   // A file://, content:// URI or base64 image
   private fun bitmap(image: String): Bitmap {
+    val cannotRead = { cause: Exception? ->
+      AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Cannot read image: ${image.take(64)}", cause)
+    }
     val bytes =
       try {
         if (image.startsWith("file:") || image.startsWith("content:")) {
@@ -212,10 +215,9 @@ class Tasks(
           Base64.decode(image, Base64.DEFAULT)
         }
       } catch (error: Exception) {
-        null
+        throw cannotRead(error)
       }
-    return bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-      ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Cannot read image: ${image.take(64)}")
+    return bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) } ?: throw cannotRead(null)
   }
 
   suspend fun getModelInfo(config: TaskConfig): ModelInfo =
