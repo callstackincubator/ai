@@ -196,6 +196,13 @@ export interface CoreAIImageGenerationOptions {
   decodeResolution?: 'auto' | 'full' | 'half' | 'tiled'
   strength?: number
   lazyModelLoading?: boolean
+  // An image to edit, as a local file path or `file://` URI, or as base64
+  // data. Needs an export with image-to-image components
+  imageUri?: string
+  imageBase64?: string
+  // How many tokens of the input image FLUX.2 attends to: more follows the
+  // image more closely and runs slower. Defaults to the finest grid the export has
+  referenceGrid?: 'full' | 'half' | 'quarter'
 }
 
 export interface CoreAIImageGenerationResult {
@@ -205,6 +212,9 @@ export interface CoreAIImageGenerationResult {
     imageFormat: 'image/png'
     width: number
     height: number
+    // False when an input image was given but the export can't edit images,
+    // so the result was generated from the prompt alone
+    imageToImage?: boolean
   }
 }
 
