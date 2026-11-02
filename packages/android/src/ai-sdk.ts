@@ -997,7 +997,7 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
       (inputAudioFormat.rate ?? 16000) !== 16000
     ) {
       throw new UnsupportedFunctionalityError({
-        functionality: `streaming transcription of ${inputAudioFormat.type}`,
+        functionality: `streaming transcription of ${inputAudioFormat.type}${inputAudioFormat.rate ? ` at ${inputAudioFormat.rate} Hz` : ''}`,
         message:
           'ML Kit streams 16 kHz mono 16-bit PCM audio (audio/pcm, rate 16000).',
       })
