@@ -105,6 +105,22 @@ export interface NativeTranscriptionOptions {
   mode?: string
 }
 
+export interface TranscriptionEvent {
+  streamId: string
+  /** `partial` text of the segment so far, or its `final` text */
+  type: string
+  segmentIndex: number
+  text: string
+  /** Final results only: each word and when it starts */
+  words?: { text: string; startMs: number }[]
+}
+
+export interface NativeStreamTranscriptionResult {
+  text: string
+  /** BCP 47 locale the recognizer transcribed, such as en-US */
+  language: string
+}
+
 export interface NativeEmbeddingModelInfo {
   availability: string
   dimension?: number
@@ -148,6 +164,20 @@ export interface Spec extends TurboModule {
     options: NativeTranscriptionOptions
   ): Promise<string>
 
+  /**
+   * Starts transcribing 16 kHz mono 16-bit PCM appended to the stream, with
+   * results as `onTranscriptionEvent`. Cancel it with `cancel(streamId)`
+   */
+  startTranscriptionStream(
+    streamId: string,
+    options: NativeTranscriptionOptions
+  ): Promise<void>
+  appendTranscriptionAudio(streamId: string, pcmBase64: string): Promise<void>
+  /** Ends the audio and resolves with the whole text */
+  finishTranscriptionStream(
+    streamId: string
+  ): Promise<NativeStreamTranscriptionResult>
+
   getEmbeddingModelInfo(): Promise<NativeEmbeddingModelInfo>
   prepareEmbedding(): Promise<void>
   embed(values: string[], taskType?: string): Promise<number[][]>
@@ -171,6 +201,7 @@ export interface Spec extends TurboModule {
 
   onStreamEvent: CodegenTypes.EventEmitter<StreamEvent>
   onDownloadProgress: CodegenTypes.EventEmitter<DownloadProgressEvent>
+  onTranscriptionEvent: CodegenTypes.EventEmitter<TranscriptionEvent>
 }
 
 const NativeAndroidAI: Spec | null =

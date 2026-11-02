@@ -1,6 +1,7 @@
 package com.callstack.ai.android
 
 import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.util.Base64
 import com.facebook.react.bridge.ReadableMap
 import com.google.mlkit.genai.common.FeatureStatus
@@ -9,6 +10,7 @@ import com.google.mlkit.genai.speechrecognition.SpeechRecognition
 import com.google.mlkit.genai.speechrecognition.SpeechRecognizer
 import com.google.mlkit.genai.speechrecognition.SpeechRecognizerOptions
 import com.google.mlkit.genai.speechrecognition.SpeechRecognizerResponse
+import com.google.mlkit.genai.speechrecognition.recognitionOptions
 import com.google.mlkit.genai.speechrecognition.speechRecognizerOptions
 import com.google.mlkit.genai.speechrecognition.speechRecognizerRequest
 import kotlinx.coroutines.sync.Mutex
@@ -54,6 +56,10 @@ class Transcription(
         AndroidAIErrors.INVALID_MESSAGE,
         "Not a BCP 47 language tag: $tag. Use a tag such as en-US",
       )
+
+  /** The language the recognizer transcribes, as a BCP 47 tag. */
+  fun languageOf(config: TranscriptionConfig): String =
+    (config.locale?.let(::locale) ?: Locale.getDefault()).toLanguageTag()
 
   suspend fun getModelInfo(config: TranscriptionConfig): ModelInfo =
     ModelInfo(availability = availabilityOf(client(config).checkStatus()))
@@ -101,6 +107,38 @@ class Transcription(
       }
     } finally {
       file.delete()
+    }
+  }
+
+  /**
+   * Transcribes 16 kHz mono 16-bit PCM read from [audio] until it is closed, reporting each
+   * partial and final result with its word timings. Returns the whole text.
+   */
+  suspend fun transcribeStream(
+    audio: ParcelFileDescriptor,
+    config: TranscriptionConfig,
+    onResult: (response: SpeechRecognizerResponse) -> Unit,
+  ): String {
+    prepare(config)
+    AudioSource.fromPfd(audio, AudioSource.Mode.STREAMING).use { source ->
+      val text = StringBuilder()
+      val request = speechRecognizerRequest {
+        audioSource = source
+        recognitionOptions { enableWordTiming = true }
+      }
+      client(config).startRecognition(request).collect { response ->
+        when (response) {
+          is SpeechRecognizerResponse.PartialTextResponse -> onResult(response)
+          is SpeechRecognizerResponse.FinalTextResponse -> {
+            if (text.isNotEmpty() && response.text.isNotEmpty()) text.append(' ')
+            text.append(response.text)
+            onResult(response)
+          }
+          is SpeechRecognizerResponse.ErrorResponse -> throw response.e
+          else -> {}
+        }
+      }
+      return text.toString()
     }
   }
 }

@@ -1,5 +1,7 @@
 package com.callstack.ai.android
 
+import android.os.ParcelFileDescriptor
+import android.util.Base64
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -8,6 +10,8 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableMap
 import com.google.mlkit.genai.common.FunctionCall
+import com.google.mlkit.genai.speechrecognition.SpeechRecognizerResponse
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +20,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.IOException
+import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
 
 class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISpec(reactContext) {
@@ -40,6 +46,22 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
 
   // Generations and transcriptions, by id, so they can be cancelled
   private val activeRuns = ConcurrentHashMap<String, Job>()
+
+  // Streamed transcriptions: both ends of the pipe audio is written to, and the result once the
+  // stream ends. Both ends close when recognition ends, so a stream JS never finishes holds no
+  // file descriptors
+  private class TranscriptionStream(
+    val read: ParcelFileDescriptor,
+    val audio: OutputStream,
+    val result: CompletableDeferred<WritableMap>,
+  ) {
+    fun close() {
+      runCatching { audio.close() }
+      runCatching { read.close() }
+    }
+  }
+
+  private val transcriptionStreams = ConcurrentHashMap<String, TranscriptionStream>()
 
   private fun Promise.rejectWithCode(error: Exception) {
     reject(AndroidAIErrors.codeFor(error), error.message ?: "Unknown ML Kit error", error)
@@ -159,6 +181,8 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
 
   override fun cancel(runId: String) {
     activeRuns.remove(runId)?.cancel()
+    // Only the write end: ML Kit may still be reading the other, which the run closes as it ends
+    transcriptionStreams.remove(runId)?.let { runCatching { it.audio.close() } }
   }
 
   override fun getTranscriptionModelInfo(options: ReadableMap, promise: Promise) =
@@ -170,6 +194,95 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
   override fun transcribe(runId: String, audio: String, options: ReadableMap, promise: Promise) =
     launchRun(runId, { promise.rejectWithCode(it) }) {
       promise.resolve(transcription.transcribe(audio, TranscriptionConfig.from(options)))
+    }
+
+  override fun startTranscriptionStream(streamId: String, options: ReadableMap, promise: Promise) =
+    launch(promise) {
+      if (transcriptionStreams.containsKey(streamId)) {
+        throw AndroidAIErrors.CodedException(AndroidAIErrors.GENERATION_ERROR, "Stream ID already in use: $streamId")
+      }
+      val (read, write) = ParcelFileDescriptor.createPipe()
+      val stream = TranscriptionStream(read, ParcelFileDescriptor.AutoCloseOutputStream(write), CompletableDeferred())
+      transcriptionStreams[streamId] = stream
+
+      // The collector calls back one response at a time, so the count needs no lock
+      var segmentIndex = 0
+      // A failure is reported by the next append, or by finish, which removes the stream
+      launchRun(streamId, { error ->
+        stream.result.completeExceptionally(error)
+        stream.close()
+      }) {
+        val config = TranscriptionConfig.from(options)
+        val text = transcription.transcribeStream(read, config) { response ->
+          emitOnTranscriptionEvent(
+            Arguments.createMap().apply {
+              putString("streamId", streamId)
+              putInt("segmentIndex", segmentIndex)
+              when (response) {
+                is SpeechRecognizerResponse.PartialTextResponse -> {
+                  putString("type", "partial")
+                  putString("text", response.text)
+                }
+                is SpeechRecognizerResponse.FinalTextResponse -> {
+                  putString("type", "final")
+                  putString("text", response.text)
+                  putArray(
+                    "words",
+                    Arguments.createArray().apply {
+                      response.wordTimings.forEach { word ->
+                        pushMap(
+                          Arguments.createMap().apply {
+                            putString("text", word.text)
+                            putDouble("startMs", word.timestampMs.toDouble())
+                          },
+                        )
+                      }
+                    },
+                  )
+                  segmentIndex++
+                }
+                else -> {}
+              }
+            },
+          )
+        }
+        stream.close()
+        stream.result.complete(
+          Arguments.createMap().apply {
+            putString("text", text)
+            putString("language", transcription.languageOf(config))
+          },
+        )
+      }
+      null
+    }
+
+  override fun appendTranscriptionAudio(streamId: String, pcmBase64: String, promise: Promise) =
+    launch(promise) {
+      val stream = transcriptionStreams[streamId]
+        ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Unknown transcription stream: $streamId")
+      // Recognition ended early: rethrow why, or drop audio it can no longer hear
+      if (stream.result.isCompleted) {
+        stream.result.await()
+        return@launch null
+      }
+      try {
+        stream.audio.write(Base64.decode(pcmBase64, Base64.DEFAULT))
+      } catch (error: IOException) {
+        // Recognition ended, and closed the pipe, while this append was writing
+        if (!stream.result.isCompleted) throw error
+        stream.result.await()
+      }
+      null
+    }
+
+  override fun finishTranscriptionStream(streamId: String, promise: Promise) =
+    launch(promise) {
+      val stream = transcriptionStreams.remove(streamId)
+        ?: throw AndroidAIErrors.CodedException(AndroidAIErrors.INVALID_MESSAGE, "Unknown transcription stream: $streamId")
+      // Closing the pipe ends the audio, so recognition finishes what it has heard
+      runCatching { stream.audio.close() }
+      stream.result.await()
     }
 
   override fun getEmbeddingModelInfo(promise: Promise) =
@@ -217,6 +330,11 @@ class AndroidAIModule(reactContext: ReactApplicationContext) : NativeAndroidAISp
     }
 
   override fun invalidate() {
+    transcriptionStreams.values.forEach { stream ->
+      stream.close()
+      stream.result.cancel()
+    }
+    transcriptionStreams.clear()
     activeRuns.values.forEach { it.cancel() }
     activeRuns.clear()
     scope.cancel()

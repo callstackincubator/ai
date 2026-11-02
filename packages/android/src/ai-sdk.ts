@@ -2,6 +2,9 @@ import type {
   EmbeddingModelV4,
   EmbeddingModelV4CallOptions,
   EmbeddingModelV4Result,
+  Experimental_TranscriptionModelV4StreamOptions as TranscriptionModelV4StreamOptions,
+  Experimental_TranscriptionModelV4StreamPart as TranscriptionModelV4StreamPart,
+  Experimental_TranscriptionModelV4StreamResult as TranscriptionModelV4StreamResult,
   LanguageModelV4,
   LanguageModelV4CallOptions,
   LanguageModelV4Content,
@@ -15,6 +18,7 @@ import type {
   TranscriptionModelV4,
   TranscriptionModelV4CallOptions,
 } from '@ai-sdk/provider'
+import { UnsupportedFunctionalityError } from '@ai-sdk/provider'
 import { generateId } from '@ai-sdk/provider-utils'
 import { Platform } from 'react-native'
 
@@ -978,6 +982,180 @@ class AndroidTranscriptionModel implements TranscriptionModelV4 {
     } finally {
       abortSignal?.removeEventListener('abort', onAbort)
     }
+  }
+
+  /**
+   * Transcribes live 16 kHz mono 16-bit PCM. A segment's text grows until a
+   * pause ends it, and its final text comes with word timings
+   */
+  async doStream(
+    options: TranscriptionModelV4StreamOptions
+  ): Promise<TranscriptionModelV4StreamResult> {
+    const { inputAudioFormat, abortSignal } = options
+    if (
+      inputAudioFormat.type !== 'audio/pcm' ||
+      (inputAudioFormat.rate ?? 16000) !== 16000
+    ) {
+      throw new UnsupportedFunctionalityError({
+        functionality: `streaming transcription of ${inputAudioFormat.type}${inputAudioFormat.rate ? ` at ${inputAudioFormat.rate} Hz` : ''}`,
+        message:
+          'ML Kit streams 16 kHz mono 16-bit PCM audio (audio/pcm, rate 16000).',
+      })
+    }
+    if (abortSignal?.aborted) {
+      throw getAbortReason(abortSignal)
+    }
+    if (!this.prepared) {
+      console.warn(notPreparedWarning)
+      await this.prepare()
+    }
+
+    const native = getNativeAndroidAI()
+    const streamId = generateId()
+    const modelId = this.modelId
+    const transcriptionOptions = this.options
+    const audio = options.audio.getReader()
+    let listener: { remove(): void } | undefined
+    // Set when the consumer cancels the stream, which ends it without a result
+    let cancelled = false
+    const cleanup = () => {
+      listener?.remove()
+      abortSignal?.removeEventListener('abort', onAbort)
+    }
+    function onAbort() {
+      native.cancel(streamId)
+      audio.cancel().catch(() => {})
+    }
+
+    const stream = new ReadableStream<TranscriptionModelV4StreamPart>({
+      async start(controller) {
+        try {
+          controller.enqueue({ type: 'stream-start', warnings: [] })
+          controller.enqueue({
+            type: 'response-metadata',
+            timestamp: new Date(),
+            modelId,
+          })
+
+          const segments: {
+            text: string
+            startSecond: number
+            endSecond: number
+          }[] = []
+          // Text sent so far of each segment, to send what the next result adds.
+          // Deltas only append, so a final text that rewrites the partial comes
+          // in its transcript-final part only
+          const sentText = new Map<number, string>()
+          listener = native.onTranscriptionEvent((event) => {
+            if (event.streamId !== streamId) {
+              return
+            }
+            const id = `segment-${event.segmentIndex}`
+            const sent = sentText.get(event.segmentIndex) ?? ''
+            const text = event.text.trim()
+            if (text.startsWith(sent) && text.length > sent.length) {
+              const separator = sent === '' && event.segmentIndex > 0 ? ' ' : ''
+              controller.enqueue({
+                type: 'transcript-delta',
+                id,
+                delta: separator + text.slice(sent.length),
+              })
+              sentText.set(event.segmentIndex, text)
+            }
+            if (event.type === 'final' && text) {
+              // ML Kit times when each word starts, so a segment ends as its
+              // last word starts. Without word timings it has no times
+              const words = event.words ?? []
+              if (words.length === 0) {
+                controller.enqueue({ type: 'transcript-final', id, text })
+                return
+              }
+              const segment = {
+                text,
+                startSecond: words[0]!.startMs / 1000,
+                endSecond: words.at(-1)!.startMs / 1000,
+              }
+              segments.push(segment)
+              controller.enqueue({ type: 'transcript-final', id, ...segment })
+            }
+          })
+          abortSignal?.addEventListener('abort', onAbort, { once: true })
+
+          await native.startTranscriptionStream(streamId, transcriptionOptions)
+          // A sample can be split across chunks
+          let carry: number | undefined
+          while (true) {
+            const { done, value } = await audio.read()
+            if (done || cancelled || abortSignal?.aborted) {
+              break
+            }
+            let chunk =
+              typeof value === 'string'
+                ? Uint8Array.from(atob(value), (char) => char.charCodeAt(0))
+                : value
+            if (carry !== undefined) {
+              const joined = new Uint8Array(chunk.length + 1)
+              joined[0] = carry
+              joined.set(chunk, 1)
+              chunk = joined
+              carry = undefined
+            }
+            if (chunk.length % 2 === 1) {
+              carry = chunk[chunk.length - 1]
+              chunk = chunk.subarray(0, chunk.length - 1)
+            }
+            if (chunk.length > 0) {
+              await native.appendTranscriptionAudio(
+                streamId,
+                uint8ArrayToBase64(chunk)
+              )
+            }
+          }
+          if (cancelled) {
+            // The cancel can land before native registers the stream, which
+            // then keeps listening
+            native.cancel(streamId)
+            return
+          }
+          if (abortSignal?.aborted) {
+            throw getAbortReason(abortSignal)
+          }
+
+          const result = await native.finishTranscriptionStream(streamId)
+          controller.enqueue({
+            type: 'finish',
+            text: result.text,
+            segments,
+            language: result.language.split(/[-_]/)[0],
+            durationInSeconds: undefined,
+          })
+          controller.close()
+        } catch (error) {
+          native.cancel(streamId)
+          // Stops a live source, such as a microphone, from capturing on
+          audio.cancel(error).catch(() => {})
+          // A cancelled stream takes no more parts
+          if (!cancelled) {
+            controller.error(
+              abortSignal?.aborted
+                ? getAbortReason(abortSignal)
+                : toAndroidAIError(error)
+            )
+          }
+        } finally {
+          cleanup()
+          audio.releaseLock()
+        }
+      },
+      // Ends the audio too, so a live source such as a microphone stops
+      cancel() {
+        cancelled = true
+        onAbort()
+        cleanup()
+      },
+    })
+
+    return { stream, response: { timestamp: new Date(), modelId } }
   }
 }
 
