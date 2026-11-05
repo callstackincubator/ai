@@ -30,10 +30,11 @@ const result = streamText({
 | [Core AI](/docs/core-ai/getting-started)       | iOS 27          | Yours: language, image, speech and vision models       | Native, provided by the platform           |
 | [Android](/docs/android/getting-started)       | Android         | Built in: Gemini Nano, speech recognition, embeddings  | Native, provided by the platform           |
 | [Llama](/docs/llama/getting-started)           | iOS and Android | Yours: GGUF models from Hugging Face                   | Third-party binding, llama.rn              |
+| [LiteRT-LM](/docs/litert/getting-started)      | iOS and Android | Yours: `.litertlm` models from Hugging Face            | Third-party binding, react-native-litert-lm |
 
 Built-in models need no download and work on supported devices right away.
-With Core AI and Llama, your app downloads or bundles the models, and we point
-you to ready-to-use ones.
+With Core AI, Llama and LiteRT-LM, your app downloads or bundles the models, and
+we point you to ready-to-use ones.
 
 Every provider needs the AI SDK's [polyfills](/docs/polyfills).
 
