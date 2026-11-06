@@ -46,6 +46,7 @@ keep the panel mounted without receiving telemetry.
 | [Android](#android) | ✅ Yes   | Android      | [ML Kit GenAI](https://developers.google.com/ml-kit/genai)          | On-device Gemini Nano, transcription and embeddings        |
 | [Core AI](#core-ai) | ❌ No    | iOS          | [Core AI](https://github.com/apple/coreai-models)                   | Text, image, video, speech, embedding and vision models    |
 | [Llama](#llama)     | ❌ No    | iOS, Android | [llama.rn](https://github.com/mybigday/llama.rn)                    | Run GGUF models via llama.rn                               |
+| [LiteRT-LM](#litert-lm) | ❌ No | iOS, Android | [react-native-litert-lm](https://github.com/hung-yueh/react-native-litert-lm) | Run `.litertlm` models via react-native-litert-lm |
 
 ---
 
@@ -274,6 +275,40 @@ Any GGUF model from HuggingFace can be used. Use the format `owner/repo/filename
 - `Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf`
 
 📚 **[View full Llama documentation →](https://react-native-ai.dev/docs/llama/getting-started)**
+
+---
+
+### LiteRT-LM
+
+Run `.litertlm` models on-device using [LiteRT-LM](https://ai.google.dev/edge/litert-lm) through [react-native-litert-lm](https://github.com/hung-yueh/react-native-litert-lm). **Requires download** - models are downloaded from HuggingFace.
+
+#### Installation
+
+```bash
+npm install @react-native-ai/litert react-native-litert-lm react-native-nitro-modules
+```
+
+#### Usage
+
+```typescript
+import { litert } from '@react-native-ai/litert'
+import { generateText } from 'ai'
+
+const model = litert('hf://litert-community/gemma-4-E2B-it-litert-lm')
+
+// Download once and load into memory
+await model.prepare()
+
+const { text } = await generateText({
+  model,
+  prompt: 'Write a haiku about coding.',
+})
+
+// Cleanup when done
+await model.unload()
+```
+
+📚 **[View full LiteRT-LM documentation →](https://react-native-ai.dev/docs/litert/getting-started)**
 
 ## JSON UI
 

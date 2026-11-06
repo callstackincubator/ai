@@ -122,6 +122,10 @@ export default defineConfig({
           ['speech', 'Speech'],
           ['model-management', 'Model management'],
         ]),
+        group('LiteRT-LM', 'litert', [
+          ['getting-started', 'Getting started'],
+          ['generating', 'Generating'],
+        ]),
         group('JSON UI', 'json-ui', [
           ['getting-started', 'Getting started'],
           ['tools', 'Tools'],

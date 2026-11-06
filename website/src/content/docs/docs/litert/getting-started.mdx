@@ -1,0 +1,171 @@
+---
+title: "Getting Started"
+---
+
+import PackageManagerTabs from '../../../../components/starlight/PackageManagerTabs.astro'
+
+Run `.litertlm` models from Hugging Face on iOS and Android, on the device. The
+provider is built on
+[react-native-litert-lm](https://github.com/hung-yueh/react-native-litert-lm), a
+third-party React Native binding for Google's
+[LiteRT-LM](https://ai.google.dev/edge/litert-lm).
+
+## Installation
+
+<PackageManagerTabs command="install @react-native-ai/litert react-native-litert-lm react-native-nitro-modules ai" />
+
+The provider works with AI SDK v7 and needs its [polyfills](/docs/polyfills). It
+requires react-native-litert-lm 0.8.2 or newer.
+
+### Expo
+
+Add the config plugin to your app config:
+
+```json title="app.json"
+{
+  "expo": {
+    "plugins": [
+      [
+        "react-native-litert-lm",
+        { "ios": { "extendedVirtualAddressing": true, "increasedMemoryLimit": true } }
+      ]
+    ]
+  }
+}
+```
+
+The two iOS settings let an app load models of about 2 GB and more, and they need
+a paid Apple Developer account. For a smaller model,
+`"plugins": ["react-native-litert-lm"]` is enough.
+
+Expo Go can't load native modules, so build a native app.
+
+## Usage
+
+Create a model, download and load it, and generate:
+
+```typescript
+import { litert } from '@react-native-ai/litert'
+import { streamText } from 'ai'
+
+const model = litert('hf://litert-community/gemma-4-E2B-it-litert-lm')
+
+await model.prepare({
+  onProgress: ({ fraction }) => console.log(fraction),
+})
+
+const { textStream } = streamText({
+  model,
+  prompt: 'Explain quantum computing in simple terms',
+})
+
+for await (const delta of textStream) {
+  console.log(delta)
+}
+
+await model.unload()
+```
+
+- **`prepare()`** downloads the model once and loads it into memory. Without it,
+  the first request does both.
+- **`unload()`** frees the memory when you are done. The next request or
+  `prepare()` loads the model again.
+
+One provider keeps one model in memory, so loading a second model unloads the
+first. Calls run one at a time, in order.
+
+A dropped connection doesn't lose the download if the server takes range requests,
+as Hugging Face does: the call fails with `DOWNLOAD_FAILED`, and
+react-native-litert-lm goes on from there on the next call.
+
+A downloaded model loads with no network. A phone keeps files by name, not by
+repo, so when Hugging Face doesn't answer, the provider looks for a file whose name
+is the repo's name, alone or with a build suffix such as `-gpu` or `_mixed_int4`.
+Any other name may be another model, and the call fails with `DOWNLOAD_FAILED`.
+For those, name the file in the model ID.
+
+A phone keeps one file per name. With a Hugging Face ID the provider passes the
+file's hash, so another revision or another repo's file of that name replaces it.
+With a plain URL, pass `sha256` to get the same.
+
+## Models
+
+| Model ID                               | What loads                        |
+| -------------------------------------- | --------------------------------- |
+| `hf://org/repo` or `org/repo`          | A file chosen from the repo       |
+| `hf://org/repo@revision/file.litertlm` | That file at that revision        |
+| `https://…/model.litertlm`             | That URL                          |
+| `/path/to/model.litertlm`              | A file on the phone               |
+
+Some repos hold a GPU-only `-gpu.litertlm` file next to a full bundle. Given a
+repo, the provider takes the GPU-only file on iOS and the full bundle on Android.
+On a Pixel 11 Pro, the GPU-only file of Gemma 4 E2B gave wrong text, with no error,
+with react-native-litert-lm 0.8.2 (LiteRT-LM 0.18.1).
+
+To load another file, name it in the model ID. A repo's
+`litertlm_manifest.json` takes precedence, files built for one chip are never
+chosen, and `backend: 'cpu'` skips the GPU-only file.
+
+If a model answers as though it never saw the question, look at the file first.
+The chat template in some older files loses the user's turn on LiteRT-LM 0.18 and
+newer, with no error. `qwen3_0_6b_mixed_int4.litertlm` did this on a Pixel 11 Pro,
+and the [Qwen3-8B](https://huggingface.co/litert-community/Qwen3-8B) card reports
+it for all of its files.
+
+## Options
+
+You can pass settings with the model. They apply when it loads:
+
+```typescript
+const model = litert('hf://litert-community/gemma-4-E2B-it-litert-lm', {
+  temperature: 0.2,
+  maxContextTokens: 4096,
+  backend: 'gpu',
+})
+```
+
+| Option                 | Description                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `backend`              | `gpu`, `cpu`, or `npu` with a bundle compiled for the phone's chip            |
+| `maxContextTokens`     | Tokens the conversation can hold: prompt, history and output together         |
+| `temperature`, `topK`, `topP` | Sampling defaults, used when a call doesn't set its own               |
+| `speculativeDecoding`  | Use the bundle's drafter for speculative decoding, if it has one              |
+| `accessToken`          | Hugging Face token of the user loading a gated or private model               |
+| `sha256`               | The file's SHA-256 as lowercase hex, checked after the download               |
+| `onProgress`           | Called while the model downloads on the first call, instead of through `prepare()` |
+
+## Errors
+
+Failures from the engine are `LiteRTError`s with a `code`:
+
+```typescript
+import { LiteRTError } from '@react-native-ai/litert'
+import { generateText } from 'ai'
+
+try {
+  await generateText({ model, prompt: 'Hello' })
+} catch (error) {
+  if (LiteRTError.isInstance(error) && error.code === 'MODEL_NOT_FOUND') {
+    // ...
+  }
+}
+```
+
+| Code                | Meaning                                                           |
+| ------------------- | ----------------------------------------------------------------- |
+| `MODEL_NOT_FOUND`   | No such file or repo, or a repo without a usable `.litertlm` file |
+| `INVALID_MODEL`     | The file is not a readable bundle                                 |
+| `DOWNLOAD_FAILED`   | The download failed                                               |
+| `OUT_OF_MEMORY`     | The engine ran out of memory, or refused to load because it would |
+| `RUNTIME_TOO_OLD`   | The bundle needs a newer LiteRT-LM                                |
+| `LOAD_FAILED`       | The engine could not start for another reason                     |
+| `CONTEXT_TOO_LONG`  | The prompt is longer than the conversation can hold               |
+| `GENERATION_FAILED` | Generation failed for another reason                              |
+
+`streamText` reports these through `onError` and the stream's `error` part. An
+aborted call stops generation, and the model stays loaded for the next one.
+react-native-litert-lm can't cancel a download: the call rejects at once, the
+download goes on, and the next call picks it up.
+
+If Android asks for memory back, the engine is freed. A call in progress ends with
+`OUT_OF_MEMORY`, and the next call loads the model again.
