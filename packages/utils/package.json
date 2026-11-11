@@ -26,7 +26,8 @@
     "url": "https://github.com/callstackincubator/ai/issues"
   },
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "author": "Mike Grabowski <grabbou@gmail.com>",
   "scripts": {
