@@ -10,6 +10,7 @@ import type {
   Experimental_VideoModelV4Result as VideoModelV4Result,
   ImageModelV4,
   ImageModelV4CallOptions,
+  ImageModelV4File,
   LanguageModelV4,
   LanguageModelV4CallOptions,
   LanguageModelV4Content,
@@ -456,12 +457,16 @@ export class CoreAIImageGenerationModel implements ImageModelV4 {
       size: options.size,
       aspectRatio: options.aspectRatio,
       seed: options.seed,
+      ...(options.files?.[0] ? await toImageInput(options.files[0]) : {}),
       ...(options.providerOptions?.['core-ai'] ?? {}),
     })
 
     return {
       images: result.images,
-      warnings: getImageWarnings(options, result.metadata),
+      warnings: [
+        ...getImageInputWarnings(options, result.metadata),
+        ...getImageWarnings(options, result.metadata),
+      ],
       response: {
         timestamp: new Date(),
         modelId: this.modelId,
@@ -779,6 +784,56 @@ export class CoreAITranscriptionModel implements TranscriptionModelV4 {
         : undefined,
     }
   }
+}
+
+// The image to edit, as base64 data or a local file. Remote images are
+// downloaded first, since native reads local files only
+async function toImageInput(
+  file: ImageModelV4File
+): Promise<Pick<CoreAIImageGenerationOptions, 'imageUri' | 'imageBase64'>> {
+  if (file.type === 'file') {
+    return { imageBase64: toBase64(file.data) }
+  }
+  if (file.url.startsWith('data:')) {
+    return { imageBase64: file.url.slice(file.url.indexOf(',') + 1) }
+  }
+  if (/^https?:/.test(file.url)) {
+    const response = await fetch(file.url)
+    const data = new Uint8Array(await response.arrayBuffer())
+    return { imageBase64: toBase64(data) }
+  }
+  return { imageUri: file.url }
+}
+
+// Core AI edits one image at a time and has no inpainting
+function getImageInputWarnings(
+  options: ImageModelV4CallOptions,
+  metadata: CoreAIImageGenerationResult['metadata']
+): SharedV4Warning[] {
+  const warnings: SharedV4Warning[] = []
+  if (metadata?.imageToImage === false) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'files',
+      details:
+        'This export has no image-to-image components, so the image was generated from the prompt alone.',
+    })
+  } else if (options.files && options.files.length > 1) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'files',
+      details: 'Core AI image models edit the first image only.',
+    })
+  }
+  if (options.mask) {
+    warnings.push({
+      type: 'unsupported',
+      feature: 'mask',
+      details:
+        'Core AI image models have no inpainting, so the mask was left out.',
+    })
+  }
+  return warnings
 }
 
 // Exported models generate one fixed size, which the metadata reports
