@@ -50,7 +50,8 @@
   },
   "homepage": "https://github.com/callstackincubator/ai#readme",
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "dependencies": {
     "@ai-sdk/provider": "^4.0.33",

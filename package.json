@@ -54,13 +54,21 @@
     "github": {
       "release": true
     },
+    "hooks": {
+      "after:bump": "bun scripts/stamp-changelogs.ts ${version}"
+    },
     "plugins": {
       "@release-it/conventional-changelog": {
         "preset": "angular"
       },
       "@release-it-plugins/workspaces": {
         "workspaces": [
-          "packages/*"
+          "packages/android",
+          "packages/apple-llm",
+          "packages/core-ai",
+          "packages/dev-tools",
+          "packages/llama",
+          "packages/utils"
         ]
       }
     }
