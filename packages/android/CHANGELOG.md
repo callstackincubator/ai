@@ -2,7 +2,7 @@
 
 Changes to `@react-native-ai/android`.
 
-## Unreleased
+## 0.13.0 (2026-11-11)
 
 This is the first release. It is an AI SDK provider for Gemini Nano built on ML Kit GenAI. ([#367](https://github.com/callstackincubator/ai/pull/367))
 

@@ -1,6 +1,6 @@
 {
   "name": "@react-native-ai/android",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "On-device Gemini Nano provider for Vercel AI SDK, built on ML Kit GenAI",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",

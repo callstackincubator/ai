@@ -1,6 +1,6 @@
 {
   "name": "@react-native-ai/utils",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Shared utilities for React Native AI SDK providers",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",

@@ -2,7 +2,7 @@
 
 Changes to `@react-native-ai/utils`.
 
-## Unreleased
+## 0.13.0 (2026-11-11)
 
 This is the first release. It holds model-agnostic helpers for AI SDK language models.
 

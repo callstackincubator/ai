@@ -2,7 +2,7 @@
 
 Changes to `@react-native-ai/core-ai`.
 
-## Unreleased
+## 0.13.0 (2026-11-11)
 
 This is the first release. It is an AI SDK provider for Apple Core AI model bundles exported with [`apple/coreai-models`](https://github.com/apple/coreai-models). It requires iOS 27, runs on physical devices only, and has `@react-native-ai/apple` as a peer dependency.
 

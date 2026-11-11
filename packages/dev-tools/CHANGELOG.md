@@ -2,7 +2,7 @@
 
 Changes to `@react-native-ai/dev-tools`. For 0.12.0 and earlier, see the [GitHub releases](https://github.com/callstackincubator/ai/releases).
 
-## Unreleased
+## 0.13.0 (2026-11-11)
 
 ### Breaking changes
 
